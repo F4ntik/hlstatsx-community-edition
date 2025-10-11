@@ -16,6 +16,22 @@ project directory) and installs the base dependencies required for future
 implementation work.  During the early migration stages, the package contains
 scaffolding only, so no executable entry points are exposed yet.
 
+### Local MySQL sandbox
+
+The Python daemon expects a MySQL schema compatible with the legacy
+installation.  A minimal dataset for local testing is provided via
+`docker-compose`.  To start a disposable MySQL 8.0 instance seeded with the
+required `hlstats_Options` entries and placeholder rows in `Proxy_Daemons` on
+your local workstation, run:
+
+```bash
+cd scripts/proxy_daemon_py
+docker compose up -d
+```
+
+See [docs/proxy_daemon_local_mysql.md](../../docs/proxy_daemon_local_mysql.md)
+for detailed instructions and connection parameters.
+
 ## Quality checks
 
 The configuration includes the following tools:

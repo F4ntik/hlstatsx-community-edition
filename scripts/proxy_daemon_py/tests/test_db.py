@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 import pytest
 
@@ -212,3 +213,130 @@ def test_async_adapter_uses_runner() -> None:
 
     asyncio.run(run())
     assert len(calls) >= 2
+
+
+def test_sync_update_daemon_state_executes_upsert() -> None:
+    heartbeat_at = datetime(2024, 1, 1, 12, 30, 0, tzinfo=timezone.utc)
+    normalized = datetime(2024, 1, 1, 12, 30, 0)
+
+    responses: dict[QueryKey, QueryResponse] = {
+        (
+            db._UPSERT_DAEMON_STATE_QUERY,
+            ("daemon.example.com", 27900, "up", "down", normalized, 120),
+        ): QueryResponse()
+    }
+    connection = FakeConnection(responses)
+    adapter = db.SyncDatabaseAdapter(CONFIG, connector=connector_for(connection))
+    adapter.connect()
+
+    adapter.update_daemon_state(
+        db.ProxyDaemonState(
+            host="daemon.example.com",
+            port=27900,
+            current_state="up",
+            previous_state="down",
+            checked_at=heartbeat_at,
+            latency_ms=120,
+        )
+    )
+
+    assert connection.executed == [
+        (
+            db._UPSERT_DAEMON_STATE_QUERY,
+            ("daemon.example.com", 27900, "up", "down", normalized, 120),
+        )
+    ]
+
+
+def test_sync_update_daemon_state_validates_inputs() -> None:
+    adapter = db.SyncDatabaseAdapter(CONFIG, connector=connector_for(FakeConnection()))
+    adapter.connect()
+
+    with pytest.raises(ValueError):
+        adapter.update_daemon_state(
+            db.ProxyDaemonState(
+                host=" ",
+                port=27900,
+                current_state="up",
+                previous_state="down",
+                checked_at=datetime.now(timezone.utc),
+            )
+        )
+
+    with pytest.raises(ValueError):
+        adapter.update_daemon_state(
+            db.ProxyDaemonState(
+                host="daemon.example.com",
+                port=70000,
+                current_state="up",
+                previous_state="down",
+                checked_at=datetime.now(timezone.utc),
+            )
+        )
+
+    with pytest.raises(ValueError):
+        adapter.update_daemon_state(
+            db.ProxyDaemonState(
+                host="daemon.example.com",
+                port=27900,
+                current_state="maybe",
+                previous_state="down",
+                checked_at=datetime.now(timezone.utc),
+            )
+        )
+
+    with pytest.raises(ValueError):
+        adapter.update_daemon_state(
+            db.ProxyDaemonState(
+                host="daemon.example.com",
+                port=27900,
+                current_state="up",
+                previous_state="down",
+                checked_at=datetime.now(timezone.utc),
+                latency_ms=-1,
+            )
+        )
+
+
+def test_async_update_daemon_state_uses_runner() -> None:
+    normalized = datetime(2024, 1, 1, 15, 0, 0)
+    responses: dict[QueryKey, QueryResponse] = {
+        (
+            db._UPSERT_DAEMON_STATE_QUERY,
+            ("daemon.example.com", 27900, "n/a", "n/a", normalized, None),
+        ): QueryResponse()
+    }
+    connection = FakeConnection(responses)
+
+    calls: list[Callable[[], object]] = []
+
+    async def runner(func: Callable[[], object]) -> object:
+        calls.append(func)
+        return func()
+
+    adapter = db.DatabaseAdapter(
+        CONFIG,
+        connector=connector_for(connection),
+        runner=runner,
+    )
+
+    state = db.ProxyDaemonState(
+        host="daemon.example.com",
+        port=27900,
+        current_state="n/a",
+        previous_state="n/a",
+        checked_at=datetime(2024, 1, 1, 15, 0, 0),
+    )
+
+    async def run() -> None:
+        await adapter.update_daemon_state(state)
+
+    asyncio.run(run())
+
+    assert calls, "Runner should be invoked for the update call"
+    assert connection.executed == [
+        (
+            db._UPSERT_DAEMON_STATE_QUERY,
+            ("daemon.example.com", 27900, "n/a", "n/a", normalized, None),
+        )
+    ]
