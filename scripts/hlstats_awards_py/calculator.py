@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date
+from typing import Any
 
 from proxy_daemon_py.db import DatabaseConfig as DaemonDatabaseConfig
 from proxy_daemon_py.db import SupportsConnection, SyncDatabaseAdapter
@@ -616,17 +617,18 @@ class AwardQueryBuilder:
             )
 
         context = _award_context(award)
+        match_value = 1 if award.code == "headshot" else award.code
         return (
-            self._generic_daily(context, award.code),
-            (award.game, award.code),
-            self._generic_global(context, award.code),
-            (award.game, award.code),
+            self._generic_daily(context, match_value),
+            (award.game, match_value),
+            self._generic_global(context, match_value),
+            (award.game, match_value),
         )
 
     # ------------------------------------------------------------------
     # Generic award queries
     # ------------------------------------------------------------------
-    def _generic_daily(self, context: _AwardContext, code: str) -> str:
+    def _generic_daily(self, context: _AwardContext, _match_value: Any) -> str:
         return (
             f"""
             SELECT {context.player_field}, COUNT({context.match_field}) AS awardcount
@@ -647,7 +649,7 @@ class AwardQueryBuilder:
             """
         )
 
-    def _generic_global(self, context: _AwardContext, code: str) -> str:
+    def _generic_global(self, context: _AwardContext, _match_value: Any) -> str:
         return (
             f"""
             SELECT {context.player_field}, COUNT({context.match_field}) AS awardcount
