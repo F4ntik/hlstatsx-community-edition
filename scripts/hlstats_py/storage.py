@@ -412,13 +412,14 @@ class EventStorage:
             player_id = self._lookup_player(connection, descriptor, context.game)
             if player_id is None:
                 player_id = self._create_player(connection, descriptor, context.game)
-                if descriptor.unique_id:
-                    self._execute(
-                        connection,
-                        _UPSERT_PLAYER_UNIQUE_QUERY,
-                        (player_id, descriptor.unique_id, context.game),
-                    )
             self._player_cache[cache_key] = player_id
+
+        if player_id is not None and descriptor.unique_id:
+            self._execute(
+                connection,
+                _UPSERT_PLAYER_UNIQUE_QUERY,
+                (player_id, descriptor.unique_id, context.game),
+            )
 
         self._touch_player_profile(connection, player_id, descriptor, timestamp)
         return player_id

@@ -28,6 +28,7 @@ from hlstats_py.storage import (
     _UPDATE_PLAYER_DEATHS_QUERY,
     _UPDATE_PLAYER_KILLS_QUERY,
     _UPDATE_PLAYER_NAME_QUERY,
+    _UPSERT_PLAYER_UNIQUE_QUERY,
     _UPSERT_PLAYER_NAME_QUERY,
     _SELECT_ACTION_QUERY,
     _UPSERT_WEAPON_QUERY,
@@ -151,9 +152,11 @@ def test_record_frag_event_executes_expected_queries(dispatcher: EventDispatcher
     timestamp = update.timestamp
     expected = [
         (_PLAYER_BY_UNIQUE_QUERY, ("STEAM_1:2", "csgo")),
+        (_UPSERT_PLAYER_UNIQUE_QUERY, (101, "STEAM_1:2", "csgo")),
         (_UPDATE_PLAYER_NAME_QUERY, ("Alice", 101)),
         (_UPSERT_PLAYER_NAME_QUERY, (101, "Alice", timestamp)),
         (_PLAYER_BY_UNIQUE_QUERY, ("STEAM_1:3", "csgo")),
+        (_UPSERT_PLAYER_UNIQUE_QUERY, (102, "STEAM_1:3", "csgo")),
         (_UPDATE_PLAYER_NAME_QUERY, ("Bob", 102)),
         (_UPSERT_PLAYER_NAME_QUERY, (102, "Bob", timestamp)),
         (
@@ -202,6 +205,7 @@ def test_record_action_creates_missing_definition(dispatcher: EventDispatcher, e
     timestamp = update.timestamp
     expected = [
         (_PLAYER_BY_UNIQUE_QUERY, ("STEAM_1:2", "csgo")),
+        (_UPSERT_PLAYER_UNIQUE_QUERY, (101, "STEAM_1:2", "csgo")),
         (_UPDATE_PLAYER_NAME_QUERY, ("Alice", 101)),
         (_UPSERT_PLAYER_NAME_QUERY, (101, "Alice", timestamp)),
         (_SELECT_ACTION_QUERY, ("csgo", "planted_bomb")),
@@ -239,12 +243,14 @@ def test_record_chat_reuses_cached_player(event_context: EventContext) -> None:
     timestamp = update.timestamp
     expected = [
         (_PLAYER_BY_UNIQUE_QUERY, ("STEAM_1:2", "csgo")),
+        (_UPSERT_PLAYER_UNIQUE_QUERY, (101, "STEAM_1:2", "csgo")),
         (_UPDATE_PLAYER_NAME_QUERY, ("Alice", 101)),
         (_UPSERT_PLAYER_NAME_QUERY, (101, "Alice", timestamp)),
         (
             _INSERT_CHAT_QUERY,
             (timestamp, 7, "de_dust2", 101, 1, "Hold position"),
         ),
+        (_UPSERT_PLAYER_UNIQUE_QUERY, (101, "STEAM_1:2", "csgo")),
         (_UPDATE_PLAYER_NAME_QUERY, ("Alice", 101)),
         (_UPSERT_PLAYER_NAME_QUERY, (101, "Alice", timestamp)),
         (
