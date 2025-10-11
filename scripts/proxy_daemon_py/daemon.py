@@ -11,10 +11,10 @@ import asyncio
 from collections.abc import Iterable
 from contextlib import suppress
 
-from .balancer import ServerAssignment, ServerBalancer
+from .balancer import Daemon, ServerAssignment, ServerBalancer
 from .config import ProxyConfig
-from .db import DatabaseAdapter
-from .heartbeat import HeartbeatManager
+from .db import DatabaseAdapter, ProxyDaemonTarget
+from .heartbeat import DaemonHeartbeatTarget, HeartbeatManager
 from .log import ProxyLogger
 from .transport import InboundDatagram, ProxyUdpServer
 
@@ -42,6 +42,8 @@ class ProxyDaemon:
         self._consumer_task: asyncio.Task[None] | None = None
         self._forwarder_task: asyncio.Task[None] | None = None
         self._game_packet_queue: asyncio.Queue[InboundDatagram] = asyncio.Queue()
+        self._heartbeat_targets: dict[str, DaemonHeartbeatTarget] = {}
+        self._reload_lock: asyncio.Lock | None = None
 
     async def start(self) -> None:
         """Start the daemon by binding the UDP listener."""
@@ -51,6 +53,9 @@ class ProxyDaemon:
         self._loop = asyncio.get_running_loop()
         await self._db.connect()
         self._proxy_key = await self._db.fetch_proxy_key()
+        self._reload_lock = asyncio.Lock()
+        await self._reload_daemons()
+        await self._heartbeat.start()
         await self._udp_server.start(self._config.bind_ip, self._config.port)
         bound_address = self._udp_server.address
         if bound_address is None:
@@ -74,11 +79,14 @@ class ProxyDaemon:
             with suppress(asyncio.CancelledError):
                 await self._forwarder_task
             self._forwarder_task = None
+        await self._heartbeat.stop()
         await self._udp_server.stop()
         await self._db.close()
         self._logger.notice("Proxy daemon stopped")
         self._loop = None
         self._proxy_key = None
+        self._heartbeat_targets.clear()
+        self._reload_lock = None
 
     @property
     def game_packet_queue(self) -> asyncio.Queue[InboundDatagram]:
@@ -119,7 +127,7 @@ class ProxyDaemon:
         payload = datagram.text.strip()
 
         if self._is_local_control_host(host) and payload.startswith("C;"):
-            response = self._handle_control_payload(payload, host, port)
+            response = await self._handle_control_payload(payload, host, port)
             if response is not None:
                 self._udp_server.send_text(response, datagram.address)
             return True
@@ -135,14 +143,14 @@ class ProxyDaemon:
             self._logger.e403(f"Sending FAILED PROXY REQUEST to {host}:{port}")
             return True
 
-        response = self._handle_control_payload(command_payload.strip(), host, port)
+        response = await self._handle_control_payload(command_payload.strip(), host, port)
         if response is None:
             return False
 
         self._udp_server.send_text(response, datagram.address)
         return True
 
-    def _handle_control_payload(self, payload: str, host: str, port: int) -> str | None:
+    async def _handle_control_payload(self, payload: str, host: str, port: int) -> str | None:
         match payload:
             case "C;HEARTBEAT;":
                 self._logger.control(f"Sending Heartbeat to {host}:{port}")
@@ -155,8 +163,78 @@ class ProxyDaemon:
                 return server_list
             case "C;RELOAD;":
                 self._logger.control(f"Received reload command from {host}:{port}")
+                await self._reload_daemons()
                 return "Reload command acknowledged\n"
         return None
+
+    async def _reload_daemons(self) -> None:
+        if self._reload_lock is None:
+            self._reload_lock = asyncio.Lock()
+
+        async with self._reload_lock:
+            try:
+                targets = await self._db.fetch_daemons()
+            except Exception as exc:  # pragma: no cover - defensive logging
+                self._logger.e403(f"Failed to reload proxy daemons: {exc}")
+                return
+
+            desired = {self._target_identifier(target): target for target in targets}
+            existing_ids = set(self._balancer.manager.daemons.keys())
+
+            # Remove daemons that are no longer configured.
+            for identifier in sorted(existing_ids - desired.keys()):
+                self._logger.control(f"Removing proxy daemon {identifier}")
+                self._balancer.unregister_daemon(identifier)
+                target = self._heartbeat_targets.pop(identifier, None)
+                if target is not None:
+                    self._heartbeat.remove_target(target)
+
+            # Register or update configured daemons.
+            for identifier, target in desired.items():
+                daemon = self._balancer.manager.daemons.get(identifier)
+                if daemon is None:
+                    daemon = self._create_daemon(identifier, target)
+                    self._balancer.register_daemon(daemon)
+                    self._logger.control(f"Registered proxy daemon {identifier}")
+                else:
+                    daemon.host = target.host
+                    daemon.port = target.port
+
+                if identifier not in self._heartbeat_targets:
+                    heartbeat_target = DaemonHeartbeatTarget(
+                        identifier,
+                        self._balancer.manager,
+                        self._db,
+                        self._logger,
+                        timeout=self._default_heartbeat_timeout(daemon),
+                    )
+                    self._heartbeat_targets[identifier] = heartbeat_target
+                    self._heartbeat.add_target(heartbeat_target)
+
+            # Ensure heartbeat targets that no longer have daemons are removed.
+            for identifier in list(self._heartbeat_targets.keys()):
+                if identifier not in desired:
+                    target = self._heartbeat_targets.pop(identifier)
+                    self._heartbeat.remove_target(target)
+
+            self._logger.control(
+                f"Reloaded proxy daemon configuration: {len(desired)} entries"
+            )
+
+    @staticmethod
+    def _target_identifier(target: ProxyDaemonTarget) -> str:
+        return f"{target.host}:{target.port}"
+
+    def _create_daemon(self, identifier: str, target: ProxyDaemonTarget) -> Daemon:
+        return Daemon(
+            identifier=identifier,
+            host=target.host,
+            port=target.port,
+        )
+
+    @staticmethod
+    def _default_heartbeat_timeout(daemon: Daemon) -> float:
+        return daemon.heartbeat_timeout or 30.0
 
     def _format_server_list(self) -> str:
         assignments: Iterable[tuple[str, ServerAssignment]] = self._balancer.assignments.items()
