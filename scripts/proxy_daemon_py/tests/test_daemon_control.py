@@ -10,14 +10,16 @@ from types import MappingProxyType
 from proxy_daemon_py.balancer import Daemon, ServerAssignment, ServerBalancer
 from proxy_daemon_py.config import ProxyConfig
 from proxy_daemon_py.daemon import ProxyDaemon
+from proxy_daemon_py.db import ProxyDaemonTarget
 from proxy_daemon_py.log import LoggerConfig, ProxyLogger
 from proxy_daemon_py.transport import ProxyUdpServer
 
 
 class FakeDatabaseAdapter:
-    def __init__(self, proxy_key: str) -> None:
+    def __init__(self, proxy_key: str, *, daemons: list[ProxyDaemonTarget] | None = None) -> None:
         self._proxy_key = proxy_key
         self.connected = False
+        self.daemons = list(daemons or [])
 
     async def connect(self) -> None:
         self.connected = True
@@ -28,13 +30,31 @@ class FakeDatabaseAdapter:
     async def fetch_proxy_key(self) -> str:
         return self._proxy_key
 
+    async def fetch_daemons(self) -> list[ProxyDaemonTarget]:
+        return list(self.daemons)
+
 
 class DummyHeartbeatManager:
-    async def start(self) -> None:  # pragma: no cover - not invoked yet
-        return None
+    def __init__(self) -> None:
+        self.started = False
+        self.targets: set[object] = set()
+        self.added: list[object] = []
+        self.removed: list[object] = []
 
-    async def stop(self) -> None:  # pragma: no cover - not invoked yet
-        return None
+    async def start(self) -> None:
+        self.started = True
+
+    async def stop(self) -> None:
+        self.started = False
+
+    def add_target(self, target: object) -> None:
+        self.targets.add(target)
+        self.added.append(target)
+
+    def remove_target(self, target: object) -> None:
+        if target in self.targets:
+            self.targets.remove(target)
+        self.removed.append(target)
 
 
 def _make_config() -> ProxyConfig:
@@ -71,6 +91,10 @@ def test_proxy_daemon_forwards_non_control_payloads() -> None:
 
 def test_proxy_daemon_reassigns_on_send_failure() -> None:
     asyncio.run(_run_reassigns_on_send_failure())
+
+
+def test_proxy_daemon_reload_updates_daemon_pool() -> None:
+    asyncio.run(_run_reload_updates_daemon_pool())
 
 
 async def _run_handles_local_commands() -> None:
@@ -212,6 +236,51 @@ async def _run_reassigns_on_send_failure() -> None:
     assert failing_server.failed_once
     assignment = balancer.assignments.get(f"127.0.0.1:{client_port}")
     assert assignment is not None and assignment.daemon_id == second_identifier
+
+
+async def _run_reload_updates_daemon_pool() -> None:
+    buffer = StringIO()
+    logger = ProxyLogger(LoggerConfig(stream=buffer))
+    heartbeat = DummyHeartbeatManager()
+    initial_target = ProxyDaemonTarget(host="127.0.0.1", port=65001)
+    db = FakeDatabaseAdapter("test", daemons=[initial_target])
+    balancer = ServerBalancer()
+    server = ProxyUdpServer(logger)
+    config = _make_config()
+
+    daemon = ProxyDaemon(config, db, balancer, heartbeat, server, logger)
+    await daemon.start()
+
+    try:
+        address = server.address
+        assert address is not None
+
+        identifier_old = "127.0.0.1:65001"
+        assert identifier_old in balancer.manager.daemons
+        assignment = balancer.assign_server("1.2.3.4:27015")
+        assert assignment is not None and assignment.daemon_id == identifier_old
+        assert heartbeat.started
+
+        db.daemons = [ProxyDaemonTarget(host="127.0.0.1", port=65002)]
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.settimeout(1)
+        try:
+            sock.sendto(b"C;RELOAD;", address)
+            data, _ = await asyncio.wait_for(asyncio.to_thread(sock.recvfrom, 1024), timeout=1)
+        finally:
+            sock.close()
+
+        assert data == b"Reload command acknowledged\n"
+
+        identifier_new = "127.0.0.1:65002"
+        assert identifier_new in balancer.manager.daemons
+        assert identifier_old not in balancer.manager.daemons
+        assert not balancer.assignments
+        heartbeat_ids = {getattr(target, "_identifier", None) for target in heartbeat.targets}
+        assert heartbeat_ids == {identifier_new}
+    finally:
+        await daemon.stop()
 
 
 class _RecordingProtocol(asyncio.DatagramProtocol):
