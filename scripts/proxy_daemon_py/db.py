@@ -70,6 +70,29 @@ class ProxyDaemonState:
     latency_ms: int | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class StoredProxyDaemon:
+    """Row persisted in ``Proxy_Daemons`` representing daemon health."""
+
+    host: str
+    port: int
+    current_state: str
+    previous_state: str
+    last_heartbeat: datetime | None
+    latency_ms: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class GameServer:
+    """Minimal subset of fields describing a tracked game server."""
+
+    server_id: int
+    address: str
+    port: int
+    name: str
+    game: str
+
+
 _VALID_DAEMON_STATES = {"up", "down", "n/a"}
 
 _UPSERT_DAEMON_STATE_QUERY = (
@@ -170,6 +193,50 @@ class SyncDatabaseAdapter:
         if not row or row[0] is None:
             return []
         return self._parse_daemon_list(str(row[0]))
+
+    def fetch_daemon_statuses(self) -> list[StoredProxyDaemon]:
+        """Return health information persisted in ``Proxy_Daemons``."""
+
+        connection = self._ensure_connection()
+        rows = self._fetchall(
+            connection,
+            "SELECT `host`, `port`, `curstate`, `oldstate`, `last_heartbeat`, `latency_ms` "
+            "FROM Proxy_Daemons ORDER BY `host`, `port`",
+        )
+        statuses: list[StoredProxyDaemon] = []
+        for host, port, curstate, oldstate, last_heartbeat, latency_ms in rows:
+            statuses.append(
+                StoredProxyDaemon(
+                    host=str(host).strip(),
+                    port=int(port),
+                    current_state=str(curstate).strip(),
+                    previous_state=str(oldstate).strip(),
+                    last_heartbeat=last_heartbeat,
+                    latency_ms=None if latency_ms is None else int(latency_ms),
+                )
+            )
+        return statuses
+
+    def fetch_servers(self) -> list[GameServer]:
+        """Return the list of tracked game servers."""
+
+        connection = self._ensure_connection()
+        rows = self._fetchall(
+            connection,
+            "SELECT `serverId`, `address`, `port`, `name`, `game` FROM hlstats_Servers ORDER BY `serverId`",
+        )
+        servers: list[GameServer] = []
+        for server_id, address, port, name, game in rows:
+            servers.append(
+                GameServer(
+                    server_id=int(server_id),
+                    address=str(address).strip(),
+                    port=int(port),
+                    name=str(name).strip(),
+                    game=str(game).strip(),
+                )
+            )
+        return servers
 
     def update_daemon_state(self, state: ProxyDaemonState) -> None:
         """Persist heartbeat information for a proxy daemon."""

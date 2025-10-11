@@ -186,6 +186,61 @@ def test_sync_fetch_daemons_validates_ports() -> None:
         adapter.fetch_daemons()
 
 
+def test_sync_fetch_daemon_statuses_reads_rows() -> None:
+    heartbeat = datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
+    responses: dict[QueryKey, QueryResponse] = {
+        (
+            "SELECT `host`, `port`, `curstate`, `oldstate`, `last_heartbeat`, `latency_ms` "
+            "FROM Proxy_Daemons ORDER BY `host`, `port`",
+            None,
+        ): QueryResponse(
+            fetchall=[("alpha", 27015, "up", "down", heartbeat, 42)],
+        )
+    }
+    connection = FakeConnection(responses)
+    adapter = db.SyncDatabaseAdapter(CONFIG, connector=connector_for(connection))
+    adapter.connect()
+
+    result = adapter.fetch_daemon_statuses()
+
+    assert result == [
+        db.StoredProxyDaemon(
+            host="alpha",
+            port=27015,
+            current_state="up",
+            previous_state="down",
+            last_heartbeat=heartbeat,
+            latency_ms=42,
+        )
+    ]
+
+
+def test_sync_fetch_servers_returns_expected_records() -> None:
+    responses: dict[QueryKey, QueryResponse] = {
+        (
+            "SELECT `serverId`, `address`, `port`, `name`, `game` FROM hlstats_Servers ORDER BY `serverId`",
+            None,
+        ): QueryResponse(
+            fetchall=[(1, "10.0.0.5", 27015, "Arena", "tf2")],
+        )
+    }
+    connection = FakeConnection(responses)
+    adapter = db.SyncDatabaseAdapter(CONFIG, connector=connector_for(connection))
+    adapter.connect()
+
+    result = adapter.fetch_servers()
+
+    assert result == [
+        db.GameServer(
+            server_id=1,
+            address="10.0.0.5",
+            port=27015,
+            name="Arena",
+            game="tf2",
+        )
+    ]
+
+
 def test_async_adapter_uses_runner() -> None:
     responses: dict[QueryKey, QueryResponse] = {
         ("SELECT `keyname`, `value` FROM hlstats_Options", None): QueryResponse(
