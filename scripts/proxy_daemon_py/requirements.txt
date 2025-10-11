@@ -1,0 +1,3 @@
+# Base runtime dependencies for the Python proxy daemon.
+# Managed by Poetry; update via `poetry export` when necessary.
+mysqlclient>=2.2,<3.0
