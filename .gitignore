@@ -2,3 +2,7 @@
 /web/.idea
 /.vscode
 /.vagrant
+/scripts/proxy_daemon_py/.venv
+/scripts/proxy_daemon_py/.mypy_cache/
+/scripts/proxy_daemon_py/.ruff_cache/
+/scripts/proxy_daemon_py/.pytest_cache/
