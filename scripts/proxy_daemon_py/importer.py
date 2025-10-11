@@ -9,8 +9,9 @@ from typing import Sequence
 
 from . import cli
 from .balancer import Daemon, DaemonState, ServerBalancer
+from .bootstrap import database_config_from_proxy_config
 from .config import ConfigError, ProxyConfig
-from .db import DatabaseConfig, GameServer, StoredProxyDaemon, SyncDatabaseAdapter
+from .db import GameServer, StoredProxyDaemon, SyncDatabaseAdapter
 from .db import DatabaseError
 
 
@@ -139,7 +140,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
 
     try:
-        db_config = _database_config_from_proxy_config(settings.config)
+        db_config = database_config_from_proxy_config(settings.config)
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
@@ -188,31 +189,6 @@ def _format_timestamp(moment: datetime | None) -> str:
     if moment is None:
         return "unknown"
     return moment.isoformat()
-
-
-def _database_config_from_proxy_config(config: ProxyConfig) -> DatabaseConfig:
-    host = config.db_host.strip()
-    if not host:
-        raise ValueError("DBHost must be configured in hlstats.conf")
-
-    port = 3306
-    if ":" in host:
-        host, port_text = host.rsplit(":", 1)
-        try:
-            port = int(port_text)
-        except ValueError as exc:  # pragma: no cover - defensive configuration handling
-            raise ValueError(f"Invalid DBHost value '{config.db_host}': port must be numeric") from exc
-        host = host.strip()
-        if not host:
-            raise ValueError("DBHost must include a hostname when specifying a port")
-
-    return DatabaseConfig(
-        host=host,
-        port=port,
-        username=config.db_username,
-        password=config.db_password,
-        database=config.db_name,
-    )
 
 
 if __name__ == "__main__":  # pragma: no cover - manual execution helper

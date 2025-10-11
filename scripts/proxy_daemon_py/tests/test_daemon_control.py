@@ -12,7 +12,7 @@ from proxy_daemon_py.config import ProxyConfig
 from proxy_daemon_py.daemon import ProxyDaemon
 from proxy_daemon_py.db import ProxyDaemonTarget
 from proxy_daemon_py.log import LoggerConfig, ProxyLogger
-from proxy_daemon_py.transport import ProxyUdpServer
+from proxy_daemon_py.transport import InboundDatagram, ProxyUdpServer
 
 
 class FakeDatabaseAdapter:
@@ -57,6 +57,18 @@ class DummyHeartbeatManager:
         self.removed.append(target)
 
 
+def _make_idle_daemon() -> tuple[ProxyDaemon, StringIO, ProxyUdpServer]:
+    buffer = StringIO()
+    logger = ProxyLogger(LoggerConfig(stream=buffer))
+    server = ProxyUdpServer(logger)
+    db = FakeDatabaseAdapter('test')
+    balancer = ServerBalancer()
+    heartbeat = DummyHeartbeatManager()
+    daemon = ProxyDaemon(_make_config(), db, balancer, heartbeat, server, logger)
+    daemon._proxy_key = 'test'
+    return daemon, buffer, server
+
+
 def _make_config() -> ProxyConfig:
     return ProxyConfig(
         config_path=Path("/tmp/hlstats.conf"),
@@ -91,6 +103,78 @@ def test_proxy_daemon_forwards_non_control_payloads() -> None:
 
 def test_proxy_daemon_reassigns_on_send_failure() -> None:
     asyncio.run(_run_reassigns_on_send_failure())
+
+
+def test_parse_proxy_command_invalid_inputs() -> None:
+    assert ProxyDaemon._parse_proxy_command('invalid') is None
+    assert ProxyDaemon._parse_proxy_command('PROXY Foo=bar PROXY C;HEARTBEAT;') is None
+    assert ProxyDaemon._parse_proxy_command('PROXY Key=abc PROXY payload') == ('abc', 'payload')
+
+
+def test_format_server_list_handles_empty_and_populated() -> None:
+    daemon, _, _ = _make_idle_daemon()
+    assert daemon._format_server_list() == 'ServerList\n'
+    daemon._balancer.register_daemon(Daemon(identifier='id', host='127.0.0.1', port=6000))
+    daemon._balancer.assignments['srv'] = ServerAssignment(
+        server_address='srv',
+        daemon_id='id',
+        assigned_at=datetime.now(tz=timezone.utc),
+    )
+    assert daemon._format_server_list() == 'ServerList\nsrv -> id\n'
+
+
+def test_forward_game_packet_requires_proxy_key() -> None:
+    daemon, buffer, _ = _make_idle_daemon()
+    daemon._proxy_key = None
+    datagram = InboundDatagram(b'data', 'RL data', ('127.0.0.1', 27015))
+    daemon._forward_game_packet(datagram)
+    assert 'Proxy key unavailable' in buffer.getvalue()
+
+
+def test_forward_game_packet_logs_when_no_daemon_available() -> None:
+    daemon, buffer, _ = _make_idle_daemon()
+    datagram = InboundDatagram(b'RL data', 'RL data', ('127.0.0.1', 27015))
+    daemon._forward_game_packet(datagram)
+    assert 'No available daemon' in buffer.getvalue()
+
+
+def test_forward_game_packet_skips_ignored_payloads() -> None:
+    daemon, buffer, _ = _make_idle_daemon()
+    text = 'rcon from 1.2.3.4:27015 command "status"'
+    datagram = InboundDatagram(text.encode(), text, ('127.0.0.1', 27015))
+    daemon._forward_game_packet(datagram)
+    assert 'Skipping message' in buffer.getvalue()
+
+
+def test_forward_game_packet_exhausts_candidates_after_failures() -> None:
+    buffer = StringIO()
+    logger = ProxyLogger(LoggerConfig(stream=buffer))
+    failing_server = _FailingProxyUdpServer(logger, fail_destination='127.0.0.1:65001')
+    db = FakeDatabaseAdapter('test')
+    balancer = ServerBalancer()
+    heartbeat = DummyHeartbeatManager()
+    daemon = ProxyDaemon(_make_config(), db, balancer, heartbeat, failing_server, logger)
+    daemon._proxy_key = 'test'
+    balancer.register_daemon(Daemon(identifier='127.0.0.1:65001', host='127.0.0.1', port=65001))
+    balancer.manager.mark_heartbeat('127.0.0.1:65001')
+    datagram = InboundDatagram(b'RL payload', 'RL payload', ('127.0.0.1', 27015))
+    daemon._forward_game_packet(datagram)
+    assert 'Exhausted daemon candidates' in buffer.getvalue()
+
+
+def test_normalise_payload_trims_to_last_marker() -> None:
+    daemon, _, _ = _make_idle_daemon()
+    assert daemon._normalise_payload('noise RL first RL second') == 'RL second'
+    assert daemon._normalise_payload('no marker') == 'no marker'
+
+
+def test_should_skip_payload_matches_commands() -> None:
+    daemon, _, _ = _make_idle_daemon()
+    assert daemon._should_skip_payload('rcon from 1 command "status"')
+    assert daemon._should_skip_payload('rcon from 1 command "stats"')
+    assert daemon._should_skip_payload('rcon from 1 command ""')
+    assert not daemon._should_skip_payload('rcon from 1 command "other"')
+    assert not daemon._should_skip_payload('some other text')
 
 
 def test_proxy_daemon_reload_updates_daemon_pool() -> None:

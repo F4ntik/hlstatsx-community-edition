@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: hlstatsx-proxy-e2e-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: hlstatsx_proxy
+      MYSQL_USER: hlstats
+      MYSQL_PASSWORD: hlstats
+    ports:
+      - "33070:3306"
+    volumes:
+      - ../sql/00_schema.sql:/docker-entrypoint-initdb.d/00_schema.sql:ro
+      - ../sql/01_seed_data.sql:/docker-entrypoint-initdb.d/01_seed_data.sql:ro
+      - ./mysql/02_seed_e2e.sql:/docker-entrypoint-initdb.d/02_seed_e2e.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  proxy-daemon:
+    build:
+      context: ../../..
+      dockerfile: scripts/proxy_daemon_py/e2e/Dockerfile.proxy
+    container_name: hlstatsx-proxy-e2e-daemon
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mock-daemon-a:
+        condition: service_started
+      mock-daemon-b:
+        condition: service_started
+    environment:
+      PYTHONUNBUFFERED: "1"
+    restart: unless-stopped
+
+  mock-daemon-a:
+    build:
+      context: ../../..
+      dockerfile: scripts/proxy_daemon_py/e2e/Dockerfile.mock
+    container_name: hlstatsx-proxy-e2e-mock-a
+    environment:
+      MOCK_DAEMON_HOST: 0.0.0.0
+      MOCK_DAEMON_PORT: "27900"
+    restart: unless-stopped
+
+  mock-daemon-b:
+    build:
+      context: ../../..
+      dockerfile: scripts/proxy_daemon_py/e2e/Dockerfile.mock
+    container_name: hlstatsx-proxy-e2e-mock-b
+    environment:
+      MOCK_DAEMON_HOST: 0.0.0.0
+      MOCK_DAEMON_PORT: "27901"
+    restart: unless-stopped

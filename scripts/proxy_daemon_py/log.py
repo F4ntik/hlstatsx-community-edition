@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone, tzinfo
+from datetime import datetime, tzinfo
 from enum import IntEnum
 from typing import TextIO
 
@@ -34,8 +34,8 @@ class LoggerConfig:
     """Configuration for :class:`ProxyLogger`."""
 
     level: LogLevel = LogLevel.NOTICE
-    time_format: str = "%Y-%m-%d %H:%M:%S"
-    timezone: tzinfo = timezone.utc
+    time_format: str = "[%Y-%m-%d %H:%M:%S]"
+    timezone: tzinfo | None = None
     stream: TextIO | None = None
 
 
@@ -60,7 +60,7 @@ class ProxyLogger:
         if level < self._config.level:
             return
 
-        timestamp = (when or datetime.now(self._config.timezone)).astimezone(self._config.timezone)
+        timestamp = self._normalise_timestamp(when)
         formatted_time = timestamp.strftime(self._config.time_format)
         self._stream.write(f"{formatted_time} [{level.name}] {message}\n")
         self._stream.flush()
@@ -85,6 +85,20 @@ class ProxyLogger:
         from sys import stdout
 
         return stdout
+
+    def _normalise_timestamp(self, when: datetime | None) -> datetime:
+        tz = self._config.timezone
+        if when is None:
+            if tz is None:
+                return datetime.now().astimezone()
+            return datetime.now(tz)
+
+        if tz is None:
+            return when.astimezone() if when.tzinfo is not None else when
+
+        if when.tzinfo is None:
+            return when.replace(tzinfo=tz)
+        return when.astimezone(tz)
 
 
 def level_from_debug(debug_enabled: bool, configured_level: int) -> LogLevel:

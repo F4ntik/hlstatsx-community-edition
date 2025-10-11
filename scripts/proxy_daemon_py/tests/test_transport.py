@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import pytest
 import socket
 from io import StringIO
 
@@ -61,3 +62,29 @@ async def _run_drops_invalid_payloads() -> None:
 
     log_contents = buffer.getvalue()
     assert "Dropping datagram with NUL byte" in log_contents
+
+
+def test_udp_server_start_twice_raises() -> None:
+    asyncio.run(_run_start_twice_raises())
+
+def test_udp_server_stop_without_start_is_safe() -> None:
+    asyncio.run(_run_stop_without_start_is_safe())
+
+def test_udp_server_send_text_requires_running() -> None:
+    asyncio.run(_run_send_text_requires_running())
+
+async def _run_start_twice_raises() -> None:
+    server = ProxyUdpServer(ProxyLogger(LoggerConfig(stream=StringIO())))
+    await server.start('127.0.0.1', 0)
+    with pytest.raises(RuntimeError):
+        await server.start('127.0.0.1', 0)
+    await server.stop()
+
+async def _run_stop_without_start_is_safe() -> None:
+    server = ProxyUdpServer(ProxyLogger(LoggerConfig(stream=StringIO())))
+    await server.stop()
+
+async def _run_send_text_requires_running() -> None:
+    server = ProxyUdpServer(ProxyLogger(LoggerConfig(stream=StringIO())))
+    with pytest.raises(RuntimeError):
+        server.send_text('payload', ('127.0.0.1', 9999))
