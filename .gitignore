@@ -6,3 +6,9 @@
 /scripts/proxy_daemon_py/.mypy_cache/
 /scripts/proxy_daemon_py/.ruff_cache/
 /scripts/proxy_daemon_py/.pytest_cache/
+/scripts/hlstats_py/.venv
+/scripts/hlstats_py/.mypy_cache/
+/scripts/hlstats_py/.ruff_cache/
+/scripts/hlstats_py/.pytest_cache/
+/scripts/hlstats_py/tests/__pycache__/
+__pycache__/
