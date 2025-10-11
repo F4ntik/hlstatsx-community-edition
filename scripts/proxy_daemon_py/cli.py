@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .config import ConfigError, ProxyConfig, load_config
+from .log import LogLevel, level_from_debug
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,6 +27,7 @@ class RuntimeSettings:
 
     config: ProxyConfig
     cli: CliOptions
+    log_level: LogLevel
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -67,7 +69,8 @@ def load_settings(argv: Sequence[str] | None = None) -> RuntimeSettings:
 
     options = parse_args(argv)
     config = load_config(options.configfile)
-    return RuntimeSettings(config=config, cli=options)
+    log_level = level_from_debug(options.debug, config.debug_level)
+    return RuntimeSettings(config=config, cli=options, log_level=log_level)
 
 
 def main(argv: Sequence[str] | None = None) -> int:

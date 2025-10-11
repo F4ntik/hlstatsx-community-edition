@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from proxy_daemon_py import importer
+from proxy_daemon_py import bootstrap, importer
 from proxy_daemon_py.balancer import DaemonState
 from proxy_daemon_py.db import GameServer, ProxyDaemonTarget, StoredProxyDaemon
 from proxy_daemon_py.config import ProxyConfig
@@ -152,7 +152,7 @@ def test_database_config_from_proxy_config_parses_port() -> None:
         raw=MappingProxyType({}),
     )
 
-    db_config = importer._database_config_from_proxy_config(config)
+    db_config = bootstrap.database_config_from_proxy_config(config)
 
     assert db_config.host == "db.example.com"
     assert db_config.port == 3307
@@ -175,4 +175,4 @@ def test_database_config_from_proxy_config_requires_host() -> None:
     )
 
     with pytest.raises(ValueError):
-        importer._database_config_from_proxy_config(config)
+        bootstrap.database_config_from_proxy_config(config)

@@ -138,6 +138,16 @@ def test_daemon_heartbeat_target_marks_failure_on_bad_response() -> None:
 def test_daemon_heartbeat_target_recovers_from_failure() -> None:
     asyncio.run(_run_daemon_heartbeat_target_recovers_from_failure())
 
+def test_daemon_heartbeat_target_skips_unknown_daemon() -> None:
+    asyncio.run(_run_daemon_heartbeat_target_skips_unknown())
+
+def test_heartbeat_manager_dispatch_without_targets() -> None:
+    asyncio.run(_run_heartbeat_manager_dispatch_without_targets())
+
+def test_heartbeat_manager_stop_without_start() -> None:
+    manager = HeartbeatManager(0.1)
+    asyncio.run(manager.stop())
+
 
 async def _run_daemon_heartbeat_target_marks_success() -> None:
     buffer = StringIO()
@@ -249,3 +259,17 @@ async def _run_daemon_heartbeat_target_recovers_from_failure() -> None:
     output = buffer.getvalue()
     assert "state changed: n/a -> down" in output
     assert "state changed: down -> up" in output
+
+
+async def _run_daemon_heartbeat_target_skips_unknown() -> None:
+    buffer = StringIO()
+    logger = ProxyLogger(LoggerConfig(stream=buffer))
+    db = _FakeDatabaseAdapter()
+    manager = DaemonManager()
+    target = DaemonHeartbeatTarget('missing', manager, db, logger, timeout=0.1)
+    await target.send_heartbeat()
+    assert 'Skipping heartbeat for unknown daemon' in buffer.getvalue()
+
+async def _run_heartbeat_manager_dispatch_without_targets() -> None:
+    manager = HeartbeatManager(0.05)
+    await manager._dispatch_once()

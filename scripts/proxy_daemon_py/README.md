@@ -32,6 +32,27 @@ docker compose up -d
 See [docs/proxy_daemon_local_mysql.md](../../docs/proxy_daemon_local_mysql.md)
 for detailed instructions and connection parameters.
 
+### End-to-end docker-compose sandbox
+
+To exercise the Python daemon together with mock downstream proxies, use the
+compose bundle under `scripts/proxy_daemon_py/e2e/`:
+
+```bash
+cd scripts/proxy_daemon_py/e2e
+./start.sh
+```
+
+The stack contains MySQL, the Python proxy daemon, and two UDP responders that
+acknowledge heartbeat probes. It binds MySQL to `localhost:33070` to avoid
+conflicting with the standalone database sandbox. Stop the environment with:
+
+```bash
+./stop.sh
+```
+
+Logs for each service can be inspected via `docker compose logs -f <service>`
+from the same directory.
+
 ## Quality checks
 
 The configuration includes the following tools:

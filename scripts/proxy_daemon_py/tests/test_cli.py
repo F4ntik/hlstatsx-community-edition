@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 from proxy_daemon_py import cli
+from proxy_daemon_py.log import LogLevel
 
 
 def _write_basic_config(tmp_path: Path) -> Path:
@@ -44,6 +45,15 @@ def test_load_settings_combines_cli_and_config(tmp_path: Path) -> None:
     assert settings.cli.configfile == config_file
     assert settings.cli.debug is False
     assert settings.config.db_host == "127.0.0.1"
+    assert settings.log_level is LogLevel.BALANCE
+
+
+def test_load_settings_honours_debug_override(tmp_path: Path) -> None:
+    config_file = _write_basic_config(tmp_path)
+
+    settings = cli.load_settings(["--configfile", str(config_file), "--debug"])
+
+    assert settings.log_level is LogLevel.NOTICE
 
 
 def test_cli_module_exits_successfully(tmp_path: Path) -> None:
