@@ -7,6 +7,7 @@ import time
 from collections.abc import Awaitable, Callable, Sequence
 from concurrent.futures import Executor
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Protocol, TypeVar, cast
 
 
@@ -55,6 +56,33 @@ class ProxyDaemonTarget:
 
     host: str
     port: int
+
+
+@dataclass(frozen=True, slots=True)
+class ProxyDaemonState:
+    """Health information for a proxy daemon obtained during heartbeat checks."""
+
+    host: str
+    port: int
+    current_state: str
+    previous_state: str
+    checked_at: datetime
+    latency_ms: int | None = None
+
+
+_VALID_DAEMON_STATES = {"up", "down", "n/a"}
+
+_UPSERT_DAEMON_STATE_QUERY = (
+    "INSERT INTO Proxy_Daemons AS new ("
+    "`host`, `port`, `curstate`, `oldstate`, `last_heartbeat`, `latency_ms`) "
+    "VALUES (%s, %s, %s, %s, %s, %s) "
+    "ON DUPLICATE KEY UPDATE "
+    "`curstate` = new.`curstate`, "
+    "`oldstate` = new.`oldstate`, "
+    "`last_heartbeat` = new.`last_heartbeat`, "
+    "`latency_ms` = new.`latency_ms`, "
+    "`updated_at` = CURRENT_TIMESTAMP"
+)
 
 
 class SyncDatabaseAdapter:
@@ -142,6 +170,45 @@ class SyncDatabaseAdapter:
         if not row or row[0] is None:
             return []
         return self._parse_daemon_list(str(row[0]))
+
+    def update_daemon_state(self, state: ProxyDaemonState) -> None:
+        """Persist heartbeat information for a proxy daemon."""
+
+        host = state.host.strip()
+        if not host:
+            raise ValueError("host must be a non-empty string")
+        if state.port <= 0 or state.port > 65535:
+            raise ValueError("port must be in the 1-65535 range")
+        if state.current_state not in _VALID_DAEMON_STATES:
+            raise ValueError(
+                "current_state must be one of 'up', 'down' or 'n/a'",
+            )
+        if state.previous_state not in _VALID_DAEMON_STATES:
+            raise ValueError(
+                "previous_state must be one of 'up', 'down' or 'n/a'",
+            )
+        if state.latency_ms is not None and state.latency_ms < 0:
+            raise ValueError("latency_ms must not be negative")
+
+        heartbeat_at = self._normalize_timestamp(state.checked_at)
+
+        connection = self._ensure_connection()
+        cursor = connection.cursor()
+        try:
+            self._execute(
+                cursor,
+                _UPSERT_DAEMON_STATE_QUERY,
+                (
+                    host,
+                    state.port,
+                    state.current_state,
+                    state.previous_state,
+                    heartbeat_at,
+                    state.latency_ms,
+                ),
+            )
+        finally:
+            cursor.close()
 
     def _connect_with_retries(self) -> SupportsConnection:
         connector = self._connector or self._load_default_connector()
@@ -242,6 +309,11 @@ class SyncDatabaseAdapter:
         except AttributeError:  # pragma: no cover - depends on driver
             pass
 
+    def _normalize_timestamp(self, moment: datetime) -> datetime:
+        if moment.tzinfo is None:
+            return moment
+        return moment.astimezone(timezone.utc).replace(tzinfo=None)
+
     def _load_default_connector(self) -> Callable[..., SupportsConnection]:
         try:
             import MySQLdb
@@ -329,6 +401,9 @@ class DatabaseAdapter:
     async def fetch_daemons(self) -> list[ProxyDaemonTarget]:
         return await self._run(self._sync.fetch_daemons)
 
+    async def update_daemon_state(self, state: ProxyDaemonState) -> None:
+        await self._run(lambda: self._sync.update_daemon_state(state))
+
     async def _run(self, func: Callable[[], T]) -> T:
         runner = self._runner
         if runner is not None:
@@ -344,5 +419,6 @@ __all__ = [
     "DatabaseConfig",
     "DatabaseError",
     "ProxyDaemonTarget",
+    "ProxyDaemonState",
     "SyncDatabaseAdapter",
 ]
