@@ -277,6 +277,11 @@ class SyncDatabaseAdapter:
         finally:
             cursor.close()
 
+    def connection(self) -> SupportsConnection:
+        """Return an active DB-API connection, creating one if required."""
+
+        return self._ensure_connection()
+
     def _connect_with_retries(self) -> SupportsConnection:
         connector = self._connector or self._load_default_connector()
         params: dict[str, Any] = {

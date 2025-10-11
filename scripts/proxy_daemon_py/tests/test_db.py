@@ -121,6 +121,15 @@ def test_sync_connect_retries_until_success() -> None:
     assert delays == [0.5, 1.0]
 
 
+def test_connection_returns_existing_connection() -> None:
+    connection = FakeConnection()
+    adapter = db.SyncDatabaseAdapter(CONFIG, connector=connector_for(connection))
+
+    adapter.connect()
+
+    assert adapter.connection() is connection
+
+
 def test_sync_fetch_options_returns_mapping() -> None:
     responses: dict[QueryKey, QueryResponse] = {
         ("SELECT `keyname`, `value` FROM hlstats_Options", None): QueryResponse(
