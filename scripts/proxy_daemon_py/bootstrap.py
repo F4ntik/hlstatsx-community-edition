@@ -13,6 +13,10 @@ from .heartbeat import HeartbeatManager
 from .log import LogLevel, LoggerConfig, ProxyLogger
 from .transport import ProxyUdpServer
 
+# TODO(proxy-daemon-py/env-bootstrap): добавить чтение переменных окружения
+# HLSTATS_CONF, PY_PROXY_DAEMON_LOG_LEVEL и PROM_PUSHGATEWAY для автоматизации
+# запуска в эксплуатационных средах.
+
 
 @dataclass(slots=True)
 class ProxyDaemonComponents:
