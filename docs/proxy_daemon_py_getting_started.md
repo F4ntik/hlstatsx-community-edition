@@ -116,6 +116,9 @@ cd scripts/proxy_daemon_py/e2e
   параметры подключения.
 - Логи: `docker compose logs -f proxy-daemon`.
 - Остановка: `./stop.sh`.
+- Скрипты `start.sh`/`stop.sh` рассчитаны на Bash. На Windows запустите их через
+  WSL или Git Bash; при использовании только PowerShell выполните `docker compose`
+  из этого каталога вручную (`docker compose up -d`, затем `docker compose down`).
 
 ## 7. Импорт текущих распределений (опционально)
 
