@@ -3,7 +3,7 @@ name = "proxy-daemon-py"
 version = "0.1.0"
 description = "Python rewrite of the HLstatsX proxy daemon."
 authors = ["HLstatsX Community Edition"]
-packages = [{ include = "proxy_daemon_py", from = "scripts" }]
+packages = [{ include = "proxy_daemon_py" }]
 readme = "README.md"
 
 [tool.poetry.dependencies]
