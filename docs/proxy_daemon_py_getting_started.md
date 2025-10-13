@@ -149,7 +149,7 @@ poetry run python -m proxy_daemon_py.importer \
    В логе появится сообщение вида «`Proxy daemon listening on <ip>:<port>`»,
    подтверждающее успешный старт.【F:scripts/proxy_daemon_py/daemon.py†L34-L74】
 3. Остановить процесс можно `Ctrl+C` — обработчик сигналов корректно закроет UDP
-   сокет, heartbeat и соединение с MySQL.【F:scripts/proxy_daemon_py/e2e/run_proxy_daemon.py†L1-L46】
+   сокет, heartbeat и соединение с MySQL.【F:scripts/proxy_daemon_py/proxy_daemon_py/e2e/run_proxy_daemon.py†L1-L46】
 
 ### 8.2 Проверка heartbeat и проксирования
 
