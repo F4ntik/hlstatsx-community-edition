@@ -12,3 +12,5 @@ ON DUPLICATE KEY UPDATE
   `port` = VALUES(`port`),
   `curstate` = VALUES(`curstate`),
   `oldstate` = VALUES(`oldstate`);
+
+ALTER USER 'hlstats'@'%' IDENTIFIED WITH mysql_native_password BY 'hlstats';
