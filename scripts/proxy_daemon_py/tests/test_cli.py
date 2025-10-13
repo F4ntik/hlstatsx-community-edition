@@ -58,7 +58,7 @@ def test_load_settings_honours_debug_override(tmp_path: Path) -> None:
 
 def test_cli_module_exits_successfully(tmp_path: Path) -> None:
     config_file = _write_basic_config(tmp_path)
-    project_root = Path(__file__).resolve().parents[2]
+    project_root = Path(__file__).resolve().parents[1]
     env = os.environ.copy()
 
     result = subprocess.run(

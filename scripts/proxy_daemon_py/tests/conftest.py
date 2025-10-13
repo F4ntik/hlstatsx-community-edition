@@ -9,7 +9,8 @@ from typing import Dict, Iterable, Set
 import pytest
 from _pytest.terminal import TerminalReporter
 
-PACKAGE_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PACKAGE_DIR = PROJECT_ROOT / "proxy_daemon_py"
 EXECUTED_LINES: Dict[str, Set[int]] = {}
 
 
@@ -96,7 +97,7 @@ def _compute_coverage() -> tuple[float, dict[str, float], dict[str, list[int]]]:
         executed = EXECUTED_LINES.get(key, set())
         hits = len(statements & executed)
         total_lines = len(statements)
-        relpath = path.relative_to(PACKAGE_ROOT)
+        relpath = path.relative_to(PROJECT_ROOT)
         key = str(relpath)
         per_file[key] = (hits / total_lines) * 100
         missing = sorted(statements - executed)
@@ -154,7 +155,7 @@ TARGET_FUNCTIONS: dict[str, set[str]] = {
 
 def _iter_package_files() -> Iterable[Path]:
     for name in TARGET_FUNCTIONS:
-        path = PACKAGE_ROOT / name
+        path = PACKAGE_DIR / name
         if path.exists():
             yield path.resolve()
 
@@ -164,7 +165,7 @@ def _statement_lines(path: Path) -> Set[int]:
 
     tree = ast.parse(source)
     statements: set[int] = set()
-    relpath = path.relative_to(PACKAGE_ROOT)
+    relpath = path.relative_to(PACKAGE_DIR)
     targets = TARGET_FUNCTIONS.get(str(relpath), set())
 
     def visit(node: ast.AST, parents: list[str]) -> None:
