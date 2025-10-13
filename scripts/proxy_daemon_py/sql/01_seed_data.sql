@@ -16,3 +16,5 @@ VALUES
 ON DUPLICATE KEY UPDATE
   `curstate` = VALUES(`curstate`),
   `oldstate` = VALUES(`oldstate`);
+
+ALTER USER 'hlstats'@'%' IDENTIFIED WITH mysql_native_password BY 'hlstats';
