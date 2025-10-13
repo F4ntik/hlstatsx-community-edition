@@ -17,6 +17,3 @@ ON DUPLICATE KEY UPDATE
   `curstate` = VALUES(`curstate`),
   `oldstate` = VALUES(`oldstate`);
 
--- Switch the hlstats user to mysql_native_password without overriding any
--- password a developer may have configured via MYSQL_PASSWORD.
-ALTER USER 'hlstats'@'%' IDENTIFIED WITH mysql_native_password;
