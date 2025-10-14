@@ -19,12 +19,12 @@
 
 Все Python-порты находятся в каталоге `scripts/` и повторяют названия Perl-предшественников:
 
-| Модуль | Назначение | Каталог |
+| Ключевой модуль | Назначение | Каталог |
 | --- | --- | --- |
-| `proxy_daemon_py` | UDP-прокси между игровыми серверами и статистикой | `scripts/proxy_daemon_py` |
-| `hlstats_py` | Парсер UDP-пакетов, нормализация событий и запись в БД | `scripts/hlstats_py` |
-| `hlstats_awards_py` | Обслуживание наград, лент и архивов БД | `scripts/hlstats_awards_py` |
-| `hlstats_resolve_py` | DNS-резолвер IP-адресов игроков и группировка хостов | `scripts/hlstats_resolve_py` |
+| `proxy_daemon_py.daemon.ProxyDaemon` | UDP-прокси между игровыми серверами и статистикой | `scripts/proxy_daemon_py` |
+| `hlstats_py.events.EventDispatcher` | Парсер UDP-пакетов, нормализация событий и запись в БД | `scripts/hlstats_py` |
+| `hlstats_awards_py.calculator` | Обслуживание наград, лент и архивов БД | `scripts/hlstats_awards_py` |
+| `hlstats_resolve_py.resolver` | DNS-резолвер IP-адресов игроков и группировка хостов | `scripts/hlstats_resolve_py` |
 
 ### 1.3 Базовое конфигурирование
 
@@ -103,7 +103,7 @@ poetry run pytest
 ### 3.1 Расположение и назначение
 
 * **Каталог**: `scripts/hlstats_py`
-* **Основные пакеты**: `hlstats_py.events`, `hlstats_py.dispatcher`, `hlstats_py.storage`
+* **Основные пакеты**: `hlstats_py.events.EventDispatcher`, `hlstats_py.protocol`, `hlstats_py.storage.EventStorage`
 * **Назначение**: приём событий от прокси-демона, построение внутренних моделей и применение SQL-операций.
 
 ### 3.2 Подготовка окружения
@@ -139,7 +139,7 @@ Python-порт `hlstats-awards.pl` отвечает за пересчёт на�
 ### 4.1 Расположение и назначение
 
 * **Каталог**: `scripts/hlstats_awards_py`
-* **Основные пакеты**: `hlstats_awards_py.cli`, `hlstats_awards_py.jobs`
+* **Основные пакеты**: `hlstats_awards_py.cli`, `hlstats_awards_py.calculator.AwardsCalculator`
 * **Назначение**: периодическая обработка активных игроков, пересчёт наград и вспомогательные отчёты.
 
 ### 4.2 Подготовка окружения
@@ -194,17 +194,17 @@ poetry run pytest
 ### 5.1 Расположение и назначение
 
 * **Каталог**: `scripts/hlstats_resolve_py`
-* **Основные пакеты**: `hlstats_resolve_py.cli`, `hlstats_resolve_py.worker`
+* **Основные пакеты**: `hlstats_resolve_py.cli`, `hlstats_resolve_py.resolver.HostResolver`
 * **Назначение**: периодическое обновление таблиц с хостами и географией игроков.
 
 ### 5.2 Подготовка окружения
 
-Пакет не содержит собственного `pyproject.toml`, поэтому используйте окружение прокси-демона:
+Пакет располагает собственным `scripts/hlstats_resolve_py/pyproject.toml`, однако он хранит только общие настройки Poetry (линтеры, pytest, mypy) и не содержит секции `[tool.poetry]`. Поэтому устанавливать зависимости нужно через общий профиль прокси-демона:
 ```bash
 cd scripts/proxy_daemon_py
 poetry shell
 ```
-Если вы не активируете shell, добавляйте `PYTHONPATH=..` к командам `poetry run`.
+Активированное окружение предоставляет `mysqlclient` и общие служебные пакеты. Если вы не используете `poetry shell`, добавляйте `PYTHONPATH=..` к командам `poetry run`.
 
 ### 5.3 Основные сценарии запуска
 
