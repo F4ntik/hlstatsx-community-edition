@@ -68,6 +68,38 @@ conflicting with the standalone database sandbox. Stop the environment with:
 Logs for each service can be inspected via `docker compose logs -f <service>`
 from the same directory.
 
+#### Troubleshooting connection issues
+
+If the proxy container reports repeated connection failures (for example,
+`[E403] Failed to start proxy daemon: Failed to connect to MySQL after repeated
+attempts`), make sure that the `hlstats` account inside the compose environment
+can authenticate with the expected credentials and uses the `mysql_native_password`
+plugin. The steps below exercise the exact configuration consumed by the Python
+daemon:
+
+```bash
+cd scripts/proxy_daemon_py/e2e
+docker compose exec mysql mysql -uhlstats -phlstats -e "SELECT user, host, plugin FROM mysql.user WHERE user = 'hlstats';"
+```
+
+The command should print a single row with `plugin` set to `mysql_native_password`.
+If the row is missing or the plugin column shows a different value, recreate the
+environment with a clean MySQL volume so that the init scripts under
+`scripts/proxy_daemon_py/sql/` can rerun:
+
+```bash
+./stop.sh
+docker compose down -v
+./start.sh
+```
+
+After the restart, tail the daemon logs to confirm that the proxy is able to log
+in successfully:
+
+```bash
+docker compose logs -f proxy-daemon
+```
+
 ## Quality checks
 
 The configuration includes the following tools:
