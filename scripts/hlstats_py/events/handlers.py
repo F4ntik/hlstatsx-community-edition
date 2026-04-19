@@ -145,6 +145,48 @@ class TriggerEventHandler(_HandlerBase):
                 attributes["points"] = action_def.points
             attributes["team_award"] = action_def.team_award
 
+        if event_code == "weaponstats":
+            weapon_code, weapon_def = _resolve_weapon(
+                context.schema,
+                _string_property(event.properties, "weapon"),
+            )
+            if weapon_def is not None:
+                attributes["weapon_name"] = weapon_def.name
+            attributes["weapon_code"] = weapon_code
+            for key in ("shots", "hits", "kills", "headshots", "damage", "deaths"):
+                attributes[key] = _int_property(event.properties, key)
+            return EventUpdate(
+                category=EventCategory.STATSME,
+                event_code=event_code,
+                actor=event.actor,
+                target=None,
+                timestamp=event.timestamp,
+                attributes=freeze_mapping(attributes),
+                message_key=event_code,
+                message=event_code,
+            )
+
+        if event_code == "weaponstats2":
+            weapon_code, weapon_def = _resolve_weapon(
+                context.schema,
+                _string_property(event.properties, "weapon"),
+            )
+            if weapon_def is not None:
+                attributes["weapon_name"] = weapon_def.name
+            attributes["weapon_code"] = weapon_code
+            for key in ("head", "chest", "stomach", "leftarm", "rightarm", "leftleg", "rightleg"):
+                attributes[key] = _int_property(event.properties, key)
+            return EventUpdate(
+                category=EventCategory.STATSME2,
+                event_code=event_code,
+                actor=event.actor,
+                target=None,
+                timestamp=event.timestamp,
+                attributes=freeze_mapping(attributes),
+                message_key=event_code,
+                message=event_code,
+            )
+
         message_key = f"trigger.{event_code}"
         message_key, rendered_message = _build_message(
             context,
@@ -233,6 +275,25 @@ class TeamEventHandler(_HandlerBase):
             attributes=freeze_mapping(attributes),
             message_key=message_key,
             message=rendered_message,
+        )
+
+
+class EntryEventHandler(_HandlerBase):
+    supported_types = (LogEventType.ENTRY,)
+
+    def handle(self, event: LogEvent, context: EventContext) -> Optional[EventUpdate]:
+        if not event.actor:
+            return None
+
+        return EventUpdate(
+            category=EventCategory.ENTRY,
+            event_code="entry",
+            actor=event.actor,
+            target=None,
+            timestamp=event.timestamp,
+            attributes=freeze_mapping({}),
+            message_key="entry",
+            message="entry",
         )
 
 
@@ -351,6 +412,35 @@ class WorldEventHandler(_HandlerBase):
         )
 
 
+class TeamTriggerEventHandler(_HandlerBase):
+    supported_types = (LogEventType.TEAM_TRIGGER,)
+
+    def handle(self, event: LogEvent, context: EventContext) -> Optional[EventUpdate]:
+        event_code, action_def = _resolve_action(context.schema, event.action)
+        attributes: dict[str, Any] = {
+            "action_code": event_code,
+            "raw_action": event.action,
+            "team": event.team,
+            "properties": event.properties,
+        }
+        if action_def is not None:
+            attributes["description"] = action_def.description
+            if action_def.points is not None:
+                attributes["points"] = action_def.points
+            attributes["team_award"] = action_def.team_award
+
+        return EventUpdate(
+            category=EventCategory.TEAM_BONUS,
+            event_code=event_code,
+            actor=None,
+            target=None,
+            timestamp=event.timestamp,
+            attributes=freeze_mapping(attributes),
+            message_key=event_code,
+            message=event_code,
+        )
+
+
 class GenericEventHandler(_HandlerBase):
     supported_types = (
         LogEventType.GENERIC,
@@ -381,3 +471,17 @@ class GenericEventHandler(_HandlerBase):
             message_key=message_key,
             message=rendered_message,
         )
+
+
+def _int_property(properties: Mapping[str, Any], key: str) -> int:
+    value = properties.get(key)
+    if value in (None, ""):
+        return 0
+    return int(str(value))
+
+
+def _string_property(properties: Mapping[str, Any], key: str) -> str | None:
+    value = properties.get(key)
+    if value in (None, ""):
+        return None
+    return str(value)

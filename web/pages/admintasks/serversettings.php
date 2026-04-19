@@ -83,7 +83,7 @@ For support and installation notes visit http://www.hlxcommunity.com
         
         <tr bgcolor="#FF0000">
             <td class="fNormal" style="color: #FFF; font-weight: bold; font-size: medium;" align="center">
-				Note: For changes on this page to take effect, you <strong>must</strong> <a href="<?php echo $g_options['scripturl'] . "?mode=admin&amp;task=tools_perlcontrol"; ?>">reload</a> or restart the HLX:CE daemon.
+				Note: For changes on this page to take effect, you <strong>must</strong> <a href="<?php echo $g_options['scripturl'] . "?mode=admin&amp;task=tools_perlcontrol"; ?>">reload</a> or restart the HLX:CE runtime.
 			</td>
         </tr>
         
@@ -125,7 +125,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 		}
 	
 ?>
-These are the actual server parameters used by the hlstats.pl script.<br>
+These are the actual server parameters used by the statistics worker runtime.<br>
 
 <?php
 

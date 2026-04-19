@@ -1,0 +1,21 @@
+L 04/17/2026 - 16:47:57: Log file started (file "logs/L0417049.log") (game "cstrike") (version "48/1.1.2.7/Stdio/4328")
+L 04/17/2026 - 16:47:57: Server cvar "sv_restart" = "1"
+L 04/17/2026 - 16:47:57: World triggered "Restart_Round_(1_second)"
+L 04/17/2026 - 16:47:57: Team "CT" scored "0" with "0" players
+L 04/17/2026 - 16:47:57: Team "TERRORIST" scored "0" with "0" players
+L 04/17/2026 - 16:47:57: Server cvar "sv_restart" = "0"
+L 04/17/2026 - 16:47:58: Rcon: "rcon 2122926088 "pikabu" sv_visiblemaxplayers" from "172.18.0.1:43311"
+L 04/17/2026 - 16:47:58: World triggered "Round_Start"
+L 04/17/2026 - 16:47:58: World triggered "Round_Start"
+L 04/17/2026 - 16:48:00: "uPlay<118><STEAM_0:1:644350905><>" entered the game
+L 04/17/2026 - 16:48:00: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:52905"
+L 04/17/2026 - 16:48:00: "Rakza<120><STEAM_0:1:55955613><>" entered the game
+L 04/17/2026 - 16:48:00: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:56040"
+L 04/17/2026 - 16:48:00: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "118,,,,,,," 1 "Rakza (Pos 6 with 1103 points) has connected from Russia"" from "172.18.0.1:45325"
+L 04/17/2026 - 16:48:00: "Lin Kuei<119><STEAM_0:0:36417680><>" entered the game
+L 04/17/2026 - 16:48:00: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:38222"
+L 04/17/2026 - 16:48:00: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "118,120,,,,,," 1 "Lin Kuei (Pos 12 with 1016 points) has connected from Russia"" from "172.18.0.1:43470"
+L 04/17/2026 - 16:48:01: "HeraTuBa<117><STEAM_0:0:100993243><>" entered the game
+L 04/17/2026 - 16:48:01: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:43414"
+L 04/17/2026 - 16:48:01: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "118,120,119,,,,," 1 "HeraTuBa (Pos 12 with 1024 points) has connected from Russia"" from "172.18.0.1:36760"
+L 04/17/2026 - 16:48:01: Log file closed

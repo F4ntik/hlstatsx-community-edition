@@ -1,0 +1,23 @@
+L 04/17/2026 - 18:42:13: Log file started (file "logs/L0417063.log") (game "cstrike") (version "48/1.1.2.7/Stdio/4328")
+L 04/17/2026 - 18:42:13: Server cvar "sv_restart" = "1"
+L 04/17/2026 - 18:42:13: World triggered "Restart_Round_(1_second)"
+L 04/17/2026 - 18:42:13: Team "CT" scored "0" with "0" players
+L 04/17/2026 - 18:42:13: Team "TERRORIST" scored "0" with "0" players
+L 04/17/2026 - 18:42:13: Server cvar "sv_restart" = "0"
+L 04/17/2026 - 18:42:14: World triggered "Round_Start"
+L 04/17/2026 - 18:42:15: "Saddz<125><STEAM_0:0:34344543><>" entered the game
+L 04/17/2026 - 18:42:15: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:49707"
+L 04/17/2026 - 18:42:15: "4f<131><STEAM_0:0:19989970><>" entered the game
+L 04/17/2026 - 18:42:15: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:49542"
+L 04/17/2026 - 18:42:15: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "125,,,,,,," 1 "4f (Pos 1 with 1704 points) has connected from Russia"" from "172.18.0.1:53442"
+L 04/17/2026 - 18:42:15: "Rakza<120><STEAM_0:1:55955613><>" entered the game
+L 04/17/2026 - 18:42:15: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:55352"
+L 04/17/2026 - 18:42:15: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "131,125,,,,,," 1 "Rakza (Pos 10 with 1103 points) has connected from Russia"" from "172.18.0.1:54915"
+L 04/17/2026 - 18:42:16: "Lin Kuei<119><STEAM_0:0:36417680><>" entered the game
+L 04/17/2026 - 18:42:16: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:45661"
+L 04/17/2026 - 18:42:17: "Rakza<120><STEAM_0:1:55955613><>" say "gggg" (dead)
+L 04/17/2026 - 18:42:17: "uPlay<118><STEAM_0:1:644350905><>" entered the game
+L 04/17/2026 - 18:42:17: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "120,131,125,,,,," 1 "Lin Kuei (Pos 12 with 1016 points) has connected from Russia"" from "172.18.0.1:46098"
+L 04/17/2026 - 18:42:17: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:32886"
+L 04/17/2026 - 18:42:17: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "119,125,120,131,,,," 1 "New player uPlay has connected from Belarus"" from "172.18.0.1:33808"
+L 04/17/2026 - 18:42:17: Log file closed

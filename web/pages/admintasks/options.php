@@ -47,7 +47,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 	
 	<div style="width:60%;height:50px;border:0;padding:0;margin:auto;background-color:#F00;text-align:center;color:#FFF;font-size:medium;font-weight:bold;vertical-align:middle;">
-		Options with an asterisk (*) beside them require a restart of the perl daemon to fully take effect.</div>
+		Options with an asterisk (*) beside them require a restart of the statistics runtime to fully take effect.</div>
 	<br />
 <?php
 
@@ -230,7 +230,7 @@ RewriteRule sig-(.*)-(.*).png$ sig.php?player_id=$1&background=$2 [L]</textarea>
 	$optiongroups[1]->options[] = new Option('show_google_map', 'Show Google worldmap', 'select');
 	$optiongroups[1]->options[] = new Option('google_map_region', 'Google Maps Region', 'select');
 	$optiongroups[1]->options[] = new Option('google_map_type', 'Google Maps Type', 'select');
-	$optiongroups[1]->options[] = new Option('UseGeoIPBinary', '*Choose whether to use GeoCityLite data loaded into mysql database or from binary file. (If binary, GeoLiteCity.dat goes in perl/GeoLiteCity and Geo::IP::PurePerl module is required', 'select');
+	$optiongroups[1]->options[] = new Option('UseGeoIPBinary', '*Choose whether to use GeoCityLite data loaded into mysql database or from the bundled GeoLiteCity binary directory. Legacy binary mode requires the GeoLiteCity data files to be present on the runtime host.', 'select');
 
 	$optiongroups[2] = new OptionGroup('Awards settings');
 	$optiongroups[2]->options[] = new Option('gamehome_show_awards', 'Show daily award winners on Game Frontpage', 'select');
@@ -265,8 +265,8 @@ RewriteRule sig-(.*)-(.*).png$ sig.php?player_id=$1&background=$2 [L]</textarea>
 	$optiongroups[40]->options[] = new Option('Mode', '*Sets the player-tracking mode.<br><ul><LI><b>Steam ID</b>     - Recommended for public Internet server use. Players will be tracked by Steam ID.<LI><b>Player Name</b>  - Useful for shared-PC environments, such as Internet cafes, etc. Players will be tracked by nickname. <LI><b>IP Address</b>        - Useful for LAN servers where players do not have a real Steam ID. Players will be tracked by IP Address. </UL>', 'select');
 	$optiongroups[40]->options[] = new Option('AllowOnlyConfigServers', '*Allow only servers set up in admin panel to be tracked. Other servers will NOT automatically added and tracked! This is a big security thing', 'select');
 	$optiongroups[40]->options[] = new Option('DeleteDays', '*HLstatsX will automatically delete history events from the events tables when they are over this many days old. This is important for performance reasons. Set lower if you are logging a large number of game servers or find the load on the MySQL server is too high', 'text');
-	$optiongroups[40]->options[] = new Option('DNSResolveIP', '*Resolve player IP addresses to hostnames. Requires a working DNS setup (on the box running hlstats.pl)', 'select');
-	$optiongroups[40]->options[] = new Option('DNSTimeout', '*Time, in seconds, to wait for DNS queries to complete before cancelling DNS resolves. You may need to increase this if on a slow connection or if you find a lot of IPs are not being resolved; however, hlstats.pl cannot be parsing log data while waiting for an IP to resolve', 'text');
+	$optiongroups[40]->options[] = new Option('DNSResolveIP', '*Resolve player IP addresses to hostnames. Requires a working DNS setup on the machine running the statistics worker.', 'select');
+	$optiongroups[40]->options[] = new Option('DNSTimeout', '*Time, in seconds, to wait for DNS queries to complete before cancelling DNS resolves. Increase this if you see slow or incomplete hostname lookups; the statistics worker waits for DNS responses while resolving addresses.', 'text');
 	$optiongroups[40]->options[] = new Option('MailTo', '*E-mail address to mail database errors to', 'text');
 	$optiongroups[40]->options[] = new Option('MailPath', '*Path to the mail program -- usually /usr/sbin/sendmail on webhosts', 'text');
 	$optiongroups[40]->options[] = new Option('Rcon', '*Allow HLstatsX to send Rcon commands to the game servers', 'select');
@@ -287,7 +287,7 @@ RewriteRule sig-(.*)-(.*).png$ sig.php?player_id=$1&background=$2 [L]</textarea>
 
 	$optiongroups[60] = new OptionGroup('Proxy Settings');
 	$optiongroups[60]->options[] = new Option('Proxy_Key', '*Key to use when sending remote commands to Daemon, empty for disable', 'text');
-	$optiongroups[60]->options[] = new Option('Proxy_Daemons', '*List of daemons to send PROXY events from (used by proxy-daemon.pl), use "," as delimiter, eg &lt;ip&gt;:&lt;port&gt;,&lt;ip&gt;:&lt;port&gt;,... ', 'text');
+	$optiongroups[60]->options[] = new Option('Proxy_Daemons', '*List of downstream statistics workers that receive PROXY events from the proxy runtime. Use "," as delimiter, eg &lt;ip&gt;:&lt;port&gt;,&lt;ip&gt;:&lt;port&gt;,... ', 'text');
 	
 	if (!empty($_POST))
 	{

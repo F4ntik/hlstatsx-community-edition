@@ -68,9 +68,11 @@ class LogEventType(Enum):
     CHAT = auto()
     TEAM_CHANGE = auto()
     CONNECT = auto()
+    ENTRY = auto()
     DISCONNECT = auto()
     NAME_CHANGE = auto()
     CVAR = auto()
+    TEAM_TRIGGER = auto()
     WORLD_TRIGGER = auto()
     GENERIC = auto()
 
@@ -185,6 +187,8 @@ def parse_log_event(payload: str) -> LogEvent:
 
     if body.startswith("World "):
         return _parse_world_event(body, timestamp, payload)
+    if body.startswith("Team "):
+        return _parse_team_trigger_event(body, timestamp, payload)
 
     actor, remainder = _consume_player(body)
     if actor is None:
@@ -207,6 +211,8 @@ def parse_log_event(payload: str) -> LogEvent:
         return _parse_name_change_event(body, actor, remainder[16:], timestamp, payload)
     if remainder.startswith("connected"):
         return _parse_connect_event(body, actor, remainder[9:], timestamp, payload)
+    if remainder.startswith("entered the game"):
+        return _parse_entry_event(body, actor, remainder[16:], timestamp, payload)
     if remainder.startswith("disconnected"):
         return _parse_disconnect_event(body, actor, remainder[12:], timestamp, payload)
     if remainder.startswith("committed suicide with "):
@@ -253,7 +259,7 @@ def _consume_player(body: str) -> tuple[PlayerDescriptor | None, str]:
         else:
             tokens = tokens[1:]
     if tokens:
-        unique_id = tokens[0]
+        unique_id = _normalize_unique_id(tokens[0])
         tokens = tokens[1:]
     if tokens:
         team = tokens[0]
@@ -268,6 +274,12 @@ def _consume_player(body: str) -> tuple[PlayerDescriptor | None, str]:
         additional_tokens=tuple(extras),
     )
     return descriptor, remainder
+
+
+def _normalize_unique_id(value: str) -> str:
+    if value.startswith("STEAM_0:"):
+        return value[len("STEAM_0:") :]
+    return value
 
 
 def _find_closing_quote(text: str) -> Optional[int]:
@@ -386,7 +398,7 @@ def _parse_chat_event(
     timestamp: datetime,
     raw: str,
 ) -> LogEvent:
-    match = re.match(r'^"(?P<message>.*)"$', remainder.strip())
+    match = re.match(r'^"(?P<message>.*)"(?:\s+\(dead\))?$', remainder.strip())
     if not match:
         return _parse_generic_event(body, timestamp, raw, actor=actor)
 
@@ -410,7 +422,7 @@ def _parse_team_event(
     timestamp: datetime,
     raw: str,
 ) -> LogEvent:
-    match = re.match(r'^"(?P<team>[^"]+)"$', remainder.strip())
+    match = re.match(r'^"(?P<team>[^"]+)"(?:\s+\(.*\))?$', remainder.strip())
     if not match:
         return _parse_generic_event(body, timestamp, raw, actor=actor)
 
@@ -455,7 +467,7 @@ def _parse_connect_event(
     address_match = re.search(r'address "(?P<address>[^"]+)"', remainder)
     address: Optional[str] = None
     if address_match:
-        address = address_match.group("address")
+        address = address_match.group("address").split(":", 1)[0]
         properties_dict["address"] = address
 
     paren_properties = dict(_parse_properties(remainder))
@@ -471,6 +483,22 @@ def _parse_connect_event(
         actor=actor,
         properties=properties,
         message=address,
+    )
+
+
+def _parse_entry_event(
+    body: str,
+    actor: PlayerDescriptor,
+    remainder: str,
+    timestamp: datetime,
+    raw: str,
+) -> LogEvent:
+    return LogEvent(
+        event_type=LogEventType.ENTRY,
+        timestamp=timestamp,
+        raw=raw,
+        actor=actor,
+        message="entered the game",
     )
 
 
@@ -527,6 +555,23 @@ def _parse_world_event(body: str, timestamp: datetime, raw: str) -> LogEvent:
         raw=raw,
         action=match.group("action"),
         properties=properties,
+    )
+
+
+def _parse_team_trigger_event(body: str, timestamp: datetime, raw: str) -> LogEvent:
+    match = re.match(r'^Team "(?P<team>[^"]+)" triggered "(?P<action>[^"]+)"(?P<properties>.*)$', body)
+    if not match:
+        return _parse_generic_event(body, timestamp, raw)
+
+    properties_dict = dict(_parse_properties(match.group("properties")))
+    properties_dict["team"] = match.group("team")
+    return LogEvent(
+        event_type=LogEventType.TEAM_TRIGGER,
+        timestamp=timestamp,
+        raw=raw,
+        action=match.group("action"),
+        team=match.group("team"),
+        properties=MappingProxyType(properties_dict),
     )
 
 

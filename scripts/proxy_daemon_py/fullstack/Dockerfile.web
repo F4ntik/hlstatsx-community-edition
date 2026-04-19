@@ -1,0 +1,8 @@
+FROM php:8.2-apache
+
+RUN docker-php-ext-install mysqli
+
+WORKDIR /var/www/html
+
+COPY web /var/www/html
+COPY scripts/proxy_daemon_py/fullstack/web-config.php /var/www/html/config.php

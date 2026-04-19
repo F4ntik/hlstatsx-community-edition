@@ -1,0 +1,20 @@
+L 04/15/2026 - 18:57:14: Log file started (file "logs/L0415059.log") (game "cstrike") (version "48/1.1.2.7/Stdio/4328")
+L 04/15/2026 - 18:57:14: Server cvar "sv_restart" = "1"
+L 04/15/2026 - 18:57:14: Rcon: "rcon 2122926088 "pikabu" hlxce_version "1.11.4"" from "172.18.0.1:57561"
+L 04/15/2026 - 18:57:14: World triggered "Restart_Round_(1_second)"
+L 04/15/2026 - 18:57:14: Team "CT" scored "0" with "0" players
+L 04/15/2026 - 18:57:14: Team "TERRORIST" scored "0" with "0" players
+L 04/15/2026 - 18:57:14: Server cvar "sv_restart" = "0"
+L 04/15/2026 - 18:57:15: "Lin Kuei<89><STEAM_0:0:36417680><>" connected, address "178.47.219.130:27005"
+L 04/15/2026 - 18:57:15: "Lin Kuei<89><STEAM_0:0:36417680><>" STEAM USERID validated
+L 04/15/2026 - 18:57:15: World triggered "Round_Start"
+L 04/15/2026 - 18:57:15: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "89,,,,,,," 1 "HLstatsX:CE disabled! Need at least 4 active players (0/4)"" from "172.18.0.1:57552"
+L 04/15/2026 - 18:57:17: "uPlay<76><STEAM_0:1:644350905><>" entered the game
+L 04/15/2026 - 18:57:17: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:43828"
+L 04/15/2026 - 18:57:17: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "89,,,,,,," 1 "New player uPlay has connected from Belarus"" from "172.18.0.1:59168"
+L 04/15/2026 - 18:57:17: "gatl<86><STEAM_0:0:204938646><>" entered the game
+L 04/15/2026 - 18:57:17: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:49262"
+L 04/15/2026 - 18:57:18: "BanForLife<88><STEAM_0:1:20467307><>" entered the game
+L 04/15/2026 - 18:57:18: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "76,89,,,,,," 1 "gatl (Pos 2 with 1294 points) has connected from Russia"" from "172.18.0.1:54659"
+L 04/15/2026 - 18:57:18: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:55913"
+L 04/15/2026 - 18:57:18: Log file closed

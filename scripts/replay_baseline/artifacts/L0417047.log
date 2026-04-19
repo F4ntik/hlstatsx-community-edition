@@ -1,0 +1,13 @@
+L 04/17/2026 - 16:07:25: Log file started (file "logs/L0417047.log") (game "cstrike") (version "48/1.1.2.7/Stdio/4328")
+L 04/17/2026 - 16:07:25: Server cvar "sv_restart" = "1"
+L 04/17/2026 - 16:07:25: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:41246"
+L 04/17/2026 - 16:07:25: World triggered "Restart_Round_(1_second)"
+L 04/17/2026 - 16:07:25: Team "CT" scored "0" with "0" players
+L 04/17/2026 - 16:07:25: Team "TERRORIST" scored "0" with "0" players
+L 04/17/2026 - 16:07:25: Server cvar "sv_restart" = "0"
+L 04/17/2026 - 16:07:25: Rcon: "rcon 2122926088 "pikabu" sv_visiblemaxplayers" from "172.18.0.1:45840"
+L 04/17/2026 - 16:07:26: World triggered "Round_Start"
+L 04/17/2026 - 16:07:26: World triggered "Round_Start"
+L 04/17/2026 - 16:07:29: "Lin Kuei<111><STEAM_0:0:36417680><>" entered the game
+L 04/17/2026 - 16:07:29: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:43300"
+L 04/17/2026 - 16:07:29: Log file closed

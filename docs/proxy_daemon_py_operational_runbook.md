@@ -26,10 +26,10 @@
 
 ### 2.1 Staging
 
-1. Подготовить staging-окружение согласно `scripts/proxy_daemon_py/e2e/docker-compose.yml`.
+1. Подготовить staging-окружение согласно `scripts/proxy_daemon_py/fullstack/docker-compose.yml` или `scripts/proxy_daemon_py/e2e/docker-compose.yml`, если нужен только прокси-контур.
 2. Выполнить деплой Python-демона с помощью Ansible playbook `deploy_proxy_daemon_py.yml` (см. репозиторий инфраструктуры).
 3. Прописать переменные окружения `HLSTATS_CONF`, `PY_PROXY_DAEMON_LOG_LEVEL`, `PROM_PUSHGATEWAY`. Поддержка автоматического чтения этих переменных запланирована в bootstrap-скрипте (см. TODO в `scripts/proxy_daemon_py/bootstrap.py`); до мерджа обновления значения передаются вручную через аргументы контейнера/сервиса.
-4. Запустить демона в foreground-режиме на 24 часа, убедиться в стабильности heartbeat и отсутствии ошибок в логах `CONTROL/E403`.
+4. Запустить proxy daemon и минимум один `hlstats_py` worker в foreground-режиме на 24 часа, убедиться в стабильности heartbeat и отсутствии ошибок в логах `CONTROL/E403`.
 5. Сравнить метрики распределения серверов с эталонным отчётом `docs/proxy_daemon_e2e_sandbox.md#expected-metrics`.
 6. Подтвердить успешность автоматических тестов: `pytest scripts/proxy_daemon_py/tests`, `pytest scripts/proxy_daemon_py/e2e`.
 7. Сформировать отчёт по результатам (таблица в Confluence) и получить согласование от владельца продукта.
@@ -54,7 +54,7 @@
 
 ### 3.1 Prometheus
 
-- Экспорт метрик из Python-демона через `/metrics` **ещё не реализован**. TODO: дождаться мерджда экспортёра Prometheus из задачи `proxy-daemon-py/metrics` в репозитории `scripts/proxy_daemon_py` и обновить инструкцию. До этого момента мониторинг строится по логам и внешнему pushgateway.
+- Экспорт метрик из Python runtime через `/metrics` **ещё не реализован**. До появления Prometheus-экспортёра мониторинг строится по логам proxy daemon и `hlstats_py` worker plus внешнему pushgateway.
 - Настроить scrape job `proxy-daemon-py` с интервалом 15 секунд.
 - Дашборды Grafana:
   - `Proxy Daemon / Traffic`: скорость пакетов, ошибка переприсвоения сервера.

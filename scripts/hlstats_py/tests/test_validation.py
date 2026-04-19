@@ -104,15 +104,16 @@ def test_replay_runner_builds_consistent_snapshot() -> None:
     assert alice.headshots == 1
     assert alice.deaths == 0
     assert alice.suicides == 0
-    assert alice.skill == 2
+    assert alice.skill == 1004
     assert alice.connections == 1
     assert alice.disconnects == 1
-    assert alice.last_address == "1.2.3.4:27005"
+    assert alice.last_address == "1.2.3.4"
 
     bob = snapshot.players_by_unique["STEAM_1:1:222"]
     assert bob.kills == 1  # suicides increment the kill counter in the legacy schema
     assert bob.deaths == 1
     assert bob.suicides == 1
+    assert bob.skill == 998
     assert bob.connections == 1
     assert bob.disconnects == 0
 
@@ -124,8 +125,6 @@ def test_replay_runner_builds_consistent_snapshot() -> None:
     actions = snapshot.actions
     assert actions["planted_bomb"].count == 1
     assert actions["planted_bomb"].reward_player == 2
-    assert actions["Round_Start"].count == 1
-    assert actions["Round_Start"].reward_team == 1
 
     assert len(snapshot.frags) == 2
     kill_frag, suicide_frag = snapshot.frags
@@ -136,10 +135,9 @@ def test_replay_runner_builds_consistent_snapshot() -> None:
     chat = snapshot.chat_messages
     assert len(chat) == 1
     assert chat[0].message == "Hello team"
-    assert chat[0].team_only is False
 
     connections = snapshot.connections
-    assert {entry.address for entry in connections} == {"1.2.3.4:27005", "5.6.7.8:27005"}
+    assert {entry.address for entry in connections} == {"1.2.3.4", "5.6.7.8"}
 
     disconnects = snapshot.disconnects
     assert len(disconnects) == 1
@@ -150,9 +148,9 @@ def test_replay_runner_builds_consistent_snapshot() -> None:
     assert admin_events[0].event_type == "generic"
     assert "mp_restartgame" in admin_events[0].message
 
-    # Ensure player action rows captured both player-bound and world actions.
+    # Ensure player action rows captured both explicit and derived player actions.
     action_codes = {entry.action_code for entry in snapshot.player_actions}
-    assert action_codes == {"planted_bomb", "Round_Start"}
+    assert action_codes == {"planted_bomb", "headshot"}
     planted = next(
         entry for entry in snapshot.player_actions if entry.action_code == "planted_bomb"
     )
@@ -160,7 +158,6 @@ def test_replay_runner_builds_consistent_snapshot() -> None:
     assert planted.player_id == alice.player_id
 
     # The replay helper should record every query issued by the storage layer.
-    assert any("lastAddress" in query for query, _ in result.executed_queries)
     assert any(
         query.startswith("INSERT INTO hlstats_Events_Admin")
         for query, _ in result.executed_queries

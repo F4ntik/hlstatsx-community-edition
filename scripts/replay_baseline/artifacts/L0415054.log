@@ -1,0 +1,17 @@
+L 04/15/2026 - 18:18:09: Log file started (file "logs/L0415054.log") (game "cstrike") (version "48/1.1.2.7/Stdio/4328")
+L 04/15/2026 - 18:18:09: Server cvar "sv_restart" = "1"
+L 04/15/2026 - 18:18:09: World triggered "Restart_Round_(1_second)"
+L 04/15/2026 - 18:18:09: Team "CT" scored "0" with "0" players
+L 04/15/2026 - 18:18:09: Team "TERRORIST" scored "0" with "0" players
+L 04/15/2026 - 18:18:09: Server cvar "sv_restart" = "0"
+L 04/15/2026 - 18:18:10: World triggered "Round_Start"
+L 04/15/2026 - 18:18:10: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "76,75,74,,,,," 1 "HLstatsX:CE disabled! Need at least 4 active players (0/4)"" from "172.18.0.1:56050"
+L 04/15/2026 - 18:18:10: World triggered "Round_Start"
+L 04/15/2026 - 18:18:10: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "76,75,74,,,,," 1 "HLstatsX:CE disabled! Need at least 4 active players (0/4)"" from "172.18.0.1:45534"
+L 04/15/2026 - 18:18:11: "uPlay<76><STEAM_0:1:644350905><>" entered the game
+L 04/15/2026 - 18:18:11: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "75,74,,,,,," 1 "New player uPlay has connected from Belarus"" from "172.18.0.1:54671"
+L 04/15/2026 - 18:18:11: "4f<75><STEAM_0:0:19989970><>" entered the game
+L 04/15/2026 - 18:18:11: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "76,74,,,,,," 1 "4f (Pos 2 with 1190 points) has connected from Russia"" from "172.18.0.1:53774"
+L 04/15/2026 - 18:18:12: "Lin Kuei<74><STEAM_0:0:36417680><>" entered the game
+L 04/15/2026 - 18:18:12: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "76,75,,,,,," 1 "Lin Kuei (Pos 15 with 979 points) has connected from Russia"" from "172.18.0.1:45363"
+L 04/15/2026 - 18:18:13: Log file closed

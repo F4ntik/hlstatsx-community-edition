@@ -5,6 +5,7 @@ from hlstats_py import (
     ChatEventHandler,
     ConnectEventHandler,
     DisconnectEventHandler,
+    EntryEventHandler,
     EventCategory,
     EventContext,
     EventDispatcher,
@@ -13,6 +14,7 @@ from hlstats_py import (
     KillEventHandler,
     LocalizationCatalog,
     TeamEventHandler,
+    TeamTriggerEventHandler,
     TriggerEventHandler,
     WeaponDefinition,
     WorldEventHandler,
@@ -67,7 +69,9 @@ def dispatcher() -> EventDispatcher:
             ChatEventHandler(),
             TeamEventHandler(),
             ConnectEventHandler(),
+            EntryEventHandler(),
             DisconnectEventHandler(),
+            TeamTriggerEventHandler(),
             WorldEventHandler(),
             generic,
         ],
@@ -128,6 +132,18 @@ def test_chat_event(dispatcher: EventDispatcher, event_context: EventContext) ->
     assert update.message == "[TEAM] Alice: Hold position"
 
 
+def test_dead_chat_event(dispatcher: EventDispatcher, event_context: EventContext) -> None:
+    event = parse_log_event(
+        'L 01/02/2024 - 03:04:05: "Alice<2><STEAM_1:2><CT>" say "gg" (dead)'
+    )
+
+    update = dispatcher.dispatch(event, event_context)
+
+    assert update.category is EventCategory.CHAT
+    assert update.attributes["team_only"] is False
+    assert update.message == "Alice: gg"
+
+
 def test_connect_event(dispatcher: EventDispatcher, event_context: EventContext) -> None:
     event = parse_log_event(
         'L 01/02/2024 - 03:04:05: "Alice<2><STEAM_1:2><CT>" connected, address "1.2.3.4:27005"'
@@ -136,8 +152,8 @@ def test_connect_event(dispatcher: EventDispatcher, event_context: EventContext)
     update = dispatcher.dispatch(event, event_context)
 
     assert update.category is EventCategory.CONNECTION
-    assert update.attributes["address"] == "1.2.3.4:27005"
-    assert update.message == "Alice connected from 1.2.3.4:27005"
+    assert update.attributes["address"] == "1.2.3.4"
+    assert update.message == "Alice connected from 1.2.3.4"
 
 
 def test_disconnect_event(dispatcher: EventDispatcher, event_context: EventContext) -> None:
@@ -160,6 +176,27 @@ def test_world_event(dispatcher: EventDispatcher, event_context: EventContext) -
     assert update.category is EventCategory.WORLD
     assert update.event_code == "round_start"
     assert update.message == "Round Start"
+
+
+def test_entry_event(dispatcher: EventDispatcher, event_context: EventContext) -> None:
+    event = parse_log_event(
+        'L 01/02/2024 - 03:04:05: "Alice<2><STEAM_0:1:2><CT>" entered the game'
+    )
+
+    update = dispatcher.dispatch(event, event_context)
+
+    assert update.category is EventCategory.ENTRY
+    assert update.actor is not None
+    assert update.actor.unique_id == "1:2"
+
+
+def test_team_trigger_event(dispatcher: EventDispatcher, event_context: EventContext) -> None:
+    event = parse_log_event('L 01/02/2024 - 03:04:05: Team "CT" triggered "CTs_Win" (CT "1") (T "0")')
+
+    update = dispatcher.dispatch(event, event_context)
+
+    assert update.category is EventCategory.TEAM_BONUS
+    assert update.attributes["team"] == "CT"
 
 
 def test_generic_fallback(dispatcher: EventDispatcher, event_context: EventContext) -> None:

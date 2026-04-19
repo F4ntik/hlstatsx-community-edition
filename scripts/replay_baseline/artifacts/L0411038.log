@@ -1,0 +1,9 @@
+L 04/11/2026 - 12:58:17: Log file started (file "logs/L0411038.log") (game "cstrike") (version "48/1.1.2.7/Stdio/4328")
+L 04/11/2026 - 12:58:17: Server cvar "sv_restart" = "1"
+L 04/11/2026 - 12:58:17: World triggered "Restart_Round_(1_second)"
+L 04/11/2026 - 12:58:17: Team "CT" scored "0" with "0" players
+L 04/11/2026 - 12:58:17: Team "TERRORIST" scored "0" with "0" players
+L 04/11/2026 - 12:58:17: Server cvar "sv_restart" = "0"
+L 04/11/2026 - 12:58:18: World triggered "Round_Start"
+L 04/11/2026 - 12:58:18: World triggered "Round_Start"
+L 04/11/2026 - 12:58:21: Log file closed

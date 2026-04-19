@@ -1,9 +1,10 @@
 """Persistence layer that mirrors ``hlstats.pl`` database mutations."""
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Optional, Protocol
+from typing import Any, Callable, Optional, Protocol
 
 from proxy_daemon_py import db as proxy_db
 from .events import EventCategory, EventContext, EventUpdate
@@ -33,16 +34,80 @@ _PLAYER_BY_NAME_QUERY = (
     "SELECT `playerId` FROM hlstats_Players WHERE `lastName` = %s AND `game` = %s"
     " ORDER BY `playerId` DESC LIMIT 1"
 )
+_SELECT_PLAYER_STATE_QUERY = (
+    "SELECT `skill`, `kills`, `lastAddress`, `connection_time` "
+    "FROM hlstats_Players WHERE `playerId` = %s LIMIT 1"
+)
 _INSERT_PLAYER_QUERY = "INSERT INTO hlstats_Players (`game`, `lastName`) VALUES (%s, %s)"
 _LAST_INSERT_ID_QUERY = "SELECT LAST_INSERT_ID()"
 _UPDATE_PLAYER_NAME_QUERY = "UPDATE hlstats_Players SET `lastName` = %s WHERE `playerId` = %s"
+_UPDATE_PLAYER_LAST_ADDRESS_QUERY = "UPDATE hlstats_Players SET `lastAddress` = %s WHERE `playerId` = %s"
 _UPSERT_PLAYER_NAME_QUERY = (
-    "INSERT INTO hlstats_PlayerNames (`playerId`, `name`, `lastuse`) VALUES (%s, %s, %s) "
+    "INSERT INTO hlstats_PlayerNames (`playerId`, `name`, `lastuse`, `numuses`) VALUES (%s, %s, %s, 1) "
     "ON DUPLICATE KEY UPDATE `lastuse` = VALUES(`lastuse`), `numuses` = `numuses` + 1"
+)
+_UPDATE_PLAYERNAME_LASTUSE_QUERY = (
+    "UPDATE hlstats_PlayerNames SET `lastuse` = %s WHERE `playerId` = %s AND `name` = %s"
+)
+_UPDATE_PLAYERNAME_TOTALS_QUERY = (
+    "UPDATE hlstats_PlayerNames "
+    "SET `connection_time` = `connection_time` + %s, "
+    "`kills` = `kills` + %s, "
+    "`deaths` = `deaths` + %s, "
+    "`suicides` = `suicides` + %s, "
+    "`headshots` = `headshots` + %s, "
+    "`shots` = `shots` + %s, "
+    "`hits` = `hits` + %s "
+    "WHERE `playerId` = %s AND `name` = %s"
 )
 _UPSERT_PLAYER_UNIQUE_QUERY = (
     "INSERT INTO hlstats_PlayerUniqueIds (`playerId`, `uniqueId`, `game`) VALUES (%s, %s, %s) "
     "ON DUPLICATE KEY UPDATE `playerId` = VALUES(`playerId`)"
+)
+_UPSERT_PLAYER_HISTORY_QUERY = (
+    "INSERT INTO hlstats_Players_History (`playerId`, `eventTime`, `game`, `skill`) "
+    "VALUES (%s, %s, %s, %s) "
+    "ON DUPLICATE KEY UPDATE `playerId` = `playerId`"
+)
+_SELECT_PLAYER_HISTORY_SNAPSHOT_QUERY = (
+    "SELECT `connection_time`, `kills`, `deaths`, `suicides`, `skill`, `headshots`, "
+    "`shots`, `hits`, `teamkills`, `death_streak`, `kill_streak`, `skill_change` "
+    "FROM hlstats_Players_History WHERE `playerId` = %s AND `eventTime` = %s AND `game` = %s LIMIT 1"
+)
+_REPLACE_PLAYER_HISTORY_SNAPSHOT_QUERY = (
+    "UPDATE hlstats_Players_History "
+    "SET `connection_time` = %s, "
+    "`kills` = %s, "
+    "`deaths` = %s, "
+    "`suicides` = %s, "
+    "`skill` = %s, "
+    "`headshots` = %s, "
+    "`shots` = %s, "
+    "`hits` = %s, "
+    "`teamkills` = %s, "
+    "`death_streak` = %s, "
+    "`kill_streak` = %s, "
+    "`skill_change` = %s "
+    "WHERE `playerId` = %s AND `eventTime` = %s AND `game` = %s"
+)
+_DELETE_PLAYER_HISTORY_QUERY = (
+    "DELETE FROM hlstats_Players_History WHERE `playerId` = %s AND `eventTime` = %s AND `game` = %s"
+)
+_UPDATE_PLAYER_HISTORY_QUERY = (
+    "UPDATE hlstats_Players_History "
+    "SET `connection_time` = `connection_time` + %s, "
+    "`kills` = `kills` + %s, "
+    "`deaths` = `deaths` + %s, "
+    "`suicides` = `suicides` + %s, "
+    "`skill` = %s, "
+    "`headshots` = `headshots` + %s, "
+    "`shots` = `shots` + %s, "
+    "`hits` = `hits` + %s, "
+    "`teamkills` = `teamkills` + %s, "
+    "`death_streak` = IF(%s > `death_streak`, %s, `death_streak`), "
+    "`kill_streak` = IF(%s > `kill_streak`, %s, `kill_streak`), "
+    "`skill_change` = `skill_change` + %s "
+    "WHERE `playerId` = %s AND `eventTime` = %s AND `game` = %s"
 )
 _INSERT_FRAG_QUERY = (
     "INSERT INTO hlstats_Events_Frags ("
@@ -50,6 +115,12 @@ _INSERT_FRAG_QUERY = (
     "`killerRole`, `victimRole`, `pos_x`, `pos_y`, `pos_z`, "
     "`pos_victim_x`, `pos_victim_y`, `pos_victim_z`) "
     "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+)
+_INSERT_TEAMKILL_QUERY = (
+    "INSERT INTO hlstats_Events_Teamkills ("
+    "`eventTime`, `serverId`, `map`, `killerId`, `victimId`, `weapon`, "
+    "`pos_x`, `pos_y`, `pos_z`, `pos_victim_x`, `pos_victim_y`, `pos_victim_z`) "
+    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
 )
 _UPDATE_PLAYER_KILLS_QUERY = (
     "UPDATE hlstats_Players SET `kills` = `kills` + %s, `headshots` = `headshots` + %s "
@@ -61,6 +132,15 @@ _UPDATE_PLAYER_DEATHS_QUERY = (
 _UPDATE_PLAYER_SUICIDES_QUERY = (
     "UPDATE hlstats_Players SET `suicides` = `suicides` + 1 WHERE `playerId` = %s"
 )
+_UPDATE_PLAYER_TEAMKILLS_QUERY = (
+    "UPDATE hlstats_Players SET `teamkills` = `teamkills` + 1 WHERE `playerId` = %s"
+)
+_UPDATE_PLAYER_STREAKS_QUERY = (
+    "UPDATE hlstats_Players "
+    "SET `kill_streak` = IF(%s > `kill_streak`, %s, `kill_streak`), "
+    "`death_streak` = IF(%s > `death_streak`, %s, `death_streak`) "
+    "WHERE `playerId` = %s"
+)
 _UPSERT_WEAPON_QUERY = (
     "INSERT INTO hlstats_Weapons (`game`, `code`, `name`, `modifier`, `kills`, `headshots`) "
     "VALUES (%s, %s, %s, %s, %s, %s) "
@@ -69,9 +149,19 @@ _UPSERT_WEAPON_QUERY = (
     "`headshots` = `headshots` + VALUES(`headshots`), "
     "`name` = VALUES(`name`)"
 )
+_SELECT_WEAPON_MODIFIER_QUERY = (
+    "SELECT `modifier` FROM hlstats_Weapons WHERE `game` = %s AND `code` = %s LIMIT 1"
+)
 _SELECT_ACTION_QUERY = (
     "SELECT `id`, `reward_player`, `reward_team` FROM hlstats_Actions "
     "WHERE `game` = %s AND `code` = %s LIMIT 1"
+)
+_SELECT_OPTION_QUERY = "SELECT `value` FROM hlstats_Options WHERE `keyname` = %s LIMIT 1"
+_SELECT_SERVER_CONFIG_QUERY = (
+    "SELECT `value` FROM hlstats_Servers_Config WHERE `serverId` = %s AND `parameter` = %s LIMIT 1"
+)
+_SELECT_DEFAULT_SERVER_CONFIG_QUERY = (
+    "SELECT `value` FROM hlstats_Servers_Config_Default WHERE `parameter` = %s LIMIT 1"
 )
 _INSERT_ACTION_QUERY = (
     "INSERT INTO hlstats_Actions ("
@@ -86,18 +176,48 @@ _INSERT_PLAYER_ACTION_QUERY = (
     "`eventTime`, `serverId`, `map`, `playerId`, `actionId`, `bonus`) "
     "VALUES (%s, %s, %s, %s, %s, %s)"
 )
+_INSERT_TEAM_BONUS_QUERY = (
+    "INSERT INTO hlstats_Events_TeamBonuses ("
+    "`eventTime`, `serverId`, `map`, `playerId`, `actionId`, `bonus`) "
+    "VALUES (%s, %s, %s, %s, %s, %s)"
+)
 _INSERT_PLAYER_PLAYER_ACTION_QUERY = (
     "INSERT INTO hlstats_Events_PlayerPlayerActions ("
     "`eventTime`, `serverId`, `map`, `playerId`, `victimId`, `actionId`, `bonus`) "
     "VALUES (%s, %s, %s, %s, %s, %s, %s)"
 )
+_INSERT_ENTRY_QUERY = (
+    "INSERT INTO hlstats_Events_Entries ("
+    "`eventTime`, `serverId`, `map`, `playerId`) "
+    "VALUES (%s, %s, %s, %s)"
+)
 _UPDATE_PLAYER_SKILL_QUERY = (
     "UPDATE hlstats_Players SET `skill` = `skill` + %s WHERE `playerId` = %s"
+)
+_UPDATE_PLAYER_SHOTS_HITS_QUERY = (
+    "UPDATE hlstats_Players SET `shots` = `shots` + %s, `hits` = `hits` + %s WHERE `playerId` = %s"
+)
+_UPDATE_PLAYERNAME_SHOTS_HITS_QUERY = (
+    "UPDATE hlstats_PlayerNames "
+    "SET `shots` = `shots` + %s, `hits` = `hits` + %s "
+    "WHERE `playerId` = %s AND `name` = %s"
 )
 _INSERT_CHAT_QUERY = (
     "INSERT INTO hlstats_Events_Chat ("
     "`eventTime`, `serverId`, `map`, `playerId`, `message_mode`, `message`) "
     "VALUES (%s, %s, %s, %s, %s, %s)"
+)
+_INSERT_STATSME_QUERY = (
+    "INSERT INTO hlstats_Events_Statsme ("
+    "`eventTime`, `serverId`, `map`, `playerId`, `weapon`, `shots`, `hits`, "
+    "`headshots`, `damage`, `kills`, `deaths`) "
+    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+)
+_INSERT_STATSME2_QUERY = (
+    "INSERT INTO hlstats_Events_Statsme2 ("
+    "`eventTime`, `serverId`, `map`, `playerId`, `weapon`, `head`, `chest`, "
+    "`stomach`, `leftarm`, `rightarm`, `leftleg`, `rightleg`) "
+    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
 )
 _INSERT_TEAM_CHANGE_QUERY = (
     "INSERT INTO hlstats_Events_ChangeTeam ("
@@ -119,6 +239,35 @@ _INSERT_ADMIN_EVENT_QUERY = (
     "`eventTime`, `serverId`, `map`, `type`, `message`, `playerName`) "
     "VALUES (%s, %s, %s, %s, %s, %s)"
 )
+_UPDATE_SERVER_PLAYER_TOTALS_QUERY = (
+    "UPDATE hlstats_Servers "
+    "SET `players` = %s, `act_players` = %s "
+    "WHERE `serverId` = %s"
+)
+_UPDATE_SERVER_FRAG_TOTALS_QUERY = (
+    "UPDATE hlstats_Servers "
+    "SET `kills` = `kills` + %s, `headshots` = `headshots` + %s "
+    "WHERE `serverId` = %s"
+)
+_UPDATE_SERVER_CT_SHOTS_HITS_QUERY = (
+    "UPDATE hlstats_Servers "
+    "SET `ct_shots` = `ct_shots` + %s, `ct_hits` = `ct_hits` + %s, "
+    "`map_ct_shots` = `map_ct_shots` + %s, `map_ct_hits` = `map_ct_hits` + %s "
+    "WHERE `serverId` = %s"
+)
+_UPDATE_SERVER_TS_SHOTS_HITS_QUERY = (
+    "UPDATE hlstats_Servers "
+    "SET `ts_shots` = `ts_shots` + %s, `ts_hits` = `ts_hits` + %s, "
+    "`map_ts_shots` = `map_ts_shots` + %s, `map_ts_hits` = `map_ts_hits` + %s "
+    "WHERE `serverId` = %s"
+)
+_UPSERT_MAP_COUNTS_QUERY = (
+    "INSERT INTO hlstats_Maps_Counts (`game`, `map`, `kills`, `headshots`) "
+    "VALUES (%s, %s, %s, %s) "
+    "ON DUPLICATE KEY UPDATE "
+    "`kills` = `kills` + VALUES(`kills`), "
+    "`headshots` = `headshots` + VALUES(`headshots`)"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -128,13 +277,69 @@ class _PlayerCacheKey:
     user_id: Optional[int]
 
 
+@dataclass(frozen=True, slots=True)
+class _ActionMetadata:
+    action_id: int
+    reward_player: int
+    reward_team: int
+
+
 class EventStorage:
     """Translate :class:`EventUpdate` objects into SQL statements."""
 
-    def __init__(self, adapter: SupportsConnectionProvider) -> None:
+    def __init__(
+        self,
+        adapter: SupportsConnectionProvider,
+        *,
+        clock: Callable[[], datetime] | None = None,
+    ) -> None:
         self._adapter = adapter
+        self._clock = clock or (lambda: datetime.now().replace(microsecond=0))
         self._player_cache: dict[_PlayerCacheKey, int] = {}
-        self._action_cache: dict[tuple[str, str], int] = {}
+        self._action_cache: dict[tuple[str, str], _ActionMetadata] = {}
+        self._player_teams: dict[int, str] = {}
+        self._player_names: dict[int, str] = {}
+        self._player_name_uses: set[tuple[int, str]] = set()
+        self._server_players: dict[int, set[int]] = {}
+        self._server_connected_players: dict[int, set[int]] = {}
+        self._server_active_players: dict[int, set[int]] = {}
+        self._server_skill_modes: dict[int, int] = {}
+        self._server_min_players: dict[int, int] = {}
+        self._server_tk_penalties: dict[int, int] = {}
+        self._option_cache: dict[str, int] = {}
+        self._weapon_modifiers: dict[tuple[str, str], float] = {}
+        self._player_kill_streaks: dict[int, int] = {}
+        self._player_death_streaks: dict[int, int] = {}
+        self._player_max_kill_streaks: dict[int, int] = {}
+        self._player_max_death_streaks: dict[int, int] = {}
+        self._player_kills_per_life: dict[int, int] = {}
+        self._player_deaths_in_a_row: dict[int, int] = {}
+        self._player_skills: dict[int, int] = {}
+        self._player_total_kills: dict[int, int] = {}
+
+    def reset_runtime_state(self) -> None:
+        """Drop replay/session-local caches after a runtime reload."""
+
+        self._player_cache.clear()
+        self._player_teams.clear()
+        self._player_names.clear()
+        self._player_name_uses.clear()
+        self._server_players.clear()
+        self._server_connected_players.clear()
+        self._server_active_players.clear()
+        self._server_skill_modes.clear()
+        self._server_min_players.clear()
+        self._server_tk_penalties.clear()
+        self._option_cache.clear()
+        self._weapon_modifiers.clear()
+        self._player_kill_streaks.clear()
+        self._player_death_streaks.clear()
+        self._player_max_kill_streaks.clear()
+        self._player_max_death_streaks.clear()
+        self._player_kills_per_life.clear()
+        self._player_deaths_in_a_row.clear()
+        self._player_skills.clear()
+        self._player_total_kills.clear()
 
     def record(self, update: EventUpdate, context: EventContext) -> None:
         """Persist *update* using metadata from *context*."""
@@ -142,20 +347,53 @@ class EventStorage:
         connection = self._connection()
         map_name = self._resolve_map(context)
         timestamp = self._normalize_timestamp(update.timestamp)
+        processed_at = self._processing_timestamp()
 
         try:
-            if update.category is EventCategory.FRAG:
-                self._record_frag(connection, update, context, map_name, timestamp)
-            elif update.category is EventCategory.ACTION:
-                self._record_action(connection, update, context, map_name, timestamp)
-            elif update.category is EventCategory.CHAT:
-                self._record_chat(connection, update, context, map_name, timestamp)
-            elif update.category is EventCategory.TEAM:
-                self._record_team_change(connection, update, context, map_name, timestamp)
-            elif update.category is EventCategory.CONNECTION:
-                self._record_connection(connection, update, context, map_name, timestamp)
-            elif update.category is EventCategory.WORLD:
+            if update.category is EventCategory.WORLD:
+                self._handle_world_state(connection, update, context, map_name, timestamp, processed_at)
                 self._record_world_action(connection, update, context, map_name, timestamp)
+                return
+
+            if update.category in {
+                EventCategory.FRAG,
+                EventCategory.ACTION,
+                EventCategory.STATSME,
+                EventCategory.STATSME2,
+            }:
+                self._prime_player_state(connection, update, context, timestamp, processed_at)
+
+            if (
+                update.category in {
+                    EventCategory.FRAG,
+                    EventCategory.ACTION,
+                    EventCategory.STATSME,
+                    EventCategory.STATSME2,
+                    EventCategory.TEAM_BONUS,
+                }
+                and self._active_trackable_players(context.server_id)
+                < self._server_min_players_required(connection, context.server_id)
+            ):
+                return
+
+            if update.category is EventCategory.FRAG:
+                self._record_frag(connection, update, context, map_name, timestamp, processed_at)
+            elif update.category is EventCategory.ACTION:
+                self._record_action(connection, update, context, map_name, timestamp, processed_at)
+            elif update.category is EventCategory.STATSME:
+                self._record_statsme(connection, update, context, map_name, timestamp, processed_at)
+            elif update.category is EventCategory.STATSME2:
+                self._record_statsme2(connection, update, context, map_name, timestamp, processed_at)
+            elif update.category is EventCategory.CHAT:
+                self._record_chat(connection, update, context, map_name, timestamp, processed_at)
+            elif update.category is EventCategory.TEAM:
+                self._record_team_change(connection, update, context, map_name, timestamp, processed_at)
+            elif update.category is EventCategory.TEAM_BONUS:
+                self._record_team_bonus(connection, update, context, map_name, timestamp, processed_at)
+            elif update.category is EventCategory.CONNECTION:
+                self._record_connection(connection, update, context, map_name, timestamp, processed_at)
+            elif update.category is EventCategory.ENTRY:
+                self._record_entry(connection, update, context, map_name, timestamp, processed_at)
             else:
                 self._record_generic(connection, update, context, map_name, timestamp)
         except Exception as exc:  # pragma: no cover - safety net
@@ -171,14 +409,51 @@ class EventStorage:
         context: EventContext,
         map_name: str,
         timestamp: datetime,
+        processed_at: datetime,
     ) -> None:
-        killer_id = self._resolve_player_id(connection, update.actor, context, timestamp)
+        killer_id = self._resolve_player_id(connection, update.actor, context, timestamp, processed_at)
         victim_descriptor = update.target if update.target is not None else update.actor
-        victim_id = self._resolve_player_id(connection, victim_descriptor, context, timestamp)
+        victim_id = self._resolve_player_id(connection, victim_descriptor, context, timestamp, processed_at)
 
         headshot = 1 if update.attributes.get("headshot") else 0
         killer_role = self._extract_role(update.actor)
         victim_role = self._extract_role(update.target)
+        properties = update.attributes.get("properties")
+        attacker_position = self._parse_position(
+            properties.get("attacker_position") if isinstance(properties, Mapping) else None
+        )
+        victim_position = self._parse_position(
+            properties.get("victim_position") if isinstance(properties, Mapping) else None
+        )
+        if headshot:
+            attacker_position = (None, None, None)
+
+        killer_team = self._effective_player_team(killer_id, update.actor)
+        victim_team = self._effective_player_team(victim_id, update.target)
+        is_teamkill = (
+            killer_id is not None
+            and victim_id is not None
+            and killer_id != victim_id
+            and killer_team != ""
+            and killer_team == victim_team
+        )
+
+        if is_teamkill:
+            self._record_teamkill(
+                connection,
+                context=context,
+                map_name=map_name,
+                timestamp=timestamp,
+                processed_at=processed_at,
+                killer_id=killer_id,
+                victim_id=victim_id,
+                weapon_code=update.event_code,
+                weapon_name=str(update.attributes.get("weapon_name") or update.event_code),
+                headshot=headshot,
+                attacker_position=attacker_position,
+                victim_position=victim_position,
+            )
+            return
 
         params = (
             timestamp,
@@ -190,12 +465,12 @@ class EventStorage:
             headshot,
             killer_role,
             victim_role,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
+            attacker_position[0],
+            attacker_position[1],
+            attacker_position[2],
+            victim_position[0],
+            victim_position[1],
+            victim_position[2],
         )
         self._execute(connection, _INSERT_FRAG_QUERY, params)
 
@@ -217,6 +492,96 @@ class EventStorage:
             _UPSERT_WEAPON_QUERY,
             (context.game, update.event_code, weapon_name, 1.0, 1, headshot),
         )
+        self._execute(
+            connection,
+            _UPDATE_SERVER_FRAG_TOTALS_QUERY,
+            (1, headshot, context.server_id),
+        )
+        self._execute(
+            connection,
+            _UPSERT_MAP_COUNTS_QUERY,
+            (context.game, map_name, 1, headshot),
+        )
+
+        if killer_id and victim_id and killer_id != victim_id:
+            self._player_kills_per_life[killer_id] = self._player_kills_per_life.get(killer_id, 0) + 1
+            self._player_total_kills[killer_id] = self._player_total_kills.get(killer_id, 0) + 1
+            self._player_deaths_in_a_row[victim_id] = self._player_deaths_in_a_row.get(victim_id, 0) + 1
+            self._player_deaths_in_a_row[killer_id] = 0
+            self._end_kill_streak(
+                connection,
+                context=context,
+                map_name=map_name,
+                timestamp=timestamp,
+                processed_at=processed_at,
+                player_id=victim_id,
+            )
+            killer_streak = self._set_player_streaks(connection, killer_id, kill_delta=1, reset_deaths=True)
+            victim_streak = self._set_player_streaks(connection, victim_id, death_delta=1, reset_kills=True)
+            killer_skill_delta, victim_skill_delta = self._calculate_frag_skill_deltas(
+                connection,
+                context=context,
+                weapon_code=update.event_code,
+                killer_id=killer_id,
+                victim_id=victim_id,
+            )
+            if killer_skill_delta:
+                self._execute(connection, _UPDATE_PLAYER_SKILL_QUERY, (killer_skill_delta, killer_id))
+            if victim_skill_delta:
+                self._execute(connection, _UPDATE_PLAYER_SKILL_QUERY, (victim_skill_delta, victim_id))
+
+            self._update_player_rollups(
+                connection,
+                context=context,
+                timestamp=timestamp,
+                processed_at=processed_at,
+                player_id=killer_id,
+                kills=1,
+                headshots=headshot,
+                skill_delta=killer_skill_delta,
+                kill_streak=self._player_max_kill_streaks.get(killer_id, killer_streak),
+            )
+            self._update_player_rollups(
+                connection,
+                context=context,
+                timestamp=timestamp,
+                processed_at=processed_at,
+                player_id=victim_id,
+                deaths=1,
+                skill_delta=victim_skill_delta,
+                death_streak=self._player_max_death_streaks.get(victim_id, victim_streak),
+            )
+
+            if headshot:
+                self._record_derived_player_action(
+                    connection,
+                    context=context,
+                    map_name=map_name,
+                    timestamp=timestamp,
+                    processed_at=processed_at,
+                    player_id=killer_id,
+                    action_code="headshot",
+                )
+        elif victim_id:
+            self._player_deaths_in_a_row[victim_id] = self._player_deaths_in_a_row.get(victim_id, 0) + 1
+            self._end_kill_streak(
+                connection,
+                context=context,
+                map_name=map_name,
+                timestamp=timestamp,
+                processed_at=processed_at,
+                player_id=victim_id,
+            )
+            victim_streak = self._set_player_streaks(connection, victim_id, death_delta=1, reset_kills=True)
+            self._update_player_rollups(
+                connection,
+                context=context,
+                timestamp=timestamp,
+                processed_at=processed_at,
+                player_id=victim_id,
+                deaths=1,
+                death_streak=self._player_max_death_streaks.get(victim_id, victim_streak),
+            )
 
     def _record_action(
         self,
@@ -225,11 +590,12 @@ class EventStorage:
         context: EventContext,
         map_name: str,
         timestamp: datetime,
+        processed_at: datetime,
     ) -> None:
-        actor_id = self._resolve_player_id(connection, update.actor, context, timestamp)
-        victim_id = self._resolve_player_id(connection, update.target, context, timestamp)
-        action_id = self._ensure_action_id(connection, context.game, update)
-        bonus = int(update.attributes.get("points") or 0)
+        actor_id = self._resolve_player_id(connection, update.actor, context, timestamp, processed_at)
+        victim_id = self._resolve_player_id(connection, update.target, context, timestamp, processed_at)
+        action = self._ensure_action_metadata(connection, context.game, update)
+        bonus = int(update.attributes.get("points") or action.reward_player)
 
         if victim_id:
             self._execute(
@@ -241,7 +607,7 @@ class EventStorage:
                     map_name,
                     actor_id or 0,
                     victim_id,
-                    action_id,
+                    action.action_id,
                     bonus,
                 ),
             )
@@ -254,14 +620,33 @@ class EventStorage:
                     context.server_id,
                     map_name,
                     actor_id or 0,
-                    action_id,
+                    action.action_id,
                     bonus,
                 ),
             )
 
-        self._execute(connection, _INCREMENT_ACTION_COUNT_QUERY, (action_id,))
+        self._execute(connection, _INCREMENT_ACTION_COUNT_QUERY, (action.action_id,))
         if actor_id and bonus:
-            self._execute(connection, _UPDATE_PLAYER_SKILL_QUERY, (bonus, actor_id))
+            self._apply_player_skill_delta(
+                connection,
+                context=context,
+                timestamp=timestamp,
+                processed_at=processed_at,
+                player_id=actor_id,
+                delta=bonus,
+            )
+        if action.reward_team:
+            team = str(update.attributes.get("team") or self._effective_player_team(actor_id, update.actor))
+            self._reward_team_players(
+                connection,
+                context=context,
+                map_name=map_name,
+                timestamp=timestamp,
+                processed_at=processed_at,
+                team=team,
+                action=action,
+                bonus=action.reward_team,
+            )
 
     def _record_chat(
         self,
@@ -270,9 +655,10 @@ class EventStorage:
         context: EventContext,
         map_name: str,
         timestamp: datetime,
+        processed_at: datetime,
     ) -> None:
-        actor_id = self._resolve_player_id(connection, update.actor, context, timestamp)
-        team_only = 1 if update.attributes.get("team_only") else 0
+        actor_id = self._resolve_player_id(connection, update.actor, context, timestamp, processed_at)
+        team_only = 2 if update.attributes.get("team_only") else 1
         message = str(update.attributes.get("message", ""))
         self._execute(
             connection,
@@ -287,6 +673,96 @@ class EventStorage:
             ),
         )
 
+    def _record_statsme(
+        self,
+        connection: proxy_db.SupportsConnection,
+        update: EventUpdate,
+        context: EventContext,
+        map_name: str,
+        timestamp: datetime,
+        processed_at: datetime,
+    ) -> None:
+        actor_id = self._resolve_player_id(connection, update.actor, context, timestamp, processed_at)
+        if actor_id is None:
+            return
+
+        shots = int(update.attributes.get("shots") or 0)
+        hits = int(update.attributes.get("hits") or 0)
+        weapon_code = str(update.attributes.get("weapon_code") or update.event_code)
+        self._execute(
+            connection,
+            _INSERT_STATSME_QUERY,
+            (
+                timestamp,
+                context.server_id,
+                map_name,
+                actor_id,
+                weapon_code,
+                shots,
+                hits,
+                int(update.attributes.get("headshots") or 0),
+                int(update.attributes.get("damage") or 0),
+                int(update.attributes.get("kills") or 0),
+                int(update.attributes.get("deaths") or 0),
+            ),
+        )
+        self._execute(connection, _UPDATE_PLAYER_SHOTS_HITS_QUERY, (shots, hits, actor_id))
+        self._update_player_rollups(
+            connection,
+            context=context,
+            timestamp=timestamp,
+            processed_at=processed_at,
+            player_id=actor_id,
+            shots=shots,
+            hits=hits,
+        )
+        player_team = self._effective_player_team(actor_id, update.actor)
+        if player_team == "CT":
+            self._execute(
+                connection,
+                _UPDATE_SERVER_CT_SHOTS_HITS_QUERY,
+                (shots, hits, shots, hits, context.server_id),
+            )
+        elif player_team == "TERRORIST":
+            self._execute(
+                connection,
+                _UPDATE_SERVER_TS_SHOTS_HITS_QUERY,
+                (shots, hits, shots, hits, context.server_id),
+            )
+
+    def _record_statsme2(
+        self,
+        connection: proxy_db.SupportsConnection,
+        update: EventUpdate,
+        context: EventContext,
+        map_name: str,
+        timestamp: datetime,
+        processed_at: datetime,
+    ) -> None:
+        actor_id = self._resolve_player_id(connection, update.actor, context, timestamp, processed_at)
+        if actor_id is None:
+            return
+
+        weapon_code = str(update.attributes.get("weapon_code") or update.event_code)
+        self._execute(
+            connection,
+            _INSERT_STATSME2_QUERY,
+            (
+                timestamp,
+                context.server_id,
+                map_name,
+                actor_id,
+                weapon_code,
+                int(update.attributes.get("head") or 0),
+                int(update.attributes.get("chest") or 0),
+                int(update.attributes.get("stomach") or 0),
+                int(update.attributes.get("leftarm") or 0),
+                int(update.attributes.get("rightarm") or 0),
+                int(update.attributes.get("leftleg") or 0),
+                int(update.attributes.get("rightleg") or 0),
+            ),
+        )
+
     def _record_team_change(
         self,
         connection: proxy_db.SupportsConnection,
@@ -294,8 +770,9 @@ class EventStorage:
         context: EventContext,
         map_name: str,
         timestamp: datetime,
+        processed_at: datetime,
     ) -> None:
-        actor_id = self._resolve_player_id(connection, update.actor, context, timestamp)
+        actor_id = self._resolve_player_id(connection, update.actor, context, timestamp, processed_at)
         team = str(update.attributes.get("team", update.event_code))
         self._execute(
             connection,
@@ -308,6 +785,52 @@ class EventStorage:
                 team,
             ),
         )
+        if actor_id:
+            self._player_teams[actor_id] = team
+            self._update_player_presence(context.server_id, actor_id, team)
+
+    def _record_team_bonus(
+        self,
+        connection: proxy_db.SupportsConnection,
+        update: EventUpdate,
+        context: EventContext,
+        map_name: str,
+        timestamp: datetime,
+        processed_at: datetime,
+    ) -> None:
+        team = str(update.attributes.get("team") or "")
+        row = self._fetchone(
+            connection,
+            _SELECT_ACTION_QUERY,
+            (context.game, update.event_code),
+        )
+        if row:
+            action = _ActionMetadata(
+                action_id=int(row[0]),
+                reward_player=int(row[1] or 0),
+                reward_team=int(row[2] or 0),
+            )
+            self._action_cache[(context.game, update.event_code)] = action
+        else:
+            if not update.attributes.get("team_award") and not int(update.attributes.get("points") or 0):
+                return
+            action = self._ensure_action_metadata(connection, context.game, update)
+        bonus = int(update.attributes.get("points") or action.reward_team)
+        self._execute(connection, _INCREMENT_ACTION_COUNT_QUERY, (action.action_id,))
+
+        if not team or bonus == 0:
+            return
+
+        self._reward_team_players(
+            connection,
+            context=context,
+            map_name=map_name,
+            timestamp=timestamp,
+            processed_at=processed_at,
+            team=team,
+            action=action,
+            bonus=bonus,
+        )
 
     def _record_connection(
         self,
@@ -316,8 +839,9 @@ class EventStorage:
         context: EventContext,
         map_name: str,
         timestamp: datetime,
+        processed_at: datetime,
     ) -> None:
-        actor_id = self._resolve_player_id(connection, update.actor, context, timestamp)
+        actor_id = self._resolve_player_id(connection, update.actor, context, timestamp, processed_at)
         if update.event_code == "connect":
             address = str(update.attributes.get("address") or "")
             self._execute(
@@ -336,7 +860,7 @@ class EventStorage:
             if actor_id and address:
                 self._execute(
                     connection,
-                    "UPDATE hlstats_Players SET `lastAddress` = %s WHERE `playerId` = %s",
+                    _UPDATE_PLAYER_LAST_ADDRESS_QUERY,
                     (address, actor_id),
                 )
         else:
@@ -345,6 +869,33 @@ class EventStorage:
                 _INSERT_DISCONNECT_QUERY,
                 (timestamp, context.server_id, map_name, actor_id or 0),
             )
+            if actor_id:
+                self._realign_player_history_day(
+                    connection,
+                    context=context,
+                    player_id=actor_id,
+                    event_timestamp=timestamp,
+                    processed_at=processed_at,
+                )
+                self._server_active_players.setdefault(context.server_id, set()).discard(actor_id)
+                self._server_connected_players.setdefault(context.server_id, set()).discard(actor_id)
+                self._refresh_server_player_totals(connection, context.server_id)
+
+    def _record_entry(
+        self,
+        connection: proxy_db.SupportsConnection,
+        update: EventUpdate,
+        context: EventContext,
+        map_name: str,
+        timestamp: datetime,
+        processed_at: datetime,
+    ) -> None:
+        actor_id = self._resolve_player_id(connection, update.actor, context, timestamp, processed_at)
+        self._execute(
+            connection,
+            _INSERT_ENTRY_QUERY,
+            (timestamp, context.server_id, map_name, actor_id or 0),
+        )
 
     def _record_world_action(
         self,
@@ -354,21 +905,9 @@ class EventStorage:
         map_name: str,
         timestamp: datetime,
     ) -> None:
-        action_id = self._ensure_action_id(connection, context.game, update)
-        bonus = int(update.attributes.get("points") or 0)
-        self._execute(
-            connection,
-            _INSERT_PLAYER_ACTION_QUERY,
-            (
-                timestamp,
-                context.server_id,
-                map_name,
-                0,
-                action_id,
-                bonus,
-            ),
-        )
-        self._execute(connection, _INCREMENT_ACTION_COUNT_QUERY, (action_id,))
+        # Legacy replay does not persist standalone world rows such as
+        # Round_Start / Round_End into the statistical event tables.
+        return
 
     def _record_generic(
         self,
@@ -393,6 +932,28 @@ class EventStorage:
             ),
         )
 
+    def _prime_player_state(
+        self,
+        connection: proxy_db.SupportsConnection,
+        update: EventUpdate,
+        context: EventContext,
+        timestamp: datetime,
+        processed_at: datetime,
+    ) -> None:
+        descriptors: list[PlayerDescriptor] = []
+        if update.actor is not None:
+            descriptors.append(update.actor)
+        if update.target is not None:
+            descriptors.append(update.target)
+
+        seen: set[_PlayerCacheKey] = set()
+        for descriptor in descriptors:
+            cache_key = self._cache_key_for_player(context.game, descriptor)
+            if cache_key in seen:
+                continue
+            seen.add(cache_key)
+            self._resolve_player_id(connection, descriptor, context, timestamp, processed_at)
+
     # ------------------------------------------------------------------
     # Resolution helpers
 
@@ -402,6 +963,7 @@ class EventStorage:
         descriptor: Optional[PlayerDescriptor],
         context: EventContext,
         timestamp: datetime,
+        processed_at: datetime,
     ) -> Optional[int]:
         if descriptor is None:
             return None
@@ -418,9 +980,41 @@ class EventStorage:
                         _UPSERT_PLAYER_UNIQUE_QUERY,
                         (player_id, descriptor.unique_id, context.game),
                     )
+                self._touch_player_profile(
+                    connection,
+                    player_id,
+                    descriptor,
+                    track_name_history=True,
+                )
+            else:
+                self._touch_player_profile(
+                    connection,
+                    player_id,
+                    descriptor,
+                    track_name_history=False,
+                )
             self._player_cache[cache_key] = player_id
+            tracked_players = self._server_players.setdefault(context.server_id, set())
+            connected_players = self._server_connected_players.setdefault(context.server_id, set())
+            needs_server_total_refresh = False
+            if player_id not in tracked_players:
+                tracked_players.add(player_id)
+                needs_server_total_refresh = True
+            if player_id not in connected_players:
+                connected_players.add(player_id)
+                needs_server_total_refresh = True
+            if needs_server_total_refresh:
+                self._refresh_server_player_totals(connection, context.server_id)
 
-        self._touch_player_profile(connection, player_id, descriptor, timestamp)
+        if descriptor.team:
+            self._player_teams[player_id] = descriptor.team
+            self._update_player_presence(context.server_id, player_id, descriptor.team)
+        if descriptor.name:
+            self._player_names[player_id] = descriptor.name
+            self._touch_player_name(connection, player_id, descriptor.name, processed_at)
+        self._ensure_player_history_row(connection, context, player_id, timestamp)
+        if self._history_timestamp(processed_at) != self._history_timestamp(timestamp):
+            self._ensure_player_history_row(connection, context, player_id, processed_at)
         return player_id
 
     def _cache_key_for_player(self, game: str, descriptor: PlayerDescriptor) -> _PlayerCacheKey:
@@ -469,21 +1063,49 @@ class EventStorage:
         connection: proxy_db.SupportsConnection,
         player_id: int,
         descriptor: PlayerDescriptor,
-        timestamp: datetime,
+        *,
+        track_name_history: bool,
     ) -> None:
         self._execute(connection, _UPDATE_PLAYER_NAME_QUERY, (descriptor.name, player_id))
+        self._player_names[player_id] = descriptor.name
+        if player_id not in self._player_skills or player_id not in self._player_total_kills:
+            row = self._fetchone(connection, _SELECT_PLAYER_STATE_QUERY, (player_id,))
+            if row:
+                self._player_skills[player_id] = int(row[0] or 1000)
+                self._player_total_kills[player_id] = int(row[1] or 0)
+            else:
+                self._player_skills.setdefault(player_id, 1000)
+                self._player_total_kills.setdefault(player_id, 0)
+        self._player_max_kill_streaks.setdefault(player_id, 0)
+        self._player_max_death_streaks.setdefault(player_id, 0)
+        self._player_kills_per_life.setdefault(player_id, 0)
+        self._player_deaths_in_a_row.setdefault(player_id, 0)
+
+    def _touch_player_name(
+        self,
+        connection: proxy_db.SupportsConnection,
+        player_id: int,
+        player_name: str,
+        processed_at: datetime,
+    ) -> None:
+        key = (player_id, player_name)
+        if key not in self._player_name_uses:
+            self._execute(connection, _UPSERT_PLAYER_NAME_QUERY, (player_id, player_name, processed_at))
+            self._player_name_uses.add(key)
+            return
+
         self._execute(
             connection,
-            _UPSERT_PLAYER_NAME_QUERY,
-            (player_id, descriptor.name, timestamp),
+            _UPDATE_PLAYERNAME_LASTUSE_QUERY,
+            (processed_at, player_id, player_name),
         )
 
-    def _ensure_action_id(
+    def _ensure_action_metadata(
         self,
         connection: proxy_db.SupportsConnection,
         game: str,
         update: EventUpdate,
-    ) -> int:
+    ) -> _ActionMetadata:
         cache_key = (game, update.event_code)
         cached = self._action_cache.get(cache_key)
         if cached is not None:
@@ -495,12 +1117,16 @@ class EventStorage:
             (game, update.event_code),
         )
         if row:
-            action_id = int(row[0])
+            action = _ActionMetadata(
+                action_id=int(row[0]),
+                reward_player=int(row[1] or 0),
+                reward_team=int(row[2] or 0),
+            )
         else:
             description = update.attributes.get("description") or update.event_code
             reward_player = int(update.attributes.get("points") or 0)
             reward_team = 1 if update.attributes.get("team_award") else 0
-            team = ""
+            team = str(update.attributes.get("team") or "")
             self._execute(
                 connection,
                 _INSERT_ACTION_QUERY,
@@ -509,9 +1135,566 @@ class EventStorage:
             row = self._fetchone(connection, _LAST_INSERT_ID_QUERY, None)
             if not row:
                 raise StorageError("Failed to create action definition")
-            action_id = int(row[0])
-        self._action_cache[cache_key] = action_id
-        return action_id
+            action = _ActionMetadata(
+                action_id=int(row[0]),
+                reward_player=reward_player,
+                reward_team=reward_team,
+            )
+        self._action_cache[cache_key] = action
+        return action
+
+    def _effective_player_team(
+        self,
+        player_id: int | None,
+        descriptor: Optional[PlayerDescriptor],
+    ) -> str:
+        if descriptor and descriptor.team:
+            return descriptor.team
+        if player_id is None:
+            return ""
+        return self._player_teams.get(player_id, "")
+
+    def _option_int(
+        self,
+        connection: proxy_db.SupportsConnection,
+        key: str,
+        *,
+        default: int,
+    ) -> int:
+        cached = self._option_cache.get(key)
+        if cached is not None:
+            return cached
+        row = self._fetchone(connection, _SELECT_OPTION_QUERY, (key,))
+        value = int(row[0]) if row and row[0] is not None else default
+        self._option_cache[key] = value
+        return value
+
+    def _server_skill_mode(
+        self,
+        connection: proxy_db.SupportsConnection,
+        server_id: int,
+    ) -> int:
+        cached = self._server_skill_modes.get(server_id)
+        if cached is not None:
+            return cached
+        row = self._fetchone(connection, _SELECT_SERVER_CONFIG_QUERY, (server_id, "SkillMode"))
+        if row and row[0] is not None:
+            value = int(row[0])
+        else:
+            default_row = self._fetchone(connection, _SELECT_DEFAULT_SERVER_CONFIG_QUERY, ("SkillMode",))
+            value = int(default_row[0]) if default_row and default_row[0] is not None else 0
+        self._server_skill_modes[server_id] = value
+        return value
+
+    def _server_min_players_required(
+        self,
+        connection: proxy_db.SupportsConnection,
+        server_id: int,
+    ) -> int:
+        cached = self._server_min_players.get(server_id)
+        if cached is not None:
+            return cached
+        row = self._fetchone(connection, _SELECT_SERVER_CONFIG_QUERY, (server_id, "MinPlayers"))
+        if row and row[0] is not None:
+            value = int(row[0])
+        else:
+            default_row = self._fetchone(connection, _SELECT_DEFAULT_SERVER_CONFIG_QUERY, ("MinPlayers",))
+            value = int(default_row[0]) if default_row and default_row[0] is not None else 0
+        self._server_min_players[server_id] = value
+        return value
+
+    def _server_tk_penalty(
+        self,
+        connection: proxy_db.SupportsConnection,
+        server_id: int,
+    ) -> int:
+        cached = self._server_tk_penalties.get(server_id)
+        if cached is not None:
+            return cached
+        row = self._fetchone(connection, _SELECT_SERVER_CONFIG_QUERY, (server_id, "TKPenalty"))
+        if row and row[0] is not None:
+            value = int(row[0])
+        else:
+            default_row = self._fetchone(connection, _SELECT_DEFAULT_SERVER_CONFIG_QUERY, ("TKPenalty",))
+            value = int(default_row[0]) if default_row and default_row[0] is not None else 50
+        self._server_tk_penalties[server_id] = value
+        return value
+
+    def _weapon_modifier(
+        self,
+        connection: proxy_db.SupportsConnection,
+        game: str,
+        weapon_code: str,
+    ) -> float:
+        cache_key = (game, weapon_code)
+        cached = self._weapon_modifiers.get(cache_key)
+        if cached is not None:
+            return cached
+        row = self._fetchone(connection, _SELECT_WEAPON_MODIFIER_QUERY, (game, weapon_code))
+        value = float(row[0]) if row and row[0] is not None else 1.0
+        self._weapon_modifiers[cache_key] = value
+        return value
+
+    def _set_player_streaks(
+        self,
+        connection: proxy_db.SupportsConnection,
+        player_id: int,
+        *,
+        kill_delta: int = 0,
+        death_delta: int = 0,
+        reset_kills: bool = False,
+        reset_deaths: bool = False,
+    ) -> int:
+        kill_streak = 0 if reset_kills else self._player_kill_streaks.get(player_id, 0)
+        death_streak = 0 if reset_deaths else self._player_death_streaks.get(player_id, 0)
+        kill_streak += kill_delta
+        death_streak += death_delta
+        self._player_kill_streaks[player_id] = kill_streak
+        self._player_death_streaks[player_id] = death_streak
+        max_kill_streak = max(kill_streak, self._player_max_kill_streaks.get(player_id, 0))
+        max_death_streak = max(death_streak, self._player_max_death_streaks.get(player_id, 0))
+        self._player_max_kill_streaks[player_id] = max_kill_streak
+        self._player_max_death_streaks[player_id] = max_death_streak
+        self._execute(
+            connection,
+            _UPDATE_PLAYER_STREAKS_QUERY,
+            (max_kill_streak, max_kill_streak, max_death_streak, max_death_streak, player_id),
+        )
+        return kill_streak
+
+    def _handle_world_state(
+        self,
+        connection: proxy_db.SupportsConnection,
+        update: EventUpdate,
+        context: EventContext,
+        map_name: str,
+        timestamp: datetime,
+        processed_at: datetime,
+    ) -> None:
+        if update.event_code in {"Restart_Round_(1_second)", "Round_End"}:
+            self._drain_kill_streaks(connection, context, map_name, timestamp, processed_at)
+            self._reset_round_streaks()
+
+    def _reset_round_streaks(self) -> None:
+        self._player_kill_streaks.clear()
+
+    def _active_trackable_players(self, server_id: int) -> int:
+        return len(self._server_active_players.get(server_id, set()))
+
+    def _update_player_presence(self, server_id: int, player_id: int, team: str) -> bool:
+        active_players = self._server_active_players.setdefault(server_id, set())
+        was_active = player_id in active_players
+        if self._is_trackable_team(team):
+            active_players.add(player_id)
+        else:
+            active_players.discard(player_id)
+        return was_active != (player_id in active_players)
+
+    def _refresh_server_player_totals(
+        self,
+        connection: proxy_db.SupportsConnection,
+        server_id: int,
+    ) -> None:
+        total_players = len(self._server_players.get(server_id, set()))
+        active_players = len(self._server_connected_players.get(server_id, set()))
+        self._execute(
+            connection,
+            _UPDATE_SERVER_PLAYER_TOTALS_QUERY,
+            (total_players, active_players, server_id),
+        )
+
+    def _is_trackable_team(self, team: str) -> bool:
+        normalized = team.strip().upper()
+        return normalized not in {"", "SPECTATOR", "SPECTATORS", "SPEC", "UNASSIGNED"}
+
+    def _record_teamkill(
+        self,
+        connection: proxy_db.SupportsConnection,
+        *,
+        context: EventContext,
+        map_name: str,
+        timestamp: datetime,
+        processed_at: datetime,
+        killer_id: int,
+        victim_id: int,
+        weapon_code: str,
+        weapon_name: str,
+        headshot: int,
+        attacker_position: tuple[int | None, int | None, int | None],
+        victim_position: tuple[int | None, int | None, int | None],
+    ) -> None:
+        self._execute(
+            connection,
+            _INSERT_TEAMKILL_QUERY,
+            (
+                timestamp,
+                context.server_id,
+                map_name,
+                killer_id,
+                victim_id,
+                weapon_code,
+                attacker_position[0],
+                attacker_position[1],
+                attacker_position[2],
+                victim_position[0],
+                victim_position[1],
+                victim_position[2],
+            ),
+        )
+        self._execute(connection, _UPDATE_PLAYER_TEAMKILLS_QUERY, (killer_id,))
+        penalty = (-1) * self._server_tk_penalty(connection, context.server_id)
+        if penalty:
+            self._execute(connection, _UPDATE_PLAYER_SKILL_QUERY, (penalty, killer_id))
+        self._execute(
+            connection,
+            _UPSERT_WEAPON_QUERY,
+            (context.game, weapon_code, weapon_name, 1.0, 1, headshot),
+        )
+        self._update_player_rollups(
+            connection,
+            context=context,
+            timestamp=timestamp,
+            processed_at=processed_at,
+            player_id=killer_id,
+            teamkills=1,
+            skill_delta=penalty,
+        )
+
+    def _drain_kill_streaks(
+        self,
+        connection: proxy_db.SupportsConnection,
+        context: EventContext,
+        map_name: str,
+        timestamp: datetime,
+        processed_at: datetime,
+    ) -> None:
+        for player_id in list(self._player_kills_per_life):
+            self._end_kill_streak(
+                connection,
+                context=context,
+                map_name=map_name,
+                timestamp=timestamp,
+                processed_at=processed_at,
+                player_id=player_id,
+            )
+
+    def _end_kill_streak(
+        self,
+        connection: proxy_db.SupportsConnection,
+        *,
+        context: EventContext,
+        map_name: str,
+        timestamp: datetime,
+        processed_at: datetime,
+        player_id: int,
+    ) -> None:
+        kill_total = self._player_kills_per_life.get(player_id, 0)
+        if kill_total <= 1:
+            self._player_kills_per_life[player_id] = 0
+            return
+        self._record_derived_player_action(
+            connection,
+            context=context,
+            map_name=map_name,
+            timestamp=timestamp,
+            processed_at=processed_at,
+            player_id=player_id,
+            action_code=f"kill_streak_{min(kill_total, 12)}",
+        )
+        self._player_kills_per_life[player_id] = 0
+
+    def _record_derived_player_action(
+        self,
+        connection: proxy_db.SupportsConnection,
+        *,
+        context: EventContext,
+        map_name: str,
+        timestamp: datetime,
+        processed_at: datetime,
+        player_id: int,
+        action_code: str,
+    ) -> None:
+        update = EventUpdate(
+            category=EventCategory.ACTION,
+            event_code=action_code,
+            actor=None,
+            target=None,
+            timestamp=timestamp,
+        )
+        action = self._ensure_action_metadata(connection, context.game, update)
+        bonus = action.reward_player
+        self._execute(
+            connection,
+            _INSERT_PLAYER_ACTION_QUERY,
+            (timestamp, context.server_id, map_name, player_id, action.action_id, bonus),
+        )
+        self._execute(connection, _INCREMENT_ACTION_COUNT_QUERY, (action.action_id,))
+        if bonus:
+            self._apply_player_skill_delta(
+                connection,
+                context=context,
+                timestamp=timestamp,
+                processed_at=processed_at,
+                player_id=player_id,
+                delta=bonus,
+            )
+
+    def _ensure_player_history_row(
+        self,
+        connection: proxy_db.SupportsConnection,
+        context: EventContext,
+        player_id: int,
+        timestamp: datetime,
+    ) -> None:
+        self._player_skills.setdefault(player_id, 1000)
+        self._execute(
+            connection,
+            _UPSERT_PLAYER_HISTORY_QUERY,
+            (player_id, self._history_timestamp(timestamp), context.game, self._player_skills[player_id]),
+        )
+
+    def _update_player_rollups(
+        self,
+        connection: proxy_db.SupportsConnection,
+        *,
+        context: EventContext,
+        timestamp: datetime,
+        processed_at: datetime,
+        player_id: int,
+        kills: int = 0,
+        deaths: int = 0,
+        suicides: int = 0,
+        headshots: int = 0,
+        shots: int = 0,
+        hits: int = 0,
+        teamkills: int = 0,
+        skill_delta: int = 0,
+        kill_streak: int | None = None,
+        death_streak: int | None = None,
+    ) -> None:
+        current_skill = self._player_skills.setdefault(player_id, 1000) + skill_delta
+        self._player_skills[player_id] = current_skill
+        history_timestamp = self._history_timestamp(processed_at)
+        self._ensure_player_history_row(connection, context, player_id, timestamp)
+
+        player_name = self._player_names.get(player_id)
+        if player_name:
+            self._execute(
+                connection,
+                _UPDATE_PLAYERNAME_TOTALS_QUERY,
+                (0, kills, deaths, suicides, headshots, shots, hits, player_id, player_name),
+            )
+
+        resolved_death_streak = death_streak or 0
+        resolved_kill_streak = kill_streak or 0
+        self._execute(
+            connection,
+            _UPDATE_PLAYER_HISTORY_QUERY,
+            (
+                0,
+                kills,
+                deaths,
+                suicides,
+                current_skill,
+                headshots,
+                shots,
+                hits,
+                teamkills,
+                resolved_death_streak,
+                resolved_death_streak,
+                resolved_kill_streak,
+                resolved_kill_streak,
+                skill_delta,
+                player_id,
+                history_timestamp,
+                context.game,
+            ),
+        )
+
+    def _calculate_frag_skill_deltas(
+        self,
+        connection: proxy_db.SupportsConnection,
+        *,
+        context: EventContext,
+        weapon_code: str,
+        killer_id: int,
+        victim_id: int,
+    ) -> tuple[int, int]:
+        killer_skill = self._player_skills.setdefault(killer_id, 1000)
+        victim_skill = self._player_skills.setdefault(victim_id, 1000)
+        killer_kills = self._player_total_kills.get(killer_id, 0)
+        victim_kills = self._player_total_kills.get(victim_id, 0)
+        skill_mode = self._server_skill_mode(connection, context.server_id)
+        max_change = self._option_int(connection, "SkillMaxChange", default=100)
+        min_change = self._option_int(connection, "SkillMinChange", default=2)
+        ratio_cap = self._option_int(connection, "SkillRatioCap", default=0)
+        min_kills = self._option_int(connection, "PlayerMinKills", default=50)
+        modifier = self._weapon_modifier(connection, context.game, weapon_code)
+        killer_team = self._player_teams.get(killer_id, "")
+
+        if killer_skill < 1:
+            return min_change, 0
+        if victim_skill < 1:
+            return min_change, 0
+
+        if ratio_cap > 0:
+            low_ratio = 0.7
+            high_ratio = 1.0 / low_ratio
+            ratio = victim_skill / killer_skill
+            if ratio < low_ratio:
+                ratio = low_ratio
+            if ratio > high_ratio:
+                ratio = high_ratio
+            killer_change = ratio * 5 * modifier
+        else:
+            killer_change = (victim_skill / killer_skill) * 5 * modifier
+
+        if killer_change > max_change:
+            killer_change = max_change
+
+        victim_change = killer_change
+        if skill_mode == 1:
+            victim_change = killer_change * 0.75
+        elif skill_mode == 2:
+            victim_change = killer_change * 0.5
+        elif skill_mode == 3:
+            victim_change = killer_change * 0.25
+        elif skill_mode == 4:
+            victim_change = 0
+        elif skill_mode == 5:
+            if killer_team == "Undead":
+                victim_change = killer_change * 0.5
+            elif killer_team == "Survivor":
+                victim_change = killer_change * 0.25
+
+        if victim_change > max_change:
+            victim_change = max_change
+
+        if max_change >= min_change:
+            if killer_change < min_change:
+                killer_change = min_change
+            if victim_change < min_change and skill_mode != 4:
+                victim_change = min_change
+
+        if killer_kills < min_kills or victim_kills < min_kills:
+            killer_change = min_change
+            victim_change = 0 if skill_mode == 4 else min_change
+
+        killer_delta = int(killer_skill + killer_change + 0.5) - killer_skill
+        victim_delta = int(victim_skill - victim_change + 0.5) - victim_skill
+        return killer_delta, victim_delta
+
+    def _apply_player_skill_delta(
+        self,
+        connection: proxy_db.SupportsConnection,
+        *,
+        context: EventContext,
+        timestamp: datetime,
+        processed_at: datetime,
+        player_id: int,
+        delta: int,
+    ) -> None:
+        self._execute(connection, _UPDATE_PLAYER_SKILL_QUERY, (delta, player_id))
+        self._update_player_rollups(
+            connection,
+            context=context,
+            timestamp=timestamp,
+            processed_at=processed_at,
+            player_id=player_id,
+            skill_delta=delta,
+            kill_streak=self._player_max_kill_streaks.get(player_id, 0),
+            death_streak=self._player_max_death_streaks.get(player_id, 0),
+        )
+
+    def _reward_team_players(
+        self,
+        connection: proxy_db.SupportsConnection,
+        *,
+        context: EventContext,
+        map_name: str,
+        timestamp: datetime,
+        processed_at: datetime,
+        team: str,
+        action: _ActionMetadata,
+        bonus: int,
+    ) -> None:
+        active_players = self._server_active_players.get(context.server_id, set())
+        for player_id in sorted(active_players):
+            if self._player_teams.get(player_id) != team:
+                continue
+            self._execute(
+                connection,
+                _INSERT_TEAM_BONUS_QUERY,
+                (timestamp, context.server_id, map_name, player_id, action.action_id, bonus),
+            )
+            self._apply_player_skill_delta(
+                connection,
+                context=context,
+                timestamp=timestamp,
+                processed_at=processed_at,
+                player_id=player_id,
+                delta=bonus,
+            )
+
+    def _history_timestamp(self, timestamp: datetime) -> datetime:
+        return datetime(timestamp.year, timestamp.month, timestamp.day)
+
+    def _realign_player_history_day(
+        self,
+        connection: proxy_db.SupportsConnection,
+        *,
+        context: EventContext,
+        player_id: int,
+        event_timestamp: datetime,
+        processed_at: datetime,
+    ) -> None:
+        source_day = self._history_timestamp(processed_at)
+        target_day = self._history_timestamp(event_timestamp)
+        if source_day == target_day:
+            return
+
+        row = self._fetchone(
+            connection,
+            _SELECT_PLAYER_HISTORY_SNAPSHOT_QUERY,
+            (player_id, source_day, context.game),
+        )
+        if row is None:
+            return
+
+        self._execute(
+            connection,
+            _UPSERT_PLAYER_HISTORY_QUERY,
+            (player_id, target_day, context.game, int(row[4] or 1000)),
+        )
+        self._execute(
+            connection,
+            _REPLACE_PLAYER_HISTORY_SNAPSHOT_QUERY,
+            (
+                int(row[0] or 0),
+                int(row[1] or 0),
+                int(row[2] or 0),
+                int(row[3] or 0),
+                int(row[4] or 1000),
+                int(row[5] or 0),
+                int(row[6] or 0),
+                int(row[7] or 0),
+                int(row[8] or 0),
+                int(row[9] or 0),
+                int(row[10] or 0),
+                int(row[11] or 0),
+                player_id,
+                target_day,
+                context.game,
+            ),
+        )
+        self._execute(
+            connection,
+            _DELETE_PLAYER_HISTORY_QUERY,
+            (player_id, source_day, context.game),
+        )
+
+    def _processing_timestamp(self) -> datetime:
+        return self._normalize_timestamp(self._clock())
 
     # ------------------------------------------------------------------
     # Low level helpers
@@ -521,8 +1704,8 @@ class EventStorage:
 
     def _resolve_map(self, context: EventContext) -> str:
         map_name = context.extras.get("map") if context.extras else None
-        if not map_name:
-            raise StorageError("Event context is missing current map name")
+        if not map_name or str(map_name) == "unknown":
+            return ""
         return str(map_name)
 
     def _normalize_timestamp(self, moment: datetime) -> datetime:
@@ -534,6 +1717,17 @@ class EventStorage:
         if descriptor is None or not descriptor.additional_tokens:
             return ""
         return descriptor.additional_tokens[0]
+
+    def _parse_position(self, value: Any) -> tuple[int | None, int | None, int | None]:
+        if not isinstance(value, str):
+            return (None, None, None)
+        parts = value.split()
+        if len(parts) != 3:
+            return (None, None, None)
+        try:
+            return (int(parts[0]), int(parts[1]), int(parts[2]))
+        except ValueError:
+            return (None, None, None)
 
     def _execute(
         self,

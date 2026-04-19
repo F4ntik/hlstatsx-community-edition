@@ -114,7 +114,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 Are you sure you want to clean up all statistics? All inactive players, clans and events will be deleted from the database. (All other admin settings will be retained.)<p>
 
-<b>Note</b> You should kill <b>hlstats.pl</b> before resetting the stats. You can restart it after they are reset.<p>
+<b>Note</b> You should stop the statistics runtime before resetting the stats. You can restart it after they are reset.<p>
 
 <input type="hidden" name="confirm" value="1">
 <center><input type="submit" value="  Reset Stats  "></center>

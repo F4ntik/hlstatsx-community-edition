@@ -1,0 +1,10 @@
+L 04/18/2026 - 02:04:20: Log file started (file "logs/L0418006.log") (game "cstrike") (version "48/1.1.2.7/Stdio/4328")
+L 04/18/2026 - 02:04:20: Server cvar "sv_restart" = "1"
+L 04/18/2026 - 02:04:20: Rcon: "rcon 2122926088 "pikabu" hlxce_version "1.11.4"" from "172.18.0.1:37667"
+L 04/18/2026 - 02:04:20: World triggered "Restart_Round_(1_second)"
+L 04/18/2026 - 02:04:20: Team "CT" scored "0" with "0" players
+L 04/18/2026 - 02:04:20: Team "TERRORIST" scored "0" with "0" players
+L 04/18/2026 - 02:04:20: Server cvar "sv_restart" = "0"
+L 04/18/2026 - 02:04:21: World triggered "Round_Start"
+L 04/18/2026 - 02:04:21: World triggered "Round_Start"
+L 04/18/2026 - 02:04:24: Log file closed

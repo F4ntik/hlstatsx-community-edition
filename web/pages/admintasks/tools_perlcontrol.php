@@ -51,7 +51,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 
    $commands[0]["name"] = "Reload Configuration";
    $commands[0]["cmd"] = "RELOAD";
-   $commands[1]["name"] = "Shut down the Daemon *";
+   $commands[1]["name"] = "Stop the Runtime *";
    $commands[1]["cmd"] = "KILL";
 
     if (isset($_POST['confirm'])) {
@@ -66,15 +66,15 @@ For support and installation notes visit http://www.hlxcommunity.com
 		{
 			if ($g_options['Proxy_Key'] == "") 
 			{
-				echo "<p><strong>Warning:</strong> You are connecting to a remote daemon and do not have a Proxy Key configured.</p>";
+				echo "<p><strong>Warning:</strong> You are connecting to a remote runtime endpoint and do not have a Proxy Key configured.</p>";
 				
-				echo "<p>Please visit the <a href=\"{$g_options['scripturl']}?mode=admin&task=options#options\">HLstatsX:CE Settings page</a> and configure a Proxy Key.  Once configured, manually restart your daemon.</p>";
+				echo "<p>Please visit the <a href=\"{$g_options['scripturl']}?mode=admin&task=options#options\">HLstatsX:CE Settings page</a> and configure a Proxy Key. Once configured, manually restart the runtime.</p>";
 				die();
 			}
 		}
 		
 		echo "<div style=\"margin-left: 50px;\"><ul>\n";      
-		echo "<li>Sending Command to HLstatsX: CE Daemon at $host:$port &mdash; ";
+		echo "<li>Sending command to HLstatsX runtime at $host:$port &mdash; ";
 		$host = gethostbyname($host);
 		$socket = socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
 		$packet = "";
@@ -127,21 +127,21 @@ For support and installation notes visit http://www.hlxcommunity.com
         
 ?>        
 
-<p>After every configuration change made in the Administration Center, you should reload the daemon configuration.  To do so, enter the hostname or IP address of your HLXCE daemon and choose the reload option.  You can also shut down your daemon from this panel.  <strong>NOTE: The daemon can not be restarted through the web interface!</strong></p>
+<p>After every configuration change made in the Administration Center, you should reload the runtime configuration. To do so, enter the hostname or IP address of your HLXCE runtime endpoint and choose the reload option. You can also stop the runtime from this panel. <strong>NOTE: The runtime can not be restarted through the web interface!</strong></p>
 
 <form method="POST">
 
 	<table class="data-table">
 		<tr class="bg1">
-			<td width="40%"><label for="masterserver">Daemon IP or Hostname:</label><p>Hostname or IP address of your HLX:CE Daemon<br />Normally the IP or Hostname listed in the "logaddress_add" line on your game server.<br />example: daemon1.hlxce.com <em>or</em> 1.2.3.4</p></td>
+			<td width="40%"><label for="masterserver">Runtime IP or Hostname:</label><p>Hostname or IP address of your HLX:CE proxy or worker runtime<br />Normally the IP or Hostname listed in the "logaddress_add" line on your game server.<br />example: daemon1.hlxce.com <em>or</em> 1.2.3.4</p></td>
 			<td><input type="text" name="masterserver" value="localhost"></td>
 		</tr>
 		<tr class="bg2">
-			<td><label for="port">Daemon Port:</label><p>Port number the daemon (or proxy_daemon) is listening on.<br />Normally the port listed in the "logaddress_add" line on your game server configuration.<br />example: 27500</p></td>
+			<td><label for="port">Runtime Port:</label><p>Port number the selected runtime endpoint is listening on.<br />Normally the port listed in the "logaddress_add" line on your game server configuration.<br />example: 27500</p></td>
 			<td><input type="text" name="port" value="27500" size="6"></td>
 		</tr>
 		<tr class="bg1">
-			<td><label for="command">Command:</label><p>Select the operation to perform on the daemon<br /><strong>* Note: If you shut the daemond down through this page it can not be restarted through this interface!</strong></p></td>
+			<td><label for="command">Command:</label><p>Select the operation to perform on the runtime endpoint<br /><strong>* Note: If you stop the runtime through this page it can not be restarted through this interface!</strong></p></td>
 			<td><SELECT NAME="command"><?php
   $i = 0;
   foreach ($commands as $cmd) {

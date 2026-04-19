@@ -11,6 +11,15 @@
 о проделанной работе в строке `Комментарий`. Комментарий может содержать ссылки
 на пул-реквесты, коммиты или основные итоги.
 
+## Последний прогресс
+
+### 2026-03-08
+- Добавлен runnable downstream worker `scripts/hlstats_py/runtime.py`, заменяющий `hlstats.pl` в runtime-цепочке.
+- Добавлены Python launcher-ы `scripts/run_proxy_py` и `scripts/run_hlstats_py` вместо Perl-ориентированной operational-обвязки.
+- Собран full-stack Docker-сценарий `scripts/proxy_daemon_py/fullstack/` для запуска `mysql + proxy daemon + hlstats worker + php web`.
+- Синхронизированы migration docs и тексты PHP-админки с новым Python runtime.
+- Добавлены runtime-тесты `scripts/hlstats_py/tests/test_runtime.py` для UDP worker-контурa (`HEARTBEAT`, `RELOAD`, `SERVERLIST`, запись события).
+
 ## Эпик 0. Подготовка
 - [x] **Задача 0.1. Актуализировать репозиторий и процессы**
   - Комментарий: Создан каркас пакета `scripts/proxy_daemon_py` с модулями и требованиями.
@@ -115,7 +124,7 @@
 
 ## Эпик 7. Ввод в эксплуатацию
 - [x] **Задача 7.1. Документация и обучение**
-  - Комментарий: Добавлено `docs/proxy_daemon_py_operational_runbook.md` с программой обучения, распределением ролей и ссылками на ключевые материалы.
+  - Комментарий: Добавлены `docs/proxy_daemon_py_operational_runbook.md`, `docs/python_migration_usage_guide.md` и `docs/python_fullstack_docker.md`; документация синхронизирована с runnable `hlstats_py` worker, Python launcher-ами и full-stack Docker-сценарием без Perl в runtime.
   - Руководство по развертыванию, настройке, мониторингу.
   - Обновление внутренних wiki/README.
 - [x] **Задача 7.2. Поэтапный запуск**
@@ -159,16 +168,26 @@
 - [x] **Задача 9.3. Запись и обновление данных в БД**
   - Комментарий: Добавлены `scripts/hlstats_py/storage.py` с кэшированием игроков и действий,
     тесты `scripts/hlstats_py/tests/test_storage.py`, документация `docs/hlstats_py_storage.md`
-    и публичный метод `SyncDatabaseAdapter.connection()` для повторного использования соединения.
+    и публичный метод `SyncDatabaseAdapter.connection()` для повторного использования соединения; позже DB-адаптер расширен чтением `act_map`/`hlstats_Servers` для runtime-контекста `hlstats_py`.
   - Настроить пул соединений и ретраи при ошибках.
   - Обновить все соответствующие таблицы (статистика игроков, серверов, достижений).
 - [x] **Задача 9.4. Тестирование и валидация миграции**
   - Комментарий: Добавлены `scripts/hlstats_py/validation.py` с `ReplayRunner`,
     документация `docs/hlstats_py_validation.md` и тест
     `scripts/hlstats_py/tests/test_validation.py`, проигрывающий эталонный
-    набор пакетов и проверяющий SQL-последовательность и счётчики игроков.
+    набор пакетов и проверяющий SQL-последовательность и счётчики игроков; дополнительно добавлен `scripts/hlstats_py/tests/test_runtime.py` для проверки реального UDP worker-контурa (`HEARTBEAT`, `RELOAD`, `SERVERLIST`, запись события).
   - Сравнить результаты Python- и Perl-версий на реплеях трафика.
   - Подготовить чеклисты приёмки и критерии успешности.
+- [x] **Задача 9.5. Собрать runnable runtime для hlstats_py**
+  - Комментарий: Добавлены `scripts/hlstats_py/runtime.py`, `scripts/hlstats_py/cli.py`, `scripts/hlstats_py/__main__.py` и `scripts/hlstats_py/README.md`; Python worker теперь заменяет `hlstats.pl` в downstream-цепочке и принимает UDP-пакеты от `proxy_daemon_py`.
+  - Поднять отдельный UDP listener для downstream worker.
+  - Реализовать обработку `Proxy_Key`, control-команд и загрузку server context из БД.
+  - Обеспечить запись событий в существующую MySQL-схему без изменения PHP web.
+- [x] **Задача 9.6. Убрать Perl из runtime-обвязки**
+  - Комментарий: Добавлены `scripts/run_proxy_py`, `scripts/run_hlstats_py`, full-stack Docker в `scripts/proxy_daemon_py/fullstack/` и обновлены тексты PHP-админки под Python runtime; Perl остаётся только как reference/fallback.
+  - Добавить Python launcher-ы вместо Perl-ориентированных operational-скриптов.
+  - Собрать контейнерный сценарий `mysql + proxy daemon + hlstats worker + php web`.
+  - Синхронизировать admin/docs-терминологию с новым runtime-контуром.
 
 ## Эпик 10. Python-порт hlstats-awards.pl
 - [x] **Задача 10.1. Совместимость CLI и конфигурации**
@@ -206,3 +225,33 @@
     с in-memory коннектором, документация по запуску и мониторингу.
   - Сравнить результаты обновления записей с Perl-версией.
   - Настроить алерты на превышение времени выполнения и ошибки обновления.
+
+## Эпик 12. Legacy follow-ups после основного runtime-порта
+- [ ] **Задача 12.1. Точный Python-совместимый `--stdin` режим для `hlstats_py`**
+  - Комментарий:
+  - Добавить CLI-режим, в котором worker читает log lines из STDIN вместо UDP.
+  - Поддержать обязательные `--server-ip` / `--server-port` и legacy-совместимое
+    использование timestamp из входных логов.
+  - Сверить import-tail поведение с `hlstats.pl --stdin`: flush/finalize,
+    `PlayerNames.lastuse/numuses`, `Players.connection_time`, отчёты прогресса.
+  - Подготовить parity-тесты на одинаковый импорт одного и того же `.log`
+    через legacy `hlstats.pl --stdin` и Python-режим.
+- [ ] **Задача 12.2. Python-порт `HLStatsFTP`**
+  - Комментарий:
+  - Реализовать загрузку удалённых `.log` по FTP/SFTP с хранением `last mtime`
+    и пропуском последнего активного файла, как в legacy `hlstats-ftp.pl`.
+  - Переключить ingestion на Python `--stdin` режим вместо вызова Perl.
+  - Добавить dry-run/verbose режимы и документацию для cron/systemd запуска.
+- [ ] **Задача 12.3. Python-порт `ImportBans`**
+  - Комментарий:
+  - Реализовать чтение ban-данных из SourceBans / AMXBans / BeetlesMod /
+    GlobalBan и обновление `hlstats_Players.hideranking`.
+  - Явно зафиксировать режим работы: только импорт банов как у legacy
+    `importbans.pl` или двусторонняя sync ban/unban.
+  - Добавить интеграционные фикстуры по SteamID-нормализации и мульти-DB
+    выборке.
+- [ ] **Задача 12.4. Экспорт runtime-метрик `/metrics`**
+  - Комментарий:
+  - Добавить Prometheus-совместимые метрики для proxy daemon и `hlstats_py`
+    worker без изменения игрового протокола.
+  - Покрыть базовые health/queue/replay counters и задокументировать scraping.

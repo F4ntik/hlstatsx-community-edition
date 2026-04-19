@@ -1,5 +1,13 @@
 # План переписывания proxy-daemon.pl на Python
 
+## Статус на 8 марта 2026
+- `proxy_daemon_py` реализован как runnable Python runtime с `asyncio`-UDP сервером, heartbeat, reload и round-robin балансировкой.
+- `hlstats_py` больше не ограничен библиотечным слоем: добавлен отдельный runnable worker, принимающий UDP-пакеты от `proxy_daemon_py`, валидирующий `Proxy_Key` и записывающий события в существующую MySQL-схему HLstats.
+- Для локальной и интеграционной проверки доступны два контейнерных сценария:
+  - `scripts/proxy_daemon_py/e2e/` для прокси-контура с моками downstream-демонов;
+  - `scripts/proxy_daemon_py/fullstack/` для полной Python runtime-цепочки `mysql + proxy daemon + hlstats worker + php web`.
+- Perl-файлы остаются в репозитории как reference и fallback, но новый runtime-контур может работать без Perl-процессов.
+
 ## 1. Цели и ограничения
 - Сохранить существующие форматы входящих UDP-пакетов и команд управления (`PROXY Key=... PROXY ...`, `C;HEARTBEAT;`, `C;SERVERLIST;`, `C;RELOAD;`).
 - Сохранить взаимодействие с MySQL (схема БД, таблицы `hlstats_Options`, `Proxy_Key`, `Proxy_Daemons`).
@@ -53,6 +61,7 @@
    - Класс `ProxyDatagramProtocol` (для asyncio) с обработчиками сообщений.
    - Поддержка локальных команд, проверки `proxy_key`, проксирования пакетов.
    - Отправка ответов и пересылка на демоны через `transport.sendto`.
+   - Отдельный downstream worker `hlstats_py.runtime`, слушающий UDP от proxy daemon и сохраняющий события в MySQL.
 
 6. **Heartbeat и контрольные задачи**
    - Периодическое задание (`asyncio.create_task`) для `check_heartbeat()`.
@@ -100,11 +109,34 @@
    - Модульные тесты (round-robin, парсинг команд).
    - Интеграционные тесты с эмулированными UDP-клиентами и моками демонов.
    - Тест с реальной БД (staging) и демонами.
+   - Full-stack smoke test для цепочки `proxy_daemon_py -> hlstats_py -> MySQL -> PHP web`.
 
 10. **План внедрения**
     - Развернуть Python-версию параллельно Perl (порт +1) для теста.
     - После успешных тестов переключить production.
     - Оставить Perl как fallback до подтверждения стабильности.
+
+## 5.1. Текущее фактическое состояние
+
+На момент последнего обновления архитектурного плана закрыты не только задачи
+по proxy daemon, но и практический разрыв между `proxy-daemon.pl` и `hlstats.pl`
+в runtime-контуре:
+
+- `proxy_daemon_py.runtime` можно запускать как production-like entrypoint вместо
+  Perl proxy daemon.
+- `hlstats_py.runtime` реализует downstream worker с обработкой `HEARTBEAT`,
+  `SERVERLIST`, `RELOAD`, `KILL`, загрузкой контекста серверов из `hlstats_Servers`
+  и записью игровых событий в MySQL.
+- Добавлены shell launcher-ы `scripts/run_proxy_py` и `scripts/run_hlstats_py`,
+  заменяющие Perl-ориентированную operational-обвязку.
+- Обновлена PHP-админка: пользовательские тексты больше не привязаны к
+  `hlstats.pl` / `proxy-daemon.pl`, при этом UDP-механика управления сохранена.
+
+Открытые хвосты за пределами runtime-миграции:
+
+- `HLStatsFTP` и `ImportBans` не переносились и по-прежнему остаются legacy Perl-утилитами.
+- `STDIN`-режим совместимости `hlstats.pl` не реализован в Python worker.
+- Экспорт Prometheus `/metrics` для runtime пока не реализован.
 
 ## 6. Оценка трудоёмкости
 - Анализ и дизайн: 1-2 дня.

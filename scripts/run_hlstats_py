@@ -1,0 +1,105 @@
+#!/bin/bash
+
+set -euo pipefail
+
+SCRIPTPATH=.
+CONFFILE=hlstats.conf
+PYTHON_BIN="${PYTHON_BIN:-python3}"
+LOGDIR="${SCRIPTPATH}/logs"
+PIDDIR="${SCRIPTPATH}"
+PYTHONPATH_VALUE="${SCRIPTPATH}:${SCRIPTPATH}/proxy_daemon_py"
+MODULE="hlstats_py.runtime"
+
+mkdir -p "${LOGDIR}"
+
+start_worker() {
+  local port="$1"
+  local log="${LOGDIR}/hlstats_py_${port}_$(date +%Y-%m-%d_%H-%M-%S)"
+  local pidfile="${PIDDIR}/hlstats_py_${port}.pid"
+
+  if [ -f "${pidfile}" ] && kill -0 "$(cat "${pidfile}")" >/dev/null 2>&1; then
+    echo "Worker already running on port ${port}"
+    return 0
+  fi
+
+  rm -f "${pidfile}"
+  PYTHONPATH="${PYTHONPATH_VALUE}" "${PYTHON_BIN}" -m "${MODULE}" \
+    --configfile="${CONFFILE}" \
+    --port="${port}" \
+    --foreground > "${log}" 2>&1 &
+  echo $! > "${pidfile}"
+  echo "Started Python stats worker on port ${port}"
+}
+
+stop_worker() {
+  local port="$1"
+  local pidfile="${PIDDIR}/hlstats_py_${port}.pid"
+
+  if [ ! -f "${pidfile}" ]; then
+    echo "No Python stats worker running on port ${port}"
+    return 0
+  fi
+
+  kill -9 "$(cat "${pidfile}")" >/dev/null 2>&1 || true
+  rm -f "${pidfile}"
+  echo "Stopped Python stats worker on port ${port}"
+}
+
+status_worker() {
+  local port="$1"
+  local pidfile="${PIDDIR}/hlstats_py_${port}.pid"
+  if [ -f "${pidfile}" ] && kill -0 "$(cat "${pidfile}")" >/dev/null 2>&1; then
+    echo "Python stats worker on port ${port} is running"
+  else
+    echo "Python stats worker on port ${port} is not running"
+  fi
+}
+
+case "${1:-}" in
+  start)
+    NUMDAEMONS="${2:-1}"
+    STARTPORT="${3:-28000}"
+    INCREMENT="${4:-1}"
+    i=0
+    current="${STARTPORT}"
+    while [ "${i}" -lt "${NUMDAEMONS}" ]; do
+      start_worker "${current}"
+      current=$((current + INCREMENT))
+      i=$((i + 1))
+    done
+    ;;
+  stop)
+    if [ -n "${2:-}" ]; then
+      stop_worker "${2}"
+    else
+      for pidfile in "${PIDDIR}"/hlstats_py_*.pid; do
+        [ -e "${pidfile}" ] || continue
+        port="$(basename "${pidfile}" .pid | sed 's/^hlstats_py_//')"
+        stop_worker "${port}"
+      done
+    fi
+    ;;
+  restart)
+    if [ -z "${2:-}" ]; then
+      echo "Usage: ./run_hlstats_py restart <port>"
+      exit 1
+    fi
+    stop_worker "${2}"
+    start_worker "${2}"
+    ;;
+  status)
+    if [ -n "${2:-}" ]; then
+      status_worker "${2}"
+    else
+      for pidfile in "${PIDDIR}"/hlstats_py_*.pid; do
+        [ -e "${pidfile}" ] || continue
+        port="$(basename "${pidfile}" .pid | sed 's/^hlstats_py_//')"
+        status_worker "${port}"
+      done
+    fi
+    ;;
+  *)
+    echo "Usage: ./run_hlstats_py [ start <count> <start-port> <increment> | stop <port> | restart <port> | status <port> ]"
+    exit 1
+    ;;
+esac

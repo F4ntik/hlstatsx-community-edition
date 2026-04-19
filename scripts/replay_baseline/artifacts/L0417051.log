@@ -1,0 +1,314 @@
+L 04/17/2026 - 17:02:35: Log file started (file "logs/L0417051.log") (game "cstrike") (version "48/1.1.2.7/Stdio/4328")
+L 04/17/2026 - 17:02:35: Server cvar "mp_friendlyfire" = "1"
+L 04/17/2026 - 17:02:35: Server cvar "mp_give_player_c4" = "1"
+L 04/17/2026 - 17:02:35: Server cvar "mp_round_restart_delay" = "5"
+L 04/17/2026 - 17:02:35: Server cvar "mp_weapons_allow_map_placed" = "1"
+L 04/17/2026 - 17:02:35: Server cvar "mp_timelimit" = "0"
+L 04/17/2026 - 17:02:35: World triggered "Restart_Round_(1_second)"
+L 04/17/2026 - 17:02:35: Team "CT" scored "1" with "2" players
+L 04/17/2026 - 17:02:35: Team "TERRORIST" scored "0" with "2" players
+L 04/17/2026 - 17:02:35: Server cvar "sv_restart" = "0"
+L 04/17/2026 - 17:02:36: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 17:02:37: Server cvar "sv_restart" = "1"
+L 04/17/2026 - 17:02:38: World triggered "Restart_Round_(1_second)"
+L 04/17/2026 - 17:02:38: Team "CT" scored "0" with "2" players
+L 04/17/2026 - 17:02:38: Team "TERRORIST" scored "0" with "2" players
+L 04/17/2026 - 17:02:38: Server cvar "sv_restart" = "0"
+L 04/17/2026 - 17:02:39: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 17:02:40: Server cvar "sv_restart" = "1"
+L 04/17/2026 - 17:02:41: World triggered "Restart_Round_(1_second)"
+L 04/17/2026 - 17:02:41: Team "CT" scored "0" with "2" players
+L 04/17/2026 - 17:02:41: Team "TERRORIST" scored "0" with "2" players
+L 04/17/2026 - 17:02:41: Server cvar "sv_restart" = "0"
+L 04/17/2026 - 17:02:42: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 17:02:43: Server cvar "sv_restart" = "1"
+L 04/17/2026 - 17:02:44: World triggered "Restart_Round_(1_second)"
+L 04/17/2026 - 17:02:44: Team "CT" scored "0" with "2" players
+L 04/17/2026 - 17:02:44: Team "TERRORIST" scored "0" with "2" players
+L 04/17/2026 - 17:02:44: Server cvar "sv_restart" = "0"
+L 04/17/2026 - 17:02:45: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 17:02:45: Rcon: "rcon 2122926088 "pikabu" stats" from "172.18.0.1:35544"
+L 04/17/2026 - 17:03:00: World triggered "Round_Start"
+L 04/17/2026 - 17:03:55: "gatl<123><STEAM_0:0:204938646><TERRORIST>" killed "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" with "usp" (headshot) (attacker_position "1452 1076 196") (victim_position "2234 993 196")
+L 04/17/2026 - 17:03:55: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:39892"
+L 04/17/2026 - 17:03:55: Rcon: "rcon 2122926088 "pikabu" sv_visiblemaxplayers" from "172.18.0.1:43021"
+L 04/17/2026 - 17:03:55: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" triggered "weaponstats" (weapon "usp") (shots "12") (hits "1") (kills "0") (headshots "0") (tks "0") (damage "23") (deaths "1")
+L 04/17/2026 - 17:03:55: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" triggered "weaponstats2" (weapon "usp") (head "0") (chest "1") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:03:55: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" triggered "weaponstats" (weapon "knife") (shots "5") (hits "1") (kills "1") (headshots "1") (tks "0") (damage "260") (deaths "0")
+L 04/17/2026 - 17:03:55: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" triggered "weaponstats2" (weapon "knife") (head "1") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:03:55: "HeraTuBa<117><STEAM_0:0:100993243><>" joined team "SPECTATOR"
+L 04/17/2026 - 17:03:55: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:57898"
+L 04/17/2026 - 17:04:08: "gatl<123><STEAM_0:0:204938646><TERRORIST>" killed "GIRO<126><STEAM_0:1:43536689><CT>" with "usp" (headshot) (attacker_position "1996 1088 196") (victim_position "1522 1006 196")
+L 04/17/2026 - 17:04:08: Team "TERRORIST" triggered "Terrorists_Win" (CT "0") (T "1")
+L 04/17/2026 - 17:04:08: World triggered "Round_End"
+L 04/17/2026 - 17:04:08: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats" (weapon "usp") (shots "5") (hits "1") (kills "0") (headshots "0") (tks "0") (damage "96") (deaths "1")
+L 04/17/2026 - 17:04:08: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats2" (weapon "usp") (head "1") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:04:08: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats" (weapon "knife") (shots "3") (hits "2") (kills "1") (headshots "0") (tks "0") (damage "130") (deaths "0")
+L 04/17/2026 - 17:04:08: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats2" (weapon "knife") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "1")
+L 04/17/2026 - 17:04:13: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 17:04:28: World triggered "Round_Start"
+L 04/17/2026 - 17:04:53: "GIRO<126><STEAM_0:1:43536689><CT>" killed "gatl<123><STEAM_0:0:204938646><TERRORIST>" with "usp" (attacker_position "957 -716 148") (victim_position "862 345 132")
+L 04/17/2026 - 17:04:53: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats" (weapon "usp") (shots "11") (hits "2") (kills "2") (headshots "2") (tks "0") (damage "200") (deaths "0")
+L 04/17/2026 - 17:04:53: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats2" (weapon "usp") (head "2") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:05:31: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" killed "photonly<122><STEAM_0:0:519683270><TERRORIST>" with "usp" (attacker_position "1486 701 196") (victim_position "704 549 132")
+L 04/17/2026 - 17:05:31: Team "CT" triggered "CTs_Win" (CT "1") (T "1")
+L 04/17/2026 - 17:05:31: World triggered "Round_End"
+L 04/17/2026 - 17:05:31: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "weaponstats" (weapon "usp") (shots "1") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 17:05:31: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "weaponstats2" (weapon "usp") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:05:31: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "weaponstats" (weapon "glock18") (shots "17") (hits "1") (kills "0") (headshots "0") (tks "0") (damage "14") (deaths "0")
+L 04/17/2026 - 17:05:31: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "weaponstats2" (weapon "glock18") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "1") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:05:36: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 17:05:51: World triggered "Round_Start"
+L 04/17/2026 - 17:06:07: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" killed "gatl<123><STEAM_0:0:204938646><TERRORIST>" with "m4a1" (attacker_position "2164 1081 196") (victim_position "1494 1028 196")
+L 04/17/2026 - 17:06:07: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "Dropped_The_Bomb"
+L 04/17/2026 - 17:06:07: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:37951"
+L 04/17/2026 - 17:06:07: Rcon: "rcon 2122926088 "pikabu" sv_visiblemaxplayers" from "172.18.0.1:34699"
+L 04/17/2026 - 17:06:07: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats" (weapon "deagle") (shots "1") (hits "1") (kills "0") (headshots "0") (tks "0") (damage "29") (deaths "1")
+L 04/17/2026 - 17:06:07: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats2" (weapon "deagle") (head "0") (chest "0") (stomach "0") (leftarm "1") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:06:23: "GIRO<126><STEAM_0:1:43536689><CT>" killed "photonly<122><STEAM_0:0:519683270><TERRORIST>" with "ak47" (attacker_position "1630 1127 196") (victim_position "1401 958 196")
+L 04/17/2026 - 17:06:23: Team "CT" triggered "CTs_Win" (CT "2") (T "1")
+L 04/17/2026 - 17:06:23: World triggered "Round_End"
+L 04/17/2026 - 17:06:23: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "weaponstats" (weapon "deagle") (shots "13") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "1")
+L 04/17/2026 - 17:06:23: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "weaponstats2" (weapon "deagle") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:06:28: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 17:06:43: World triggered "Round_Start"
+L 04/17/2026 - 17:07:05: "GIRO<126><STEAM_0:1:43536689><CT>" killed "gatl<123><STEAM_0:0:204938646><TERRORIST>" with "ak47" (headshot) (attacker_position "1189 -512 283") (victim_position "1102 -682 204")
+L 04/17/2026 - 17:07:05: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats" (weapon "deagle") (shots "1") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 17:07:05: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats2" (weapon "deagle") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:07:05: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats" (weapon "ak47") (shots "1") (hits "1") (kills "0") (headshots "0") (tks "0") (damage "33") (deaths "1")
+L 04/17/2026 - 17:07:05: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats2" (weapon "ak47") (head "0") (chest "0") (stomach "1") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:07:36: "GIRO<126><STEAM_0:1:43536689><CT>" killed "photonly<122><STEAM_0:0:519683270><TERRORIST>" with "ak47" (headshot) (attacker_position "1873 -243 308") (victim_position "1696 -415 309")
+L 04/17/2026 - 17:07:36: Team "CT" triggered "CTs_Win" (CT "3") (T "1")
+L 04/17/2026 - 17:07:36: World triggered "Round_End"
+L 04/17/2026 - 17:07:36: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "weaponstats" (weapon "deagle") (shots "1") (hits "1") (kills "0") (headshots "0") (tks "0") (damage "36") (deaths "1")
+L 04/17/2026 - 17:07:36: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "weaponstats2" (weapon "deagle") (head "0") (chest "0") (stomach "0") (leftarm "1") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:07:41: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 17:07:45: Rcon: "rcon 2122926088 "pikabu" stats" from "172.18.0.1:33233"
+L 04/17/2026 - 17:07:56: World triggered "Round_Start"
+L 04/17/2026 - 17:08:20: "gatl<123><STEAM_0:0:204938646><TERRORIST>" killed "GIRO<126><STEAM_0:1:43536689><CT>" with "deagle" (headshot) (attacker_position "1340 216 196") (victim_position "1490 -31 196")
+L 04/17/2026 - 17:08:20: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats" (weapon "grenade") (shots "1") (hits "2") (kills "0") (headshots "0") (tks "0") (damage "31") (deaths "0")
+L 04/17/2026 - 17:08:20: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats2" (weapon "grenade") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:08:20: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats" (weapon "usp") (shots "11") (hits "4") (kills "1") (headshots "0") (tks "0") (damage "116") (deaths "0")
+L 04/17/2026 - 17:08:20: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats2" (weapon "usp") (head "1") (chest "0") (stomach "1") (leftarm "0") (rightarm "1") (leftleg "0") (rightleg "1")
+L 04/17/2026 - 17:08:20: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats" (weapon "ak47") (shots "26") (hits "7") (kills "3") (headshots "2") (tks "0") (damage "455") (deaths "1")
+L 04/17/2026 - 17:08:20: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats2" (weapon "ak47") (head "2") (chest "2") (stomach "1") (leftarm "1") (rightarm "1") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:08:20: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats" (weapon "knife") (shots "2") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 17:08:20: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats2" (weapon "knife") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:08:20: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:46476"
+L 04/17/2026 - 17:08:20: Rcon: "rcon 2122926088 "pikabu" sv_visiblemaxplayers" from "172.18.0.1:37613"
+L 04/17/2026 - 17:08:22: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" killed "photonly<122><STEAM_0:0:519683270><TERRORIST>" with "m4a1" (attacker_position "1581 1199 196") (victim_position "1534 902 196")
+L 04/17/2026 - 17:08:22: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "weaponstats" (weapon "glock18") (shots "1") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "1")
+L 04/17/2026 - 17:08:22: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "weaponstats2" (weapon "glock18") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:08:29: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "Planted_The_Bomb"
+L 04/17/2026 - 17:09:04: Team "TERRORIST" triggered "Target_Bombed" (CT "3") (T "2")
+L 04/17/2026 - 17:09:04: World triggered "Round_End"
+L 04/17/2026 - 17:09:04: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" triggered "weaponstats" (weapon "grenade") (shots "1") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 17:09:04: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" triggered "weaponstats2" (weapon "grenade") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:09:04: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" triggered "weaponstats" (weapon "usp") (shots "6") (hits "4") (kills "1") (headshots "0") (tks "0") (damage "92") (deaths "0")
+L 04/17/2026 - 17:09:04: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" triggered "weaponstats2" (weapon "usp") (head "0") (chest "1") (stomach "0") (leftarm "3") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:09:04: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" triggered "weaponstats" (weapon "m4a1") (shots "69") (hits "15") (kills "2") (headshots "0") (tks "0") (damage "274") (deaths "0")
+L 04/17/2026 - 17:09:04: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" triggered "weaponstats2" (weapon "m4a1") (head "0") (chest "2") (stomach "1") (leftarm "8") (rightarm "0") (leftleg "2") (rightleg "2")
+L 04/17/2026 - 17:09:04: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats" (weapon "grenade") (shots "1") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 17:09:04: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats2" (weapon "grenade") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:09:04: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats" (weapon "deagle") (shots "4") (hits "1") (kills "1") (headshots "1") (tks "0") (damage "141") (deaths "0")
+L 04/17/2026 - 17:09:04: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats2" (weapon "deagle") (head "1") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:09:04: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats" (weapon "ak47") (shots "1") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 17:09:04: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats2" (weapon "ak47") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:09:09: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 17:09:24: World triggered "Round_Start"
+L 04/17/2026 - 17:09:51: "gatl<123><STEAM_0:0:204938646><TERRORIST>" killed "GIRO<126><STEAM_0:1:43536689><CT>" with "ak47" (headshot) (attacker_position "1196 -463 308") (victim_position "1256 -316 309")
+L 04/17/2026 - 17:09:51: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats" (weapon "m4a1") (shots "15") (hits "6") (kills "0") (headshots "0") (tks "0") (damage "109") (deaths "1")
+L 04/17/2026 - 17:09:51: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats2" (weapon "m4a1") (head "0") (chest "0") (stomach "0") (leftarm "2") (rightarm "0") (leftleg "1") (rightleg "3")
+L 04/17/2026 - 17:09:51: "photonly<122><STEAM_0:0:519683270><TERRORIST>" killed "gatl<123><STEAM_0:0:204938646><TERRORIST>" with "ak47" (attacker_position "1179 -575 252") (victim_position "1196 -463 308")
+L 04/17/2026 - 17:09:51: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats" (weapon "grenade") (shots "1") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 17:09:51: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats2" (weapon "grenade") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:09:51: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats" (weapon "ak47") (shots "10") (hits "1") (kills "1") (headshots "1") (tks "0") (damage "108") (deaths "1")
+L 04/17/2026 - 17:09:51: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats2" (weapon "ak47") (head "1") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:09:55: "Lin Kuei<119><STEAM_0:0:36417680><SPECTATOR>" say ":D"
+L 04/17/2026 - 17:09:55: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:59080"
+L 04/17/2026 - 17:10:15: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "Planted_The_Bomb"
+L 04/17/2026 - 17:10:28: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" killed "photonly<122><STEAM_0:0:519683270><TERRORIST>" with "m4a1" (headshot) (attacker_position "2396 743 196") (victim_position "2064 768 178")
+L 04/17/2026 - 17:10:28: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:45117"
+L 04/17/2026 - 17:10:28: Rcon: "rcon 2122926088 "pikabu" sv_visiblemaxplayers" from "172.18.0.1:57595"
+L 04/17/2026 - 17:10:28: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "weaponstats" (weapon "ak47") (shots "10") (hits "2") (kills "1") (headshots "0") (tks "1") (damage "21") (deaths "1")
+L 04/17/2026 - 17:10:28: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "weaponstats2" (weapon "ak47") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "2")
+L 04/17/2026 - 17:10:30: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" triggered "Begin_Bomb_Defuse_Without_Kit"
+L 04/17/2026 - 17:10:40: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" triggered "Defused_The_Bomb"
+L 04/17/2026 - 17:10:40: Team "CT" triggered "Bomb_Defused" (CT "4") (T "2")
+L 04/17/2026 - 17:10:40: World triggered "Round_End"
+L 04/17/2026 - 17:10:45: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 17:11:00: World triggered "Round_Start"
+L 04/17/2026 - 17:11:37: "GIRO<126><STEAM_0:1:43536689><CT>" killed "photonly<122><STEAM_0:0:519683270><TERRORIST>" with "m4a1" (headshot) (attacker_position "1183 455 174") (victim_position "1544 527 196")
+L 04/17/2026 - 17:11:45: "gatl<123><STEAM_0:0:204938646><TERRORIST>" killed "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" with "deagle" (headshot) (attacker_position "1445 644 196") (victim_position "1380 761 178")
+L 04/17/2026 - 17:11:45: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" triggered "weaponstats" (weapon "m4a1") (shots "21") (hits "5") (kills "1") (headshots "1") (tks "0") (damage "144") (deaths "1")
+L 04/17/2026 - 17:11:45: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" triggered "weaponstats2" (weapon "m4a1") (head "1") (chest "1") (stomach "0") (leftarm "2") (rightarm "0") (leftleg "1") (rightleg "0")
+L 04/17/2026 - 17:11:45: "GIRO<126><STEAM_0:1:43536689><CT>" killed "gatl<123><STEAM_0:0:204938646><TERRORIST>" with "m4a1" (attacker_position "1122 577 145") (victim_position "1452 655 196")
+L 04/17/2026 - 17:11:45: Team "CT" triggered "CTs_Win" (CT "5") (T "2")
+L 04/17/2026 - 17:11:45: World triggered "Round_End"
+L 04/17/2026 - 17:11:45: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats" (weapon "grenade") (shots "1") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 17:11:45: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats2" (weapon "grenade") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:11:45: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats" (weapon "deagle") (shots "4") (hits "1") (kills "1") (headshots "1") (tks "0") (damage "153") (deaths "1")
+L 04/17/2026 - 17:11:45: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats2" (weapon "deagle") (head "1") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:11:50: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 17:12:05: World triggered "Round_Start"
+L 04/17/2026 - 17:12:45: Rcon: "rcon 2122926088 "pikabu" stats" from "172.18.0.1:44940"
+L 04/17/2026 - 17:12:50: "GIRO<126><STEAM_0:1:43536689><CT>" killed "photonly<122><STEAM_0:0:519683270><TERRORIST>" with "m4a1" (headshot) (attacker_position "1195 -675 204") (victim_position "983 -641 148")
+L 04/17/2026 - 17:12:50: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "Dropped_The_Bomb"
+L 04/17/2026 - 17:12:50: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:58547"
+L 04/17/2026 - 17:12:50: Rcon: "rcon 2122926088 "pikabu" sv_visiblemaxplayers" from "172.18.0.1:51495"
+L 04/17/2026 - 17:13:06: "gatl<123><STEAM_0:0:204938646><TERRORIST>" killed "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" with "ak47" (attacker_position "966 444 133") (victim_position "1378 655 196")
+L 04/17/2026 - 17:13:06: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" triggered "weaponstats" (weapon "m4a1") (shots "2") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "1")
+L 04/17/2026 - 17:13:06: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" triggered "weaponstats2" (weapon "m4a1") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:13:23: "gatl<123><STEAM_0:0:204938646><TERRORIST>" killed "GIRO<126><STEAM_0:1:43536689><CT>" with "ak47" (attacker_position "1508 183 196") (victim_position "2034 -146 348")
+L 04/17/2026 - 17:13:23: Team "TERRORIST" triggered "Terrorists_Win" (CT "5") (T "3")
+L 04/17/2026 - 17:13:23: World triggered "Round_End"
+L 04/17/2026 - 17:13:23: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats" (weapon "grenade") (shots "1") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 17:13:23: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats2" (weapon "grenade") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:13:23: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats" (weapon "m4a1") (shots "33") (hits "11") (kills "3") (headshots "2") (tks "0") (damage "433") (deaths "0")
+L 04/17/2026 - 17:13:23: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats2" (weapon "m4a1") (head "2") (chest "2") (stomach "0") (leftarm "1") (rightarm "2") (leftleg "2") (rightleg "2")
+L 04/17/2026 - 17:13:28: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 17:13:43: World triggered "Round_Start"
+L 04/17/2026 - 17:14:07: "gatl<123><STEAM_0:0:204938646><TERRORIST>" killed "GIRO<126><STEAM_0:1:43536689><CT>" with "ak47" (headshot) (attacker_position "1287 476 196") (victim_position "1612 -5 196")
+L 04/17/2026 - 17:14:07: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats" (weapon "grenade") (shots "1") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 17:14:07: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats2" (weapon "grenade") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:14:08: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" killed "gatl<123><STEAM_0:0:204938646><TERRORIST>" with "m4a1" (attacker_position "1312 1231 178") (victim_position "1304 479 196")
+L 04/17/2026 - 17:14:08: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "Dropped_The_Bomb"
+L 04/17/2026 - 17:14:08: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats" (weapon "grenade") (shots "1") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 17:14:08: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats2" (weapon "grenade") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:14:08: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats" (weapon "ak47") (shots "48") (hits "9") (kills "3") (headshots "1") (tks "0") (damage "325") (deaths "1")
+L 04/17/2026 - 17:14:08: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats2" (weapon "ak47") (head "1") (chest "1") (stomach "1") (leftarm "3") (rightarm "0") (leftleg "1") (rightleg "2")
+L 04/17/2026 - 17:14:10: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" killed "photonly<122><STEAM_0:0:519683270><TERRORIST>" with "m4a1" (attacker_position "1585 1217 178") (victim_position "1443 628 196")
+L 04/17/2026 - 17:14:10: Team "CT" triggered "CTs_Win" (CT "6") (T "3")
+L 04/17/2026 - 17:14:10: World triggered "Round_End"
+L 04/17/2026 - 17:14:10: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "weaponstats" (weapon "ak47") (shots "30") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "1")
+L 04/17/2026 - 17:14:10: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "weaponstats2" (weapon "ak47") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:14:15: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 17:14:30: World triggered "Round_Start"
+L 04/17/2026 - 17:15:20: "gatl<123><STEAM_0:0:204938646><TERRORIST>" killed "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" with "ak47" (attacker_position "1556 540 196") (victim_position "1522 809 196")
+L 04/17/2026 - 17:15:20: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:45687"
+L 04/17/2026 - 17:15:20: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" triggered "weaponstats" (weapon "grenade") (shots "1") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 17:15:20: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" triggered "weaponstats2" (weapon "grenade") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:15:20: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" triggered "weaponstats" (weapon "m4a1") (shots "36") (hits "12") (kills "2") (headshots "0") (tks "0") (damage "264") (deaths "1")
+L 04/17/2026 - 17:15:20: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" triggered "weaponstats2" (weapon "m4a1") (head "0") (chest "2") (stomach "4") (leftarm "3") (rightarm "0") (leftleg "0") (rightleg "3")
+L 04/17/2026 - 17:15:20: Rcon: "rcon 2122926088 "pikabu" sv_visiblemaxplayers" from "172.18.0.1:39307"
+L 04/17/2026 - 17:15:32: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "Planted_The_Bomb"
+L 04/17/2026 - 17:15:36: "gatl<123><STEAM_0:0:204938646><TERRORIST>" killed "GIRO<126><STEAM_0:1:43536689><CT>" with "ak47" (attacker_position "2207 767 196") (victim_position "1846 10 196")
+L 04/17/2026 - 17:15:36: Team "TERRORIST" triggered "Terrorists_Win" (CT "6") (T "4")
+L 04/17/2026 - 17:15:36: World triggered "Round_End"
+L 04/17/2026 - 17:15:36: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats" (weapon "m4a1") (shots "5") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "1")
+L 04/17/2026 - 17:15:36: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats2" (weapon "m4a1") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:15:36: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats" (weapon "knife") (shots "1") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 17:15:36: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats2" (weapon "knife") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:15:41: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 17:15:56: World triggered "Round_Start"
+L 04/17/2026 - 17:16:19: "gatl<123><STEAM_0:0:204938646><TERRORIST>" killed "GIRO<126><STEAM_0:1:43536689><CT>" with "ak47" (headshot) (attacker_position "1118 -303 290") (victim_position "1135 127 242")
+L 04/17/2026 - 17:16:19: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats" (weapon "knife") (shots "1") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 17:16:19: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats2" (weapon "knife") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:16:28: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" killed "photonly<122><STEAM_0:0:519683270><TERRORIST>" with "m4a1" (attacker_position "2275 657 196") (victim_position "2091 -385 308")
+L 04/17/2026 - 17:16:28: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "weaponstats" (weapon "glock18") (shots "18") (hits "2") (kills "0") (headshots "0") (tks "0") (damage "45") (deaths "0")
+L 04/17/2026 - 17:16:28: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "weaponstats2" (weapon "glock18") (head "0") (chest "0") (stomach "2") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:16:28: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "weaponstats" (weapon "m4a1") (shots "6") (hits "4") (kills "0") (headshots "0") (tks "0") (damage "58") (deaths "1")
+L 04/17/2026 - 17:16:28: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "weaponstats2" (weapon "m4a1") (head "0") (chest "0") (stomach "0") (leftarm "4") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:16:39: "gatl<123><STEAM_0:0:204938646><TERRORIST>" killed "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" with "ak47" (attacker_position "1810 -6 196") (victim_position "1808 292 178")
+L 04/17/2026 - 17:16:39: Team "TERRORIST" triggered "Terrorists_Win" (CT "6") (T "5")
+L 04/17/2026 - 17:16:39: World triggered "Round_End"
+L 04/17/2026 - 17:16:39: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" triggered "weaponstats" (weapon "m4a1") (shots "20") (hits "5") (kills "1") (headshots "0") (tks "0") (damage "114") (deaths "1")
+L 04/17/2026 - 17:16:39: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" triggered "weaponstats2" (weapon "m4a1") (head "1") (chest "2") (stomach "1") (leftarm "1") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:16:44: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 17:16:59: World triggered "Round_Start"
+L 04/17/2026 - 17:17:32: "gatl<123><STEAM_0:0:204938646><TERRORIST>" killed "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" with "ak47" (attacker_position "2156 1024 196") (victim_position "1398 1005 196")
+L 04/17/2026 - 17:17:32: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" triggered "weaponstats" (weapon "usp") (shots "10") (hits "3") (kills "0") (headshots "0") (tks "0") (damage "42") (deaths "1")
+L 04/17/2026 - 17:17:32: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" triggered "weaponstats2" (weapon "usp") (head "1") (chest "0") (stomach "0") (leftarm "1") (rightarm "1") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:17:32: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:60294"
+L 04/17/2026 - 17:17:32: Rcon: "rcon 2122926088 "pikabu" sv_visiblemaxplayers" from "172.18.0.1:58949"
+L 04/17/2026 - 17:17:33: "GIRO<126><STEAM_0:1:43536689><CT>" killed "photonly<122><STEAM_0:0:519683270><TERRORIST>" with "usp" (attacker_position "1160 437 170") (victim_position "1176 521 173")
+L 04/17/2026 - 17:17:33: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "Dropped_The_Bomb"
+L 04/17/2026 - 17:17:34: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "weaponstats" (weapon "grenade") (shots "1") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 17:17:34: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "weaponstats2" (weapon "grenade") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:17:34: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "weaponstats" (weapon "ak47") (shots "30") (hits "1") (kills "0") (headshots "0") (tks "0") (damage "35") (deaths "1")
+L 04/17/2026 - 17:17:34: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "weaponstats2" (weapon "ak47") (head "0") (chest "0") (stomach "0") (leftarm "1") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:17:46: Rcon: "rcon 2122926088 "pikabu" stats" from "172.18.0.1:50906"
+L 04/17/2026 - 17:17:47: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "Got_The_Bomb"
+L 04/17/2026 - 17:17:56: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "Planted_The_Bomb"
+L 04/17/2026 - 17:18:07: "gatl<123><STEAM_0:0:204938646><TERRORIST>" killed "GIRO<126><STEAM_0:1:43536689><CT>" with "ak47" (headshot) (attacker_position "1909 653 196") (victim_position "1991 8 178")
+L 04/17/2026 - 17:18:07: Team "TERRORIST" triggered "Terrorists_Win" (CT "6") (T "6")
+L 04/17/2026 - 17:18:07: World triggered "Round_End"
+L 04/17/2026 - 17:18:07: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats" (weapon "usp") (shots "14") (hits "4") (kills "1") (headshots "0") (tks "0") (damage "64") (deaths "0")
+L 04/17/2026 - 17:18:07: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats2" (weapon "usp") (head "0") (chest "3") (stomach "0") (leftarm "0") (rightarm "1") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:18:07: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats" (weapon "ak47") (shots "15") (hits "2") (kills "0") (headshots "0") (tks "0") (damage "37") (deaths "1")
+L 04/17/2026 - 17:18:07: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats2" (weapon "ak47") (head "0") (chest "0") (stomach "0") (leftarm "1") (rightarm "0") (leftleg "0") (rightleg "1")
+L 04/17/2026 - 17:18:07: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats" (weapon "knife") (shots "2") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 17:18:07: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats2" (weapon "knife") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:18:07: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:44728"
+L 04/17/2026 - 17:18:12: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 17:18:27: World triggered "Round_Start"
+L 04/17/2026 - 17:19:12: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" killed "gatl<123><STEAM_0:0:204938646><TERRORIST>" with "m4a1" (attacker_position "1767 1298 178") (victim_position "1312 654 196")
+L 04/17/2026 - 17:19:12: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "Dropped_The_Bomb"
+L 04/17/2026 - 17:19:12: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats" (weapon "grenade") (shots "4") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 17:19:12: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats2" (weapon "grenade") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:19:12: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats" (weapon "ak47") (shots "63") (hits "23") (kills "6") (headshots "2") (tks "0") (damage "613") (deaths "1")
+L 04/17/2026 - 17:19:12: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats2" (weapon "ak47") (head "3") (chest "4") (stomach "1") (leftarm "10") (rightarm "4") (leftleg "0") (rightleg "1")
+L 04/17/2026 - 17:19:12: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats" (weapon "knife") (shots "3") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 17:19:12: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats2" (weapon "knife") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:19:36: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" killed "photonly<122><STEAM_0:0:519683270><TERRORIST>" with "m4a1" (attacker_position "1667 1204 196") (victim_position "1349 655 196")
+L 04/17/2026 - 17:19:36: Team "CT" triggered "CTs_Win" (CT "7") (T "6")
+L 04/17/2026 - 17:19:36: World triggered "Round_End"
+L 04/17/2026 - 17:19:36: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:45990"
+L 04/17/2026 - 17:19:36: Rcon: "rcon 2122926088 "pikabu" sv_visiblemaxplayers" from "172.18.0.1:33473"
+L 04/17/2026 - 17:19:36: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "weaponstats" (weapon "grenade") (shots "1") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 17:19:36: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "weaponstats2" (weapon "grenade") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:19:36: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "weaponstats" (weapon "ak47") (shots "5") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "1")
+L 04/17/2026 - 17:19:36: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "weaponstats2" (weapon "ak47") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:19:41: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 17:19:56: World triggered "Round_Start"
+L 04/17/2026 - 17:20:18: "gatl<123><STEAM_0:0:204938646><TERRORIST>" killed "GIRO<126><STEAM_0:1:43536689><CT>" with "ak47" (attacker_position "1470 207 196") (victim_position "1716 -3 196")
+L 04/17/2026 - 17:20:18: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats" (weapon "grenade") (shots "2") (hits "1") (kills "0") (headshots "0") (tks "0") (damage "29") (deaths "0")
+L 04/17/2026 - 17:20:18: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats2" (weapon "grenade") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:20:18: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats" (weapon "ak47") (shots "8") (hits "3") (kills "0") (headshots "0") (tks "0") (damage "81") (deaths "1")
+L 04/17/2026 - 17:20:18: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats2" (weapon "ak47") (head "0") (chest "1") (stomach "0") (leftarm "2") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:20:19: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" killed "gatl<123><STEAM_0:0:204938646><TERRORIST>" with "m4a1" (attacker_position "1506 1183 196") (victim_position "1493 194 196")
+L 04/17/2026 - 17:20:19: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats" (weapon "grenade") (shots "1") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 17:20:19: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats2" (weapon "grenade") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:20:19: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats" (weapon "ak47") (shots "21") (hits "4") (kills "1") (headshots "0") (tks "0") (damage "113") (deaths "1")
+L 04/17/2026 - 17:20:19: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats2" (weapon "ak47") (head "0") (chest "0") (stomach "1") (leftarm "2") (rightarm "0") (leftleg "0") (rightleg "1")
+L 04/17/2026 - 17:20:19: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats" (weapon "knife") (shots "1") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 17:20:19: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "weaponstats2" (weapon "knife") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:20:20: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" killed "photonly<122><STEAM_0:0:519683270><TERRORIST>" with "m4a1" (attacker_position "1488 1159 178") (victim_position "1475 736 196")
+L 04/17/2026 - 17:20:20: Team "CT" triggered "CTs_Win" (CT "8") (T "6")
+L 04/17/2026 - 17:20:20: World triggered "Round_End"
+L 04/17/2026 - 17:20:20: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "weaponstats" (weapon "glock18") (shots "6") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "1")
+L 04/17/2026 - 17:20:20: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "weaponstats2" (weapon "glock18") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:20:25: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 17:20:40: World triggered "Round_Start"
+L 04/17/2026 - 17:21:03: "gatl<123><STEAM_0:0:204938646><TERRORIST>" killed "GIRO<126><STEAM_0:1:43536689><CT>" with "ak47" (attacker_position "1173 -637 220") (victim_position "1196 -585 244")
+L 04/17/2026 - 17:21:03: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats" (weapon "m4a1") (shots "13") (hits "7") (kills "0") (headshots "0") (tks "0") (damage "144") (deaths "1")
+L 04/17/2026 - 17:21:03: "GIRO<126><STEAM_0:1:43536689><CT>" triggered "weaponstats2" (weapon "m4a1") (head "0") (chest "2") (stomach "2") (leftarm "3") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:21:26: "gatl<123><STEAM_0:0:204938646><TERRORIST>" triggered "Planted_The_Bomb"
+L 04/17/2026 - 17:21:36: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" killed "photonly<122><STEAM_0:0:519683270><TERRORIST>" with "m4a1" (attacker_position "2193 803 196") (victim_position "2081 -394 308")
+L 04/17/2026 - 17:21:36: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "weaponstats" (weapon "galil") (shots "12") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 17:21:36: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "weaponstats2" (weapon "galil") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:21:36: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "weaponstats" (weapon "m4a1") (shots "33") (hits "3") (kills "0") (headshots "0") (tks "0") (damage "28") (deaths "1")
+L 04/17/2026 - 17:21:36: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "weaponstats2" (weapon "m4a1") (head "0") (chest "0") (stomach "0") (leftarm "2") (rightarm "0") (leftleg "0") (rightleg "1")
+L 04/17/2026 - 17:21:40: "gatl<123><STEAM_0:0:204938646><TERRORIST>" killed "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" with "ak47" (headshot) (attacker_position "1915 427 196") (victim_position "2361 767 196")
+L 04/17/2026 - 17:21:40: Team "TERRORIST" triggered "Terrorists_Win" (CT "8") (T "7")
+L 04/17/2026 - 17:21:40: World triggered "Round_End"
+L 04/17/2026 - 17:21:40: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:34769"
+L 04/17/2026 - 17:21:40: Rcon: "rcon 2122926088 "pikabu" sv_visiblemaxplayers" from "172.18.0.1:38491"
+L 04/17/2026 - 17:21:40: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" triggered "weaponstats" (weapon "grenade") (shots "1") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 17:21:40: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" triggered "weaponstats2" (weapon "grenade") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:21:40: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" triggered "weaponstats" (weapon "usp") (shots "1") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 17:21:40: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" triggered "weaponstats2" (weapon "usp") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 17:21:40: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" triggered "weaponstats" (weapon "m4a1") (shots "66") (hits "17") (kills "5") (headshots "0") (tks "0") (damage "362") (deaths "1")
+L 04/17/2026 - 17:21:40: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" triggered "weaponstats2" (weapon "m4a1") (head "0") (chest "3") (stomach "2") (leftarm "4") (rightarm "1") (leftleg "7") (rightleg "0")
+L 04/17/2026 - 17:21:45: "photonly<122><STEAM_0:0:519683270><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 17:21:46: "Rakza<120><STEAM_0:1:55955613><SPECTATOR>" joined team "SPECTATOR" (auto)
+L 04/17/2026 - 17:21:46: "Lin Kuei<119><STEAM_0:0:36417680><SPECTATOR>" joined team "SPECTATOR" (auto)
+L 04/17/2026 - 17:21:46: "uPlay<118><STEAM_0:1:644350905><SPECTATOR>" joined team "SPECTATOR" (auto)
+L 04/17/2026 - 17:21:46: "photonly<122><STEAM_0:0:519683270><TERRORIST>" joined team "CT" (auto)
+L 04/17/2026 - 17:21:46: "gatl<123><STEAM_0:0:204938646><TERRORIST>" joined team "CT" (auto)
+L 04/17/2026 - 17:21:46: "Casper | Punk Not Dead<124><STEAM_0:1:30207066><CT>" joined team "TERRORIST" (auto)
+L 04/17/2026 - 17:21:46: "HeraTuBa<117><STEAM_0:0:100993243><SPECTATOR>" joined team "SPECTATOR" (auto)
+L 04/17/2026 - 17:21:46: "Saddz<125><STEAM_0:0:34344543><SPECTATOR>" joined team "SPECTATOR" (auto)
+L 04/17/2026 - 17:21:46: "GIRO<126><STEAM_0:1:43536689><CT>" joined team "TERRORIST" (auto)
+L 04/17/2026 - 17:21:46: "GIRO<126><STEAM_0:1:43536689><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 17:21:46: Log file closed

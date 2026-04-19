@@ -1,0 +1,65 @@
+#!/bin/bash
+
+set -euo pipefail
+
+confdir=.
+conffile=hlstats.conf
+python_bin="${PYTHON_BIN:-python3}"
+logdir=logs
+logfile="proxy_py$(date +_%Y%m%d_%H-%M-%S)"
+piddir="${confdir}"
+pidfile="${piddir}/proxy-daemon-py.pid"
+
+pythonpath="${confdir}/proxy_daemon_py"
+module="proxy_daemon_py.runtime"
+
+if [ ! -f "${confdir}/${conffile}" ]; then
+  echo "Missing configuration file (${conffile})"
+  exit 1
+fi
+
+if [ ! -d "${confdir}/${logdir}" ]; then
+  mkdir -p "${confdir}/${logdir}"
+fi
+
+run_proxy() {
+  PYTHONPATH="${pythonpath}" "${python_bin}" -m "${module}" --configfile="${conffile}" --foreground
+}
+
+start_proxy() {
+  if [ -f "${pidfile}" ] && kill -0 "$(cat "${pidfile}")" >/dev/null 2>&1; then
+    echo "HLstatsX proxy runtime already running"
+    return 0
+  fi
+  rm -f "${pidfile}"
+  run_proxy > "${logdir}/${logfile}" 2>&1 &
+  echo $! > "${pidfile}"
+  echo "Started HLstatsX Python proxy runtime"
+}
+
+stop_proxy() {
+  if [ ! -f "${pidfile}" ]; then
+    echo "HLstatsX proxy runtime is not running"
+    return 0
+  fi
+  kill -9 "$(cat "${pidfile}")" >/dev/null 2>&1 || true
+  rm -f "${pidfile}"
+  echo "Stopped HLstatsX Python proxy runtime"
+}
+
+case "${1:-}" in
+  start)
+    start_proxy
+    ;;
+  stop)
+    stop_proxy
+    ;;
+  restart)
+    stop_proxy
+    start_proxy
+    ;;
+  *)
+    echo "Usage: ./run_proxy_py [ start | stop | restart ]"
+    exit 1
+    ;;
+esac

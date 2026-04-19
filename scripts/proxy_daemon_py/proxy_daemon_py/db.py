@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import time
 from collections.abc import Awaitable, Callable, Sequence
 from concurrent.futures import Executor
@@ -91,6 +92,7 @@ class GameServer:
     port: int
     name: str
     game: str
+    current_map: str = ""
 
 
 _VALID_DAEMON_STATES = {"up", "down", "n/a"}
@@ -223,10 +225,11 @@ class SyncDatabaseAdapter:
         connection = self._ensure_connection()
         rows = self._fetchall(
             connection,
-            "SELECT `serverId`, `address`, `port`, `name`, `game` FROM hlstats_Servers ORDER BY `serverId`",
+            "SELECT `serverId`, `address`, `port`, `name`, `game`, `act_map` "
+            "FROM hlstats_Servers ORDER BY `serverId`",
         )
         servers: list[GameServer] = []
-        for server_id, address, port, name, game in rows:
+        for server_id, address, port, name, game, current_map in rows:
             servers.append(
                 GameServer(
                     server_id=int(server_id),
@@ -234,6 +237,7 @@ class SyncDatabaseAdapter:
                     port=int(port),
                     name=str(name).strip(),
                     game=str(game).strip(),
+                    current_map="" if current_map is None else str(current_map).strip(),
                 )
             )
         return servers
@@ -292,12 +296,12 @@ class SyncDatabaseAdapter:
             "db": self._config.database,
             "charset": "utf8mb4",
             "use_unicode": True,
-            "connect_timeout": self._connect_timeout,
-            "read_timeout": self._read_timeout,
+            "connect_timeout": self._normalize_timeout(self._connect_timeout),
+            "read_timeout": self._normalize_timeout(self._read_timeout),
             "init_command": "SET NAMES 'utf8mb4'",
         }
         if self._write_timeout is not None:
-            params["write_timeout"] = self._write_timeout
+            params["write_timeout"] = self._normalize_timeout(self._write_timeout)
 
         last_error: Exception | None = None
         for attempt in range(self._max_retries + 1):
@@ -380,6 +384,11 @@ class SyncDatabaseAdapter:
             connection.autocommit(True)
         except AttributeError:  # pragma: no cover - depends on driver
             pass
+
+    def _normalize_timeout(self, value: float) -> int:
+        """Convert adapter timeouts into integers accepted by ``mysqlclient``."""
+
+        return max(1, int(math.ceil(value)))
 
     def _normalize_timestamp(self, moment: datetime) -> datetime:
         if moment.tzinfo is None:

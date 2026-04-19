@@ -21,10 +21,11 @@
 
 | Ключевой модуль | Назначение | Каталог |
 | --- | --- | --- |
-| `proxy_daemon_py.daemon.ProxyDaemon` | UDP-прокси между игровыми серверами и статистикой | `scripts/proxy_daemon_py` |
-| `hlstats_py.events.EventDispatcher` | Парсер UDP-пакетов, нормализация событий и запись в БД | `scripts/hlstats_py` |
-| `hlstats_awards_py.calculator` | Обслуживание наград, лент и архивов БД | `scripts/hlstats_awards_py` |
-| `hlstats_resolve_py.resolver` | DNS-резолвер IP-адресов игроков и группировка хостов | `scripts/hlstats_resolve_py` |
+<<<<<<< HEAD
+| `proxy_daemon_py` | UDP-прокси между игровыми серверами и статистикой | `scripts/proxy_daemon_py` |
+| `hlstats_py` | Runnable downstream worker: приём UDP от proxy daemon, нормализация событий и запись в БД | `scripts/hlstats_py` |
+| `hlstats_awards_py` | Обслуживание наград, лент и архивов БД | `scripts/hlstats_awards_py` |
+| `hlstats_resolve_py` | DNS-резолвер IP-адресов игроков и группировка хостов | `scripts/hlstats_resolve_py` |
 
 ### 1.3 Базовое конфигурирование
 
@@ -37,7 +38,7 @@ Python-порт прокси-демона — основной сервис, п�
 ### 2.1 Расположение и назначение
 
 * **Каталог**: `scripts/proxy_daemon_py`
-* **Основные пакеты**: `proxy_daemon_py.cli`, `proxy_daemon_py.e2e.run_proxy_daemon`, `proxy_daemon_py.importer`
+* **Основные пакеты**: `proxy_daemon_py.cli`, `proxy_daemon_py.runtime`, `proxy_daemon_py.importer`
 * **Назначение**: приём UDP-пакетов от игровых серверов, валидация ключа, распределение трафика на downstream-демоны и публикация heartbeat.
 * **Почему запускать даже с одним игровым сервером**: Python-демон заменяет Perl-реализацию «один к одному», поэтому остаётся точкой входа для всей статистики. Даже если у вас единственный сервер CS/TF2, именно через прокси проходят heartbeat, проверка ключей и конвертация пакетов в формат `hlstats_py`. Прямое подключение `hlstats_py` к игре не поддерживается — без демона вы потеряете контроль доступа и балансировку heartbeat.
 
@@ -61,6 +62,7 @@ Python-порт прокси-демона — основной сервис, п�
 * **База данных**: для локальных проверок используйте один из сценариев:
   * Минимальная MySQL — выполните `docker compose up -d`, схема создастся автоматически.
   * E2E-песочница — `e2e/start.sh` запустит MySQL (`localhost:33070`), сам демон и мок-воркеры; `e2e/stop.sh` выключит окружение. Скрипты написаны на Bash, поэтому под Windows их удобнее запускать через WSL или Git Bash. Если у вас только PowerShell, смотрите раздел 6.2 в руководстве по прокси-демону — там описан ручной запуск контейнеров.
+  * Полный Python-стек — `fullstack/docker-compose.yml` поднимает `mysql + proxy-daemon + hlstats worker + php web` и подходит для smoke-теста всей цепочки.
 * **Конфиг**: убедитесь, что рядом доступен `hlstats.conf` (или `hlstats.local.conf`) с заполненными параметрами `DBHost`, `DBName`, `DBUsername`, `DBPassword`, `ProxyKey`, `BindIP`, `Port`, `DebugLevel`.
 * **Верификация**: проверьте конфигурацию, не запуская рабочие процессы:
   ```bash
@@ -72,7 +74,7 @@ Python-порт прокси-демона — основной сервис, п�
 1. Подготовьте MySQL и заполните таблицы `Proxy_Daemons` и `hlstats_Servers` (скрипты из каталога `sql/` или выгрузка из продакшена).
 2. Запустите сервис в переднем плане для отладки:
    ```bash
-   poetry run python -m proxy_daemon_py.e2e.run_proxy_daemon \
+   poetry run python -m proxy_daemon_py.runtime \
      --configfile ../hlstats.local.conf \
      --foreground
    ```
@@ -96,14 +98,15 @@ poetry run mypy .
 poetry run pytest
 ```
 
-## 3. Модуль обработки событий hlstats_py (scripts/hlstats_py)
+## 3. Статистический worker hlstats_py (scripts/hlstats_py)
 
-Пакет отвечает за разбор UDP-событий, нормализацию данных и запись в БД. Его импортируют все остальные модули.
+Пакет отвечает за downstream-обработку: worker принимает UDP-события от `proxy_daemon_py`, нормализует их и пишет в БД. Его модули также можно импортировать как библиотеку.
 
 ### 3.1 Расположение и назначение
 
 * **Каталог**: `scripts/hlstats_py`
-* **Основные пакеты**: `hlstats_py.events.EventDispatcher`, `hlstats_py.protocol`, `hlstats_py.storage.EventStorage`
+<<<<<<< HEAD
+* **Основные пакеты**: `hlstats_py.runtime`, `hlstats_py.events`, `hlstats_py.storage`
 * **Назначение**: приём событий от прокси-демона, построение внутренних моделей и применение SQL-операций.
 
 ### 3.2 Подготовка окружения
@@ -117,6 +120,14 @@ poetry shell
 
 ### 3.3 Основные сценарии использования
 
+* **Запуск worker на downstream-порту**:
+  ```bash
+  cd scripts/proxy_daemon_py
+  PYTHONPATH=.. poetry run python -m hlstats_py.runtime \
+    --configfile ../hlstats.local.conf \
+    --port 28000 \
+    --foreground
+  ```
 * **Переиспользование в сервисах**: импортируйте `parse_proxy_envelope`, `parse_log_event`, `EventDispatcher`, `EventStorage`.
 * **Ручная валидация**: воспроизведите тестовый поток пакетов для сравнения с Perl-версией:
   ```bash
@@ -245,10 +256,14 @@ PYTHONPATH=.. poetry run pytest ../hlstats_resolve_py/tests
 2. Клонируйте репозиторий и скопируйте рабочий `hlstats.conf`.
 3. Настройте окружение прокси-демона (`poetry install`, docker-compose, проверка CLI).
 4. Запустите e2e-песочницу и убедитесь, что heartbeat отвечает.
-5. Выполните импорт существующих данных демона (`proxy_daemon_py.importer`).
-6. Подготовьте пакет `hlstats_py`, прогоните его тесты и реплей-сценарий.
-7. Установите и протестируйте `hlstats_awards_py`, затем выполните пробный прогон с тестовой БД.
-8. Настройте и протестируйте `hlstats_resolve_py` (ручной запуск + тесты).
-9. Перед коммитом запустите все линтеры и тесты в затронутых пакетах.
+5. Поднимите хотя бы один `hlstats_py` worker и добавьте его адрес в `Proxy_Daemons`.
+6. Выполните импорт существующих данных демона (`proxy_daemon_py.importer`).
+7. Подготовьте пакет `hlstats_py`, прогоните его тесты и реплей-сценарий.
+8. Установите и протестируйте `hlstats_awards_py`, затем выполните пробный прогон с тестовой БД.
+9. Настройте и протестируйте `hlstats_resolve_py` (ручной запуск + тесты).
+10. Перед коммитом запустите все линтеры и тесты в затронутых пакетах.
 
 После прохождения этих шагов у вас будет полностью рабочий Python-пайплайн HLstatsX, готовый к эксплуатации и дальнейшей разработке.
+
+Дополнительно для контейнерного smoke-теста всей цепочки смотрите
+`docs/python_fullstack_docker.md`.

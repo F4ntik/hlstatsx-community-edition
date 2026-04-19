@@ -63,7 +63,7 @@ The Host Pattern should look like the <b>end</b> of the hostname. For example a 
 
 The patterns are sorted below in the order they will be applied. A more specific pattern should match before a less specific pattern.<p>
 
-<b>Note</b> Run <b>hlstats-resolve.pl --regroup</b> to apply grouping changes to existing data.<p>
+<b>Note</b> Run <b>python -m hlstats_resolve_py.cli --configfile /path/to/hlstats.conf --regroup</b> to apply grouping changes to existing data.<p>
 <?php $result = $db->query("
 		SELECT
 			id,

@@ -10,6 +10,9 @@
   `scripts/proxy_daemon_py` и повторяет архитектуру исходного скрипта, но
   использует асинхронные компоненты и отдельные модули для баланcировщика,
   работы с БД и логирования.【F:scripts/proxy_daemon_py/daemon.py†L1-L106】【F:scripts/proxy_daemon_py/bootstrap.py†L1-L76】
+- Downstream-часть статистики теперь запускается отдельным Python worker из
+  `scripts/hlstats_py`, который слушает UDP от proxy daemon и пишет события в
+  существующую MySQL-схему.
 - Интерфейс командной строки оставляет те же параметры `--configfile`, `--debug`
   и `--foreground`, что и Perl-скрипт, поэтому существующие ansible-плейбуки и
   сервисные юниты можно адаптировать с минимальными правками.【F:scripts/proxy_daemon_py/cli.py†L19-L66】
@@ -142,14 +145,29 @@ poetry run python -m proxy_daemon_py.importer \
 1. Убедитесь, что MySQL доступен и `hlstats.conf` указывает на верные параметры.
 2. Запустите демон с теми же флагами, что использовались для Perl-скрипта:
    ```bash
-   poetry run python -m proxy_daemon_py.e2e.run_proxy_daemon \
+   poetry run python -m proxy_daemon_py.runtime \
      --configfile ../hlstats.local.conf \
      --foreground
    ```
    В логе появится сообщение вида «`Proxy daemon listening on <ip>:<port>`»,
    подтверждающее успешный старт.【F:scripts/proxy_daemon_py/daemon.py†L34-L74】
 3. Остановить процесс можно `Ctrl+C` — обработчик сигналов корректно закроет UDP
-   сокет, heartbeat и соединение с MySQL.【F:scripts/proxy_daemon_py/proxy_daemon_py/e2e/run_proxy_daemon.py†L1-L46】
+   сокет, heartbeat и соединение с MySQL.
+
+## 8.1 Запуск downstream statistics worker
+
+После старта proxy daemon поднимите минимум один downstream worker:
+
+```bash
+cd scripts/proxy_daemon_py
+PYTHONPATH=.. poetry run python -m hlstats_py.runtime \
+  --configfile ../hlstats.local.conf \
+  --port 28000 \
+  --foreground
+```
+
+Затем добавьте адрес worker в `hlstats_Options.Proxy_Daemons`, например
+`127.0.0.1:28000`, и отправьте proxy daemon команду `RELOAD`.
 
 ### 8.2 Проверка heartbeat и проксирования
 

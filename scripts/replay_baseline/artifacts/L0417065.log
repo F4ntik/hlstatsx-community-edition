@@ -1,0 +1,293 @@
+L 04/17/2026 - 19:09:42: Log file started (file "logs/L0417065.log") (game "cstrike") (version "48/1.1.2.7/Stdio/4328")
+L 04/17/2026 - 19:09:42: Server cvar "mp_friendlyfire" = "1"
+L 04/17/2026 - 19:09:42: Server cvar "mp_give_player_c4" = "1"
+L 04/17/2026 - 19:09:42: Server cvar "mp_round_restart_delay" = "5"
+L 04/17/2026 - 19:09:42: Server cvar "mp_weapons_allow_map_placed" = "1"
+L 04/17/2026 - 19:09:42: Server cvar "mp_timelimit" = "0"
+L 04/17/2026 - 19:09:43: World triggered "Restart_Round_(1_second)"
+L 04/17/2026 - 19:09:43: Team "CT" scored "1" with "2" players
+L 04/17/2026 - 19:09:43: Team "TERRORIST" scored "0" with "2" players
+L 04/17/2026 - 19:09:43: Server cvar "sv_restart" = "0"
+L 04/17/2026 - 19:09:44: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 19:09:45: Server cvar "sv_restart" = "1"
+L 04/17/2026 - 19:09:46: World triggered "Restart_Round_(1_second)"
+L 04/17/2026 - 19:09:46: Team "CT" scored "0" with "2" players
+L 04/17/2026 - 19:09:46: Team "TERRORIST" scored "0" with "2" players
+L 04/17/2026 - 19:09:46: Server cvar "sv_restart" = "0"
+L 04/17/2026 - 19:09:47: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 19:09:48: Server cvar "sv_restart" = "1"
+L 04/17/2026 - 19:09:49: World triggered "Restart_Round_(1_second)"
+L 04/17/2026 - 19:09:49: Team "CT" scored "0" with "2" players
+L 04/17/2026 - 19:09:49: Team "TERRORIST" scored "0" with "2" players
+L 04/17/2026 - 19:09:49: Server cvar "sv_restart" = "0"
+L 04/17/2026 - 19:09:50: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 19:09:51: Server cvar "sv_restart" = "1"
+L 04/17/2026 - 19:09:52: World triggered "Restart_Round_(1_second)"
+L 04/17/2026 - 19:09:52: Team "CT" scored "0" with "2" players
+L 04/17/2026 - 19:09:52: Team "TERRORIST" scored "0" with "2" players
+L 04/17/2026 - 19:09:52: Server cvar "sv_restart" = "0"
+L 04/17/2026 - 19:09:53: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 19:10:08: World triggered "Round_Start"
+L 04/17/2026 - 19:10:24: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:44794"
+L 04/17/2026 - 19:10:24: Rcon: "rcon 2122926088 "pikabu" sv_visiblemaxplayers" from "172.18.0.1:33134"
+L 04/17/2026 - 19:11:16: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" killed "gatl<144><STEAM_0:0:204938646><CT>" with "deagle" (attacker_position "1255 632 170") (victim_position "1346 326 196")
+L 04/17/2026 - 19:11:16: "gatl<144><STEAM_0:0:204938646><CT>" triggered "weaponstats" (weapon "usp") (shots "2") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "1")
+L 04/17/2026 - 19:11:16: "gatl<144><STEAM_0:0:204938646><CT>" triggered "weaponstats2" (weapon "usp") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:11:19: "4f<131><STEAM_0:0:19989970><TERRORIST>" killed "photonly<139><STEAM_0:0:519683270><CT>" with "knife" (attacker_position "1688 1111 196") (victim_position "1732 1091 231")
+L 04/17/2026 - 19:11:19: Team "TERRORIST" triggered "Terrorists_Win" (CT "0") (T "1")
+L 04/17/2026 - 19:11:19: World triggered "Round_End"
+L 04/17/2026 - 19:11:19: "photonly<139><STEAM_0:0:519683270><CT>" triggered "weaponstats" (weapon "usp") (shots "12") (hits "2") (kills "0") (headshots "0") (tks "0") (damage "24") (deaths "1")
+L 04/17/2026 - 19:11:19: "photonly<139><STEAM_0:0:519683270><CT>" triggered "weaponstats2" (weapon "usp") (head "0") (chest "0") (stomach "0") (leftarm "2") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:11:19: "photonly<139><STEAM_0:0:519683270><CT>" triggered "weaponstats" (weapon "ak47") (shots "20") (hits "5") (kills "1") (headshots "0") (tks "0") (damage "112") (deaths "0")
+L 04/17/2026 - 19:11:19: "photonly<139><STEAM_0:0:519683270><CT>" triggered "weaponstats2" (weapon "ak47") (head "1") (chest "2") (stomach "0") (leftarm "2") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:11:19: "photonly<139><STEAM_0:0:519683270><CT>" triggered "weaponstats" (weapon "knife") (shots "4") (hits "3") (kills "2") (headshots "1") (tks "0") (damage "390") (deaths "0")
+L 04/17/2026 - 19:11:19: "photonly<139><STEAM_0:0:519683270><CT>" triggered "weaponstats2" (weapon "knife") (head "1") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:11:24: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 19:11:32: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "Dropped_The_Bomb"
+L 04/17/2026 - 19:11:32: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "Got_The_Bomb"
+L 04/17/2026 - 19:11:37: "Lin Kuei<140><STEAM_0:0:36417680><SPECTATOR>" say "дизморалити!"
+L 04/17/2026 - 19:11:37: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:36456"
+L 04/17/2026 - 19:11:39: World triggered "Round_Start"
+L 04/17/2026 - 19:12:31: "4f<131><STEAM_0:0:19989970><TERRORIST>" killed "photonly<139><STEAM_0:0:519683270><CT>" with "ak47" (attacker_position "1360 773 196") (victim_position "1806 1332 196")
+L 04/17/2026 - 19:12:31: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:51317"
+L 04/17/2026 - 19:12:31: "photonly<139><STEAM_0:0:519683270><CT>" triggered "weaponstats" (weapon "grenade") (shots "1") (hits "1") (kills "0") (headshots "0") (tks "0") (damage "5") (deaths "0")
+L 04/17/2026 - 19:12:31: "photonly<139><STEAM_0:0:519683270><CT>" triggered "weaponstats2" (weapon "grenade") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:12:31: "photonly<139><STEAM_0:0:519683270><CT>" triggered "weaponstats" (weapon "usp") (shots "4") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "1")
+L 04/17/2026 - 19:12:31: "photonly<139><STEAM_0:0:519683270><CT>" triggered "weaponstats2" (weapon "usp") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:12:31: Rcon: "rcon 2122926088 "pikabu" sv_visiblemaxplayers" from "172.18.0.1:54960"
+L 04/17/2026 - 19:12:54: "gatl<144><STEAM_0:0:204938646><CT>" killed "SPORK<135><STEAM_0:0:32599427><TERRORIST>" with "deagle" (headshot) (attacker_position "1952 542 196") (victim_position "2431 198 196")
+L 04/17/2026 - 19:12:54: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "weaponstats" (weapon "deagle") (shots "6") (hits "3") (kills "1") (headshots "0") (tks "0") (damage "100") (deaths "0")
+L 04/17/2026 - 19:12:54: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "weaponstats2" (weapon "deagle") (head "0") (chest "0") (stomach "2") (leftarm "1") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:12:54: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "weaponstats" (weapon "ak47") (shots "18") (hits "2") (kills "0") (headshots "0") (tks "0") (damage "76") (deaths "1")
+L 04/17/2026 - 19:12:54: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "weaponstats2" (weapon "ak47") (head "0") (chest "0") (stomach "1") (leftarm "1") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:12:58: Rcon: "rcon 2122926088 "pikabu" stats" from "172.18.0.1:56006"
+L 04/17/2026 - 19:13:01: "gatl<144><STEAM_0:0:204938646><CT>" killed "4f<131><STEAM_0:0:19989970><TERRORIST>" with "deagle" (headshot) (attacker_position "1978 193 196") (victim_position "2127 182 196")
+L 04/17/2026 - 19:13:01: Team "CT" triggered "CTs_Win" (CT "1") (T "1")
+L 04/17/2026 - 19:13:01: World triggered "Round_End"
+L 04/17/2026 - 19:13:01: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats" (weapon "grenade") (shots "1") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 19:13:01: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats2" (weapon "grenade") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:13:01: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats" (weapon "glock18") (shots "20") (hits "3") (kills "0") (headshots "0") (tks "0") (damage "55") (deaths "1")
+L 04/17/2026 - 19:13:01: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats2" (weapon "glock18") (head "0") (chest "0") (stomach "0") (leftarm "3") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:13:01: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats" (weapon "ak47") (shots "30") (hits "3") (kills "1") (headshots "0") (tks "0") (damage "84") (deaths "0")
+L 04/17/2026 - 19:13:01: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats2" (weapon "ak47") (head "0") (chest "1") (stomach "0") (leftarm "2") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:13:01: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats" (weapon "knife") (shots "2") (hits "1") (kills "1") (headshots "0") (tks "0") (damage "65") (deaths "0")
+L 04/17/2026 - 19:13:01: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats2" (weapon "knife") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:13:06: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 19:13:21: World triggered "Round_Start"
+L 04/17/2026 - 19:13:34: "photonly<139><STEAM_0:0:519683270><CT>" killed "4f<131><STEAM_0:0:19989970><TERRORIST>" with "m4a1" (headshot) (attacker_position "1595 777 196") (victim_position "886 445 132")
+L 04/17/2026 - 19:13:34: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "Dropped_The_Bomb"
+L 04/17/2026 - 19:13:34: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats" (weapon "glock18") (shots "4") (hits "3") (kills "0") (headshots "0") (tks "0") (damage "21") (deaths "1")
+L 04/17/2026 - 19:13:34: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats2" (weapon "glock18") (head "0") (chest "1") (stomach "0") (leftarm "1") (rightarm "1") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:13:36: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "Got_The_Bomb"
+L 04/17/2026 - 19:14:12: "gatl<144><STEAM_0:0:204938646><CT>" killed "SPORK<135><STEAM_0:0:32599427><TERRORIST>" with "ak47" (headshot) (attacker_position "2421 -228 136") (victim_position "2410 -164 133")
+L 04/17/2026 - 19:14:12: Team "CT" triggered "CTs_Win" (CT "2") (T "1")
+L 04/17/2026 - 19:14:12: World triggered "Round_End"
+L 04/17/2026 - 19:14:12: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "weaponstats" (weapon "glock18") (shots "1") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "1")
+L 04/17/2026 - 19:14:12: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "weaponstats2" (weapon "glock18") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:14:17: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 19:14:27: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "Dropped_The_Bomb"
+L 04/17/2026 - 19:14:27: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "Got_The_Bomb"
+L 04/17/2026 - 19:14:32: World triggered "Round_Start"
+L 04/17/2026 - 19:14:32: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:38128"
+L 04/17/2026 - 19:14:32: Rcon: "rcon 2122926088 "pikabu" sv_visiblemaxplayers" from "172.18.0.1:43592"
+L 04/17/2026 - 19:15:36: "gatl<144><STEAM_0:0:204938646><CT>" killed "SPORK<135><STEAM_0:0:32599427><TERRORIST>" with "ak47" (headshot) (attacker_position "1364 435 196") (victim_position "1071 432 135")
+L 04/17/2026 - 19:15:36: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "weaponstats" (weapon "ak47") (shots "5") (hits "1") (kills "0") (headshots "0") (tks "0") (damage "26") (deaths "1")
+L 04/17/2026 - 19:15:36: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "weaponstats2" (weapon "ak47") (head "0") (chest "0") (stomach "0") (leftarm "1") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:15:43: "4f<131><STEAM_0:0:19989970><TERRORIST>" killed "gatl<144><STEAM_0:0:204938646><CT>" with "galil" (headshot) (attacker_position "646 -172 127") (victim_position "945 451 132")
+L 04/17/2026 - 19:15:43: "gatl<144><STEAM_0:0:204938646><CT>" triggered "weaponstats" (weapon "grenade") (shots "2") (hits "2") (kills "0") (headshots "0") (tks "0") (damage "41") (deaths "0")
+L 04/17/2026 - 19:15:43: "gatl<144><STEAM_0:0:204938646><CT>" triggered "weaponstats2" (weapon "grenade") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:15:43: "gatl<144><STEAM_0:0:204938646><CT>" triggered "weaponstats" (weapon "deagle") (shots "11") (hits "2") (kills "2") (headshots "2") (tks "0") (damage "326") (deaths "0")
+L 04/17/2026 - 19:15:43: "gatl<144><STEAM_0:0:204938646><CT>" triggered "weaponstats2" (weapon "deagle") (head "2") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:15:43: "gatl<144><STEAM_0:0:204938646><CT>" triggered "weaponstats" (weapon "ak47") (shots "57") (hits "7") (kills "2") (headshots "2") (tks "0") (damage "415") (deaths "1")
+L 04/17/2026 - 19:15:43: "gatl<144><STEAM_0:0:204938646><CT>" triggered "weaponstats2" (weapon "ak47") (head "2") (chest "0") (stomach "0") (leftarm "1") (rightarm "2") (leftleg "1") (rightleg "1")
+L 04/17/2026 - 19:15:43: "gatl<144><STEAM_0:0:204938646><CT>" triggered "weaponstats" (weapon "knife") (shots "4") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 19:15:43: "gatl<144><STEAM_0:0:204938646><CT>" triggered "weaponstats2" (weapon "knife") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:16:15: "photonly<139><STEAM_0:0:519683270><CT>" killed "4f<131><STEAM_0:0:19989970><TERRORIST>" with "m4a1" (attacker_position "1938 -171 308") (victim_position "2097 183 178")
+L 04/17/2026 - 19:16:15: Team "CT" triggered "CTs_Win" (CT "3") (T "1")
+L 04/17/2026 - 19:16:15: World triggered "Round_End"
+L 04/17/2026 - 19:16:15: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats" (weapon "galil") (shots "25") (hits "4") (kills "1") (headshots "1") (tks "0") (damage "148") (deaths "0")
+L 04/17/2026 - 19:16:15: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats2" (weapon "galil") (head "1") (chest "0") (stomach "1") (leftarm "0") (rightarm "1") (leftleg "0") (rightleg "1")
+L 04/17/2026 - 19:16:15: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats" (weapon "glock18") (shots "1") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 19:16:15: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats2" (weapon "glock18") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:16:15: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats" (weapon "knife") (shots "1") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 19:16:15: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats2" (weapon "knife") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:16:20: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 19:16:35: World triggered "Round_Start"
+L 04/17/2026 - 19:16:35: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:34945"
+L 04/17/2026 - 19:16:35: Rcon: "rcon 2122926088 "pikabu" sv_visiblemaxplayers" from "172.18.0.1:51465"
+L 04/17/2026 - 19:17:05: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" killed "photonly<139><STEAM_0:0:519683270><CT>" with "galil" (attacker_position "1112 -251 290") (victim_position "992 -239 260")
+L 04/17/2026 - 19:17:05: "photonly<139><STEAM_0:0:519683270><CT>" triggered "weaponstats" (weapon "grenade") (shots "2") (hits "1") (kills "0") (headshots "0") (tks "0") (damage "11") (deaths "0")
+L 04/17/2026 - 19:17:05: "photonly<139><STEAM_0:0:519683270><CT>" triggered "weaponstats2" (weapon "grenade") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:17:05: "photonly<139><STEAM_0:0:519683270><CT>" triggered "weaponstats" (weapon "m4a1") (shots "31") (hits "6") (kills "2") (headshots "1") (tks "0") (damage "231") (deaths "1")
+L 04/17/2026 - 19:17:05: "photonly<139><STEAM_0:0:519683270><CT>" triggered "weaponstats2" (weapon "m4a1") (head "1") (chest "1") (stomach "0") (leftarm "4") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:17:30: "4f<131><STEAM_0:0:19989970><TERRORIST>" killed "gatl<144><STEAM_0:0:204938646><CT>" with "galil" (attacker_position "1432 191 178") (victim_position "2161 -32 196")
+L 04/17/2026 - 19:17:30: Team "TERRORIST" triggered "Terrorists_Win" (CT "3") (T "2")
+L 04/17/2026 - 19:17:30: World triggered "Round_End"
+L 04/17/2026 - 19:17:30: "gatl<144><STEAM_0:0:204938646><CT>" triggered "weaponstats" (weapon "grenade") (shots "1") (hits "1") (kills "0") (headshots "0") (tks "0") (damage "13") (deaths "0")
+L 04/17/2026 - 19:17:30: "gatl<144><STEAM_0:0:204938646><CT>" triggered "weaponstats2" (weapon "grenade") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:17:30: "gatl<144><STEAM_0:0:204938646><CT>" triggered "weaponstats" (weapon "m4a1") (shots "16") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "1")
+L 04/17/2026 - 19:17:30: "gatl<144><STEAM_0:0:204938646><CT>" triggered "weaponstats2" (weapon "m4a1") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:17:35: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 19:17:50: World triggered "Round_Start"
+L 04/17/2026 - 19:17:58: Rcon: "rcon 2122926088 "pikabu" stats" from "172.18.0.1:50354"
+L 04/17/2026 - 19:18:15: "gatl<144><STEAM_0:0:204938646><CT>" killed "SPORK<135><STEAM_0:0:32599427><TERRORIST>" with "m4a1" (attacker_position "909 -572 148") (victim_position "837 534 132")
+L 04/17/2026 - 19:18:15: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "Dropped_The_Bomb"
+L 04/17/2026 - 19:18:15: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "weaponstats" (weapon "grenade") (shots "1") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 19:18:15: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "weaponstats2" (weapon "grenade") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:18:15: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "weaponstats" (weapon "galil") (shots "10") (hits "2") (kills "1") (headshots "0") (tks "0") (damage "111") (deaths "0")
+L 04/17/2026 - 19:18:15: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "weaponstats2" (weapon "galil") (head "1") (chest "1") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:18:15: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "weaponstats" (weapon "m4a1") (shots "5") (hits "2") (kills "0") (headshots "0") (tks "0") (damage "41") (deaths "1")
+L 04/17/2026 - 19:18:15: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "weaponstats2" (weapon "m4a1") (head "0") (chest "1") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "1")
+L 04/17/2026 - 19:18:18: "photonly<139><STEAM_0:0:519683270><CT>" killed "4f<131><STEAM_0:0:19989970><TERRORIST>" with "m4a1" (headshot) (attacker_position "1396 609 196") (victim_position "586 538 132")
+L 04/17/2026 - 19:18:18: Team "CT" triggered "CTs_Win" (CT "4") (T "2")
+L 04/17/2026 - 19:18:18: World triggered "Round_End"
+L 04/17/2026 - 19:18:18: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats" (weapon "grenade") (shots "1") (hits "1") (kills "0") (headshots "0") (tks "0") (damage "6") (deaths "0")
+L 04/17/2026 - 19:18:18: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats2" (weapon "grenade") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:18:18: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats" (weapon "galil") (shots "12") (hits "5") (kills "1") (headshots "0") (tks "0") (damage "116") (deaths "0")
+L 04/17/2026 - 19:18:18: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats2" (weapon "galil") (head "0") (chest "1") (stomach "1") (leftarm "3") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:18:18: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats" (weapon "m4a1") (shots "11") (hits "1") (kills "0") (headshots "0") (tks "0") (damage "21") (deaths "1")
+L 04/17/2026 - 19:18:18: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats2" (weapon "m4a1") (head "0") (chest "0") (stomach "0") (leftarm "1") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:18:18: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats" (weapon "knife") (shots "1") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 19:18:18: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats2" (weapon "knife") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:18:23: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 19:18:38: World triggered "Round_Start"
+L 04/17/2026 - 19:18:38: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:37239"
+L 04/17/2026 - 19:18:38: Rcon: "rcon 2122926088 "pikabu" sv_visiblemaxplayers" from "172.18.0.1:58438"
+L 04/17/2026 - 19:19:44: "gatl<144><STEAM_0:0:204938646><CT>" killed "SPORK<135><STEAM_0:0:32599427><TERRORIST>" with "m4a1" (headshot) (attacker_position "2112 -104 226") (victim_position "1183 303 242")
+L 04/17/2026 - 19:19:52: "photonly<139><STEAM_0:0:519683270><CT>" killed "4f<131><STEAM_0:0:19989970><TERRORIST>" with "m4a1" (headshot) (attacker_position "1312 917 178") (victim_position "1480 643 178")
+L 04/17/2026 - 19:19:52: Team "CT" triggered "CTs_Win" (CT "5") (T "2")
+L 04/17/2026 - 19:19:52: World triggered "Round_End"
+L 04/17/2026 - 19:19:52: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats" (weapon "ak47") (shots "12") (hits "2") (kills "0") (headshots "0") (tks "0") (damage "54") (deaths "1")
+L 04/17/2026 - 19:19:52: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats2" (weapon "ak47") (head "0") (chest "1") (stomach "0") (leftarm "1") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:19:57: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 19:20:12: World triggered "Round_Start"
+L 04/17/2026 - 19:20:45: "gatl<144><STEAM_0:0:204938646><CT>" killed "4f<131><STEAM_0:0:19989970><TERRORIST>" with "ak47" (headshot) (attacker_position "1448 829 196") (victim_position "1299 614 229")
+L 04/17/2026 - 19:20:45: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats" (weapon "glock18") (shots "3") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "1")
+L 04/17/2026 - 19:20:45: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats2" (weapon "glock18") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:20:45: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:60915"
+L 04/17/2026 - 19:20:45: Rcon: "rcon 2122926088 "pikabu" sv_visiblemaxplayers" from "172.18.0.1:53000"
+L 04/17/2026 - 19:20:46: "gatl<144><STEAM_0:0:204938646><CT>" killed "SPORK<135><STEAM_0:0:32599427><TERRORIST>" with "ak47" (headshot) (attacker_position "1435 840 196") (victim_position "1306 637 196")
+L 04/17/2026 - 19:20:46: Team "CT" triggered "CTs_Win" (CT "6") (T "2")
+L 04/17/2026 - 19:20:46: World triggered "Round_End"
+L 04/17/2026 - 19:20:46: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "weaponstats" (weapon "deagle") (shots "1") (hits "1") (kills "0") (headshots "0") (tks "0") (damage "36") (deaths "1")
+L 04/17/2026 - 19:20:46: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "weaponstats2" (weapon "deagle") (head "0") (chest "0") (stomach "0") (leftarm "1") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:20:51: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 19:20:58: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "Dropped_The_Bomb"
+L 04/17/2026 - 19:20:58: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "Got_The_Bomb"
+L 04/17/2026 - 19:21:06: World triggered "Round_Start"
+L 04/17/2026 - 19:21:33: "4f<131><STEAM_0:0:19989970><TERRORIST>" killed "gatl<144><STEAM_0:0:204938646><CT>" with "ak47" (attacker_position "1095 -719 204") (victim_position "1271 -304 309")
+L 04/17/2026 - 19:21:33: "gatl<144><STEAM_0:0:204938646><CT>" triggered "weaponstats" (weapon "grenade") (shots "3") (hits "2") (kills "0") (headshots "0") (tks "0") (damage "21") (deaths "0")
+L 04/17/2026 - 19:21:33: "gatl<144><STEAM_0:0:204938646><CT>" triggered "weaponstats2" (weapon "grenade") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:21:33: "gatl<144><STEAM_0:0:204938646><CT>" triggered "weaponstats" (weapon "m4a1") (shots "35") (hits "11") (kills "2") (headshots "1") (tks "0") (damage "214") (deaths "0")
+L 04/17/2026 - 19:21:33: "gatl<144><STEAM_0:0:204938646><CT>" triggered "weaponstats2" (weapon "m4a1") (head "1") (chest "1") (stomach "1") (leftarm "4") (rightarm "1") (leftleg "3") (rightleg "0")
+L 04/17/2026 - 19:21:33: "gatl<144><STEAM_0:0:204938646><CT>" triggered "weaponstats" (weapon "ak47") (shots "14") (hits "5") (kills "2") (headshots "2") (tks "0") (damage "307") (deaths "1")
+L 04/17/2026 - 19:21:33: "gatl<144><STEAM_0:0:204938646><CT>" triggered "weaponstats2" (weapon "ak47") (head "2") (chest "0") (stomach "0") (leftarm "3") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:21:33: "gatl<144><STEAM_0:0:204938646><CT>" triggered "weaponstats" (weapon "knife") (shots "2") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 19:21:33: "gatl<144><STEAM_0:0:204938646><CT>" triggered "weaponstats2" (weapon "knife") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:21:53: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" killed "photonly<139><STEAM_0:0:519683270><CT>" with "ak47" (attacker_position "1141 435 166") (victim_position "1449 405 196")
+L 04/17/2026 - 19:21:53: Team "TERRORIST" triggered "Terrorists_Win" (CT "6") (T "3")
+L 04/17/2026 - 19:21:53: World triggered "Round_End"
+L 04/17/2026 - 19:21:53: "photonly<139><STEAM_0:0:519683270><CT>" triggered "weaponstats" (weapon "grenade") (shots "2") (hits "1") (kills "0") (headshots "0") (tks "0") (damage "11") (deaths "0")
+L 04/17/2026 - 19:21:53: "photonly<139><STEAM_0:0:519683270><CT>" triggered "weaponstats2" (weapon "grenade") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:21:53: "photonly<139><STEAM_0:0:519683270><CT>" triggered "weaponstats" (weapon "m4a1") (shots "42") (hits "11") (kills "2") (headshots "2") (tks "0") (damage "408") (deaths "1")
+L 04/17/2026 - 19:21:53: "photonly<139><STEAM_0:0:519683270><CT>" triggered "weaponstats2" (weapon "m4a1") (head "2") (chest "4") (stomach "0") (leftarm "5") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:21:58: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 19:22:06: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "Dropped_The_Bomb"
+L 04/17/2026 - 19:22:07: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "Got_The_Bomb"
+L 04/17/2026 - 19:22:13: World triggered "Round_Start"
+L 04/17/2026 - 19:22:17: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "Dropped_The_Bomb"
+L 04/17/2026 - 19:22:22: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "Got_The_Bomb"
+L 04/17/2026 - 19:22:40: "photonly<139><STEAM_0:0:519683270><CT>" killed "4f<131><STEAM_0:0:19989970><TERRORIST>" with "m4a1" (headshot) (attacker_position "914 -684 148") (victim_position "825 333 132")
+L 04/17/2026 - 19:22:40: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats" (weapon "ak47") (shots "23") (hits "8") (kills "1") (headshots "0") (tks "0") (damage "186") (deaths "1")
+L 04/17/2026 - 19:22:40: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats2" (weapon "ak47") (head "0") (chest "2") (stomach "0") (leftarm "5") (rightarm "0") (leftleg "0") (rightleg "1")
+L 04/17/2026 - 19:22:58: Rcon: "rcon 2122926088 "pikabu" stats" from "172.18.0.1:43740"
+L 04/17/2026 - 19:23:20: "photonly<139><STEAM_0:0:519683270><CT>" killed "SPORK<135><STEAM_0:0:32599427><TERRORIST>" with "m4a1" (headshot) (attacker_position "738 288 132") (victim_position "720 473 114")
+L 04/17/2026 - 19:23:20: Team "CT" triggered "CTs_Win" (CT "7") (T "3")
+L 04/17/2026 - 19:23:20: World triggered "Round_End"
+L 04/17/2026 - 19:23:20: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:45101"
+L 04/17/2026 - 19:23:20: Rcon: "rcon 2122926088 "pikabu" sv_visiblemaxplayers" from "172.18.0.1:49895"
+L 04/17/2026 - 19:23:20: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "weaponstats" (weapon "m4a1") (shots "15") (hits "9") (kills "0") (headshots "0") (tks "0") (damage "178") (deaths "1")
+L 04/17/2026 - 19:23:20: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "weaponstats2" (weapon "m4a1") (head "0") (chest "3") (stomach "0") (leftarm "6") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:23:20: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "weaponstats" (weapon "ak47") (shots "8") (hits "1") (kills "1") (headshots "0") (tks "0") (damage "27") (deaths "0")
+L 04/17/2026 - 19:23:20: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "weaponstats2" (weapon "ak47") (head "0") (chest "0") (stomach "0") (leftarm "1") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:23:25: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 19:23:30: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "Dropped_The_Bomb"
+L 04/17/2026 - 19:23:40: World triggered "Round_Start"
+L 04/17/2026 - 19:23:41: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "Got_The_Bomb"
+L 04/17/2026 - 19:24:06: "gatl<144><STEAM_0:0:204938646><CT>" killed "SPORK<135><STEAM_0:0:32599427><TERRORIST>" with "awp" (attacker_position "1762 1293 196") (victim_position "1137 432 165")
+L 04/17/2026 - 19:24:06: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "Dropped_The_Bomb"
+L 04/17/2026 - 19:24:09: "gatl<144><STEAM_0:0:204938646><CT>" killed "4f<131><STEAM_0:0:19989970><TERRORIST>" with "awp" (headshot) (attacker_position "1798 1321 196") (victim_position "1338 550 196")
+L 04/17/2026 - 19:24:09: Team "CT" triggered "CTs_Win" (CT "8") (T "3")
+L 04/17/2026 - 19:24:09: World triggered "Round_End"
+L 04/17/2026 - 19:24:09: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats" (weapon "knife") (shots "1") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 19:24:09: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats2" (weapon "knife") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:24:14: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 19:24:20: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "Dropped_The_Bomb"
+L 04/17/2026 - 19:24:21: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "Got_The_Bomb"
+L 04/17/2026 - 19:24:29: World triggered "Round_Start"
+L 04/17/2026 - 19:24:40: "gatl<144><STEAM_0:0:204938646><CT>" killed "4f<131><STEAM_0:0:19989970><TERRORIST>" with "grenade" (attacker_position "1320 1064 196") (victim_position "498 719 97")
+L 04/17/2026 - 19:24:40: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "Dropped_The_Bomb"
+L 04/17/2026 - 19:24:40: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats" (weapon "knife") (shots "1") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 19:24:40: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats2" (weapon "knife") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:24:56: "photonly<139><STEAM_0:0:519683270><CT>" killed "SPORK<135><STEAM_0:0:32599427><TERRORIST>" with "m4a1" (attacker_position "2061 -179 308") (victim_position "1860 -251 308")
+L 04/17/2026 - 19:24:56: Team "CT" triggered "CTs_Win" (CT "9") (T "3")
+L 04/17/2026 - 19:24:56: World triggered "Round_End"
+L 04/17/2026 - 19:24:56: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "weaponstats" (weapon "galil") (shots "12") (hits "4") (kills "0") (headshots "0") (tks "0") (damage "46") (deaths "1")
+L 04/17/2026 - 19:24:56: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "weaponstats2" (weapon "galil") (head "0") (chest "1") (stomach "3") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:25:00: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 19:25:15: World triggered "Round_Start"
+L 04/17/2026 - 19:25:28: "gatl<144><STEAM_0:0:204938646><CT>" killed "SPORK<135><STEAM_0:0:32599427><TERRORIST>" with "awp" (headshot) (attacker_position "1062 -78 260") (victim_position "8 -64 82")
+L 04/17/2026 - 19:25:28: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:36628"
+L 04/17/2026 - 19:25:28: Rcon: "rcon 2122926088 "pikabu" sv_visiblemaxplayers" from "172.18.0.1:43957"
+L 04/17/2026 - 19:25:28: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "weaponstats" (weapon "knife") (shots "1") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 19:25:28: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "weaponstats2" (weapon "knife") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:26:21: "gatl<144><STEAM_0:0:204938646><CT>" killed "4f<131><STEAM_0:0:19989970><TERRORIST>" with "awp" (headshot) (attacker_position "1497 685 196") (victim_position "731 484 114")
+L 04/17/2026 - 19:26:21: Team "CT" triggered "CTs_Win" (CT "10") (T "3")
+L 04/17/2026 - 19:26:21: World triggered "Round_End"
+L 04/17/2026 - 19:26:21: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats" (weapon "galil") (shots "34") (hits "4") (kills "0") (headshots "0") (tks "0") (damage "93") (deaths "1")
+L 04/17/2026 - 19:26:21: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats2" (weapon "galil") (head "0") (chest "1") (stomach "1") (leftarm "2") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:26:21: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats" (weapon "knife") (shots "1") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "0")
+L 04/17/2026 - 19:26:21: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats2" (weapon "knife") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:26:26: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 19:26:41: World triggered "Round_Start"
+L 04/17/2026 - 19:27:42: "gatl<144><STEAM_0:0:204938646><CT>" killed "4f<131><STEAM_0:0:19989970><TERRORIST>" with "awp" (attacker_position "1444 682 196") (victim_position "684 617 132")
+L 04/17/2026 - 19:27:42: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:52399"
+L 04/17/2026 - 19:27:42: Rcon: "rcon 2122926088 "pikabu" sv_visiblemaxplayers" from "172.18.0.1:39064"
+L 04/17/2026 - 19:27:42: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats" (weapon "galil") (shots "1") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "1")
+L 04/17/2026 - 19:27:42: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats2" (weapon "galil") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:27:51: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" killed "photonly<139><STEAM_0:0:519683270><CT>" with "ak47" (attacker_position "1922 116 178") (victim_position "1523 147 196")
+L 04/17/2026 - 19:27:51: "photonly<139><STEAM_0:0:519683270><CT>" triggered "weaponstats" (weapon "grenade") (shots "4") (hits "1") (kills "0") (headshots "0") (tks "0") (damage "72") (deaths "0")
+L 04/17/2026 - 19:27:51: "photonly<139><STEAM_0:0:519683270><CT>" triggered "weaponstats2" (weapon "grenade") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:27:51: "photonly<139><STEAM_0:0:519683270><CT>" triggered "weaponstats" (weapon "m4a1") (shots "85") (hits "13") (kills "3") (headshots "2") (tks "0") (damage "439") (deaths "1")
+L 04/17/2026 - 19:27:51: "photonly<139><STEAM_0:0:519683270><CT>" triggered "weaponstats2" (weapon "m4a1") (head "3") (chest "6") (stomach "0") (leftarm "2") (rightarm "2") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:27:54: "gatl<144><STEAM_0:0:204938646><CT>" killed "SPORK<135><STEAM_0:0:32599427><TERRORIST>" with "m4a1" (attacker_position "1529 40 196") (victim_position "1413 193 196")
+L 04/17/2026 - 19:27:54: Team "CT" triggered "CTs_Win" (CT "11") (T "3")
+L 04/17/2026 - 19:27:54: World triggered "Round_End"
+L 04/17/2026 - 19:27:54: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "weaponstats" (weapon "grenade") (shots "1") (hits "2") (kills "0") (headshots "0") (tks "0") (damage "31") (deaths "0")
+L 04/17/2026 - 19:27:54: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "weaponstats2" (weapon "grenade") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:27:54: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "weaponstats" (weapon "glock18") (shots "3") (hits "0") (kills "0") (headshots "0") (tks "0") (damage "0") (deaths "1")
+L 04/17/2026 - 19:27:54: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "weaponstats2" (weapon "glock18") (head "0") (chest "0") (stomach "0") (leftarm "0") (rightarm "0") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:27:54: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "weaponstats" (weapon "ak47") (shots "18") (hits "3") (kills "1") (headshots "0") (tks "0") (damage "87") (deaths "0")
+L 04/17/2026 - 19:27:54: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "weaponstats2" (weapon "ak47") (head "0") (chest "0") (stomach "1") (leftarm "1") (rightarm "1") (leftleg "0") (rightleg "0")
+L 04/17/2026 - 19:27:58: Rcon: "rcon 2122926088 "pikabu" stats" from "172.18.0.1:59665"
+L 04/17/2026 - 19:27:59: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 19:28:14: World triggered "Round_Start"
+L 04/17/2026 - 19:29:10: "gatl<144><STEAM_0:0:204938646><CT>" killed "4f<131><STEAM_0:0:19989970><TERRORIST>" with "awp" (attacker_position "1492 706 196") (victim_position "775 495 132")
+L 04/17/2026 - 19:29:10: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "Dropped_The_Bomb"
+L 04/17/2026 - 19:29:10: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats" (weapon "galil") (shots "4") (hits "3") (kills "0") (headshots "0") (tks "0") (damage "65") (deaths "1")
+L 04/17/2026 - 19:29:10: "4f<131><STEAM_0:0:19989970><TERRORIST>" triggered "weaponstats2" (weapon "galil") (head "0") (chest "0") (stomach "0") (leftarm "2") (rightarm "0") (leftleg "0") (rightleg "1")
+L 04/17/2026 - 19:29:32: "gatl<144><STEAM_0:0:204938646><CT>" killed "SPORK<135><STEAM_0:0:32599427><TERRORIST>" with "awp" (attacker_position "1257 300 220") (victim_position "1956 -141 340")
+L 04/17/2026 - 19:29:32: Team "CT" triggered "CTs_Win" (CT "12") (T "3")
+L 04/17/2026 - 19:29:32: World triggered "Round_End"
+L 04/17/2026 - 19:29:37: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 19:29:38: "Rakza<120><STEAM_0:1:55955613><SPECTATOR>" joined team "SPECTATOR" (auto)
+L 04/17/2026 - 19:29:38: "Lin Kuei<140><STEAM_0:0:36417680><SPECTATOR>" joined team "SPECTATOR" (auto)
+L 04/17/2026 - 19:29:38: "uPlay<118><STEAM_0:1:644350905><SPECTATOR>" joined team "SPECTATOR" (auto)
+L 04/17/2026 - 19:29:38: "SPORK<135><STEAM_0:0:32599427><TERRORIST>" joined team "CT" (auto)
+L 04/17/2026 - 19:29:38: "photonly<139><STEAM_0:0:519683270><CT>" joined team "TERRORIST" (auto)
+L 04/17/2026 - 19:29:38: "gatl<144><STEAM_0:0:204938646><CT>" joined team "TERRORIST" (auto)
+L 04/17/2026 - 19:29:38: "GG.HeraTuBa<143><STEAM_0:0:100993243><SPECTATOR>" joined team "SPECTATOR" (auto)
+L 04/17/2026 - 19:29:38: "Saddz<142><STEAM_0:0:34344543><SPECTATOR>" joined team "SPECTATOR" (auto)
+L 04/17/2026 - 19:29:38: "4f<131><STEAM_0:0:19989970><TERRORIST>" joined team "CT" (auto)
+L 04/17/2026 - 19:29:38: "gatl<144><STEAM_0:0:204938646><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/17/2026 - 19:29:38: Log file closed

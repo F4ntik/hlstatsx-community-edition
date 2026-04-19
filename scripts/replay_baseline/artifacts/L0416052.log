@@ -1,0 +1,37 @@
+L 04/16/2026 - 17:33:38: Log file started (file "logs/L0416052.log") (game "cstrike") (version "48/1.1.2.7/Stdio/4328")
+L 04/16/2026 - 17:33:38: Server cvar "sv_restart" = "1"
+L 04/16/2026 - 17:33:38: World triggered "Restart_Round_(1_second)"
+L 04/16/2026 - 17:33:38: Team "CT" scored "0" with "0" players
+L 04/16/2026 - 17:33:38: Team "TERRORIST" scored "0" with "0" players
+L 04/16/2026 - 17:33:38: Server cvar "sv_restart" = "0"
+L 04/16/2026 - 17:33:39: World triggered "Round_Start"
+L 04/16/2026 - 17:33:39: World triggered "Round_Start"
+L 04/16/2026 - 17:33:39: "Saddz<108><STEAM_0:0:34344543><>" entered the game
+L 04/16/2026 - 17:33:39: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:53333"
+L 04/16/2026 - 17:33:39: "SPORK<105><STEAM_0:0:32599427><>" entered the game
+L 04/16/2026 - 17:33:39: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:43383"
+L 04/16/2026 - 17:33:40: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "108,,,,,,," 1 "SPORK (Pos 14 with 990 points) has connected from Russia"" from "172.18.0.1:40894"
+L 04/16/2026 - 17:33:40: "4f<104><STEAM_0:0:19989970><>" entered the game
+L 04/16/2026 - 17:33:40: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:38211"
+L 04/16/2026 - 17:33:40: "tankograd<107><STEAM_0:0:47465593><>" entered the game
+L 04/16/2026 - 17:33:40: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "105,108,,,,,," 1 "4f (Pos 2 with 1255 points) has connected from Russia"" from "172.18.0.1:60642"
+L 04/16/2026 - 17:33:40: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:46833"
+L 04/16/2026 - 17:33:40: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "105,108,104,,,,," 1 "tankograd (Pos 10 with 1070 points) has connected from Russia"" from "172.18.0.1:56015"
+L 04/16/2026 - 17:33:40: "uPlay<97><STEAM_0:1:644350905><>" entered the game
+L 04/16/2026 - 17:33:40: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:42869"
+L 04/16/2026 - 17:33:40: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "107,105,108,104,,,," 1 "New player uPlay has connected from Belarus"" from "172.18.0.1:44727"
+L 04/16/2026 - 17:33:40: "Rakza<95><STEAM_0:1:55955613><>" entered the game
+L 04/16/2026 - 17:33:40: "Psych<100><STEAM_0:0:49933366><>" entered the game
+L 04/16/2026 - 17:33:40: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:44667"
+L 04/16/2026 - 17:33:40: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "104,97,105,108,107,,," 1 "Rakza (Pos 6 with 1103 points) has connected from Russia"" from "172.18.0.1:54401"
+L 04/16/2026 - 17:33:40: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:58730"
+L 04/16/2026 - 17:33:40: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "104,97,107,105,108,95,," 1 "Psych (Pos 8 with 1077 points) has connected from Russia"" from "172.18.0.1:55640"
+L 04/16/2026 - 17:33:40: "HeraTuBa<102><STEAM_0:0:100993243><>" entered the game
+L 04/16/2026 - 17:33:40: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:44887"
+L 04/16/2026 - 17:33:40: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "97,104,107,105,108,95,100," 1 "HeraTuBa (Pos 12 with 1024 points) has connected from Russia"" from "172.18.0.1:43141"
+L 04/16/2026 - 17:33:41: "mURk<96><STEAM_0:0:36417680><>" entered the game
+L 04/16/2026 - 17:33:41: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:58892"
+L 04/16/2026 - 17:33:41: "Saddz<108><STEAM_0:0:34344543><>" joined team "SPECTATOR"
+L 04/16/2026 - 17:33:41: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "100,107,105,108,95,104,97,102" 1 "mURk (Pos 15 with 924 points) has connected from Russia"" from "172.18.0.1:48051"
+L 04/16/2026 - 17:33:41: "SPORK<105><STEAM_0:0:32599427><>" joined team "CT"
+L 04/16/2026 - 17:33:42: Log file closed

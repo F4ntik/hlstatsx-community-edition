@@ -1,0 +1,62 @@
+services:
+  db:
+    image: mariadb:10.11
+    container_name: hlstatsx-legacy-db
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --max-allowed-packet=256M
+    environment:
+      MARIADB_ROOT_PASSWORD: root123
+      MARIADB_DATABASE: hlstatsxce
+      MARIADB_USER: hlstatsxce
+      MARIADB_PASSWORD: hlx123
+    ports:
+      - "3317:3306"
+    volumes:
+      - hlstatsx_legacy_db:/var/lib/mysql
+    networks:
+      - hlstatsx_legacy_net
+
+  web:
+    image: startersclan/hlstatsx-community-edition:1.11.4-web
+    container_name: hlstatsx-legacy-web
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      DB_ADDR: db
+      DB_NAME: hlstatsxce
+      DB_USER: hlstatsxce
+      DB_PASS: hlx123
+    ports:
+      - "8181:80"
+    networks:
+      - hlstatsx_legacy_net
+
+  daemon:
+    image: startersclan/hlstatsx-community-edition:1.11.4-daemon
+    container_name: hlstatsx-legacy-daemon
+    restart: unless-stopped
+    depends_on:
+      - db
+    command:
+      - --ip=0.0.0.0
+      - --port=27500
+      - --db-host=db:3306
+      - --db-name=hlstatsxce
+      - --db-username=hlstatsxce
+      - --db-password=hlx123
+      - --nodns-resolveip
+    ports:
+      - "27600:27500/udp"
+    networks:
+      - hlstatsx_legacy_net
+
+networks:
+  hlstatsx_legacy_net:
+    driver: bridge
+
+volumes:
+  hlstatsx_legacy_db:

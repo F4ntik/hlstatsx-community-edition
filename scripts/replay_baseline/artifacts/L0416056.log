@@ -1,0 +1,25 @@
+L 04/16/2026 - 18:10:00: Log file started (file "logs/L0416056.log") (game "cstrike") (version "48/1.1.2.7/Stdio/4328")
+L 04/16/2026 - 18:10:00: Server cvar "sv_restart" = "1"
+L 04/16/2026 - 18:10:00: World triggered "Restart_Round_(1_second)"
+L 04/16/2026 - 18:10:00: Team "CT" scored "0" with "0" players
+L 04/16/2026 - 18:10:00: Team "TERRORIST" scored "0" with "0" players
+L 04/16/2026 - 18:10:00: Server cvar "sv_restart" = "0"
+L 04/16/2026 - 18:10:01: World triggered "Round_Start"
+L 04/16/2026 - 18:10:01: "Saddz<108><STEAM_0:0:34344543><>" entered the game
+L 04/16/2026 - 18:10:01: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:49933"
+L 04/16/2026 - 18:10:02: "tankograd<107><STEAM_0:0:47465593><>" entered the game
+L 04/16/2026 - 18:10:02: "Rakza<95><STEAM_0:1:55955613><>" entered the game
+L 04/16/2026 - 18:10:02: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:43081"
+L 04/16/2026 - 18:10:02: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "108,,,,,,," 1 "tankograd (Pos 9 with 1070 points) has connected from Russia"" from "172.18.0.1:56801"
+L 04/16/2026 - 18:10:02: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:58831"
+L 04/16/2026 - 18:10:02: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "107,108,,,,,," 1 "Rakza (Pos 6 with 1103 points) has connected from Russia"" from "172.18.0.1:49810"
+L 04/16/2026 - 18:10:03: "uPlay<97><STEAM_0:1:644350905><>" entered the game
+L 04/16/2026 - 18:10:03: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:38891"
+L 04/16/2026 - 18:10:03: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "95,108,107,,,,," 1 "New player uPlay has connected from Belarus"" from "172.18.0.1:38474"
+L 04/16/2026 - 18:10:03: "mURk<96><STEAM_0:0:36417680><>" entered the game
+L 04/16/2026 - 18:10:03: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:38279"
+L 04/16/2026 - 18:10:03: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "108,107,95,97,,,," 1 "mURk (Pos 12 with 1016 points) has connected from Russia"" from "172.18.0.1:49916"
+L 04/16/2026 - 18:10:04: "HeraTuBa<102><STEAM_0:0:100993243><>" entered the game
+L 04/16/2026 - 18:10:04: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:45650"
+L 04/16/2026 - 18:10:04: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "108,107,95,96,97,,," 1 "HeraTuBa (Pos 12 with 1024 points) has connected from Russia"" from "172.18.0.1:48436"
+L 04/16/2026 - 18:10:04: Log file closed

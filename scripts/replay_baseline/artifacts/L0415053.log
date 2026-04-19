@@ -1,0 +1,23 @@
+L 04/15/2026 - 17:57:53: Log file started (file "logs/L0415053.log") (game "cstrike") (version "48/1.1.2.7/Stdio/4328")
+L 04/15/2026 - 17:57:53: Server cvar "sv_restart" = "1"
+L 04/15/2026 - 17:57:53: World triggered "Restart_Round_(1_second)"
+L 04/15/2026 - 17:57:53: Team "CT" scored "0" with "0" players
+L 04/15/2026 - 17:57:53: Team "TERRORIST" scored "0" with "0" players
+L 04/15/2026 - 17:57:53: Server cvar "sv_restart" = "0"
+L 04/15/2026 - 17:57:54: World triggered "Round_Start"
+L 04/15/2026 - 17:57:54: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "67,71,69,66,68,70,62," 1 "HLstatsX:CE disabled! Need at least 4 active players (0/4)"" from "172.18.0.1:32897"
+L 04/15/2026 - 17:57:54: World triggered "Round_Start"
+L 04/15/2026 - 17:57:54: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "67,71,69,66,68,70,62," 1 "HLstatsX:CE disabled! Need at least 4 active players (0/4)"" from "172.18.0.1:33824"
+L 04/15/2026 - 17:57:54: "skinius<68><STEAM_0:1:920071810><>" entered the game
+L 04/15/2026 - 17:57:54: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "67,71,69,66,70,62,," 1 "New player skinius has connected from Russia"" from "172.18.0.1:51574"
+L 04/15/2026 - 17:57:55: "HeraTuBa<69><STEAM_0:0:100993243><>" entered the game
+L 04/15/2026 - 17:57:55: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "67,71,66,68,70,62,," 1 "HeraTuBa (Pos 12 with 1024 points) has connected from Russia"" from "172.18.0.1:46963"
+L 04/15/2026 - 17:57:56: "Laturmatur<71><STEAM_0:0:94888080><>" entered the game
+L 04/15/2026 - 17:57:56: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "67,69,66,68,70,62,," 1 "New player Laturmatur has connected from Russia"" from "172.18.0.1:40165"
+L 04/15/2026 - 17:57:56: "Lin Kuei<70><STEAM_0:0:36417680><>" entered the game
+L 04/15/2026 - 17:57:56: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "67,71,69,66,68,62,," 1 "Lin Kuei (Pos 15 with 979 points) has connected from Russia"" from "172.18.0.1:32973"
+L 04/15/2026 - 17:57:56: "Mep3ocTb<62><STEAM_0:1:45686725><>" entered the game
+L 04/15/2026 - 17:57:56: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "67,71,69,66,68,70,," 1 "Mep3ocTb (Pos 8 with 1084 points) has connected from Russia"" from "172.18.0.1:45320"
+L 04/15/2026 - 17:57:56: "HeraTuBa<69><STEAM_0:0:100993243><>" joined team "TERRORIST"
+L 04/15/2026 - 17:57:57: "HeraTuBa<69><STEAM_0:0:100993243><TERRORIST>" triggered "Spawned_With_The_Bomb"
+L 04/15/2026 - 17:57:57: Log file closed

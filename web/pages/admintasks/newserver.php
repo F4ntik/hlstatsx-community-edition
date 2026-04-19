@@ -100,7 +100,7 @@ For support and installation notes visit http://www.hlxcommunity.com
     $server_public_address = (!empty($_POST['public_address'])) ? clean_data($_POST['public_address']) : "";
 ?>
 Enter the address of a server that you want to accept data from.<br /><br />
-The "Public Address" should be the address you want shown to users. If left blank, it will be generated from the IP Address and Port. If you are using any kind of log relaying utility (i.e. hlstats.pl will not be receiving data directly from the game servers), you will want to set the IP Address and Port to the address of the log relay program, and set the Public Address to the real address of the game server. You will need a separate log relay for each game server. You can specify a hostname (or anything at all) in the Public Address.<p>
+The "Public Address" should be the address you want shown to users. If left blank, it will be generated from the IP Address and Port. If you are using a log relay or proxy runtime, set the IP Address and Port to the relay endpoint and set the Public Address to the real address of the game server. You will need a separate relay path for each game server. You can specify a hostname (or anything at all) in the Public Address.<p>
 
 <table width="100%" border="0" cellspacing="0" cellpadding="0">
 

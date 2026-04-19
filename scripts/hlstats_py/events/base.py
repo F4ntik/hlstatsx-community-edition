@@ -15,9 +15,13 @@ class EventCategory(Enum):
 
     FRAG = "frags"
     ACTION = "actions"
+    STATSME = "statsme"
+    STATSME2 = "statsme2"
     CHAT = "chat"
     TEAM = "team"
+    TEAM_BONUS = "team_bonus"
     CONNECTION = "connection"
+    ENTRY = "entry"
     WORLD = "world"
     GENERIC = "generic"
 

@@ -1,0 +1,19 @@
+L 04/15/2026 - 17:37:37: Log file started (file "logs/L0415052.log") (game "cstrike") (version "48/1.1.2.7/Stdio/4328")
+L 04/15/2026 - 17:37:37: Server cvar "sv_restart" = "1"
+L 04/15/2026 - 17:37:37: World triggered "Restart_Round_(1_second)"
+L 04/15/2026 - 17:37:37: Team "CT" scored "0" with "0" players
+L 04/15/2026 - 17:37:37: Team "TERRORIST" scored "0" with "0" players
+L 04/15/2026 - 17:37:37: Server cvar "sv_restart" = "0"
+L 04/15/2026 - 17:37:38: World triggered "Round_Start"
+L 04/15/2026 - 17:37:38: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "66,63,62,64,,,," 1 "HLstatsX:CE disabled! Need at least 4 active players (0/4)"" from "172.18.0.1:49145"
+L 04/15/2026 - 17:37:38: World triggered "Round_Start"
+L 04/15/2026 - 17:37:38: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "66,63,62,64,,,," 1 "HLstatsX:CE disabled! Need at least 4 active players (0/4)"" from "172.18.0.1:45596"
+L 04/15/2026 - 17:37:39: "SPORK<66><STEAM_0:0:32599427><>" entered the game
+L 04/15/2026 - 17:37:39: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "63,62,64,,,,," 1 "SPORK (Pos 14 with 1042 points) has connected from Russia"" from "172.18.0.1:46252"
+L 04/15/2026 - 17:37:40: "HeraTuBa<63><STEAM_0:0:100993243><>" entered the game
+L 04/15/2026 - 17:37:40: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "66,62,64,,,,," 1 "HeraTuBa (Pos 7 with 1143 points) has connected from Russia"" from "172.18.0.1:48080"
+L 04/15/2026 - 17:37:40: "Lin Kuei<64><STEAM_0:0:36417680><>" entered the game
+L 04/15/2026 - 17:37:40: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "66,63,62,,,,," 1 "Lin Kuei (Pos 7 with 1146 points) has connected from Russia"" from "172.18.0.1:37260"
+L 04/15/2026 - 17:37:40: "Mep3ocTb<62><STEAM_0:1:45686725><>" entered the game
+L 04/15/2026 - 17:37:40: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "66,63,64,,,,," 1 "Mep3ocTb (Pos 1 with 1247 points) has connected from Russia"" from "172.18.0.1:52456"
+L 04/15/2026 - 17:37:41: Log file closed

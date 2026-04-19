@@ -121,6 +121,41 @@ def test_sync_connect_retries_until_success() -> None:
     assert delays == [0.5, 1.0]
 
 
+def test_sync_connect_normalizes_mysqlclient_timeout_parameters() -> None:
+    connection = FakeConnection()
+    attempts: list[dict[str, object]] = []
+
+    def connector(**kwargs: object) -> db.SupportsConnection:
+        attempts.append(kwargs)
+        return connection
+
+    adapter = db.SyncDatabaseAdapter(
+        CONFIG,
+        connector=connector,
+        connect_timeout=0.5,
+        read_timeout=1.2,
+        write_timeout=2.1,
+    )
+
+    adapter.connect()
+
+    assert attempts == [
+        {
+            "host": CONFIG.host,
+            "port": CONFIG.port,
+            "user": CONFIG.username,
+            "passwd": CONFIG.password,
+            "db": CONFIG.database,
+            "charset": "utf8mb4",
+            "use_unicode": True,
+            "connect_timeout": 1,
+            "read_timeout": 2,
+            "write_timeout": 3,
+            "init_command": "SET NAMES 'utf8mb4'",
+        }
+    ]
+
+
 def test_connection_returns_existing_connection() -> None:
     connection = FakeConnection()
     adapter = db.SyncDatabaseAdapter(CONFIG, connector=connector_for(connection))
@@ -227,10 +262,11 @@ def test_sync_fetch_daemon_statuses_reads_rows() -> None:
 def test_sync_fetch_servers_returns_expected_records() -> None:
     responses: dict[QueryKey, QueryResponse] = {
         (
-            "SELECT `serverId`, `address`, `port`, `name`, `game` FROM hlstats_Servers ORDER BY `serverId`",
+            "SELECT `serverId`, `address`, `port`, `name`, `game`, `act_map` "
+            "FROM hlstats_Servers ORDER BY `serverId`",
             None,
         ): QueryResponse(
-            fetchall=[(1, "10.0.0.5", 27015, "Arena", "tf2")],
+            fetchall=[(1, "10.0.0.5", 27015, "Arena", "tf2", "ctf_2fort")],
         )
     }
     connection = FakeConnection(responses)
@@ -246,6 +282,7 @@ def test_sync_fetch_servers_returns_expected_records() -> None:
             port=27015,
             name="Arena",
             game="tf2",
+            current_map="ctf_2fort",
         )
     ]
 

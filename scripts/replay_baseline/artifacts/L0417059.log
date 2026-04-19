@@ -1,0 +1,26 @@
+L 04/17/2026 - 18:32:00: Log file started (file "logs/L0417059.log") (game "cstrike") (version "48/1.1.2.7/Stdio/4328")
+L 04/17/2026 - 18:32:00: Server cvar "mp_buytime" = "-1"
+L 04/17/2026 - 18:32:00: Server cvar "mp_forcecamera" = "0"
+L 04/17/2026 - 18:32:00: Server cvar "mp_forcechasecam" = "0"
+L 04/17/2026 - 18:32:00: Server cvar "mp_freezetime" = "0"
+L 04/17/2026 - 18:32:00: Server cvar "mp_friendlyfire" = "0"
+L 04/17/2026 - 18:32:00: Server cvar "mp_playerid" = "0"
+L 04/17/2026 - 18:32:00: Server cvar "mp_startmoney" = "16000"
+L 04/17/2026 - 18:32:00: Server cvar "mp_forcerespawn" = "0.75"
+L 04/17/2026 - 18:32:00: Server cvar "mp_give_player_c4" = "0"
+L 04/17/2026 - 18:32:00: Server cvar "mp_infinite_ammo" = "2"
+L 04/17/2026 - 18:32:00: Server cvar "mp_item_staytime" = "0"
+L 04/17/2026 - 18:32:00: Server cvar "mp_round_infinite" = "1"
+L 04/17/2026 - 18:32:00: Server cvar "mp_respawn_immunitytime" = "6"
+L 04/17/2026 - 18:32:00: Server cvar "mp_respawn_immunity_force_unset" = "1"
+L 04/17/2026 - 18:32:00: Server cvar "mp_show_scenarioicon" = "0"
+L 04/17/2026 - 18:32:00: Server cvar "mp_weapons_allow_map_placed" = "0"
+L 04/17/2026 - 18:32:00: Server cvar "sv_alltalk" = "1"
+L 04/17/2026 - 18:32:00: Server cvar "sv_restart" = "1"
+L 04/17/2026 - 18:32:00: World triggered "Restart_Round_(1_second)"
+L 04/17/2026 - 18:32:00: Team "CT" scored "4" with "2" players
+L 04/17/2026 - 18:32:00: Team "TERRORIST" scored "11" with "2" players
+L 04/17/2026 - 18:32:00: Server cvar "sv_restart" = "0"
+L 04/17/2026 - 18:32:01: World triggered "Round_Start"
+L 04/17/2026 - 18:32:03: Server cvar "sv_restart" = "1"
+L 04/17/2026 - 18:32:03: Log file closed

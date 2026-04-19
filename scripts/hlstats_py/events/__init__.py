@@ -15,9 +15,11 @@ from .handlers import (
     ChatEventHandler,
     ConnectEventHandler,
     DisconnectEventHandler,
+    EntryEventHandler,
     GenericEventHandler,
     KillEventHandler,
     TeamEventHandler,
+    TeamTriggerEventHandler,
     TriggerEventHandler,
     WorldEventHandler,
 )
@@ -36,9 +38,11 @@ __all__ = [
     "ChatEventHandler",
     "ConnectEventHandler",
     "DisconnectEventHandler",
+    "EntryEventHandler",
     "GenericEventHandler",
     "KillEventHandler",
     "TeamEventHandler",
+    "TeamTriggerEventHandler",
     "TriggerEventHandler",
     "WorldEventHandler",
 ]

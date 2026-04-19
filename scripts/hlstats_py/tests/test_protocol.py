@@ -88,6 +88,18 @@ def test_parse_chat_event():
     assert event.properties.get("team_only") is True
 
 
+def test_parse_dead_chat_event():
+    payload = (
+        "L 06/15/2023 - 10:16:10: "
+        '"Alice<2><STEAM_1:1:111><TERRORIST>" say "gg" (dead)'
+    )
+    event = parse_log_event(payload)
+
+    assert event.event_type is LogEventType.CHAT
+    assert event.message == "gg"
+    assert event.properties.get("team_only") is None
+
+
 def test_parse_world_event():
     payload = "L 06/15/2023 - 10:16:30: World triggered \"Round_Start\""
     event = parse_log_event(payload)
@@ -104,7 +116,7 @@ def test_parse_connect_event():
     event = parse_log_event(payload)
 
     assert event.event_type is LogEventType.CONNECT
-    assert event.properties["address"] == "1.2.3.4:27005"
+    assert event.properties["address"] == "1.2.3.4"
 
 
 def test_parse_log_event_errors():

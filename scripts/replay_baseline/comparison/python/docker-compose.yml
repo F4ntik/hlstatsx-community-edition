@@ -1,0 +1,68 @@
+services:
+  db:
+    image: mariadb:10.11
+    container_name: hlstatsx-python-db
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --max-allowed-packet=256M
+    environment:
+      MARIADB_ROOT_PASSWORD: root123
+      MARIADB_DATABASE: hlstatsxce
+      MARIADB_USER: hlstatsxce
+      MARIADB_PASSWORD: hlx123
+    ports:
+      - "3327:3306"
+    volumes:
+      - hlstatsx_python_db:/var/lib/mysql
+    networks:
+      - hlstatsx_python_net
+
+  web:
+    image: startersclan/hlstatsx-community-edition:1.11.4-web
+    container_name: hlstatsx-python-web
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      DB_ADDR: db
+      DB_NAME: hlstatsxce
+      DB_USER: hlstatsxce
+      DB_PASS: hlx123
+    ports:
+      - "8281:80"
+    networks:
+      - hlstatsx_python_net
+
+  proxy-daemon:
+    build:
+      context: ../../../..
+      dockerfile: scripts/replay_baseline/comparison/python/Dockerfile.proxy
+    container_name: hlstatsx-python-proxy
+    depends_on:
+      - db
+      - hlstats-worker
+    restart: unless-stopped
+    ports:
+      - "27601:27500/udp"
+    networks:
+      - hlstatsx_python_net
+
+  hlstats-worker:
+    build:
+      context: ../../../..
+      dockerfile: scripts/replay_baseline/comparison/python/Dockerfile.worker
+    container_name: hlstatsx-python-worker
+    depends_on:
+      - db
+    restart: unless-stopped
+    networks:
+      - hlstatsx_python_net
+
+networks:
+  hlstatsx_python_net:
+    driver: bridge
+
+volumes:
+  hlstatsx_python_db:

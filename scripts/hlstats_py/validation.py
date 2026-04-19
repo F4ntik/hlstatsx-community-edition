@@ -10,6 +10,7 @@ from .events import EventContext, EventDispatcher
 from .protocol import parse_log_event, parse_proxy_envelope
 from .storage import (
     EventStorage,
+    _DELETE_PLAYER_HISTORY_QUERY,
     _INSERT_ACTION_QUERY,
     _INSERT_ADMIN_EVENT_QUERY,
     _INSERT_CHAT_QUERY,
@@ -19,17 +20,34 @@ from .storage import (
     _INSERT_PLAYER_ACTION_QUERY,
     _INSERT_PLAYER_PLAYER_ACTION_QUERY,
     _INSERT_PLAYER_QUERY,
+    _INSERT_TEAMKILL_QUERY,
     _INSERT_TEAM_CHANGE_QUERY,
     _INCREMENT_ACTION_COUNT_QUERY,
     _LAST_INSERT_ID_QUERY,
     _PLAYER_BY_NAME_QUERY,
     _PLAYER_BY_UNIQUE_QUERY,
+    _REPLACE_PLAYER_HISTORY_SNAPSHOT_QUERY,
     _SELECT_ACTION_QUERY,
+    _SELECT_DEFAULT_SERVER_CONFIG_QUERY,
+    _SELECT_OPTION_QUERY,
+    _SELECT_PLAYER_HISTORY_SNAPSHOT_QUERY,
+    _SELECT_PLAYER_STATE_QUERY,
+    _SELECT_SERVER_CONFIG_QUERY,
+    _SELECT_WEAPON_MODIFIER_QUERY,
     _UPDATE_PLAYER_DEATHS_QUERY,
     _UPDATE_PLAYER_KILLS_QUERY,
     _UPDATE_PLAYER_NAME_QUERY,
+    _UPDATE_PLAYER_STREAKS_QUERY,
+    _UPDATE_PLAYER_HISTORY_QUERY,
+    _UPDATE_PLAYERNAME_LASTUSE_QUERY,
+    _UPDATE_PLAYERNAME_TOTALS_QUERY,
     _UPDATE_PLAYER_SKILL_QUERY,
     _UPDATE_PLAYER_SUICIDES_QUERY,
+    _UPDATE_PLAYER_TEAMKILLS_QUERY,
+    _UPDATE_SERVER_FRAG_TOTALS_QUERY,
+    _UPDATE_SERVER_PLAYER_TOTALS_QUERY,
+    _UPSERT_MAP_COUNTS_QUERY,
+    _UPSERT_PLAYER_HISTORY_QUERY,
     _UPSERT_PLAYER_NAME_QUERY,
     _UPSERT_PLAYER_UNIQUE_QUERY,
     _UPSERT_WEAPON_QUERY,
@@ -50,6 +68,18 @@ class FragSnapshot:
     victim_id: int
     weapon: str
     headshot: bool
+
+
+@dataclass(frozen=True)
+class TeamkillSnapshot:
+    """Captured teamkill row produced by :class:`EventStorage`."""
+
+    timestamp: datetime
+    server_id: int
+    map: str
+    killer_id: int
+    victim_id: int
+    weapon: str
 
 
 @dataclass(frozen=True)
@@ -135,6 +165,7 @@ class PlayerSnapshot:
     headshots: int
     deaths: int
     suicides: int
+    teamkills: int
     skill: int
     connections: int
     disconnects: int
@@ -150,6 +181,7 @@ class ReplaySnapshot:
     actions: Mapping[str, ActionSnapshot]
     weapons: Mapping[str, WeaponSnapshot]
     frags: Tuple[FragSnapshot, ...]
+    teamkills: Tuple[TeamkillSnapshot, ...]
     player_actions: Tuple[PlayerActionSnapshot, ...]
     chat_messages: Tuple[ChatMessageSnapshot, ...]
     connections: Tuple[ConnectionSnapshot, ...]
@@ -181,7 +213,8 @@ class _PlayerRecord:
     headshots: int = 0
     deaths: int = 0
     suicides: int = 0
-    skill: int = 0
+    teamkills: int = 0
+    skill: int = 1000
     connections: int = 0
     disconnects: int = 0
     last_address: Optional[str] = None
@@ -207,6 +240,25 @@ class _WeaponRecord:
     headshots: int = 0
 
 
+@dataclass
+class _PlayerHistoryRecord:
+    player_id: int
+    game: str
+    event_time: datetime
+    connection_time: int = 0
+    kills: int = 0
+    deaths: int = 0
+    suicides: int = 0
+    skill: int = 1000
+    headshots: int = 0
+    shots: int = 0
+    hits: int = 0
+    teamkills: int = 0
+    death_streak: int = 0
+    kill_streak: int = 0
+    skill_change: int = 0
+
+
 class ReplayDatabase:
     """In-memory stand-in for the HLstats MySQL schema used in tests."""
 
@@ -217,7 +269,9 @@ class ReplayDatabase:
         self._actions_by_code: Dict[Tuple[str, str], _ActionRecord] = {}
         self._actions_by_id: Dict[int, _ActionRecord] = {}
         self._weapons: Dict[Tuple[str, str], _WeaponRecord] = {}
+        self._player_history: Dict[Tuple[int, datetime, str], _PlayerHistoryRecord] = {}
         self._frags: List[FragSnapshot] = []
+        self._teamkills: List[TeamkillSnapshot] = []
         self._player_actions: List[PlayerActionSnapshot] = []
         self._chat_messages: List[ChatMessageSnapshot] = []
         self._connections: List[ConnectionSnapshot] = []
@@ -271,6 +325,13 @@ class ReplayDatabase:
             return _ExecutionResult()
         if query == _LAST_INSERT_ID_QUERY:
             return _ExecutionResult(fetchone=(self._last_insert_id,))
+        if query == _SELECT_PLAYER_STATE_QUERY:
+            assert normalized_params is not None
+            (player_id,) = normalized_params
+            record = self._players.get(int(player_id))
+            if record is None:
+                return _ExecutionResult(fetchone=None)
+            return _ExecutionResult(fetchone=(record.skill, record.kills, record.last_address, 0))
         if query == _UPDATE_PLAYER_NAME_QUERY:
             assert normalized_params is not None
             name, player_id = normalized_params
@@ -290,6 +351,130 @@ class ReplayDatabase:
             ids = self._player_names.setdefault(key, [])
             if record.player_id not in ids:
                 ids.append(record.player_id)
+            return _ExecutionResult()
+        if query == _UPDATE_PLAYERNAME_LASTUSE_QUERY:
+            return _ExecutionResult()
+        if query == _UPDATE_PLAYERNAME_TOTALS_QUERY:
+            return _ExecutionResult()
+        if query == _UPSERT_PLAYER_HISTORY_QUERY:
+            assert normalized_params is not None
+            player_id, event_time, game, skill = normalized_params
+            self._player_history.setdefault(
+                (int(player_id), event_time, str(game)),
+                _PlayerHistoryRecord(
+                    player_id=int(player_id),
+                    event_time=event_time,
+                    game=str(game),
+                    skill=int(skill),
+                ),
+            )
+            return _ExecutionResult()
+        if query == _SELECT_PLAYER_HISTORY_SNAPSHOT_QUERY:
+            assert normalized_params is not None
+            player_id, event_time, game = normalized_params
+            row = self._player_history.get((int(player_id), event_time, str(game)))
+            if row is None:
+                return _ExecutionResult(fetchone=None)
+            return _ExecutionResult(
+                fetchone=(
+                    row.connection_time,
+                    row.kills,
+                    row.deaths,
+                    row.suicides,
+                    row.skill,
+                    row.headshots,
+                    row.shots,
+                    row.hits,
+                    row.teamkills,
+                    row.death_streak,
+                    row.kill_streak,
+                    row.skill_change,
+                )
+            )
+        if query == _REPLACE_PLAYER_HISTORY_SNAPSHOT_QUERY:
+            assert normalized_params is not None
+            (
+                connection_time,
+                kills,
+                deaths,
+                suicides,
+                skill,
+                headshots,
+                shots,
+                hits,
+                teamkills,
+                death_streak,
+                kill_streak,
+                skill_change,
+                player_id,
+                event_time,
+                game,
+            ) = normalized_params
+            self._player_history[(int(player_id), event_time, str(game))] = _PlayerHistoryRecord(
+                player_id=int(player_id),
+                event_time=event_time,
+                game=str(game),
+                connection_time=int(connection_time),
+                kills=int(kills),
+                deaths=int(deaths),
+                suicides=int(suicides),
+                skill=int(skill),
+                headshots=int(headshots),
+                shots=int(shots),
+                hits=int(hits),
+                teamkills=int(teamkills),
+                death_streak=int(death_streak),
+                kill_streak=int(kill_streak),
+                skill_change=int(skill_change),
+            )
+            return _ExecutionResult()
+        if query == _DELETE_PLAYER_HISTORY_QUERY:
+            assert normalized_params is not None
+            player_id, event_time, game = normalized_params
+            self._player_history.pop((int(player_id), event_time, str(game)), None)
+            return _ExecutionResult()
+        if query == _UPDATE_PLAYER_HISTORY_QUERY:
+            assert normalized_params is not None
+            (
+                connection_time,
+                kills,
+                deaths,
+                suicides,
+                skill,
+                headshots,
+                shots,
+                hits,
+                teamkills,
+                death_streak,
+                _death_streak_again,
+                kill_streak,
+                _kill_streak_again,
+                skill_change,
+                player_id,
+                event_time,
+                game,
+            ) = normalized_params
+            record = self._player_history.setdefault(
+                (int(player_id), event_time, str(game)),
+                _PlayerHistoryRecord(
+                    player_id=int(player_id),
+                    event_time=event_time,
+                    game=str(game),
+                    skill=int(skill),
+                ),
+            )
+            record.connection_time += int(connection_time)
+            record.kills += int(kills)
+            record.deaths += int(deaths)
+            record.suicides += int(suicides)
+            record.skill = int(skill)
+            record.headshots += int(headshots)
+            record.shots += int(shots)
+            record.hits += int(hits)
+            record.teamkills += int(teamkills)
+            record.death_streak = max(record.death_streak, int(death_streak))
+            record.kill_streak = max(record.kill_streak, int(kill_streak))
+            record.skill_change += int(skill_change)
             return _ExecutionResult()
         if query == _UPSERT_PLAYER_UNIQUE_QUERY:
             assert normalized_params is not None
@@ -325,6 +510,28 @@ class ReplayDatabase:
             )
             self._frags.append(frag)
             return _ExecutionResult()
+        if query == _INSERT_TEAMKILL_QUERY:
+            assert normalized_params is not None
+            (
+                timestamp,
+                server_id,
+                map_name,
+                killer_id,
+                victim_id,
+                weapon,
+                *_positions,
+            ) = normalized_params
+            self._teamkills.append(
+                TeamkillSnapshot(
+                    timestamp=timestamp,
+                    server_id=int(server_id),
+                    map=str(map_name),
+                    killer_id=int(killer_id),
+                    victim_id=int(victim_id),
+                    weapon=str(weapon),
+                )
+            )
+            return _ExecutionResult()
         if query == _UPDATE_PLAYER_KILLS_QUERY:
             assert normalized_params is not None
             kills, headshots, player_id = normalized_params
@@ -343,6 +550,14 @@ class ReplayDatabase:
             (player_id,) = normalized_params
             record = self._players[int(player_id)]
             record.suicides += 1
+            return _ExecutionResult()
+        if query == _UPDATE_PLAYER_TEAMKILLS_QUERY:
+            assert normalized_params is not None
+            (player_id,) = normalized_params
+            record = self._players[int(player_id)]
+            record.teamkills += 1
+            return _ExecutionResult()
+        if query == _UPDATE_PLAYER_STREAKS_QUERY:
             return _ExecutionResult()
         if query == _UPSERT_WEAPON_QUERY:
             assert normalized_params is not None
@@ -365,6 +580,14 @@ class ReplayDatabase:
             return _ExecutionResult(
                 fetchone=(record.action_id, record.reward_player, record.reward_team)
             )
+        if query == _SELECT_SERVER_CONFIG_QUERY:
+            return _ExecutionResult(fetchone=None)
+        if query == _SELECT_DEFAULT_SERVER_CONFIG_QUERY:
+            return _ExecutionResult(fetchone=None)
+        if query == _SELECT_OPTION_QUERY:
+            return _ExecutionResult(fetchone=None)
+        if query == _SELECT_WEAPON_MODIFIER_QUERY:
+            return _ExecutionResult(fetchone=None)
         if query == _INSERT_ACTION_QUERY:
             assert normalized_params is not None
             game, code, description, reward_player, reward_team, _team = normalized_params
@@ -422,6 +645,12 @@ class ReplayDatabase:
             delta, player_id = normalized_params
             record = self._players[int(player_id)]
             record.skill += int(delta)
+            return _ExecutionResult()
+        if query == _UPDATE_SERVER_PLAYER_TOTALS_QUERY:
+            return _ExecutionResult()
+        if query == _UPDATE_SERVER_FRAG_TOTALS_QUERY:
+            return _ExecutionResult()
+        if query == _UPSERT_MAP_COUNTS_QUERY:
             return _ExecutionResult()
         if query == _INSERT_CHAT_QUERY:
             assert normalized_params is not None
@@ -499,6 +728,7 @@ class ReplayDatabase:
                 headshots=record.headshots,
                 deaths=record.deaths,
                 suicides=record.suicides,
+                teamkills=record.teamkills,
                 skill=record.skill,
                 connections=record.connections,
                 disconnects=record.disconnects,
@@ -537,6 +767,7 @@ class ReplayDatabase:
             actions=MappingProxyType(actions),
             weapons=MappingProxyType(weapons),
             frags=tuple(self._frags),
+            teamkills=tuple(self._teamkills),
             player_actions=tuple(self._player_actions),
             chat_messages=tuple(self._chat_messages),
             connections=tuple(self._connections),
@@ -620,6 +851,7 @@ __all__ = [
     "WeaponSnapshot",
     "ActionSnapshot",
     "FragSnapshot",
+    "TeamkillSnapshot",
     "PlayerActionSnapshot",
     "ChatMessageSnapshot",
     "ConnectionSnapshot",

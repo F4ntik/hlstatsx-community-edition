@@ -1,0 +1,22 @@
+L 04/17/2026 - 19:39:17: Log file started (file "logs/L0417068.log") (game "cstrike") (version "48/1.1.2.7/Stdio/4328")
+L 04/17/2026 - 19:39:17: Server cvar "sv_restart" = "1"
+L 04/17/2026 - 19:39:17: World triggered "Restart_Round_(1_second)"
+L 04/17/2026 - 19:39:17: Team "CT" scored "0" with "0" players
+L 04/17/2026 - 19:39:17: Team "TERRORIST" scored "0" with "0" players
+L 04/17/2026 - 19:39:17: Server cvar "sv_restart" = "0"
+L 04/17/2026 - 19:39:17: "Rakza<145><STEAM_0:1:55955613><>" connected, address "94.242.166.29:27005"
+L 04/17/2026 - 19:39:18: "Rakza<145><STEAM_0:1:55955613><>" STEAM USERID validated
+L 04/17/2026 - 19:39:18: World triggered "Round_Start"
+L 04/17/2026 - 19:39:18: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "145,,,,,,," 1 "HLstatsX:CE disabled! Need at least 4 active players (0/4)"" from "172.18.0.1:57908"
+L 04/17/2026 - 19:39:20: "uPlay<118><STEAM_0:1:644350905><>" entered the game
+L 04/17/2026 - 19:39:20: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:48154"
+L 04/17/2026 - 19:39:20: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "145,,,,,,," 1 "New player uPlay has connected from Belarus"" from "172.18.0.1:41223"
+L 04/17/2026 - 19:39:20: "Rakza<145><STEAM_0:1:55955613><>" entered the game
+L 04/17/2026 - 19:39:20: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "118,,,,,,," 1 "Rakza (Pos 10 with 1103 points) has connected from Russia"" from "172.18.0.1:36564"
+L 04/17/2026 - 19:39:20: "GG.HeraTuBa<143><STEAM_0:0:100993243><>" entered the game
+L 04/17/2026 - 19:39:20: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:55461"
+L 04/17/2026 - 19:39:20: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "145,118,,,,,," 1 "GG.HeraTuBa (Pos 6 with 1330 points) has connected from Russia"" from "172.18.0.1:55326"
+L 04/17/2026 - 19:39:20: "Lin Kuei<140><STEAM_0:0:36417680><>" entered the game
+L 04/17/2026 - 19:39:20: Rcon: "rcon 2122926088 "pikabu" status" from "172.18.0.1:43232"
+L 04/17/2026 - 19:39:20: Rcon: "rcon 2122926088 "pikabu" hlx_amx_bulkpsay "145,143,118,,,,," 1 "Lin Kuei (Pos 14 with 989 points) has connected from Russia"" from "172.18.0.1:50861"
+L 04/17/2026 - 19:39:21: Log file closed
