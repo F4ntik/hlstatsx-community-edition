@@ -4,8 +4,10 @@ import asyncio
 import socket
 from dataclasses import dataclass
 from io import StringIO
+from unittest.mock import patch
 
 from hlstats_py.runtime import HlstatsRuntime, build_dispatcher
+from hlstats_py.cli import load_settings
 from proxy_daemon_py.db import GameServer
 from proxy_daemon_py.log import LoggerConfig, ProxyLogger
 from proxy_daemon_py.transport import ProxyUdpServer
@@ -24,6 +26,7 @@ class StubStorage:
     def __init__(self) -> None:
         self.recorded: list[RecordedEvent] = []
         self.reset_calls = 0
+        self.finalize_calls = 0
 
     def record(self, update: object, context: object) -> None:
         event_code = getattr(update, "event_code")
@@ -44,6 +47,9 @@ class StubStorage:
 
     def reset_runtime_state(self) -> None:
         self.reset_calls += 1
+
+    def finalize_import(self) -> None:
+        self.finalize_calls += 1
 
 
 class StubAdapter:
@@ -105,6 +111,60 @@ def test_runtime_handles_control_commands_and_reload() -> None:
 
 def test_runtime_drops_bad_proxy_key_without_response() -> None:
     asyncio.run(_run_drops_bad_proxy_key_without_response())
+
+
+def test_runtime_processes_stdin_line_for_known_server() -> None:
+    adapter = StubAdapter()
+    storage = StubStorage()
+    logger = ProxyLogger(LoggerConfig(stream=StringIO()))
+    server = ProxyUdpServer(logger)
+    runtime = HlstatsRuntime(adapter, server, logger, build_dispatcher(), storage)
+    adapter.connect()
+    runtime._reload_state()
+
+    runtime.process_stdin_line(
+        'L 01/02/2024 - 03:00:00: "Alice<2><STEAM_1:1:111><CT>" connected, address "1.2.3.4:27005"',
+        "127.0.0.1:27015",
+    )
+    runtime.finalize_stdin_import()
+
+    assert storage.recorded == [
+        RecordedEvent(
+            event_code="connect",
+            category="connection",
+            server_id=7,
+            game="csgo",
+            current_map="de_dust2",
+        )
+    ]
+    assert storage.finalize_calls == 1
+
+
+def test_load_settings_requires_server_identity_for_stdin(tmp_path) -> None:
+    config_path = tmp_path / "hlstats.conf"
+    config_path.write_text(
+        "\n".join(
+            [
+                "DBHost 127.0.0.1",
+                "DBName hlstatsxce",
+                "DBUsername hlstatsxce",
+                "DBPassword hlx123",
+                "BindIP 0.0.0.0",
+                "Port 27500",
+                "DebugLevel 0",
+                "ProxyKey secret",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    with patch("sys.stderr", new=StringIO()):
+        try:
+            load_settings(["--configfile", str(config_path), "--stdin"])
+        except Exception as exc:
+            assert str(exc) == "--stdin requires both --server-ip and --server-port"
+        else:
+            raise AssertionError("stdin mode should require explicit source server identity")
 
 
 async def _run_records_proxied_event() -> None:

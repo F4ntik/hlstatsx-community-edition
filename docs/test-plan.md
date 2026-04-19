@@ -89,6 +89,9 @@ the resulting database state.
   before the live round begins.
 - Legacy offline `--stdin` replay corrupting non-ASCII chat payloads, which can
   look like a Python parity failure even when gameplay semantics match.
+- Python heatmap generation lacking the required external
+  `heatmaps/src/<game>/<map>.jpg` map-pack assets, which blocks real-map parity
+  even when the batch CLI itself is implemented.
 
 ## Release readiness for parity work
 
@@ -123,3 +126,9 @@ the resulting database state.
 - `/metrics` export:
   validate scrape stability, counter/gauge semantics, and zero impact on the
   existing UDP/runtime behaviour.
+- Heatmaps batch CLI:
+  validate `python -m hlstats_py.heatmaps` against 1-2 real maps with an
+  installed legacy map-pack, compare the generated `*-kill.jpg`,
+  `*-kill-thumb.jpg`, and overlay cache behaviour against legacy PHP output,
+  and confirm the PHP web pages continue to resolve the published assets
+  without path/name changes.

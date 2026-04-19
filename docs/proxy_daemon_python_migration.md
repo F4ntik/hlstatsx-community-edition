@@ -137,6 +137,15 @@
 - `HLStatsFTP` и `ImportBans` не переносились и по-прежнему остаются legacy Perl-утилитами.
 - `STDIN`-режим совместимости `hlstats.pl` не реализован в Python worker.
 - Экспорт Prometheus `/metrics` для runtime пока не реализован.
+- Heatmaps частично перенесены: batch-генератор
+  `python -m hlstats_py.heatmaps` уже заменяет legacy entrypoint
+  `heatmaps/generate.php` / `heatmaps/heatmap.class.php` на стороне генерации,
+  сохраняя `hlstats_Heatmap_Config`, legacy cache/output paths и имена
+  артефактов для PHP web.
+- Открытый хвост по heatmaps: реальная legacy-vs-Python parity-проверка на
+  1-2 production map-pack картах ещё не закрыта, потому что исходные
+  `heatmaps/src/<game>/<map>.jpg` assets не хранятся в репозитории и требуют
+  отдельной установки.
 
 ## 6. Оценка трудоёмкости
 - Анализ и дизайн: 1-2 дня.

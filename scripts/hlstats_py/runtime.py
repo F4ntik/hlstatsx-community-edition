@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import sys
 import signal
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -54,6 +55,8 @@ class SupportsEventStorage(Protocol):
     def record(self, update: object, context: EventContext) -> None: ...
 
     def reset_runtime_state(self) -> None: ...
+
+    def finalize_import(self) -> None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -229,16 +232,10 @@ class HlstatsRuntime:
             )
             return
 
-        event = parse_log_event(envelope.payload)
-        context = EventContext(
-            server_id=server.server_id,
-            game=server.game,
-            extras=MappingProxyType({"map": server.current_map or ""}),
-        )
-        update = self._dispatcher.dispatch(event, context)
-        self._storage.record(update, context)
-        self._logger.notice(
-            f"Recorded {update.category.value} event '{update.event_code}' for {server.address}:{server.port}"
+        self._process_event_payload(
+            payload=envelope.payload,
+            server=server,
+            source_label=f"{server.address}:{server.port}",
         )
 
     def _handle_control_command(self, command: str, host: str, port: int) -> str | None:
@@ -270,6 +267,33 @@ class HlstatsRuntime:
     def _is_local_control_host(host: str) -> bool:
         return host in {"127.0.0.1", "::1", "localhost"}
 
+    def process_stdin_line(self, line: str, server_address: str) -> None:
+        """Handle one raw legacy log line associated with *server_address*."""
+
+        server = self._servers.get(server_address)
+        if server is None:
+            self._logger.e403(f"Unknown source server '{server_address}'; dropping stdin line")
+            return
+        self._process_event_payload(payload=line, server=server, source_label=server_address)
+
+    def finalize_stdin_import(self) -> None:
+        """Flush import-tail metadata after a finite stdin replay."""
+
+        self._storage.finalize_import()
+
+    def _process_event_payload(self, *, payload: str, server: TrackedServer, source_label: str) -> None:
+        event = parse_log_event(payload)
+        context = EventContext(
+            server_id=server.server_id,
+            game=server.game,
+            extras=MappingProxyType({"map": server.current_map or ""}),
+        )
+        update = self._dispatcher.dispatch(event, context)
+        self._storage.record(update, context)
+        self._logger.notice(
+            f"Recorded {update.category.value} event '{update.event_code}' for {source_label}"
+        )
+
 
 async def _serve(argv: Sequence[str] | None = None) -> int:
     try:
@@ -282,7 +306,10 @@ async def _serve(argv: Sequence[str] | None = None) -> int:
     logger = ProxyLogger(LoggerConfig(level=settings.log_level))
     transport = ProxyUdpServer(logger)
     dispatcher = build_dispatcher()
-    storage = EventStorage(database)
+    storage = EventStorage(
+        database,
+        use_event_timestamps_for_processing=settings.stdin,
+    )
     runtime = HlstatsRuntime(database, transport, logger, dispatcher, storage)
 
     loop = asyncio.get_running_loop()
@@ -290,6 +317,32 @@ async def _serve(argv: Sequence[str] | None = None) -> int:
     for sig in (signal.SIGINT, signal.SIGTERM):
         with contextlib.suppress(NotImplementedError):
             loop.add_signal_handler(sig, signal_event.set)
+
+    if settings.stdin:
+        try:
+            runtime._adapter.connect()
+            runtime._reload_state()
+            logger.notice("UDP listen socket disabled, reading log data from STDIN.")
+            logger.notice(
+                f"All data from STDIN will be allocated to server '{settings.server_ip}:{settings.server_port}'."
+            )
+            line_count = 0
+            server_address = f"{settings.server_ip}:{settings.server_port}".strip().lower()
+            for raw_line in sys.stdin:
+                line = raw_line.rstrip("\r\n")
+                if not line:
+                    continue
+                runtime.process_stdin_line(line, server_address)
+                line_count += 1
+            runtime.finalize_stdin_import()
+            logger.notice(f"Import of log file complete. Scanned {line_count} lines.")
+            runtime._adapter.close()
+            return 0
+        except Exception as exc:  # pragma: no cover - defensive startup logging
+            logger.e403(f"Failed to run HLstats worker stdin import: {exc}")
+            with contextlib.suppress(Exception):
+                runtime._adapter.close()
+            return 2
 
     try:
         await runtime.start(settings.bind_ip, settings.port)

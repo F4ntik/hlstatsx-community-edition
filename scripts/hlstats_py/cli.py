@@ -21,6 +21,9 @@ class CliOptions:
     foreground: bool
     bind_ip: str | None
     port: int | None
+    stdin: bool
+    server_ip: str | None
+    server_port: int | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,6 +35,9 @@ class RuntimeSettings:
     log_level: LogLevel
     bind_ip: str | None
     port: int
+    stdin: bool
+    server_ip: str | None
+    server_port: int | None
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -64,6 +70,20 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         help="Override Port from hlstats.conf",
     )
+    parser.add_argument(
+        "--stdin",
+        action="store_true",
+        help="Read raw legacy log lines from standard input instead of UDP",
+    )
+    parser.add_argument(
+        "--server-ip",
+        help="Source server IP to associate with --stdin log data",
+    )
+    parser.add_argument(
+        "--server-port",
+        type=int,
+        help="Source server port to associate with --stdin log data",
+    )
     return parser
 
 
@@ -77,6 +97,9 @@ def parse_args(argv: Sequence[str] | None = None) -> CliOptions:
         foreground=parsed.foreground,
         bind_ip=parsed.bind_ip,
         port=parsed.port,
+        stdin=parsed.stdin,
+        server_ip=parsed.server_ip,
+        server_port=parsed.server_port,
     )
 
 
@@ -89,6 +112,10 @@ def load_settings(argv: Sequence[str] | None = None) -> RuntimeSettings:
     port = options.port if options.port is not None else config.port
     if port <= 0 or port > 65535:
         raise ConfigError("Port must be between 1 and 65535")
+    if options.stdin and (not options.server_ip or options.server_port is None):
+        raise ConfigError("--stdin requires both --server-ip and --server-port")
+    if options.server_port is not None and (options.server_port <= 0 or options.server_port > 65535):
+        raise ConfigError("Server port must be between 1 and 65535")
     log_level = level_from_debug(options.debug, config.debug_level)
     return RuntimeSettings(
         config=config,
@@ -96,6 +123,9 @@ def load_settings(argv: Sequence[str] | None = None) -> RuntimeSettings:
         log_level=log_level,
         bind_ip=bind_ip,
         port=port,
+        stdin=options.stdin,
+        server_ip=options.server_ip,
+        server_port=options.server_port,
     )
 
 

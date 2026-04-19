@@ -114,8 +114,23 @@ noise instead of being treated as a Python runtime mismatch.
 - Extending the clean replay loop to more production fixtures now that the
   known legacy `--stdin` Unicode chat corruption has been pushed out of the
   canonical parity gate.
+- Landed the first runnable Python `--stdin` path in `hlstats_py.runtime`:
+  the worker can now read raw legacy log lines directly from STDIN when given
+  `--server-ip/--server-port`, route them through the same dispatcher/storage
+  pipeline, use event timestamps as the processing clock, and run an
+  import-finalize tail that updates `hlstats_Players.last_event` at EOF.
+- Landed the first runnable Python heatmap batch generator in
+  `hlstats_py.heatmaps`: it now reads `hlstats_Heatmap_Config`, queries
+  frag/teamkill coordinates directly from MySQL, reuses the legacy
+  `heatmaps/src` asset layout and cache directory, and publishes
+  `*-kill.jpg` / `*-kill-thumb.jpg` into the same PHP-web-facing paths under
+  `web/hlstatsimg/games/<code>/heatmaps`.
+- Added targeted heatmap regression coverage for CLI defaults / path handling
+  plus a smoke generation path that writes legacy-named outputs and cache
+  artifacts from synthetic assets.
 - Keeping the post-runtime migration backlog explicit:
-  exact Python `--stdin`, `HLStatsFTP`, `ImportBans`, and optional `/metrics`.
+  exact Python `--stdin`, `HLStatsFTP`, `ImportBans`, optional `/metrics`, and
+  the remaining real-map parity gate for legacy heatmap generation.
 
 ## Next
 
@@ -123,14 +138,22 @@ noise instead of being treated as a Python runtime mismatch.
 - Replay the same fixture set into both contours.
 - Run the compact DB diff as the canonical parity gate for replay-semantic
   tables.
-- If the next run resumes code migration rather than parity expansion, start
-  with exact Python `--stdin` compatibility for `hlstats_py`, then use that
-  mode as the base for a future `HLStatsFTP` port.
+- Continue the new Python `--stdin` compatibility track by diffing one
+  identical fixture through legacy `hlstats.pl --stdin` and Python
+  `hlstats_py.runtime --stdin`, focusing next on import-tail metadata
+  (`connection_time`, `lastuse`, `numuses`) and any remaining finalize/flush
+  semantics.
+- Use the Python `--stdin` path as the base for the future `HLStatsFTP` port
+  once the import-tail parity target is explicit.
 - If exact legacy `--stdin` import-finalize metadata ever becomes required,
   treat it as a separate follow-up instead of mixing it with gameplay parity.
 - Expand the clean loop to more fixtures beyond the current five verified logs.
 - Keep `ImportBans` separate from the replay/runtime critical path; it can be
   ported after `--stdin`/`HLStatsFTP` unless ban sync is immediately needed.
+- Keep heatmaps as a separate follow-up validation track after the
+  runtime/ingestion backlog: the Python batch generator now exists, but the
+  real-map legacy-vs-Python parity gate still depends on installing external
+  map-pack JPEG assets that are not stored in this repository.
 
 ## Decisions
 
@@ -153,6 +176,9 @@ noise instead of being treated as a Python runtime mismatch.
 - Treat legacy offline `--stdin` non-ASCII chat corruption the same way:
   normalize it in the compact diff instead of degrading Python storage fidelity
   to match the import artifact.
+- For the dedicated Python `--stdin` migration track, use event timestamps as
+  the processing clock so import-time metadata follows the log timeline rather
+  than wall-clock replay pacing.
 
 ## Assumptions
 
@@ -206,7 +232,12 @@ noise instead of being treated as a Python runtime mismatch.
   Python runtime, but it is now explicitly outside the compact statistical diff
   gate.
 - Remaining migration backlog outside the validated runtime path:
-  exact Python `--stdin` mode, `HLStatsFTP`, `ImportBans`, optional `/metrics`.
+  exact Python `--stdin` mode, `HLStatsFTP`, `ImportBans`, optional `/metrics`,
+  and a real-map parity check for the new heatmap batch CLI once the external
+  map-pack is installed.
+- The new Python `--stdin` path is runnable, but exact legacy import-tail
+  parity for alias/session metadata is still open and should be measured with a
+  direct legacy-vs-Python offline import diff.
 
 ## Audit log
 
@@ -265,6 +296,14 @@ noise instead of being treated as a Python runtime mismatch.
 - 2026-04-19: promoted post-runtime legacy tooling into an explicit follow-up
   backlog in the migration docs:
   exact Python `--stdin`, `HLStatsFTP`, `ImportBans`, optional `/metrics`.
+- 2026-04-19: added an initial runnable Python `hlstats_py.runtime --stdin`
+  mode with required `--server-ip/--server-port`, event-timestamp processing,
+  and EOF finalize support (`hlstats_Players.last_event`), plus targeted
+  runtime/storage regression tests for the new path.
+- 2026-04-19: implemented the first Python heatmap batch generator
+  (`python -m hlstats_py.heatmaps`) with legacy-compatible DB selection,
+  asset/cache/output paths, and targeted smoke tests; the remaining open item
+  is a manual parity run on real map-pack assets outside the repository.
 
 ## Smoke/demo checks
 
@@ -284,6 +323,12 @@ noise instead of being treated as a Python runtime mismatch.
 - Targeted Python checks still pass after the latest parity fixes:
   `PYTHONPATH='scripts;scripts/proxy_daemon_py'; python -m pytest scripts\hlstats_py\tests\test_protocol.py scripts\hlstats_py\tests\test_events.py scripts\hlstats_py\tests\test_storage.py scripts\hlstats_py\tests\test_validation.py -q`
   -> `40 passed`.
+- Targeted runtime/storage coverage for the new stdin path also passes:
+  `PYTHONPATH='scripts;scripts/proxy_daemon_py'; python -m pytest scripts\hlstats_py\tests\test_runtime.py scripts\hlstats_py\tests\test_storage.py scripts\hlstats_py\tests\test_protocol.py scripts\hlstats_py\tests\test_events.py scripts\hlstats_py\tests\test_validation.py -q`
+  -> `47 passed`.
+- Heatmap regression coverage now also passes:
+  `PYTHONPATH='scripts;scripts/proxy_daemon_py'; python -m pytest scripts\hlstats_py\tests\test_heatmaps.py scripts\hlstats_py\tests\test_runtime.py scripts\hlstats_py\tests\test_storage.py scripts\hlstats_py\tests\test_protocol.py scripts\hlstats_py\tests\test_events.py scripts\hlstats_py\tests\test_validation.py -q`
+  -> `50 passed`.
 - Confirmed clean compact diff on:
   `L0415056.log`, `L0415058.log`, `L0416053.log`, `L0417051.log`,
   `L0417065.log`.

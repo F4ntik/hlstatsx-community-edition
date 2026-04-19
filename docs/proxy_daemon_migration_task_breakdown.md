@@ -255,3 +255,30 @@
   - Добавить Prometheus-совместимые метрики для proxy daemon и `hlstats_py`
     worker без изменения игрового протокола.
   - Покрыть базовые health/queue/replay counters и задокументировать scraping.
+- [~] **Задача 12.5. Python-порт heatmaps**
+  - Комментарий:
+  - Перенести генерацию heatmaps из legacy PHP-кода
+    (`heatmaps/generate.php`, `heatmaps/heatmap.class.php`) в отдельный
+    Python-инструмент или сервис без изменения формата готовых артефактов,
+    которые ожидает PHP web.
+  - Сохранить совместимость с `hlstats_Heatmap_Config`, существующими map-pack
+    asset'ами, именованием файлов (`*-kill`, `*-kill-thumb`) и текущими путями
+    публикации в `hlstatsimg/games/<game>/heatmaps`.
+  - Явно решить целевую форму запуска: batch/crON generator, on-demand CLI или
+    отдельный worker, и зафиксировать требования по CPU/IO, потому что legacy
+    README отдельно предупреждает о высокой ресурсоёмкости heatmap generation.
+  - Подготовить parity-проверку на 1-2 реальных картах:
+    legacy PHP heatmap vs Python heatmap по одинаковому входному набору
+    событий/координат и одинаковому `hlstats_Heatmap_Config`.
+  - Текущий статус:
+  - Выбран legacy-совместимый режим запуска: отдельный batch/cron CLI
+    `python -m hlstats_py.heatmaps`, без встраивания в runtime worker.
+  - Реализованы чтение `hlstats_Heatmap_Config`, выборка frag/teamkill
+    координат, legacy-совместимые `--game/--map/--disablecache/--ignoreinfected`,
+    публикация `*-kill.jpg` / `*-kill-thumb.jpg` и overlay-cache в
+    `heatmaps/cache/<code>`.
+  - Добавлены таргетированные тесты на CLI/default paths и smoke-генерацию
+    файлов с искусственными asset'ами.
+  - Открытый хвост: manual parity gate на 1-2 реальных картах ещё не закрыт,
+    потому что map-pack JPEG assets не лежат в репозитории и требуют внешней
+    установки перед сравнением legacy PHP vs Python.

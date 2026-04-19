@@ -244,6 +244,7 @@ _UPDATE_SERVER_PLAYER_TOTALS_QUERY = (
     "SET `players` = %s, `act_players` = %s "
     "WHERE `serverId` = %s"
 )
+_FINALIZE_PLAYER_LAST_EVENT_QUERY = "UPDATE hlstats_Players SET `last_event` = UNIX_TIMESTAMP()"
 _UPDATE_SERVER_FRAG_TOTALS_QUERY = (
     "UPDATE hlstats_Servers "
     "SET `kills` = `kills` + %s, `headshots` = `headshots` + %s "
@@ -292,9 +293,11 @@ class EventStorage:
         adapter: SupportsConnectionProvider,
         *,
         clock: Callable[[], datetime] | None = None,
+        use_event_timestamps_for_processing: bool = False,
     ) -> None:
         self._adapter = adapter
         self._clock = clock or (lambda: datetime.now().replace(microsecond=0))
+        self._use_event_timestamps_for_processing = use_event_timestamps_for_processing
         self._player_cache: dict[_PlayerCacheKey, int] = {}
         self._action_cache: dict[tuple[str, str], _ActionMetadata] = {}
         self._player_teams: dict[int, str] = {}
@@ -341,13 +344,19 @@ class EventStorage:
         self._player_skills.clear()
         self._player_total_kills.clear()
 
+    def finalize_import(self) -> None:
+        """Apply import-tail updates after a finite stdin replay."""
+
+        connection = self._connection()
+        self._execute(connection, _FINALIZE_PLAYER_LAST_EVENT_QUERY, None)
+
     def record(self, update: EventUpdate, context: EventContext) -> None:
         """Persist *update* using metadata from *context*."""
 
         connection = self._connection()
         map_name = self._resolve_map(context)
         timestamp = self._normalize_timestamp(update.timestamp)
-        processed_at = self._processing_timestamp()
+        processed_at = self._processing_timestamp(timestamp)
 
         try:
             if update.category is EventCategory.WORLD:
@@ -1693,7 +1702,9 @@ class EventStorage:
             (player_id, source_day, context.game),
         )
 
-    def _processing_timestamp(self) -> datetime:
+    def _processing_timestamp(self, event_timestamp: datetime) -> datetime:
+        if self._use_event_timestamps_for_processing:
+            return event_timestamp
         return self._normalize_timestamp(self._clock())
 
     # ------------------------------------------------------------------

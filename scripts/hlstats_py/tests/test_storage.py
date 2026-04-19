@@ -22,6 +22,7 @@ from hlstats_py.events import (
 )
 from hlstats_py.protocol import parse_log_event
 from hlstats_py.storage import (
+    _FINALIZE_PLAYER_LAST_EVENT_QUERY,
     _INSERT_ACTION_QUERY,
     _INSERT_CHAT_QUERY,
     _INSERT_FRAG_QUERY,
@@ -564,6 +565,37 @@ def test_disconnect_realigns_history_row_to_event_day(event_context: EventContex
         (0, 3, 5, 0, 1013, 2, 85, 21, 0, 3, 2, 13, 101, target_day, "csgo"),
     ) in connection.executed
     assert (_DELETE_PLAYER_HISTORY_QUERY, (101, source_day, "csgo")) in connection.executed
+
+
+def test_stdin_processing_uses_event_timestamp_for_name_lastuse(event_context: EventContext) -> None:
+    chat_dispatcher = EventDispatcher([ChatEventHandler()])
+    chat_event = parse_log_event(
+        'L 01/02/2024 - 03:04:05: "Alice<2><STEAM_1:2><CT>" say_team "Hold position"'
+    )
+    update = chat_dispatcher.dispatch(chat_event, event_context)
+
+    responses: Dict[QueryKey, List[QueryResponse]] = {
+        (_PLAYER_BY_UNIQUE_QUERY, ("STEAM_1:2", "csgo")): [QueryResponse(fetchone=(101,))],
+    }
+    connection = FakeConnection(responses)
+    storage = EventStorage(
+        StubAdapter(connection),
+        clock=lambda: datetime(2024, 1, 9, 12, 0, 0),
+        use_event_timestamps_for_processing=True,
+    )
+
+    storage.record(update, event_context)
+
+    assert (_UPSERT_PLAYER_NAME_QUERY, (101, "Alice", update.timestamp)) in connection.executed
+
+
+def test_finalize_import_updates_last_event_for_all_players() -> None:
+    connection = FakeConnection()
+    storage = EventStorage(StubAdapter(connection))
+
+    storage.finalize_import()
+
+    assert (_FINALIZE_PLAYER_LAST_EVENT_QUERY, None) in connection.executed
 
 
 def test_teamkill_records_teamkill_event_and_penalty(

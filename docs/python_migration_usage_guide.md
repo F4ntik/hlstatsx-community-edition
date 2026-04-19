@@ -21,7 +21,6 @@
 
 | Ключевой модуль | Назначение | Каталог |
 | --- | --- | --- |
-<<<<<<< HEAD
 | `proxy_daemon_py` | UDP-прокси между игровыми серверами и статистикой | `scripts/proxy_daemon_py` |
 | `hlstats_py` | Runnable downstream worker: приём UDP от proxy daemon, нормализация событий и запись в БД | `scripts/hlstats_py` |
 | `hlstats_awards_py` | Обслуживание наград, лент и архивов БД | `scripts/hlstats_awards_py` |
@@ -267,3 +266,45 @@ PYTHONPATH=.. poetry run pytest ../hlstats_resolve_py/tests
 
 Дополнительно для контейнерного smoke-теста всей цепочки смотрите
 `docs/python_fullstack_docker.md`.
+
+## 7. Batch-генерация heatmaps
+
+Python-порт heatmaps теперь доступен как отдельный batch CLI, повторяющий
+legacy-модель запуска без встраивания в `hlstats_py.runtime`:
+
+```bash
+cd scripts/proxy_daemon_py
+PYTHONPATH=.. poetry run python -m hlstats_py.heatmaps \
+  --configfile ../hlstats.conf \
+  --web-root ../web \
+  --heatmaps-root ../heatmaps
+```
+
+Что важно для эксплуатации:
+
+- Генератор читает `hlstats_Heatmap_Config` и `hlstats_Games` из общей MySQL.
+- Исходные карты по-прежнему ожидаются в legacy-layout:
+  `heatmaps/src/<realgame>/<map>.jpg`.
+- Готовые артефакты публикуются туда же, куда их ждёт PHP web:
+  `web/hlstatsimg/games/<code>/heatmaps/<map>-kill.jpg` и
+  `<map>-kill-thumb.jpg`.
+- Overlay-cache сохраняется в `heatmaps/cache/<code>`.
+- Поддерживаются legacy-флаги `--game`, `--map`, `--disablecache`,
+  `--ignoreinfected`.
+
+Пример точечного запуска для одной карты:
+
+```bash
+cd scripts/proxy_daemon_py
+PYTHONPATH=.. poetry run python -m hlstats_py.heatmaps \
+  --configfile ../hlstats.conf \
+  --web-root ../web \
+  --heatmaps-root ../heatmaps \
+  --game cstrike \
+  --map de_dust2 \
+  --disablecache
+```
+
+Открытое ограничение: реальная parity-проверка legacy PHP vs Python на
+production map-pack картах требует установленного набора
+`heatmaps/src/<game>/<map>.jpg`, который в репозиторий не входит.
