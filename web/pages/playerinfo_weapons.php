@@ -65,20 +65,20 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'weapon',
-				'Weapon',
+				t('literal.weapon'),
 				'width=15&type=weaponimg&align=center&link=' . urlencode("mode=weaponinfo&amp;weapon=%k&amp;game=$game"),
 				$fname
 			),
 			new TableColumn
 			(
 				'modifier',
-				'Modifier',
+				t('literal.modifier'),
 				'width=10&align=right'
 			),
 			new TableColumn
 			(
 				'kills',
-				'Kills',
+				t('literal.kills'),
 				'width=11&align=right'
 			),
 			new TableColumn
@@ -90,13 +90,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'kpercent',
-				'Ratio',
+				t('literal.ratio'),
 				'width=18&sort=no&type=bargraph'
 			),
 			new TableColumn
 			(
 				'headshots',
-				'Headshots',
+				t('literal.headshots'),
 				'width=8&align=right'
 			),
 			new TableColumn
@@ -108,13 +108,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'hpercent',
-				'Ratio',
+				t('literal.ratio'),
 				'width=18&sort=no&type=bargraph'
 			),
 			new TableColumn
 			(
 				'hpk',
-				'HS:K',
+				t('literal.hpk_cap'),
 				'width=5&align=right'
 			)
 		),
@@ -162,7 +162,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 	$numitems = $db->num_rows($result);
 	if ($numitems > 0) {
-		printSectionTitle('Weapon Usage *');
+		printSectionTitle(t('literal.weapon_usage'));
 		$tblWeapons->draw($result, $numitems, 95); ?>
 		<br /><br />
 <?php
@@ -180,61 +180,61 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'smweapon',
-				'Weapon',
+				t('literal.weapon'),
 				'width=15&type=weaponimg&align=center&link=' . urlencode("mode=weaponinfo&amp;weapon=%k&amp;game=$game"),
 				$fname
 			),
 			new TableColumn
 			(
 				'smshots',
-				'Shots',
+				t('literal.shots'),
 				'width=8&align=right'
 			),
 			new TableColumn
 			(
 				'smhits',
-				'Hits',
+				t('literal.hits'),
 				'width=8&align=right'
 			),
 			new TableColumn
 			(
 				'smdamage',
-				'Damage',
+				t('literal.damage'),
 				'width=8&align=right'
 			),
 			new TableColumn
 			(
 				'smheadshots',
-				'Headshots',
+				t('literal.headshots'),
 				'width=8&align=right'
 			),
 			new TableColumn
 			(
 				'smkills',
-				'Kills',
+				t('literal.kills'),
 				'width=7&align=right'
 			),
 			new TableColumn
 			(
 				'smkdr',
-				'K:D',
+				t('literal.kpd_cap'),
 				'width=12&align=right'
 			),
 			new TableColumn
 			(
 				'smaccuracy',
-				'Accuracy',
+				t('literal.accuracy'),
 				'width=8&align=right&append=' . urlencode('%')
 			),
 			new TableColumn
 			(
 				'smdhr',
-				'Damage per Hit',
+				t('literal.damage_per_hit'),
 				'width=10&align=right'
 			),
 			new TableColumn(
 				'smspk',
-				'Shots per Kill',
+				t('literal.shots_per_kill'),
 				'width=11&align=right'
 			)
 		),
@@ -279,7 +279,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 	$numitems = $db->num_rows($result);
 	if ($numitems > 0) {
-		printSectionTitle('Weapon Statistics *');
+		printSectionTitle(t('literal.weapon_statistics_star'));
 		$tblWeaponstats->draw($result, $numitems, 95); ?>
 		<br /><br />
 <!-- End of StatsMe Addon 1.0 by JustinHoMi@aol.com -->
@@ -296,32 +296,32 @@ For support and installation notes visit http://www.hlxcommunity.com
 				new TableColumn
 				(
 					'smweapon',
-					'Weapon',
+					t('literal.weapon'),
 					'width=35&type=weaponimg&align=center&link='.urlencode("javascript:switch_weapon('%k');"),
 					$fname
 				),
 				new TableColumn
 				(
 					'smhits',
-					'Hits',
+					t('literal.hits'),
 					'width=15&align=right'
 				),
 				new TableColumn
 				(
 					'smleft',
-					'Left',
+					t('literal.left'),
 					'width=15&align=right&append=' . urlencode('%')
 				),
 				new TableColumn
 				(
 					'smmiddle',
-					'Middle',
+					t('literal.middle'),
 					'width=15&align=right&append=' . urlencode('%')
 				),
 				new TableColumn
 				(
 					'smright',
-					'Right',
+					t('literal.right'),
 					'width=15&align=right&append=' . urlencode('%')
 				)
 			),
@@ -346,74 +346,74 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'smweapon',
-				'Weapon',
+				t('literal.weapon'),
 				'width=15&type=weaponimg&align=center&link=' . urlencode("mode=weaponinfo&amp;weapon=%k&amp;game=$game"),
 				$fname
 			),
 			new TableColumn
 			(
 				'smhits',
-				'Hits',
+				t('literal.hits'),
 				'width=7&align=right'
 			),
 			new TableColumn
 			(
 				'smhead',
-				'Head',
+				t('literal.head'),
 				'width=7&align=right'
 			),
 			new TableColumn
 			(
 				'smchest',
-				'Chest',
+				t('literal.chest'),
 				'width=7&align=right'
 			),
 			new TableColumn
 			(
 				'smstomach',
-				'Stomach',
+				t('literal.stomach'),
 				'width=7&align=right'
 			),
 			new TableColumn
 			(
 				'smleftarm',
-				'Left Arm',
+				t('literal.left_arm'),
 				'width=7&align=right'
 			),
 			new TableColumn
 			(
 				'smrightarm',
-				'Right Arm',
+				t('literal.right_arm'),
 				'width=7&align=right'
 			),
 			new TableColumn
 			(
 				'smleftleg',
-				'Left Leg',
+				t('literal.left_leg'),
 				'width=7&align=right'
 			),
 			new TableColumn
 			(
 				'smrightleg',
-				'Right Leg',
+				t('literal.right_leg'),
 				'width=7&align=right'
 			),
 			new TableColumn
 			(
 				'smleft',
-				'Left',
+				t('literal.left'),
 				'width=8&align=right&append=' . urlencode('%')
 			),
 			new TableColumn
 			(
 				'smmiddle',
-				'Middle',
+				t('literal.middle'),
 				'width=8&align=right&append=' . urlencode('%')
 			),
 			new TableColumn
 			(
 				'smright',
-				'Right',
+				t('literal.right'),
 				'width=8&align=right&append=' . urlencode('%')
 			)
 		),
@@ -465,7 +465,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	$result = $db->query($query);
 	if ($db->num_rows($result) != 0)
 	{
-		printSectionTitle('Weapon Targets *');
+		printSectionTitle(t('literal.weapon_targets'));
 		if ($g_options['show_weapon_target_flash'] == 1)
 		{
 ?>
@@ -613,7 +613,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			foreach ($weapon_data as $key => $entry)
 			{
 				if ($key == 'total')
-					$key = 'All Weapons';
+					$key = t('literal.all_weapons');
 				echo "data_array['$key'] = ['".ucfirst($key)."',".$entry['head'].",".$entry['leftarm'].",".$entry['rightarm'].",".$entry['chest'].",".$entry['stomach'].",".$entry['leftleg'].",".$entry['rightleg'].",'".$entry['model']."'];\n";
 				$i++; 
 			}
@@ -657,7 +657,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	<div style="float:right;vertical-align:top;width:480px;">
 		<table class="data-table">
 			<tr class="data-table-head">
-				<td style="text-align:center;">Targets</td>
+				<td style="text-align:center;"><?php echo eHtml(t('literal.targets')); ?></td>
 			</tr>
 			<tr class="bg1">
 				<td style="text-align:center;">
@@ -666,13 +666,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 						<param name="quality" value="high" />
 						<param name="wmode" value="opaque" />
 						<param name="bgcolor" value="#<?php echo $g_options['graphbg_load'] ?>" />
-						The hitbox display requires <a href="http://www.adobe.com" target="_blank">Adobe Flash Player</a> to view.
+						<?php echo t('literal.flash_required', array('player' => '<a href="http://www.adobe.com" target="_blank">Adobe Flash Player</a>')); ?>
 					</object>
 				</td>
 			</tr>
 			<tr class="bg2">
 				<td style="text-align:center;">
-					<a href="javascript:switch_weapon('All Weapons');">Show total target statistics</a>
+					<a href="javascript:switch_weapon('<?php echo eHtml(t('literal.all_weapons')); ?>');"><?php echo eHtml(t('literal.show_total_target_statistics')); ?></a>
 				</td>
 			</tr>
 		</table>

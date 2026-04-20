@@ -130,14 +130,14 @@ For support and installation notes visit http://www.hlxcommunity.com
 					hlstats_Actions.game = '$game'
 			");
 			list($totalactions) = $db->fetch_row();
-			?>From a total of <strong><?php echo number_format($totalactions); ?></strong> earned actions
+			?><?php echo t('literal.from_total_actions', array('total' => number_format($totalactions))); ?>
 	</div><br /><br />
 	<?php
 		$tblPlayerActions->draw($result, $db->num_rows($result), 95);
 	?><br /><br />
 	<div class="subblock">
 		<div style="float:right;">
-			Go to: <a href="<?php echo $g_options['scripturl'] . "?game=$game"; ?>"><?php echo $gamename; ?></a>
+			<?php echo eHtml(t('literal.go_to')); ?>: <a href="<?php echo $g_options['scripturl'] . "?game=$game"; ?>"><?php echo $gamename; ?></a>
 		</div>
 	</div>
 </div>

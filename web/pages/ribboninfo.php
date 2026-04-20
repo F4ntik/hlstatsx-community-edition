@@ -183,10 +183,10 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 
 <div class="block">
-	<?php printSectionTitle('Ribbon Details'); ?>
+	<?php printSectionTitle(t('literal.ribbon_details')); ?>
 	<div class="subblock">
 		<div style="float:right;">
-			Back to <a href="<?php echo $g_options['scripturl'] . "?mode=awards&amp;game=$game&tab=ribbons"; ?>">Ribbons</a>
+			<?php echo eHtml(t('literal.back_to')); ?> <a href="<?php echo $g_options['scripturl'] . "?mode=awards&amp;game=$game&tab=ribbons"; ?>"><?php echo eHtml(t('literal.ribbons')); ?></a>
 		</div>
 		<div style="clear:both;"></div>
 	</div>

@@ -165,7 +165,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	<?php printSectionTitle('Map Statistics'); ?>
 	<div class="subblock">
 		<div style="float:left;">
-			From a total of <strong><?php echo number_format($realkills); ?></strong> kills with <strong><?php echo number_format($realheadshots); ?></strong> headshots
+		<?php echo t('literal.from_total_kills_headshots', array('kills' => number_format($realkills), 'headshots' => number_format($realheadshots))); ?>
 		</div>
 		<div style="clear:both;"></div>
 	</div>
@@ -173,7 +173,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	<?php $tblMaps->draw($result, $db->num_rows($result), 95); ?><br /><br />
 	<div class="subblock">
 		<div style="float:right;">
-			Go to: <a href="<?php echo $g_options['scripturl'] . "?game=$game"; ?>"><?php echo $gamename; ?></a>
+			<?php echo eHtml(t('literal.go_to')); ?>: <a href="<?php echo $g_options['scripturl'] . "?game=$game"; ?>"><?php echo $gamename; ?></a>
 		</div>
 	</div>
 </div>

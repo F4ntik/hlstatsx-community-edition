@@ -47,19 +47,19 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'description',
-				'Action',
+				t('literal.action'),
 				'width=45&link=' . urlencode("mode=actioninfo&amp;action=%k&amp;game=$game")
 			),
 			new TableColumn
 			(
 				'obj_count',
-				'Earned',
-				'width=25&align=right&append=+times'
+				t('literal.earned'),
+				'width=25&align=right&append=' . urlencode(t('ui.times_suffix'))
 			),
 			new TableColumn
 			(
 				'obj_bonus',
-				'Accumulated Points',
+				t('literal.accumulated_points'),
 				'width=25&align=right'
 			)
 		),
@@ -122,7 +122,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 		<div style="clear:both;padding-top:20px;"></div>
 <?php
-		printSectionTitle('Player Actions *');
+		printSectionTitle(t('literal.player_actions'));
 		$tblPlayerActions->draw($result, $numitems, 95);
 ?>
 		<br /><br />
@@ -135,19 +135,19 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'description',
-				'Action',
+				t('literal.action'),
 				'width=45&link=' . urlencode("mode=actioninfo&amp;action=%k&amp;game=$game#victims")
 			),
 			new TableColumn
 			(
 				'obj_count',
-				'Earned Against',
-				'width=25&align=right&append=+times'
+				t('literal.earned_against'),
+				'width=25&align=right&append=' . urlencode(t('ui.times_suffix'))
 			),
 			new TableColumn
 			(
 				'obj_bonus',
-				'Accumulated Points',
+				t('literal.accumulated_points'),
 				'width=25&align=right'
 			)
 		),
@@ -194,7 +194,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 <?php
 		}
 		
-		printSectionTitle('Victims of Player-Player Actions *');
+		printSectionTitle(t('literal.victims_of_player_player_actions'));
 		$tblPlayerPlayerActionsV->draw($result, $numitems, 95);
 ?>
 		<br /><br />

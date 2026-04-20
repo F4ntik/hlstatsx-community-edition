@@ -47,7 +47,10 @@
 
 	$footerImage = eHtml(IMAGE_PATH . "/footer-small.png");
 	$versionStats = eHtml($g_options['version']);
-	$debugText = eHtml("Executed {$db->querycount} queries, generated this page in {$scripttime} Seconds");
+	$debugText = eHtml(t('ui.debug_summary', array(
+		'count' => $db->querycount,
+		'seconds' => $scripttime,
+	)));
 	$scriptUrl = eHtml($g_options['scripturl']);
 
 	$mapFile = INCLUDE_PATH . '/google_maps.php';
@@ -72,18 +75,18 @@
 
 			<div id="footer">
 				<a href="http://www.hlxce.com" target="_blank">
-					<img src="<?=$footerImage;?>" alt="HLstatsX Community Edition" border="0">
+					<img src="<?=$footerImage;?>" alt="<?php echo eHtml(t('footer.brand')); ?>" border="0">
 				</a>
 			</div>
 			<br>
 
 			<div class="fSmall" style="text-align:center;">
 					<?php if (isset($_SESSION['nojs']) && $_SESSION['nojs'] == 1) : ?>
-						You are currently viewing the basic version of this page, please enable JavaScript and reload the page to access full functionality.
+						<?php echo eHtml(t('ui.nojs_notice')); ?>
 						<br>
 					<?php endif; ?>
 					
-					Generated in real-time by 
+					<?php echo eHtml(t('ui.generated_by')); ?>
 					<a href="http://www.hlxce.com" target="_blank">
 						HLstatsX Community Edition <?=$versionStats;?>
 					</a>
@@ -93,12 +96,12 @@
 						<?=$debugText;?>
 					<?php endif; ?>
 				<br>
-				All images are copyrighted by their respective owners.
+				<?php echo eHtml(t('ui.footer_images')); ?>
 				<br><br>
-				[<a href="<?=$scriptUrl;?>?mode=admin">Admin</a>]
+				[<a href="<?=$scriptUrl;?>?mode=admin"><?php echo eHtml(t('ui.admin')); ?></a>]
 
 				<?php if (isset($_SESSION['loggedin'])) : ?>
-					&nbsp;[<a href="hlstats.php?logout=1">Logout</a>]
+					&nbsp;[<a href="<?php echo eHtml(lang_url(current_lang())); ?>&amp;logout=1"><?php echo eHtml(t('ui.logout')); ?></a>]
 				<?php endif; ?>
 			</div>
 

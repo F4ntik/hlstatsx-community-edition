@@ -180,13 +180,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 <div class="block">
 	<?php printSectionTitle('Weapon Statistics'); ?>
 	<div class="subblock">
-		From a total of <strong><?php echo number_format($realkills); ?></strong> kills with <strong><?php echo number_format($realheadshots); ?></strong> headshots
+		<?php echo t('literal.from_total_kills_headshots', array('kills' => number_format($realkills), 'headshots' => number_format($realheadshots))); ?>
 	</div>
 	<br /><br />
 	<?php $tblWeapons->draw($result, $db->num_rows($result), 95); ?><br /><br />
 	<div class="subblock">
 		<div style="float:right;">
-			Go to: <a href="<?php echo $g_options["scripturl"] . "?game=$game"; ?>"><?php echo $gamename; ?></a>
+			<?php echo eHtml(t('literal.go_to')); ?>: <a href="<?php echo $g_options["scripturl"] . "?game=$game"; ?>"><?php echo $gamename; ?></a>
 		</div>
 	</div>
 </div>

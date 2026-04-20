@@ -97,14 +97,14 @@
 
 	pageHeader
 	(
-		array ($gamename, 'Server Chat Statistics'),
-		array ($gamename => "%s?game={$gameSafeHtml}", 'Server Chat Statistics' => '')
+		array ($gamename, t('literal.server_chat_statistics')),
+		array ($gamename => "%s?game={$gameSafeHtml}", t('literal.server_chat_statistics') => '')
 	);
 
-	$servername = "(All Servers)";
+	$servername = '(' . t('chat.all_servers') . ')';
 	if ($showserver != 0) {
 		$servername = getServerNameById($db, $showserver);
-		$servername = ($servername !== null) ? "({$servername})" : "(Unknown Server)";
+		$servername = ($servername !== null) ? "({$servername})" : '(' . t('chat.unknown_server') . ')';
 	}
 
 	$delaySql = "";
@@ -119,7 +119,7 @@
 	$filter = getChatFilterParam();
 
 	$deleteDaysSafe = isset($g_options['DeleteDays']) ? (int)$g_options['DeleteDays'] : 30;
-	$pageTitle = sprintf('%s %s Server Chat Log (Last %d Days)', $gamename, $servername, $deleteDaysSafe);
+	$pageTitle = t('literal.server_chat_log', array('server' => trim($gamename . ' ' . $servername), 'days' => $deleteDaysSafe));
 
 	$columns = getChatColumns($showserver);
 	$table = new Table(
@@ -315,10 +315,10 @@
 					<input type="hidden" name="mode" value="chat" />
 					<input type="hidden" name="game" value="<?=$gameSafeHtml;?>">
 
-					<strong>&#8226;</strong> Show Chat from
+					<strong>&#8226;</strong> <?php echo eHtml(t('chat.show_from')); ?>
 
 					<select name="server_id">
-						<option value="0">All Servers</option>
+						<option value="0"><?php echo eHtml(t('chat.all_servers')); ?></option>
 
 						<?php foreach($serversList as $srv) : ?>
 							<?php $selected = ($showserver == $srv['serverId']) ? 'selected' : ''; ?>
@@ -329,16 +329,16 @@
 						<?php endforeach; ?>
 					</select>
 
-					Filter: <input type="text" name="filter" value="<?=eHtml($filter);?>"> 
+					<?php echo eHtml(t('ui.filter')); ?>: <input type="text" name="filter" value="<?=eHtml($filter);?>"> 
 
-					<input type="submit" value="View" class="smallsubmit">
-					<input type="button" value="Clear" class="smallsubmit" onclick="window.location.href='?mode=chat&game=<?= urlencode($checkGame); ?>';">
+					<input type="submit" value="<?php echo eHtml(t('ui.view')); ?>" class="smallsubmit">
+					<input type="button" value="<?php echo eHtml(t('ui.clear')); ?>" class="smallsubmit" onclick="window.location.href='?mode=chat&game=<?= urlencode($checkGame); ?>';">
 				</form>
 			</span>
 
 			<?php if (!empty($delaySql)) : ?>
 				<div style="font-size:0.9em; color:#8d90a3; margin-top:10px;">
-					*Messages are delayed by <?=eHtml($delayChat);?> minutes to prevent real-time tracking.
+					<?php echo t('chat.delayed_notice', array('minutes' => eHtml($delayChat))); ?>
 				</div>
 			<?php endif; ?>
 		</div>
@@ -351,7 +351,7 @@
 
 	<div class="subblock">
 		<div style="float:right;">
-			Go to: <a href="<?=eHtml($fullUrl);?>"><?=eHtml($gamename);?></a>
+			<?php echo eHtml(t('literal.go_to')); ?>: <a href="<?=eHtml($fullUrl);?>"><?=eHtml($gamename);?></a>
 		</div>
 	</div>
 </div>

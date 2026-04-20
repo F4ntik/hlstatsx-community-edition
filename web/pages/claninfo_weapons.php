@@ -561,7 +561,7 @@ if ($db->num_rows($result) != 0)
 		$i = 1;
 		foreach ($weapon_data as $key => $entry) {
 			if ($key == 'total')
-				$key = 'All Weapons';
+				$key = t('literal.all_weapons');
 			echo "data_array['$key'] = ['".ucfirst($key)."',".$entry['head'].",".$entry['leftarm'].",".$entry['rightarm'].",".$entry['chest'].",".$entry['stomach'].",".$entry['leftleg'].",".$entry['rightleg'].",'".$entry['model']."'];\n";
 			$i++; 
 		}
@@ -599,7 +599,7 @@ if ($db->num_rows($result) != 0)
 	<div style="float:right;vertical-align:top;width:480px;">
 		<table class="data-table">
 			<tr class="data-table-head">
-				<td style="text-align:center;">Targets</td>
+				<td style="text-align:center;"><?php echo eHtml(t('literal.targets')); ?></td>
 			</tr>
 			<tr class="bg1">
 				<td style="text-align:center;">
@@ -608,13 +608,13 @@ if ($db->num_rows($result) != 0)
 						<param name="quality" value="high" />
 						<param name="wmode" value="opaque" />
 						<param name="bgcolor" value="#<?php echo $g_options['graphbg_load'] ?>" />
-						The hitbox display requires <a href="http://www.adobe.com" target="_blank">Adobe Flash Player</a> to view.
+						<?php echo t('literal.flash_required', array('player' => '<a href="http://www.adobe.com" target="_blank">Adobe Flash Player</a>')); ?>
 					</object>
 				</td>
 			</tr>
 			<tr class="bg2">
 				<td style="text-align:center;">
-					<a href="javascript:switch_weapon('All Weapons');">Show total target statistics</a>
+					<a href="javascript:switch_weapon('<?php echo eHtml(t('literal.all_weapons')); ?>');"><?php echo eHtml(t('literal.show_total_target_statistics')); ?></a>
 				</td>
 			</tr>
 		</table>

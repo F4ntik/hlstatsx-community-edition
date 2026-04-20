@@ -125,6 +125,186 @@ function eHtml($str)
     return htmlspecialchars($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 }
 
+function translate_ui_literal($text)
+{
+	if (!is_string($text) || $text === '') {
+		return $text;
+	}
+
+	$map = array(
+		'Contents' => 'literal.contents',
+		'Games' => 'ui.games',
+		'Game' => 'ui.game',
+		'Search' => 'ui.search',
+		'Help' => 'ui.help',
+		'Name' => 'literal.name',
+		'Players' => 'literal.players',
+		'Player' => 'literal.player',
+		'Clans' => 'literal.clans',
+		'Clan' => 'literal.clan',
+		'Servers' => 'literal.servers',
+		'Chat' => 'literal.chat',
+		'Countries' => 'literal.countries',
+		'Awards' => 'literal.awards',
+		'Actions' => 'literal.actions',
+		'Weapons' => 'literal.weapons',
+		'Maps' => 'literal.maps',
+		'Roles' => 'literal.roles',
+		'Ribbons' => 'literal.ribbons',
+		'Ranks' => 'literal.ranks',
+		'Player Rankings' => 'literal.player_rankings',
+		'Clan Rankings' => 'literal.clan_rankings',
+		'Player Details' => 'literal.player_details',
+		'Clan Details' => 'literal.clan_details',
+		'Weapon Statistics' => 'literal.weapon_statistics',
+		'Action Statistics' => 'literal.action_statistics',
+		'Role Statistics' => 'literal.role_statistics',
+		'Map Statistics' => 'literal.map_statistics',
+		'Awards Info' => 'literal.awards_info',
+		'Questions' => 'literal.questions',
+		'Answers' => 'literal.answers',
+		'Participating Servers' => 'literal.participating_servers',
+		'General Statistics' => 'literal.general_statistics',
+		'Server Live View' => 'literal.server_live_view',
+		'Server Load History' => 'literal.server_load_history',
+		'Server Load Graph' => 'literal.server_load_graph',
+		'Player Information' => 'literal.player_information',
+		'Clan Information' => 'literal.clan_information',
+		'Player Profile' => 'literal.player_profile',
+		'Statistics Summary' => 'literal.statistics_summary',
+		'Miscellaneous Statistics' => 'literal.misc_statistics',
+		'Player Kill Statistics *' => 'literal.player_kill_statistics',
+		'Player Action' => 'literal.player_action',
+		'Player Actions *' => 'literal.player_actions',
+		'Victims of Player-Player Actions *' => 'literal.victims_of_player_player_actions',
+		'PlyrPlyr Action' => 'literal.plyrplyr_action',
+		'Team Action' => 'literal.team_action',
+		'World Action' => 'literal.world_action',
+		'Action' => 'literal.action',
+		'Action Statistics' => 'literal.action_statistics',
+		'Weapon' => 'literal.weapon',
+		'Weapon Usage *' => 'literal.weapon_usage',
+		'Weapon Statistics *' => 'literal.weapon_statistics_star',
+		'Weapon Stats *' => 'literal.weapon_statistics_star',
+		'Weapon Targets *' => 'literal.weapon_targets',
+		'Team' => 'literal.team',
+		'Team Selection *' => 'literal.team_selection',
+		'Role' => 'literal.role',
+		'Role Selection *' => 'literal.role_selection',
+		'Role Statistics' => 'literal.role_statistics',
+		'Map Performance *' => 'literal.map_performance',
+		'Map Statistics' => 'literal.map_statistics',
+		'Server' => 'literal.server',
+		'Server Activity *' => 'literal.server_activity',
+		'Address' => 'literal.address',
+		'Connection Time' => 'literal.connection_time',
+		'Map Name' => 'literal.map_name',
+		'Map' => 'literal.map',
+		'Played' => 'literal.played',
+		'Top Player' => 'literal.top_player',
+		'Top Clan' => 'literal.top_clan',
+		'Rank' => 'literal.rank',
+		'Points' => 'literal.points',
+		'Activity' => 'literal.activity',
+		'Kills' => 'literal.kills',
+		'Deaths' => 'literal.deaths',
+		'Headshots' => 'literal.headshots',
+		'No Players' => 'literal.no_players',
+		'Unknown' => 'literal.unknown',
+		'Unknown team' => 'literal.unknown_team',
+		'Damage per Hit' => 'literal.damage_per_hit',
+		'Shots per Kill' => 'literal.shots_per_kill',
+		'Player Locations' => 'literal.player_locations',
+		'Clan Kills' => 'literal.clan_kills',
+		'Modifier' => 'literal.modifier',
+		'Shots' => 'literal.shots',
+		'Hits' => 'literal.hits',
+		'Damage' => 'literal.damage',
+		'Head' => 'literal.head',
+		'Chest' => 'literal.chest',
+		'Stomach' => 'literal.stomach',
+		'Left' => 'literal.left',
+		'Middle' => 'literal.middle',
+		'Right' => 'literal.right',
+		'HeatMap' => 'literal.heatmap',
+		'Earned' => 'literal.earned',
+		'Earned Against' => 'literal.earned_against',
+		'Achieved' => 'literal.achieved',
+		'Times Victimized' => 'literal.times_victimized',
+		'Reward' => 'literal.reward',
+		'Picked' => 'literal.picked',
+		'Joined' => 'literal.joined',
+		'Accuracy' => 'literal.accuracy',
+		'Suicides' => 'literal.suicides',
+		'Aliases' => 'literal.aliases',
+		'Last Use' => 'literal.last_use',
+		'Hidden' => 'literal.hidden',
+		'Banned' => 'literal.banned',
+		'In good standing' => 'literal.in_good_standing',
+		'Not active' => 'literal.not_active',
+		'Members' => 'literal.members',
+		'(None)' => 'literal.none',
+		'(Not specified.)' => 'literal.not_specified',
+		'Player List' => 'literal.player_list',
+		'Daily Awards' => 'literal.daily_awards',
+		'Global Awards' => 'literal.global_awards',
+		'Awards (hover over image to see name)' => 'literal.awards_hover',
+		'Time' => 'literal.time_label',
+		'Skill' => 'literal.skill_label',
+		'Hpk' => 'literal.hpk_cap',
+		'Kpd' => 'literal.kpd_cap',
+		'K:D' => 'literal.kpd_cap',
+	);
+
+	if (!isset($map[$text])) {
+		return $text;
+	}
+
+	return t($map[$text], array(), $text);
+}
+
+function format_compact_duration($seconds)
+{
+	$seconds = max(0, (int) round($seconds));
+
+	$days = intdiv($seconds, 86400);
+	$seconds %= 86400;
+	$hours = intdiv($seconds, 3600);
+	$seconds %= 3600;
+	$minutes = intdiv($seconds, 60);
+	$seconds %= 60;
+
+	return sprintf(
+		'%d%s&nbsp;%02d%s&nbsp;%02d%s&nbsp;%02d%s',
+		$days,
+		t('time.compact.d'),
+		$hours,
+		t('time.compact.h'),
+		$minutes,
+		t('time.compact.m'),
+		$seconds,
+		t('time.compact.s')
+	);
+}
+
+function format_short_duration($time)
+{
+	$time = max(0, (int) round($time));
+	$hours = intdiv($time, 3600);
+	$minutes = intdiv($time % 3600, 60);
+	$seconds = $time % 60;
+
+	if ($hours > 0) {
+		return $hours . t('time.compact.h') . ' ' . $minutes . t('time.compact.m') . ' ' . $seconds . t('time.compact.s');
+	}
+
+	if ($minutes > 0) {
+		return $minutes . t('time.compact.m') . ' ' . $seconds . t('time.compact.s');
+	}
+
+	return $seconds . t('time.compact.s');
+}
+
 // Test if flags exists
 /**
  * getFlag()
@@ -176,22 +356,15 @@ function timestamp_to_str($seconds)
 {
     // We allow passing an empty parameter, for output in html
 	if (empty($seconds)) {
-		return '---';
+		return t('time.zero');
 	}
 
     // If something other than int or float is passed here, then return 'Undefined'
 	if (!is_numeric($seconds)) {
-		return "Undefined";
+		return t('ui.undefined');
 	}
 
-    // DateTime class doesn't work with float type,
-    // doesn't matter we don't need microsecond precision :D
-	$seconds = round($seconds);
-
-	$dtF = new \DateTime('@0');
-	$dtT = new \DateTime("@$seconds");
-
-	return $dtF->diff($dtT)->format('%ad&nbsp;%H:%I:%Sh');
+	return format_compact_duration($seconds);
 }
 
 /**
@@ -209,7 +382,7 @@ function error(string $message, bool $exit = true) : void
 
     $html .= '<thead style="text-align:center; color:#673636;">';
     $html .= '<tr>';
-    $html .= '<td class="errorhead">ERROR</td>';
+    $html .= '<td class="errorhead">' . eHtml(t('ui.error')) . '</td>';
     $html .= '</tr>';
     $html .= '</thead>';
 
@@ -356,7 +529,7 @@ function getSortArrow($sort, $sortorder, $name, $longname, $var_sort = 'sort', $
 		$arrowstring .= " onclick=\"Tabs.refreshTab({'$var_sort': '$name', $jsarrow}); return false;\"";
 	}
 	
-	$arrowstring .= ' title="Change sorting order">' . "$longname</a>";
+	$arrowstring .= ' title="' . eHtml(t('ui.change_sort_order')) . '">' . eHtml(translate_ui_literal($longname)) . '</a>';
 
 	if ($sort == $name)
 	{
@@ -555,7 +728,7 @@ function printSectionTitle($title, $echo = true)
 {
 	$html = '<span class="fHeading">';
 	$html .= '&nbsp;<img src="' . TITLE_IMAGE . '" alt="">';
-	$html .= '&nbsp;' . eHtml($title);
+	$html .= '&nbsp;' . eHtml(translate_ui_literal($title));
 	$html .= '</span>';
 	$html .= '<br><br>';
 

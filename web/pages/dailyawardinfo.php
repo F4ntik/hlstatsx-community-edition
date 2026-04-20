@@ -142,10 +142,10 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 
 <div class="block">
-	<?php printSectionTitle('Daily Award Details'); ?>
+	<?php printSectionTitle(t('literal.daily_award_details')); ?>
 	<div class="subblock">
 		<div style="float:right;">
-			Back to <a href="<?php echo $g_options['scripturl'] . "?mode=awards&amp;game=$game"; ?>">Daily Awards</a>
+			<?php echo eHtml(t('literal.back_to')); ?> <a href="<?php echo $g_options['scripturl'] . "?mode=awards&amp;game=$game"; ?>"><?php echo eHtml(t('literal.daily_awards')); ?></a>
 		</div>
 		<div style="clear:both;"></div>
 	</div>

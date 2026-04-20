@@ -225,7 +225,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 <div class="block">
 <?php
-	printSectionTitle('Player Awards History');
+	printSectionTitle(t('literal.player_awards_history'));
 	if ($numitems > 0)
 	{
 		$table->draw($result, $numitems, 95);
@@ -245,7 +245,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 				");
 				list($lastName) = $db->fetch_row();
 			?>
-			Go to: <a href="<?php echo $g_options['scripturl'] . "?mode=playerinfo&amp;player=$player"; ?>"><?php echo $lastName; ?>'s Statistics</a>
+			<?php echo eHtml(t('literal.go_to')); ?>: <a href="<?php echo $g_options['scripturl'] . "?mode=playerinfo&amp;player=$player"; ?>"><?php echo t('literal.player_statistics_link', array('player' => eHtml($lastName))); ?></a>
 		</div>
 	</div>
 </div>

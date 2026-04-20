@@ -134,13 +134,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 
 <div class="block">
-	<?php printSectionTitle('Map Details'); ?>
+	<?php printSectionTitle(t('literal.map_details')); ?>
 	<div class="subblock">
 		<div style="float:left;">
-			<strong><?php echo $map; ?></strong>: From a total of <strong><?php echo number_format(intval($totalkills)); ?></strong> kills (Last <?php echo $g_options['DeleteDays']; ?> Days)
+			<strong><?php echo eHtml($map); ?></strong>: <?php echo t('literal.from_total_kills_last_days', array('kills' => number_format(intval($totalkills)), 'days' => $g_options['DeleteDays'])); ?>
 		</div>
 		<div style="float:right;">
-			Back to <a href="<?php echo $g_options['scripturl'] . "?mode=maps&amp;game=$game"; ?>">Map Statistics</a>
+			<?php echo eHtml(t('literal.back_to')); ?> <a href="<?php echo $g_options['scripturl'] . "?mode=maps&amp;game=$game"; ?>"><?php echo eHtml(t('literal.map_statistics')); ?></a>
 		</div>
 		<div style="clear:both;"></div>
 	</div>

@@ -145,7 +145,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 <div class="block">
 
-<?php	printSectionTitle('Participating Servers'); ?>
+<?php	printSectionTitle(t('literal.participating_servers')); ?>
 		<div class="subblock">
 <?php
 	if (count($servers) == 1)
@@ -159,9 +159,23 @@ For support and installation notes visit http://www.hlxcommunity.com
 		else
 			$hpk = sprintf("%.2f", 0);
 		if ($players_last_day > -1)
-			echo "Tracking <b>" . number_format($total_players) . "</b> players (<b>+" . number_format($players_last_day) . "</b> new players last 24h) with <b>" . number_format($total_kills) . "</b> kills (<b>+" . number_format($kills_last_day) . "</b> last 24h) and <b>" . number_format($total_headshots) . "</b> headshots (<b>$hpk%</b>) on <b>" . number_format($total_servers) . "</b> servers";
+			echo t('contents.tracking_summary_with_delta', array(
+				'players' => number_format($total_players),
+				'players_delta' => number_format($players_last_day),
+				'kills' => number_format($total_kills),
+				'kills_delta' => number_format($kills_last_day),
+				'headshots' => number_format($total_headshots),
+				'hpk' => $hpk,
+				'servers' => number_format($total_servers),
+			));
 		else
-			echo "Tracking <b>" . number_format($total_players) . "</b> players with <b>" . number_format($total_kills) . "</b> kills and <b>" . number_format($total_headshots) . "</b> headshots (<b>$hpk%</b>) on <b>" . number_format($total_servers) . "</b> servers";
+			echo t('contents.tracking_summary', array(
+				'players' => number_format($total_players),
+				'kills' => number_format($total_kills),
+				'headshots' => number_format($total_headshots),
+				'hpk' => $hpk,
+				'servers' => number_format($total_servers),
+			));
 ?></td>
 		</tr>	
     </table>
@@ -188,19 +202,33 @@ For support and installation notes visit http://www.hlxcommunity.com
 		else
 			$hpk = sprintf("%.2f", 0);
 		if ($players_last_day > -1)
-			echo "Tracking <b>" . number_format($total_players) . "</b> players (<b>+" . number_format($players_last_day) . "</b> new players last 24h) with <b>" . number_format($total_kills) . "</b> kills (<b>+" . number_format($kills_last_day) . "</b> last 24h) and <b>" . number_format($total_headshots) . "</b> headshots (<b>$hpk%</b>) on <b>" . number_format($total_servers) . "</b> servers";
+			echo t('contents.tracking_summary_with_delta', array(
+				'players' => number_format($total_players),
+				'players_delta' => number_format($players_last_day),
+				'kills' => number_format($total_kills),
+				'kills_delta' => number_format($kills_last_day),
+				'headshots' => number_format($total_headshots),
+				'hpk' => $hpk,
+				'servers' => number_format($total_servers),
+			));
 		else
-			echo "Tracking <b>" . number_format($total_players) . "</b> players with <b>" . number_format($total_kills) . "</b> kills and <b>" . number_format($total_headshots) . "</b> headshots (<b>$hpk%</b>) on <b>" . number_format($total_servers) . "</b> servers";
+			echo t('contents.tracking_summary', array(
+				'players' => number_format($total_players),
+				'kills' => number_format($total_kills),
+				'headshots' => number_format($total_headshots),
+				'hpk' => $hpk,
+				'servers' => number_format($total_servers),
+			));
 ?></td>
       </tr>
       <tr class="data-table-head">
-		<td class="fSmall" style="width:37%;">&nbsp;Server</td>
-		<td class="fSmall" style="width:19%;">&nbsp;Address</td>
-		<td class="fSmall" style="width:7%;text-align:center;">&nbsp;Map</td>
-		<td class="fSmall" style="width:7%;text-align:center;">&nbsp;Played</td>
-		<td class="fSmall" style="width:10%;text-align:center;">&nbsp;Players</td>
-		<td class="fSmall" style="width:7%;text-align:center;">&nbsp;Kills</td>
-		<td class="fSmall" style="width:7%;text-align:center;">&nbsp;Headshots</td>
+		<td class="fSmall" style="width:37%;">&nbsp;<?php echo eHtml(t('literal.server')); ?></td>
+		<td class="fSmall" style="width:19%;">&nbsp;<?php echo eHtml(t('literal.address')); ?></td>
+		<td class="fSmall" style="width:7%;text-align:center;">&nbsp;<?php echo eHtml(t('literal.map')); ?></td>
+		<td class="fSmall" style="width:7%;text-align:center;">&nbsp;<?php echo eHtml(t('literal.played')); ?></td>
+		<td class="fSmall" style="width:10%;text-align:center;">&nbsp;<?php echo eHtml(t('literal.players')); ?></td>
+		<td class="fSmall" style="width:7%;text-align:center;">&nbsp;<?php echo eHtml(t('literal.kills')); ?></td>
+		<td class="fSmall" style="width:7%;text-align:center;">&nbsp;<?php echo eHtml(t('literal.headshots')); ?></td>
 		<td class="fSmall" style="width:6%;text-align:center;">&nbsp;HS:K</td>
       </tr>
 
@@ -242,7 +270,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			echo '<b>' . $rowdata['name'] . '</b>';
 ?></td>
             <td class="game-table-cell"><?php
-			echo "$addr (<a href=\"steam://connect/$addr\">Join</a>)";
+			echo $addr . ' (<a href="steam://connect/' . $addr . '">' . eHtml(t('literal.join')) . '</a>)';
 ?></td>
             <td class="game-table-cell" style="text-align:center;"><?php
 			echo $rowdata['act_map'];
@@ -279,7 +307,12 @@ For support and installation notes visit http://www.hlxcommunity.com
 					<?php printserverstats($server_id); ?>
 					<div class="subblock">
 <?php
-				$range_arr = array(1=>"24h View", 2=>"Last Week", 3=>"Last Month", 4=>"Last Year");
+				$range_arr = array(
+					1 => t('literal.24h_view'),
+					2 => t('literal.last_week'),
+					3 => t('literal.last_month'),
+					4 => t('literal.last_year'),
+				);
 				foreach($range_arr as $range_code => $range_name) {
 					print('<table class="data-table"><tr class="data-table-head">');
 					print('<td class="fSmall">&nbsp;'.$range_name.'</td></tr>');
@@ -353,7 +386,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 		<tr class="data-table-row">
 			<td style="text-align:center;padding:0px;">
-				<img src="show_graph.php?type=1&amp;game=<?php echo $game ?>&amp;width=870&amp;height=200&amp;bgcolor=<?php echo $g_options['graphbg_load']; ?>&amp;color=<?php echo $g_options['graphtxt_load']; ?>" alt="Server Load Graph" title="serverLoadGraph" />
+				<img src="show_graph.php?type=1&amp;game=<?php echo $game ?>&amp;width=870&amp;height=200&amp;bgcolor=<?php echo $g_options['graphbg_load']; ?>&amp;color=<?php echo $g_options['graphtxt_load']; ?>" alt="<?php echo eHtml(t('literal.server_load_graph')); ?>" title="serverLoadGraph" />
 			</td>
 		</tr>
 <?php
@@ -384,13 +417,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 		  <table class="data-table">
 					<tr class="data-table-head">
-						<td class="fSmall" style="width:37%;">&nbsp;Server</td>
-						<td class="fSmall" style="width:19%;">&nbsp;Address</td>
-						<td class="fSmall" style="width:7%;text-align:center;">&nbsp;Map</td>
-						<td class="fSmall" style="width:7%;text-align:center;">&nbsp;Played</td>
-						<td class="fSmall" style="width:10%;text-align:center;">&nbsp;Players</td>
-						<td class="fSmall" style="width:7%;text-align:center;">&nbsp;Kills</td>
-						<td class="fSmall" style="width:7%;text-align:center;">&nbsp;Headshots</td>
+						<td class="fSmall" style="width:37%;">&nbsp;<?php echo eHtml(t('literal.server')); ?></td>
+						<td class="fSmall" style="width:19%;">&nbsp;<?php echo eHtml(t('literal.address')); ?></td>
+						<td class="fSmall" style="width:7%;text-align:center;">&nbsp;<?php echo eHtml(t('literal.map')); ?></td>
+						<td class="fSmall" style="width:7%;text-align:center;">&nbsp;<?php echo eHtml(t('literal.played')); ?></td>
+						<td class="fSmall" style="width:10%;text-align:center;">&nbsp;<?php echo eHtml(t('literal.players')); ?></td>
+						<td class="fSmall" style="width:7%;text-align:center;">&nbsp;<?php echo eHtml(t('literal.kills')); ?></td>
+						<td class="fSmall" style="width:7%;text-align:center;">&nbsp;<?php echo eHtml(t('literal.headshots')); ?></td>
 						<td class="fSmall" style="width:6%;text-align:center;">&nbsp;HS:K</td>
 					</tr>
 					<tr class="game-table-row">
@@ -405,7 +438,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			echo "<b><a href=\"" . $g_options['scripturl'] . "?mode=servers&amp;server_id=$server_id&amp;game=$game\" style=\"text-decoration:none;\">" . htmlspecialchars($rowdata['name']) . "</a></b>";
 	?></td>
 						<td class="game-table-cell"><?php
-			echo "$addr <a href=\"steam://connect/$addr\" style=\"color:black\">(Join)</a>";
+			echo $addr . ' <a href="steam://connect/' . $addr . '" style="color:black">' . eHtml(t('literal.join_parenthesized')) . '</a>';
 	?></td>
 						<td class="game-table-cell" style="text-align:center;"><?php
 			echo $rowdata['act_map'];
@@ -438,7 +471,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			<table class="data-table">
 			<tr class="data-table-row">
 			  <td style="padding:0px;text-align:center;">
-				<a href="<?php $g_options['scripturl'] ?>?mode=servers&amp;server_id=<?php echo $server_id ?>&amp;game=<?php echo $game ?>" style="text-decoration:none;"><img src="show_graph.php?type=0&amp;game=<?php echo $game; ?>&amp;width=870&amp;height=200&amp;server_id=<?php echo $server_id ?>&amp;bgcolor=<?php echo $g_options['graphbg_load']; ?>&amp;color=<?php echo $g_options['graphtxt_load']; ?>" style="border:0px;" alt="Server Load Graph" title="Server Load Graph" /></a>
+				<a href="<?php $g_options['scripturl'] ?>?mode=servers&amp;server_id=<?php echo $server_id ?>&amp;game=<?php echo $game ?>" style="text-decoration:none;"><img src="show_graph.php?type=0&amp;game=<?php echo $game; ?>&amp;width=870&amp;height=200&amp;server_id=<?php echo $server_id ?>&amp;bgcolor=<?php echo $g_options['graphbg_load']; ?>&amp;color=<?php echo $g_options['graphtxt_load']; ?>" style="border:0px;" alt="<?php echo eHtml(t('literal.server_load_graph')); ?>" title="<?php echo eHtml(t('literal.server_load_graph')); ?>" /></a>
 			  </td>
 			</tr>
 			</table>
@@ -502,7 +535,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 <div class="block" style="padding-top:20px">
 
 <?php
-	printSectionTitle((($awards_numdays == 1) ? 'Daily' : "$awards_numdays Day")." Awards ($awards_d_date)");
+	printSectionTitle(
+		$awards_numdays == 1
+			? t('awards.daily_title', array('date' => $awards_d_date))
+			: t('awards.period_title', array('days' => $awards_numdays, 'date' => $awards_d_date))
+	);
 ?>
 	<div class="subblock">
 
@@ -525,18 +562,18 @@ For support and installation notes visit http://www.hlxcommunity.com
 				if ($awarddata['d_winner_id']) {
 					if ($g_options['countrydata'] == 1) {
 						$flag = '0.gif';
-						$alt = 'Unknown Country';
+						$alt = t('ui.no_country');
 						if ($awarddata['flag'] != '') {
 							$alt = ucfirst(strtolower($awarddata['country']));
 						}
 						echo "<img src=\"" . getFlag($awarddata['flag']) . "\" hspace=\"4\" alt=\"$alt\" title=\"$alt\" /><a href=\"{$g_options['scripturl']}?mode=playerinfo&amp;player={$awarddata['d_winner_id']}\"><b>" . htmlspecialchars($awarddata['d_winner_name'], ENT_COMPAT) . "</b></a> ({$awarddata['d_winner_count']} " . htmlspecialchars($awarddata['verb']) . ")";
 					} else {
-						echo "<img src=\"" . IMAGE_PATH . "/player.gif\" hspace=\"4\" alt=\"Player\" /><a href=\"{$g_options['scripturl']}?mode=playerinfo&amp;player={$awarddata['d_winner_id']}\"><b>" . htmlspecialchars($awarddata['d_winner_name'], ENT_COMPAT) . "</b></a> ({$awarddata['d_winner_count']} ". htmlspecialchars($awarddata['verb']) . ")";
+						echo "<img src=\"" . IMAGE_PATH . "/player.gif\" hspace=\"4\" alt=\"" . eHtml(t('literal.player')) . "\" /><a href=\"{$g_options['scripturl']}?mode=playerinfo&amp;player={$awarddata['d_winner_id']}\"><b>" . htmlspecialchars($awarddata['d_winner_name'], ENT_COMPAT) . "</b></a> ({$awarddata['d_winner_count']} ". htmlspecialchars($awarddata['verb']) . ")";
 					}
 				}
 				else
 				{
-					echo '&nbsp;&nbsp; <em>No Award Winner</em>';
+					echo '&nbsp;&nbsp; <em>' . eHtml(t('awards.no_winner')) . '</em>';
 				}
 ?></td>
 </tr>

@@ -38,40 +38,47 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 define('IN_HLSTATS', true);
 require('config.php');
+require(INCLUDE_PATH . '/i18n.php');
 
 define('TITLE_IMAGE', IMAGE_PATH . "/downarrow.gif");
 
-$historical_cache=0;
-if(defined('HISTORICAL_CACHE'))
-{
-	$historical_cache=constant('HISTORICAL_CACHE');
+session_start();
+init_i18n();
+
+if (!empty($_GET['logout']) && $_GET['logout'] == '1') {
+	unset($_SESSION['loggedin']);
+	header('Location: ' . lang_url(current_lang()));
+	die;
 }
 
-if($historical_cache==1)
+$historical_cache = 0;
+if (defined('HISTORICAL_CACHE'))
 {
-	$rawmd5=md5(http_build_query($_REQUEST));
-	$dir1=substr($rawmd5,0,1);
-	$dir2=substr($rawmd5,1,1);
-	$cachetarget=sprintf("cache/%s/%s/%s", $dir1, $dir2, $rawmd5);
+	$historical_cache = constant('HISTORICAL_CACHE');
+}
+
+if ($historical_cache == 1)
+{
+	$cacheRequest = $_REQUEST;
+	$cacheRequest['lang'] = current_lang();
+
+	$rawmd5 = md5(http_build_query($cacheRequest));
+	$dir1 = substr($rawmd5, 0, 1);
+	$dir2 = substr($rawmd5, 1, 1);
+	$cachetarget = sprintf("cache/%s/%s/%s", $dir1, $dir2, $rawmd5);
 
 	@mkdir("cache/$dir1");
 	@mkdir("cache/$dir1/$dir2");
 
-	if(file_exists($cachetarget))
+	if (file_exists($cachetarget))
 	{
-		file_put_contents("cache/cachehit",$cachetarget . "\n", FILE_APPEND);
+		file_put_contents("cache/cachehit", $cachetarget . "\n", FILE_APPEND);
 		echo file_get_contents($cachetarget);
 		die;
 	}
 }
 
-session_start();
-
-if (!empty($_GET['logout']) && $_GET['logout'] == '1') {
-	unset($_SESSION['loggedin']);
-	header("Location: http://".$_SERVER['HTTP_HOST'].$_SERVER['SCRIPT_NAME']);
-	die;
-}
+ob_start('translate_output_html');
 
 // Several stuff added by Malte Bayer
 global $scripttime, $siteurlneo;
@@ -219,12 +226,12 @@ $valid_modes = array(
    
 if (file_exists('./updater') && $mode != 'updater')
 {
-	pageHeader(array('Update Notice'), array('Update Notice' => ''));
+	pageHeader(array(t('ui.updater.notice_title')), array(t('ui.updater.notice_title') => ''));
 	echo "<div class=\"warning\">\n" . 
-	"<span class=\"warning-heading\"><img src=\"".IMAGE_PATH."/warning.gif\" alt=\"Warning\"> Warning:</span><br />\n" .
-	"<span class=\"warning-text\">The updater folder was detected in your web directory.<br />
-	To perform a Database Update, please go to <strong><a href=\"{$g_options['scripturl']}?mode=updater\">HLX:CE Database Updater</a></strong> to perform the database update.<br /><br />
-	<strong>If you have already performed the database update, <strong>you must delete the \"updater\" folder from your web folder.</span>\n</div>";
+	"<span class=\"warning-heading\"><img src=\"".IMAGE_PATH."/warning.gif\" alt=\"".eHtml(t('ui.warning'))."\"> " . eHtml(t('ui.warning')) . ":</span><br />\n" .
+	"<span class=\"warning-text\">" . eHtml(t('ui.updater.detected')) . "<br />" .
+	eHtml(t('ui.updater.perform')) . " <strong><a href=\"{$g_options['scripturl']}?mode=updater\">" . eHtml(t('ui.updater.link')) . "</a></strong>.<br /><br />" .
+	"<strong>" . eHtml(t('ui.updater.cleanup')) . "</strong></span>\n</div>";
 	pageFooter();
 	die();
 }

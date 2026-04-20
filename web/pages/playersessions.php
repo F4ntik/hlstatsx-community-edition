@@ -227,7 +227,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 <div class="block">
 <?php
-	printSectionTitle('Player Session History');
+	printSectionTitle(t('literal.player_session_history'));
 	if ($numitems > 0)
 	{
 		$table->draw($result, $numitems, 95);
@@ -235,7 +235,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?><br /><br />
 	<div class="subblock">
 		<div style="float:left;">
-			Items above are generated from the last <?php echo $g_options['DeleteDays']; ?> days.
+			<?php echo t('literal.generated_last_days', array('days' => $g_options['DeleteDays'])); ?>
 		</div>
 		<div style="float:right;">
 <?php 
@@ -250,7 +250,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	");
 	list($lastName) = $db->fetch_row();
 ?>
-			Go to: <a href="<?php echo $g_options['scripturl'] . "?mode=playerinfo&amp;player=$player"; ?>"><?php echo $lastName; ?>'s Statistics</a>
+			<?php echo eHtml(t('literal.go_to')); ?>: <a href="<?php echo $g_options['scripturl'] . "?mode=playerinfo&amp;player=$player"; ?>"><?php echo t('literal.player_statistics_link', array('player' => eHtml($lastName))); ?></a>
 		</div>
 	</div>
 </div>

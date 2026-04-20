@@ -196,16 +196,16 @@
 <div class="block" style="clear:both;padding-top:12px;">
 	<div class="subblock">
 		<div style="float:left;">
-			Items marked "*" above are generated from the last <?php echo $g_options['DeleteDays']; ?> days.
+			<?php echo t('literal.generated_last_days', array('days' => $g_options['DeleteDays'])); ?>
 		</div>
 		<div style="float:right;">
 			<?php
 				if (isset($_SESSION['loggedin']))
 				{
-					echo 'Admin Options: <a href="'.$g_options['scripturl']."?mode=admin&amp;task=tools_editdetails_clan&amp;id=$clan\">Edit Clan Details</a><br />";
+					echo eHtml(t('literal.admin_options')) . ': <a href="'.$g_options['scripturl']."?mode=admin&amp;task=tools_editdetails_clan&amp;id=$clan\">" . eHtml(t('literal.edit_clan_details')) . "</a><br />";
 				}
 			?>
-			Go to: <a href="<?php echo $g_options['scripturl'] . "?mode=players&amp;game=$game"; ?>">Clan Rankings</a>
+			<?php echo eHtml(t('literal.go_to')); ?>: <a href="<?php echo $g_options['scripturl'] . "?mode=players&amp;game=$game"; ?>"><?php echo eHtml(t('literal.clan_rankings')); ?></a>
 		</div>
 	</div>
 </div>

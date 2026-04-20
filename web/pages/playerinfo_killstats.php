@@ -49,13 +49,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'name',
-				'Victim',
+				t('literal.victim'),
 				'width=21&flag=1&link=' . urlencode('mode=playerinfo&amp;player=%k')
 			),
 			new TableColumn
 			(
 				'kills',
-				'Kills',
+				t('literal.kills'),
 				'width=6&align=right'
 			),
 			new TableColumn
@@ -67,13 +67,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'kpercent',
-				'Ratio',
+				t('literal.ratio'),
 				'width=7&sort=no&type=bargraph'
 			),
 			new TableColumn
 			(
 				'deaths',
-				'Deaths',
+				t('literal.deaths'),
 				'width=6&align=right'
 			),
 			new TableColumn
@@ -85,19 +85,19 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'dpercent',
-				'Ratio',
+				t('literal.ratio'),
 				'width=7&sort=no&type=bargraph'
 			),
 			new TableColumn
 			(
 				'kpd',
-				'K:D',
+				t('literal.kpd_cap'),
 				'width=7&align=right'
 			),
 			new TableColumn
 			(
 				'headshots',
-				'Headshots',
+				t('literal.headshots'),
 				'width=6&align=right'
 			),
 			new TableColumn
@@ -109,13 +109,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'hpercent',
-				'Ratio',
+				t('literal.ratio'),
 				'width=7&sort=no&type=bargraph'
 			),
 			new TableColumn
 			(
 				'hpk',
-				'HS:K',
+				t('literal.hpk_cap'),
 				'width=7&align=right'
 			)
 			
@@ -248,13 +248,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 	");
 	if ($numitems > 0)
 	{
-		printSectionTitle('Player Kill Statistics *');
+		printSectionTitle(t('literal.player_kill_statistics'));
 		$tblPlayerKillStats->draw($result, $numitems, 95); ?>
 	<br /><br />
 	<div class="subblock">
 	<form method="get" action="<?php echo $g_options['scripturl']; ?>">
-		<strong>&#8226;</strong> Show only victims this person has killed
-		<select name="killLimit" onchange="Tabs.refreshTab({'killLimit': this.options[this.selectedIndex].value, 'playerkills_page': 1})">
+		<?php $killLimitSelect = '<select name="killLimit" onchange="Tabs.refreshTab({\'killLimit\': this.options[this.selectedIndex].value, \'playerkills_page\': 1})">'; ?>
+		<strong>&#8226;</strong> <?php echo t('literal.killstats_victims_filter', ['input' => $killLimitSelect]); ?>
 			<?php
 				for($j = 0; $j < 16; $j++)
 				{
@@ -267,7 +267,6 @@ For support and installation notes visit http://www.hlxcommunity.com
 				}
 			?>
 		</select>
-		or more times
 	</form>
 	</div>
 	<br /><br />

@@ -67,8 +67,8 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 	pageHeader
 	(
-		array ($gamename, 'Country Rankings'),
-		array ($gamename=>"%s?game=$game", 'Country Rankings' => '')
+		array ($gamename, t('literal.country_rankings')),
+		array ($gamename=>"%s?game=$game", t('literal.country_rankings') => '')
 	);
 
 	$table = new Table
@@ -78,13 +78,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'name',
-				'Country',
+				t('literal.country'),
 				'width=40&flag=1&link=' . urlencode('mode=countryclansinfo&amp;flag=%k&amp;game='.$game)
 			),
 			new TableColumn
 			(
 				'skill',
-				'Avg. Points',
+				t('literal.avg_points'),
 				'width=8&skill_change=1&align=right'
 			),
 			new TableColumn
@@ -189,7 +189,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 <div class="block">
 <?php
-	printSectionTitle('Country Rankings');
+	printSectionTitle(t('literal.country_rankings'));
 	$table->draw($result, $db->num_rows($resultCount), 95);
 ?><br /><br />
 	<div class="subblock">
@@ -219,13 +219,18 @@ For support and installation notes visit http://www.hlxcommunity.com
 		}
 	}
 ?>
-				<strong>&#8226;</strong> Show only clans with
-					<input type="text" name="minmembers" size="4" maxlength="2" value="<?php echo $minmembers; ?>" class="textbox" /> or more members from a total of <b><?php echo number_format($total_countrys); ?></b> countrys
-					<input type="submit" value="Apply" class="smallsubmit" />
+				<strong>&#8226;</strong>
+				<?php
+					echo t('countryclans.min_members_filter', array(
+						'input' => '<input type="text" name="minmembers" size="4" maxlength="2" value="' . eHtml($minmembers) . '" class="textbox" />',
+						'total' => number_format($total_countrys),
+					));
+				?>
+					<input type="submit" value="<?php echo eHtml(t('ui.apply')); ?>" class="smallsubmit" />
 			</form>
 		</div>
 		<div style="float:right;">
-			Go to: <a href="<?php echo $g_options['scripturl'] . "?game=$game"; ?>"><?php echo $gamename; ?></a>
+			<?php echo eHtml(t('literal.go_to')); ?>: <a href="<?php echo $g_options['scripturl'] . "?game=$game"; ?>"><?php echo eHtml($gamename); ?></a>
 		</div>
 		<div style="clear:both;"></div>
 	</div>

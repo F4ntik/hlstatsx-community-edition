@@ -47,13 +47,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'map',
-				'Map',
+				t('literal.map'),
 				'width=22&align=left&link=' . urlencode("mode=mapinfo&amp;map=%k&amp;game=$game")
 			),
 			new TableColumn
 			(
 				'kills',
-				'Kills',
+				t('literal.kills'),
 				'width=7&align=right'
 			),
 			new TableColumn
@@ -65,13 +65,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'kpercent',
-				'Ratio',
+				t('literal.ratio'),
 				'width=8&sort=no&type=bargraph'
 			),
 			new TableColumn
 			(
 				'deaths',
-				'Deaths',
+				t('literal.deaths'),
 				'width=7&align=right'
 			),
 			new TableColumn
@@ -83,19 +83,19 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'dpercent',
-				'Ratio',
+				t('literal.ratio'),
 				'width=8&sort=no&type=bargraph'
 			),
 			new TableColumn
 			(
 				'kpd',
-				'K:D',
+				t('literal.kpd_cap'),
 				'width=5&align=right'
 			),
 			new TableColumn
 			(
 				'headshots',
-				'Headshots',
+				t('literal.headshots'),
 				'width=7&align=right'
 			),
 			new TableColumn
@@ -107,13 +107,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'hpercent',
-				'Ratio',
+				t('literal.ratio'),
 				'width=8&sort=no&type=bargraph'
 			),
 			new TableColumn
 			(
 				'hpk',
-				'HS:K',
+				t('literal.hpk_cap'),
 				'width=5&align=right'
 			)
 		),
@@ -158,7 +158,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 <div style="clear:both;padding-top:20px;"></div>
 <?php
-		printSectionTitle('Map Performance *');
+		printSectionTitle(t('literal.map_performance'));
 		$tblMaps->draw($result, $numitems, 95);
 ?>
 <br /><br />

@@ -120,7 +120,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	echo $g_options['sitename']; 
 	foreach ($title as $t)
 	{
-		echo " - $t";
+		echo ' - ' . translate_ui_literal($t);
 	}
 ?>
 	</title>
@@ -159,6 +159,8 @@ For support and installation notes visit http://www.hlxcommunity.com
 	if ($g_options['forum_address'] && file_exists($iconpath . "/title-forum.png")) {
 		$extratabs .= "<li><a href=\"" . $g_options['forum_address'] . "\" target=\"_blank\"><img src=\"" . $iconpath . "/title-forum.png\" alt=\"Forum\" /></a></li>\n";
 	}
+
+	$availableLanguages = available_langs();
 ?>
 <div class="block">
 	
@@ -189,10 +191,10 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 		<div class="headertabs">
 			<ul>
-				<li><a href="<?php echo $g_options['scripturl'] ?>"><img src="<?php echo $iconpath; ?>/title-contents.png" alt="Contents" /></a></li>
-				<li><a href="<?php echo $g_options['scripturl'] ?>?mode=search"><img src="<?php echo $iconpath; ?>/title-search.png" alt="Search" /></a></li>
+				<li><a href="<?php echo $g_options['scripturl'] ?>"><img src="<?php echo $iconpath; ?>/title-contents.png" alt="<?php echo eHtml(t('ui.contents')); ?>" /></a></li>
+				<li><a href="<?php echo $g_options['scripturl'] ?>?mode=search"><img src="<?php echo $iconpath; ?>/title-search.png" alt="<?php echo eHtml(t('ui.search')); ?>" /></a></li>
 				<?php if ($extratabs) { print $extratabs; } ?>				
-				<li><a href="<?php echo $g_options['scripturl'] ?>?mode=help"><img src="<?php echo $iconpath; ?>/title-help.png" alt="Help" /></a></li>
+				<li><a href="<?php echo $g_options['scripturl'] ?>?mode=help"><img src="<?php echo $iconpath; ?>/title-help.png" alt="<?php echo eHtml(t('ui.help')); ?>" /></a></li>
 			</ul>
 
 		</div>
@@ -214,9 +216,9 @@ For support and installation notes visit http://www.hlxcommunity.com
 				$url = preg_replace('/&/', '&amp;', $url);
 				echo ' <span class="arrow">&raquo;</span></li><li>';
 				if ($url) {
-					echo "<a href=\"$url\">$l</a>";
+					echo '<a href="' . $url . '">' . eHtml(translate_ui_literal($l)) . '</a>';
 				} else {
-					echo "<strong>$l</strong>";
+					echo '<strong>' . eHtml(translate_ui_literal($l)) . '</strong>';
 				}
 				$i++;
 		}
@@ -226,8 +228,8 @@ For support and installation notes visit http://www.hlxcommunity.com
 <?php 
 		if ($g_options['display_style_selector'] == 1) {
 ?>
-		<div class="fNormal" style="float:right;"> 
-			<form name="style_selection" id="style_selection" action="" method="post"> Style: 
+		<div class="fNormal" style="float:right;margin-left:12px;">
+			<form name="style_selection" id="style_selection" action="" method="post"> <?php echo eHtml(t('ui.style')); ?>:
 				<select name="stylesheet" onchange="document.style_selection.submit()"> 
 				<?php 
 					$d = dir('styles'); 
@@ -239,7 +241,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 					}
 					$d->close(); 
 					asort($styles); 
-					$styles = array_merge(array($g_options['style'] => 'Default'),$styles);
+					$styles = array_merge(array($g_options['style'] => t('ui.default')),$styles);
 					foreach ($styles as $e => $ename) { 
 						$sel = ''; 
 						if ($e == $selectedStyle) $sel = ' selected="selected"'; 
@@ -251,6 +253,25 @@ For support and installation notes visit http://www.hlxcommunity.com
 <?php
 		}
 ?>
+		<div class="fNormal" style="float:right;">
+			<form name="language_selection" id="language_selection" action="<?php echo eHtml($g_options['scripturl']); ?>" method="get">
+				<?php foreach ($_GET as $param => $value) :
+					if ($param === 'lang' || is_array($value)) {
+						continue;
+					}
+				?>
+					<input type="hidden" name="<?php echo eHtml($param); ?>" value="<?php echo eHtml($value); ?>" />
+				<?php endforeach; ?>
+				<?php echo eHtml(t('ui.language')); ?>:
+				<select name="lang" onchange="document.language_selection.submit()">
+					<?php foreach ($availableLanguages as $languageCode => $languageMeta) :
+						$selected = ($languageCode === current_lang()) ? ' selected="selected"' : '';
+					?>
+						<option value="<?php echo eHtml($languageCode); ?>"<?php echo $selected; ?>><?php echo eHtml($languageMeta['label']); ?></option>
+					<?php endforeach; ?>
+				</select>
+			</form>
+		</div>
 	</div>
 	<div class="location_under" style="clear:both;width:100%;"></div>
 </div>
@@ -276,43 +297,43 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>    
 		<nav>
 		<ul class="fancyNav">
-			<li><a href="<?php echo $g_options['scripturl']  . "?game=$game";  ?>" class="fHeading">Servers</a></li>
+			<li><a href="<?php echo $g_options['scripturl']  . "?game=$game";  ?>" class="fHeading"><?php echo eHtml(t('literal.servers')); ?></a></li>
 
 <?php
 	if ($g_options['nav_globalchat']==1) {
 ?>
-			<li><a href="<?php echo $g_options['scripturl']  . "?mode=chat&amp;game=$game";  ?>" class="fHeading">Chat</a></li>
+			<li><a href="<?php echo $g_options['scripturl']  . "?mode=chat&amp;game=$game";  ?>" class="fHeading"><?php echo eHtml(t('literal.chat')); ?></a></li>
 <?php
 	}
 ?>
-			<li><a href="<?php echo $g_options['scripturl'] . "?mode=players&amp;game=$game"; ?>" class="fHeading">Players</a></li>
-			<li><a href="<?php echo $g_options['scripturl'] . "?mode=clans&amp;game=$game"; ?>" class="fHeading">Clans</a></li>
+			<li><a href="<?php echo $g_options['scripturl'] . "?mode=players&amp;game=$game"; ?>" class="fHeading"><?php echo eHtml(t('literal.players')); ?></a></li>
+			<li><a href="<?php echo $g_options['scripturl'] . "?mode=clans&amp;game=$game"; ?>" class="fHeading"><?php echo eHtml(t('literal.clans')); ?></a></li>
 
 <?php
 	if ($g_options["countrydata"]==1) {
 ?>
-			<li><a href="<?php echo $g_options['scripturl']  . "?mode=countryclans&amp;game=$game&amp;sort=nummembers";  ?>" class="fHeading">Countries</a></li>
+			<li><a href="<?php echo $g_options['scripturl']  . "?mode=countryclans&amp;game=$game&amp;sort=nummembers";  ?>" class="fHeading"><?php echo eHtml(t('literal.countries')); ?></a></li>
 <?php
 	}
 ?>
-			<li><a href="<?php echo $g_options['scripturl'] . "?mode=awards&amp;game=$game"; ?>" class="fHeading">Awards</a></li>
+			<li><a href="<?php echo $g_options['scripturl'] . "?mode=awards&amp;game=$game"; ?>" class="fHeading"><?php echo eHtml(t('literal.awards')); ?></a></li>
 <?php
 	// look for actions
 	$db->query("SELECT game FROM hlstats_Actions WHERE game='".$game."' LIMIT 1");
 	if ($db->num_rows()>0) {
 ?> 
-			<li><a href="<?php echo $g_options['scripturl'] . "?mode=actions&amp;game=$game"; ?>" class="fHeading">Actions</a></li>
+			<li><a href="<?php echo $g_options['scripturl'] . "?mode=actions&amp;game=$game"; ?>" class="fHeading"><?php echo eHtml(t('literal.actions')); ?></a></li>
 <?php
 	}
 ?>
-			<li><a href="<?php echo $g_options['scripturl'] . "?mode=weapons&amp;game=$game"; ?>" class="fHeading">Weapons</a></li>
-			<li><a href="<?php echo $g_options['scripturl'] . "?mode=maps&amp;game=$game"; ?>" class="fHeading">Maps</a></li>
+			<li><a href="<?php echo $g_options['scripturl'] . "?mode=weapons&amp;game=$game"; ?>" class="fHeading"><?php echo eHtml(t('literal.weapons')); ?></a></li>
+			<li><a href="<?php echo $g_options['scripturl'] . "?mode=maps&amp;game=$game"; ?>" class="fHeading"><?php echo eHtml(t('literal.maps')); ?></a></li>
 <?php
 	$result = $db->query("SELECT game from hlstats_Roles WHERE game='$game' AND hidden = '0'");
 	$numitems = $db->num_rows($result);
 	if ($numitems > 0) {
 ?>
-			<li><a href="<?php echo $g_options['scripturl'] . "?mode=roles&amp;game=$game"; ?>" class="fHeading">Roles</a></li>
+			<li><a href="<?php echo $g_options['scripturl'] . "?mode=roles&amp;game=$game"; ?>" class="fHeading"><?php echo eHtml(t('literal.roles')); ?></a></li>
 <?php
 	}
 	if ($g_options['nav_cheaters'] == 1) {

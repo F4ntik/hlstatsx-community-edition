@@ -85,7 +85,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 
 <div class="block">
-	<?php printSectionTitle('Ranks'); ?>
+	<?php printSectionTitle(t('literal.ranks')); ?>
 	<div class="subblock">
 		<table class="data-table">
 <?php
@@ -118,18 +118,18 @@ For support and installation notes visit http://www.hlxcommunity.com
 		}
 		else
 		{
-			$imagestring = 'Player List';
+			$imagestring = eHtml(t('literal.player_list'));
 		}
 		$achvd = '';
 		if ($ranks[$r['rankId']] > 0)
 		{
 			$imagestring = "$link$imagestring</a>";
-			$achvd = 'Achieved by '.$ranks[$r['rankId']].' Players';
+			$achvd = t('awards.achieved_by_players', array('count' => $ranks[$r['rankId']]));
 		}    
-   
+
 		echo "<td style=\"text-align:center;vertical-align:top;width:$colwidth%;\">"
 			.'<strong>'.$r['rankName'].'</strong><br />'
-			.'<span class="fSmall">('.$r['minKills'].'-'.$r['maxKills'].'&nbsp;kills)'.'<br />'
+			.'<span class="fSmall">'.t('awards.kills_range', array('min' => $r['minKills'], 'max' => $r['maxKills'])).'<br />'
 			."$achvd<br /></span>"
 			.$imagestring.'
 			</td>';

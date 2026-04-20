@@ -196,7 +196,7 @@
 	list($numitems) = $db->fetch_row($resultCount);
 
 	$deleteDaysSafe = isset($g_options['DeleteDays']) ? (int)$g_options['DeleteDays'] : 30;
-	$pageTitle = sprintf('Player Chat History (Last %d Days)', $deleteDaysSafe);
+	$pageTitle = t('literal.player_chat_history', array('days' => $deleteDaysSafe));
 	$sectionTitle = printSectionTitle($pageTitle, false);
 
 	$playerInfoUrl = $urlSafe . "?mode=playerinfo&amp;player={$player}";
@@ -213,9 +213,9 @@
 				<input type="hidden" name="mode" value="chathistory" />
 				<input type="hidden" name="player" value="<?=$player;?>" />
 				<strong>&#8226;</strong>
-				Filter: <input type="text" name="filter" id="filter_input" value="<?=eHtml($filter);?>" /> 
-				<input type="submit" value="View" class="smallsubmit" />
-				<input type="button" value="Clear" class="smallsubmit" onclick="document.getElementById('filter_input').value=''; this.form.submit();">
+				<?php echo eHtml(t('ui.filter')); ?>: <input type="text" name="filter" id="filter_input" value="<?=eHtml($filter);?>" /> 
+				<input type="submit" value="<?php echo eHtml(t('ui.view')); ?>" class="smallsubmit" />
+				<input type="button" value="<?php echo eHtml(t('ui.clear')); ?>" class="smallsubmit" onclick="document.getElementById('filter_input').value=''; this.form.submit();">
 			</form>
 			</span>
 		</div>
@@ -231,7 +231,7 @@
 
 	<div class="subblock">
 		<div style="float:right;">
-			Go to: <a href="<?=$playerInfoUrl;?>"><?=$pl_name;?>'s Statistics</a>
+			<?php echo eHtml(t('literal.go_to')); ?>: <a href="<?=$playerInfoUrl;?>"><?php echo t('literal.player_statistics_link', array('player' => $pl_name)); ?></a>
 		</div>
 	</div>
 </div>

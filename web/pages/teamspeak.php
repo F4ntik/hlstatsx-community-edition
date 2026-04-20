@@ -1,7 +1,7 @@
 <?php
 	pageHeader(
-		array('Teamspeak viewer'),
-		array('Teamspeak viewer' => '')
+		array(t('teamspeak.viewer')),
+		array(t('teamspeak.viewer') => '')
 	);
 	include (PAGE_PATH.'/voicecomm_serverlist.php');
 	 include (PAGE_PATH.'/teamspeak_query.php');
@@ -37,7 +37,7 @@
 
 	if(!$fp)
     {
-		$index = error("No teamspeak", 1);
+		$index = error('No teamspeak', 1);
     } else {
 	    $out = "";
 	    $fp = fsockopen($uip, $tPort, $errno, $errstr, 2);
@@ -226,22 +226,22 @@
                                            "os" => $os,
                                            "uptime" => time_convert($uptime),
                                            "user" => $user,
-                                           "t_name" => "Server name",
-                                           "t_os" => "Operating system",
+                                           "t_name" => t('voice.server_name'),
+                                           "t_os" => t('voice.operating_system'),
                                            "uchannels" => $chan,
                                            "info" => $info,
-                                           "t_uptime" => "Uptime",
-                                           "t_channels" => "Channels",
-                                           "t_user" => "Users",
-                                           "head" => "Teamspeak Overview",
-                                           "users_head" => "User Information",
-                                           "player" => "User",
-                                           "channel" => "Channel",
-                                           "channel_head" => "Channel Information",
+                                           "t_uptime" => t('voice.uptime'),
+                                           "t_channels" => t('voice.channels'),
+                                           "t_user" => t('voice.users'),
+                                           "head" => t('voice.teamspeak_overview'),
+                                           "users_head" => t('voice.user_information'),
+                                           "player" => t('voice.user'),
+                                           "channel" => t('voice.channel'),
+                                           "channel_head" => t('voice.channel_information'),
                                            "max" => $max,
                                            "channels" => $cAmount,
-                                           "logintime" => "Login time",
-                                           "idletime" => "Idle time",
+                                           "logintime" => t('voice.login_time'),
+                                           "idletime" => t('voice.idle_time'),
                                            "channelstats" => $channelstats,
                                            "userstats" => $userstats));
 					   

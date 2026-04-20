@@ -153,17 +153,17 @@ For support and installation notes visit http://www.hlxcommunity.com
     }
 ?>
 		<div style="float:left;">
-			<?php echo $wep_content ?>
-			&nbsp;From a total of <b><?php echo number_format(intval($totalkills)); ?></b> kills as <?php 
-				echo htmlspecialchars($role_name);
-				if($totalheadshots > 0 || $role=='sniper')
-				{
-					echo ' with <b>' . number_format($totalheadshots) . '</b> headshots ';
+			<?php
+				$headshotsText = '';
+				if ($totalheadshots > 0 || $role == 'sniper') {
+					$headshotsText = t('literal.with_headshots', array('headshots' => number_format($totalheadshots)));
 				}
-				?> (Last <?php echo $g_options['DeleteDays']; ?> Days)
+				echo $wep_content;
+			?>
+			&nbsp;<?php echo t('literal.from_total_kills_as_last_days', array('kills' => number_format(intval($totalkills)), 'item' => eHtml($role_name), 'headshots' => $headshotsText, 'days' => $g_options['DeleteDays'])); ?>
 		</div>
 		<div style="float:right;">
-			Back to <a href="<?php echo $g_options['scripturl'] . "?mode=roles&amp;game=$game"; ?>">Roles Statistics</a>
+			<?php echo eHtml(t('literal.back_to')); ?> <a href="<?php echo $g_options['scripturl'] . "?mode=roles&amp;game=$game"; ?>"><?php echo eHtml(t('literal.roles_statistics')); ?></a>
 		</div>
 		<div style="clear:both;padding:2px;"></div>
 	</div>

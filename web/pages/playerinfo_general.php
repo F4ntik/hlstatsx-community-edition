@@ -45,12 +45,12 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 ?>
 
-	<?php printSectionTitle('Player Information'); ?>
+	<?php printSectionTitle(t('literal.player_information')); ?>
 	<div class="subblock">
 		<div style="float:left;vertical-align:top;width:48.5%;">
 			<table class="data-table">
 			<tr class="data-table-head">
-					<td style="vertical-align:top;">Player Profile<br /><br /></td>
+					<td style="vertical-align:top;"><?php echo eHtml(t('literal.player_profile')); ?><br /><br /></td>
 					<td style="text-align:center; vertical-align:middle;" rowspan="7" id="player_avatar">
 						<?php
 							$db->query
@@ -90,7 +90,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 								$avatar_full = $xmlDoc->avatarFull;
 							}
 						
-							echo("<img src=\"$avatar_full\" style=\"height:158px;width:158px;\" alt=\"Steam Community Avatar\" />");
+							echo("<img src=\"$avatar_full\" style=\"height:158px;width:158px;\" alt=\"" . eHtml(t('literal.steam_community_avatar')) . "\" />");
 						?>
 					</td>
 				</tr>
@@ -107,7 +107,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 						<?php
 							if ($playerdata['country'])
 							{
-								echo 'Location: ';
+								echo eHtml(t('literal.location')) . ': ';
 								if ($playerdata['city']) {
 									echo htmlspecialchars($playerdata['city'], ENT_COMPAT) . ', ';
 								}
@@ -115,7 +115,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 							}
 							else
 							{
-								echo 'Location: (Unknown)';
+								echo eHtml(t('literal.location')) . ': (' . eHtml(t('literal.unknown')) . ')';
 							}
 						?>
 					</td>
@@ -124,23 +124,23 @@ For support and installation notes visit http://www.hlxcommunity.com
 					<td>
 						<?php 
 							$prefix = ((!preg_match('/^BOT/i',$uqid)) && $g_options['Mode'] == 'Normal') ? 'STEAM_0:' : '';
-							echo "Steam: <a href=\"http://steamcommunity.com/profiles/$coid\" target=\"_blank\">$prefix" . "$uqid</a>";
+							echo eHtml(t('literal.steam')) . ": <a href=\"http://steamcommunity.com/profiles/$coid\" target=\"_blank\">$prefix" . "$uqid</a>";
 						?>
 					</td>
 				</tr>
 				<tr class="bg1">
-					<td>Status: <strong><?php echo $status; ?></strong></td>
+					<td><?php echo eHtml(t('literal.status')); ?>: <strong><?php echo eHtml(translate_ui_literal($status)); ?></strong></td>
 				</tr>
 				<tr class="bg2">
 					<td>
-						<a href="steam://friends/add/<?php echo($coid); ?>" target="_blank">Click here to add as friend</a>
+						<a href="steam://friends/add/<?php echo($coid); ?>" target="_blank"><?php echo eHtml(t('literal.add_as_friend')); ?></a>
 					</td>
 				</tr>
 				<tr class="bg1">
-					<td><?php echo "Karma: $statusmsg"; ?></td>
+					<td><?php echo eHtml(t('literal.karma')) . ": $statusmsg"; ?></td>
 				</tr>
 				<tr class="bg2">
-					<td style="width:50%;">Member of Clan:</td>
+					<td style="width:50%;"><?php echo eHtml(t('literal.member_of_clan')); ?>:</td>
 					<td style="width:50%;">
 						<?php
 							if ($playerdata['clan'])
@@ -148,12 +148,12 @@ For support and installation notes visit http://www.hlxcommunity.com
 								echo '&nbsp;<a href="' . $g_options['scripturl'] . '?mode=claninfo&amp;clan=' . $playerdata['clan'] . '">' . htmlspecialchars($playerdata['clan_name'], ENT_COMPAT) . '</a>';
 							}
 							else
-								echo '(None)';
+								echo eHtml(t('literal.none'));
 						?>
 					</td>
 				</tr>
 				<tr class="bg1">
-					<td>Real Name:</td>
+					<td><?php echo eHtml(t('literal.real_name')); ?>:</td>
 					<td>
 						<?php
 							if ($playerdata['fullName'])
@@ -161,13 +161,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 								echo '<b>' . htmlspecialchars($playerdata['fullName'], ENT_COMPAT) . '</b>';
 							}
 							else
-								echo "(<a href=\"" . $g_options['scripturl'] . '?mode=help#set"><em>Not Specified</em></a>)';
+								echo "(<a href=\"" . $g_options['scripturl'] . '?mode=help#set"><em>' . eHtml(t('literal.not_specified')) . '</em></a>)';
 						?>
 					</td>
 				</tr>
 
 				<tr class="bg2">
-					<td>E-mail Address:</td>
+					<td><?php echo eHtml(t('literal.email_address')); ?>:</td>
 
 					<td>
 						<?php $emailLinkSafe = getEmailLink($playerdata['email']); ?>
@@ -175,13 +175,13 @@ For support and installation notes visit http://www.hlxcommunity.com
                         <?php if (!empty($emailLinkSafe)) : ?>
                             <?=$emailLinkSafe;?>
                         <?php else : ?>
-                            (<a href="<?=eHtml($g_options['scripturl']);?>?mode=help#set"><em>Not Specified</em></a>)
+                            (<a href="<?=eHtml($g_options['scripturl']);?>?mode=help#set"><em><?=eHtml(t('literal.not_specified'));?></em></a>)
                         <?php endif; ?>
 					</td>
 				</tr>
 
 				<tr class="bg1">
-					<td>Home Page:</td>
+					<td><?php echo eHtml(t('literal.home_page')); ?>:</td>
 					<td>
 						<?php
 							if ($playerdata['homepage'])
@@ -189,13 +189,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 								echo getLink($playerdata['homepage']);
 							}
 							else
-								echo "(<a href=\"" . $g_options['scripturl'] . '?mode=help#set"><em>Not Specified</em></a>)';
+								echo "(<a href=\"" . $g_options['scripturl'] . '?mode=help#set"><em>' . eHtml(t('literal.not_specified')) . '</em></a>)';
 						?>
 					</td>
 				</tr>
 
 				<tr class="bg2">
-                        <td>MM Rank:</td>
+                        <td><?php echo eHtml(t('literal.mm_rank')); ?>:</td>
 
                         <td>
                             <?php
@@ -210,7 +210,7 @@ For support and installation notes visit http://www.hlxcommunity.com
                 </tr>
 
 				<tr class="bg1">
-					<td>Last Connect:*</td>
+					<td><?php echo eHtml(t('literal.last_connect')); ?>:*</td>
 					<td>
 						<?php
 							$db->query
@@ -230,18 +230,18 @@ For support and installation notes visit http://www.hlxcommunity.com
 							if ($lastevent)
 								echo $lastevent;
 							else
-								echo '(Unknown)';
+								echo '(' . eHtml(t('literal.unknown')) . ')';
 						?>
 					</td>
 				</tr>
 				<tr class="bg2">
-					<td>Total Connection Time:</td>
+					<td><?php echo eHtml(t('literal.total_connection_time')); ?>:</td>
 					<td>
 						<?php echo timestamp_to_str($playerdata['connection_time']); ?>
 					</td>
 				</tr>
 				<tr class="bg1">
-					<td>Average Ping:*</td>
+					<td><?php echo eHtml(t('literal.average_ping')); ?>:*</td>
 					<td>
 						<?php
 							$db->query
@@ -256,14 +256,14 @@ For support and installation notes visit http://www.hlxcommunity.com
 							");
 							list($av_ping, $av_latency) = $db->fetch_row();
 							if ($av_ping)
-								echo $av_ping." ms (Latency: $av_latency ms)";
+								echo $av_ping . " ms (" . eHtml(t('literal.latency')) . ": $av_latency ms)";
 							else
 								echo '-';
 						?>
 					</td>
 				</tr>
 				<tr class="bg2">
-					<td>Favorite Server:*</td>
+					<td><?php echo eHtml(t('literal.favorite_server')); ?>:*</td>
 					<td>
 						<?php
 							// leave this one
@@ -282,7 +282,8 @@ For support and installation notes visit http://www.hlxcommunity.com
 								WHERE 
 									hlstats_Events_Entries.playerId = '$player'
 								GROUP BY
-									hlstats_Events_Entries.serverId
+									hlstats_Events_Entries.serverId,
+									hlstats_Servers.name
 								ORDER BY
 									cnt DESC
 								LIMIT
@@ -294,7 +295,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 					</td>
 				</tr>
 				<tr class="bg1">
-					<td>Favorite Map:*</td>
+					<td><?php echo eHtml(t('literal.favorite_map')); ?>:*</td>
 					<td>
 						<?php
 							$db->query
@@ -319,7 +320,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 					</td>
 				</tr>
 				<tr class="bg2">
-					<td>Favorite Weapon:*</td>
+					<td><?php echo eHtml(t('literal.favorite_weapon')); ?>:*</td>
 						<?php
 							$result = $db->query("
 								SELECT
@@ -336,7 +337,8 @@ For support and installation notes visit http://www.hlxcommunity.com
 								WHERE
 									hlstats_Events_Frags.killerId=$player
 								GROUP BY
-									hlstats_Events_Frags.weapon
+									hlstats_Events_Frags.weapon,
+									hlstats_Weapons.name
 								ORDER BY
 									kills desc, headshots desc
 								LIMIT
@@ -377,10 +379,10 @@ For support and installation notes visit http://www.hlxcommunity.com
 		<div style="float:right;vertical-align:top;width:48.5%;">
 			<table class="data-table">
 				<tr class="data-table-head">
-					<td style="vertical-align:top;" colspan="3">Statistics Summary<br /><br /></td>
+					<td style="vertical-align:top;" colspan="3"><?php echo eHtml(t('literal.statistics_summary')); ?><br /><br /></td>
 				</tr>
 				<tr class="bg1">
-					<td style="width:50%;">Activity:</td>
+					<td style="width:50%;"><?php echo eHtml(t('literal.activity')); ?>:</td>
 					<td style="width:35%;">
 	                                <meter min="0" max="100" low="25" high="50" optimum="75" value="<?php
                                         echo $playerdata['activity'] ?>"></meter>
@@ -388,7 +390,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 					<td style="width:15%;"><?php echo $playerdata['activity'].'%'; ?></td>
 				</tr>
 				<tr class="bg2">
-					<td>Points:</td>
+					<td><?php echo eHtml(t('literal.points')); ?>:</td>
 					<td style="width:55%;" colspan="2">
 						<?php
 							echo '<b>' . number_format($playerdata['skill']) . '</b>';
@@ -396,10 +398,10 @@ For support and installation notes visit http://www.hlxcommunity.com
 					</td>
 				</tr>
 				<tr class="bg1">
-					<td style="width:45%;">Rank:</td>
+					<td style="width:45%;"><?php echo eHtml(t('literal.rank')); ?>:</td>
 					<td style="width:55%;" colspan="2">
 						<?php
-                            $rank = 'Unknown';
+							$rank = t('literal.unknown');
 
 							if ($playerdata['activity'] > 0 && $playerdata['hideranking'] == 0)  {
                                 $plGame = $playerdata['game'];
@@ -411,15 +413,15 @@ For support and installation notes visit http://www.hlxcommunity.com
                                 $rank = $playerRepo->getPlayerRank($plGame, $rankType, $plValue, $plKills, $playerDeaths);
 
                                 if (is_null($rank)) {
-                                    $rank = 'Unknown';
+                                    $rank = t('literal.unknown');
                                 }
 							} else {
 								if ($playerdata['hideranking'] == 1) {
-									$rank = "Hidden";
+									$rank = t('literal.hidden');
 								} elseif ($playerdata['hideranking'] == 2) {
-									$rank = "<span style=\"color:red;\">Banned</span>";
+									$rank = "<span style=\"color:red;\">" . eHtml(t('literal.banned')) . "</span>";
 								} else {
-									$rank = 'Not active';
+									$rank = t('literal.not_active');
 								}
 							}
 
@@ -432,7 +434,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 					</td>
 				</tr>
 				<tr class="bg2">
-					<td style="width:45%;">Kills per Minute:</td>
+					<td style="width:45%;"><?php echo eHtml(t('literal.kills_per_minute')); ?>:</td>
 					<td style="width:55%;" colspan="2">
 						<?php
 							if ($playerdata['connection_time'] > 0)
@@ -447,7 +449,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 					</td>
 				</tr>
 				<tr class="bg1">
-					<td style="width:45%;">Kills per Death:</td>
+					<td style="width:45%;"><?php echo eHtml(t('literal.kills_per_death')); ?>:</td>
 					<td style="width:55%;" colspan="2">
 						<?php
 							$db->query
@@ -469,7 +471,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 					</td>
 				</tr>
 				<tr class="bg2">
-					<td style="width:45%;">Headshots per Kill:</td>
+					<td style="width:45%;"><?php echo eHtml(t('literal.headshots_per_kill')); ?>:</td>
 					<td style="width:55%;" colspan="2">
 						<?php
 							$db->query
@@ -488,7 +490,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 					</td>
 				</tr>
 				<tr class="bg1">
-					<td style="width:45%;">Shots per Kill:</td>
+					<td style="width:45%;"><?php echo eHtml(t('literal.shots_per_kill')); ?>:</td>
 					<td style="width:55%;" colspan="2">
 						<?php
 							$db->query
@@ -516,7 +518,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 					</td>
 				</tr>
 				<tr class="bg2">
-					<td style="width:45%;">Weapon Accuracy:</td>
+					<td style="width:45%;"><?php echo eHtml(t('literal.weapon_accuracy')); ?>:</td>
 					<td style="width:55%;" colspan="2">
 						<?php
 							echo $playerdata['acc'] . '%';
@@ -525,7 +527,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 					</td>
 				</tr>
 				<tr class="bg1">
-					<td style="width:45%;">Headshots:</td>
+					<td style="width:45%;"><?php echo eHtml(t('literal.headshots')); ?>:</td>
 					<td style="width:55%;" colspan="2">
 						<?php
 							if ($playerdata['headshots']==0) 
@@ -537,7 +539,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 					</td>
 				</tr>
 				<tr class="bg2">
-					<td style="width:45%;">Kills:</td>
+					<td style="width:45%;"><?php echo eHtml(t('literal.kills')); ?>:</td>
 					<td style="width:55%;" colspan="2">
 						<?php
 							echo number_format($playerdata['kills']);
@@ -546,7 +548,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 					</td>
 				</tr>
 				<tr class="bg1">
-					<td style="width:45%;">Deaths:</td>
+					<td style="width:45%;"><?php echo eHtml(t('literal.deaths')); ?>:</td>
 					<td style="width:55%;" colspan="2">
 						<?php
 							echo number_format($playerdata['deaths']);
@@ -555,7 +557,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 					</td>
 				</tr>
 				<tr class="bg2">
-					<td style="width:45%;">Longest Kill Streak:</td>
+					<td style="width:45%;"><?php echo eHtml(t('literal.longest_kill_streak')); ?>:</td>
 					<td style="width:55%;" colspan="2">
 						<?php
 							$db->query
@@ -573,7 +575,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 					</td>
 				</tr>
 				<tr class="bg1">
-					<td style="width:45%;">Longest Death Streak:</td>
+					<td style="width:45%;"><?php echo eHtml(t('literal.longest_death_streak')); ?>:</td>
 					<td style="width:55%;" colspan="2">
 						<?php
 							$db->query
@@ -591,13 +593,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 					</td>
 				</tr>
 				<tr class="bg2">
-					<td style="width:45%;">Suicides:</td>
+					<td style="width:45%;"><?php echo eHtml(t('literal.suicides')); ?>:</td>
 					<td style="width:55%;" colspan="2">
 						<?php echo number_format($playerdata['suicides']); ?>
 					</td>
 				</tr>
 				<tr class="bg1">
-					<td style="width:45%;">Teammate Kills:</td>
+					<td style="width:45%;"><?php echo eHtml(t('literal.teammate_kills')); ?>:</td>
 					<td style="width:55%;" colspan="2">
 						<?php
 							echo number_format($playerdata['teamkills']);
@@ -607,10 +609,10 @@ For support and installation notes visit http://www.hlxcommunity.com
 				</tr>
 			</table><br />
 			<?php
-				echo '&nbsp;&nbsp;<img src="' . IMAGE_PATH . '/history.gif" style="padding-left:3px;padding-right:3px;" alt="History" />&nbsp;<b>'
-					. htmlspecialchars($playerdata['lastName'], ENT_COMPAT) . '</b>\'s History:<br />';
-				echo '&nbsp;&nbsp;<a href="' . $g_options['scripturl'] . "?mode=playerhistory&amp;player=$player\">Events</a>&nbsp;|&nbsp;";
-				echo '<a href="' . $g_options['scripturl'] . "?mode=playersessions&amp;player=$player\">Sessions</a>&nbsp;|&nbsp;";
+				echo '&nbsp;&nbsp;<img src="' . IMAGE_PATH . '/history.gif" style="padding-left:3px;padding-right:3px;" alt="' . eHtml(t('literal.history')) . '" />&nbsp;<b>'
+					. htmlspecialchars($playerdata['lastName'], ENT_COMPAT) . '</b>: ' . eHtml(t('literal.history')) . '<br />';
+				echo '&nbsp;&nbsp;<a href="' . $g_options['scripturl'] . "?mode=playerhistory&amp;player=$player\">" . eHtml(t('literal.event_history')) . "</a>&nbsp;|&nbsp;";
+				echo '<a href="' . $g_options['scripturl'] . "?mode=playersessions&amp;player=$player\">" . eHtml(t('literal.session_history')) . "</a>&nbsp;|&nbsp;";
 				$resultCount = $db->query
 				("
 					SELECT
@@ -621,27 +623,27 @@ For support and installation notes visit http://www.hlxcommunity.com
 						hlstats_Players_Awards.playerId = $player
 				");
 				list($numawards) = $db->fetch_row($resultCount);
-				echo "<a href=\"" . $g_options['scripturl'] . "?mode=playerawards&amp;player=$player\">Awards&nbsp;($numawards)</a>&nbsp;|&nbsp;";
+				echo "<a href=\"" . $g_options['scripturl'] . "?mode=playerawards&amp;player=$player\">" . eHtml(t('literal.awards')) . "&nbsp;($numawards)</a>&nbsp;|&nbsp;";
 				if ($g_options["nav_globalchat"] == 1)
 				{
-					echo "<a href=\"" . $g_options['scripturl'] . "?mode=chathistory&amp;player=$player\">Chat</a>";
+					echo "<a href=\"" . $g_options['scripturl'] . "?mode=chathistory&amp;player=$player\">" . eHtml(t('literal.chat')) . "</a>";
 				}
 			?>
-			<br />&nbsp;&nbsp;<a href="<?php echo $g_options['scripturl']; ?>?mode=search&amp;st=player&amp;q=<?php echo $pl_urlname; ?>"><img src="<?php echo IMAGE_PATH; ?>/search.gif" style="margin-left:3px;margin-right:3px;" alt="Search" />&nbsp;Find other players with the same name</a>
+			<br />&nbsp;&nbsp;<a href="<?php echo $g_options['scripturl']; ?>?mode=search&amp;st=player&amp;q=<?php echo $pl_urlname; ?>"><img src="<?php echo IMAGE_PATH; ?>/search.gif" style="margin-left:3px;margin-right:3px;" alt="<?php echo eHtml(t('ui.search')); ?>" />&nbsp;<?php echo eHtml(t('literal.find_same_name')); ?></a>
 		</div>
 	</div>
 	<br /><br />
 	<div style="clear:both;padding-top:24px;"></div>
-	<?php printSectionTitle('Miscellaneous Statistics'); ?>
+	<?php printSectionTitle(t('literal.misc_statistics')); ?>
 	<div class="subblock">
 		<div style="float:left;vertical-align:top;width:48.5%;">
 			<table class="data-table">
 				<tr class="data-table-head">
-					<td>Player Trend</td>
+					<td><?php echo eHtml(t('literal.player_trend')); ?></td>
 				</tr>
 				<tr class="bg1">
 					<td style="text-align:center;">
-						<?php echo "<img src=\"trend_graph.php?bgcolor=".$g_options['graphbg_trend'].'&amp;color='.$g_options['graphtxt_trend']."&amp;player=$player\" alt=\"Player Trend Graph\" />"; ?>
+						<?php echo "<img src=\"trend_graph.php?bgcolor=".$g_options['graphbg_trend'].'&amp;color='.$g_options['graphtxt_trend']."&amp;player=$player\" alt=\"" . eHtml(t('literal.player_trend_graph')) . "\" />"; ?>
 					</td>
 				</tr>
 			</table>
@@ -649,7 +651,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 		<div style="float:right;vertical-align:top;width:48.5%;">
 			<table class="data-table">
 				<tr class="data-table-head">
-					<td colspan="2">Forum Signature</td>
+					<td colspan="2"><?php echo eHtml(t('literal.forum_signature')); ?></td>
 				</tr>
 				<tr class="bg1">
 					<td style="text-align:center;">
@@ -666,7 +668,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 								$jimglink = $imglink;
 							}
 							
-							echo "<img src=\"$imglink\" title=\"Copy &amp; Paste the whole URL below in your forum signature\" alt=\"forum sig image\"/>";
+							echo "<img src=\"$imglink\" title=\"" . eHtml(t('literal.copy_signature_url')) . "\" alt=\"" . eHtml(t('literal.forum_signature')) . "\"/>";
 							$script_path = (isset($_SERVER['SSL']) || (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == "on")) ? 'https://' : 'http://';
 							$script_path .= $_SERVER['HTTP_HOST'];
 							$script_path .= str_replace('\\','/',dirname($_SERVER['PHP_SELF']));
@@ -694,7 +696,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 							/* ]]> */
 						</script>
 						<a href="" onclick="setForumText(1);return false">
-							bbCode 1 (phpBB, SMF)</a>&nbsp;|&nbsp;<a href="" onclick="setForumText(2);return false">bbCode 2 (IPB)</a>&nbsp;|&nbsp;<a href="" onclick="setForumText(0);return false">Direct Image
+							<?php echo eHtml(t('literal.bbcode_1')); ?></a>&nbsp;|&nbsp;<a href="" onclick="setForumText(2);return false"><?php echo eHtml(t('literal.bbcode_2')); ?></a>&nbsp;|&nbsp;<a href="" onclick="setForumText(0);return false"><?php echo eHtml(t('literal.direct_image')); ?>
 						</a>
 						<?php echo '<textarea style="width: 95%; height: 50px;" rows="2" cols="70" id="siglink" readonly="readonly" onclick="document.getElementById(\'siglink\').select();">[url='."$script_path/hlstats.php?mode=playerinfo&amp;player=$player"."][img]$imglink".'[/img][/url]</textarea>'; ?>
 					</td>
@@ -777,13 +779,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 
 	<div style="clear:both;padding-top:24px;"></div>
-	<?php printSectionTitle('Ranks'); ?>
+	<?php printSectionTitle(t('literal.ranks')); ?>
 	<div class="subblock">
 		<div style="float:left;vertical-align:top;width:48.5%;">
 			<table class="data-table">
 				<tr class="data-table-head">
 					<td colspan="2">
-						Current rank: <b><?php echo htmlspecialchars($rankName, ENT_COMPAT); ?></b>
+						<?php echo eHtml(t('literal.current_rank')); ?>: <b><?php echo htmlspecialchars($rankName, ENT_COMPAT); ?></b>
 					</td>
 				</tr>
 				<tr class="bg1">
@@ -798,7 +800,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 					
 					</td>
 					<td style="width:40%;">
-						Kills needed: <b><?php echo "$rankKillsNeeded (".number_format($rankPercent, 0, '.', '');?>%)</b>
+						<?php echo eHtml(t('literal.kills_needed')); ?>: <b><?php echo "$rankKillsNeeded (".number_format($rankPercent, 0, '.', '');?>%)</b>
 					</td>
 				</tr>
 			</table>
@@ -806,7 +808,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 		<div style="float:right;vertical-align:top;width:48.5%;">
 			<table class="data-table">
 				<tr class="data-table-head">
-					<td>Rank history</td>
+					<td><?php echo eHtml(t('literal.rank_history')); ?></td>
 				</tr>
 				<tr class="bg1">
 					<td style="text-align:center;"><?php echo $rankHistory; ?></td>
@@ -833,7 +835,8 @@ For support and installation notes visit http://www.hlxcommunity.com
 				OR hlstats_Ribbons.special = 2
 			)
 		GROUP BY
-			hlstats_Ribbons.awardCode
+			hlstats_Ribbons.awardCode,
+			hlstats_Ribbons.image
 	");
 	$res = $db->query
 	("
@@ -965,12 +968,12 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 
 	<div style="clear:both;padding-top:24px;"></div>
-	<?php printSectionTitle('Awards (hover over image to see name)'); ?>
+	<?php printSectionTitle(t('literal.awards_hover')); ?>
 	<div class="subblock">
 		<div style="float:left;vertical-align:top;width:68.5%;">
 			<table class="data-table">
 				<tr class="data-table-head">
-					<td>Ribbons</td>
+					<td><?php echo eHtml(t('literal.ribbons')); ?></td>
 				</tr>
 				<tr class="bg1">
 					<td style="text-align:center;"><?php echo $ribbonList; ?></td>
@@ -980,7 +983,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 		<div style="float:right;vertical-align:top;width:28.5%;">
 			<table class="data-table">
 				<tr class="data-table-head">
-					<td colspan="2">Global Awards</td>
+					<td colspan="2"><?php echo eHtml(t('literal.global_awards')); ?></td>
 				</tr>
 				<tr class="bg1">
 					<td style="text-align:center;"><?php echo $GlobalAwardsList; ?></td>

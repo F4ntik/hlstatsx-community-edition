@@ -116,7 +116,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 <div class="block">
 <?php
-	printSectionTitle('Server Live View');
+	printSectionTitle(t('literal.server_live_view'));
 	$i=0;
 	for ($i=0; $i<count($servers); $i++)
 	{
@@ -135,14 +135,14 @@ For support and installation notes visit http://www.hlxcommunity.com
 	<div class="subblock">
 		<table class="data-table">
 			<tr class="data-table-head">
-				<td class="fSmall" style="width:37%;">&nbsp;Server</td>
-				<td class="fSmall" style="width:23%;">&nbsp;Address</td>
-				<td class="fSmall" style="width:6%;text-align:center;">&nbsp;Map</td>
-				<td class="fSmall" style="width:6%;text-align:center;">&nbsp;Played</td>
-				<td class="fSmall" style="width:10%;text-align:center;">&nbsp;Players</td>
-				<td class="fSmall" style="width:6%;text-align:center;">&nbsp;Kills</td>
-				<td class="fSmall" style="width:6%;text-align:center;">&nbsp;Headshots</td>
-				<td class="fSmall" style="width:6%;text-align:center;">&nbsp;Hpk</td>
+				<td class="fSmall" style="width:37%;">&nbsp;<?php echo eHtml(t('literal.server')); ?></td>
+				<td class="fSmall" style="width:23%;">&nbsp;<?php echo eHtml(t('literal.address')); ?></td>
+				<td class="fSmall" style="width:6%;text-align:center;">&nbsp;<?php echo eHtml(t('literal.map')); ?></td>
+				<td class="fSmall" style="width:6%;text-align:center;">&nbsp;<?php echo eHtml(t('literal.played')); ?></td>
+				<td class="fSmall" style="width:10%;text-align:center;">&nbsp;<?php echo eHtml(t('literal.players')); ?></td>
+				<td class="fSmall" style="width:6%;text-align:center;">&nbsp;<?php echo eHtml(t('literal.kills')); ?></td>
+				<td class="fSmall" style="width:6%;text-align:center;">&nbsp;<?php echo eHtml(t('literal.headshots')); ?></td>
+				<td class="fSmall" style="width:6%;text-align:center;">&nbsp;<?php echo eHtml(t('literal.hpk_cap')); ?></td>
 			</tr>
 			<tr class="game-table-row">
 				<td class="game-table-cell"><?php
@@ -156,7 +156,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 		echo '<b>'.htmlspecialchars($rowdata['name']).'</b>';
                         ?></td>
 			<td class="game-table-cell"><?php
-		echo "$addr <a href=\"steam://connect/$addr\" style=\"color:black\">(Join)</a>";
+		echo $addr . ' <a href="steam://connect/' . $addr . '" style="color:black">' . eHtml(t('literal.join_parenthesized')) . '</a>';
                     ?></td>
 			<td class="game-table-cell" style="text-align:center;"><?php
 		echo $rowdata['act_map'];
@@ -191,48 +191,48 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>	</div>
 </div>
 <div class="block">
-	<?php printSectionTitle('Server Load History'); ?>
+	<?php printSectionTitle(t('literal.server_load_history')); ?>
 	<div class="subblock">
 		<table class="data-table">
 			<tr class="data-table-head">
-				<td class="fSmall">&nbsp;24h View</td>
+				<td class="fSmall">&nbsp;<?php echo eHtml(t('literal.24h_view')); ?></td>
 			</tr>
 			<tr class="data-table-row">
 				<td style="text-align:center; height: 200px; vertical-align:middle;">
-					<img src="show_graph.php?type=0&amp;game=<?php echo $game; ?>&amp;width=870&amp;height=200&amp;server_id=<?php echo $server_id ?>&amp;bgcolor=<?php echo $g_options['graphbg_load']; ?>&amp;color=<?php echo $g_options['graphtxt_load']; ?>&amp;range=1" alt="24h View" />
+					<img src="show_graph.php?type=0&amp;game=<?php echo $game; ?>&amp;width=870&amp;height=200&amp;server_id=<?php echo $server_id ?>&amp;bgcolor=<?php echo $g_options['graphbg_load']; ?>&amp;color=<?php echo $g_options['graphtxt_load']; ?>&amp;range=1" alt="<?php echo eHtml(t('literal.24h_view')); ?>" />
 				</td>
 			</tr>
 		</table>
 		<br /><br />
 		<table class="data-table">
 			<tr class="data-table-head">
-				<td class="fSmall">&nbsp;Last Week</td>
+				<td class="fSmall">&nbsp;<?php echo eHtml(t('literal.last_week')); ?></td>
 			</tr>
 			<tr class="data-table-row">
 				<td style="text-align:center; height: 200px; vertical-align:middle;">
-					<img src="show_graph.php?type=0&amp;game=<?php echo $game; ?>&amp;width=870&amp;height=200&amp;server_id=<?php echo $server_id ?>&amp;bgcolor=<?php echo $g_options['graphbg_load']; ?>&amp;color=<?php echo $g_options['graphtxt_load']; ?>&amp;range=2" alt="Last Week" />
+					<img src="show_graph.php?type=0&amp;game=<?php echo $game; ?>&amp;width=870&amp;height=200&amp;server_id=<?php echo $server_id ?>&amp;bgcolor=<?php echo $g_options['graphbg_load']; ?>&amp;color=<?php echo $g_options['graphtxt_load']; ?>&amp;range=2" alt="<?php echo eHtml(t('literal.last_week')); ?>" />
 				</td>
 			</tr>
 		</table>
 		<br /><br />
 		<table class="data-table">
 			<tr class="data-table-head">
-				<td class="fSmall">&nbsp;Last Month</td>
+				<td class="fSmall">&nbsp;<?php echo eHtml(t('literal.last_month')); ?></td>
 			</tr>
 			<tr class="data-table-row">
 				<td style="text-align:center; height: 200px; vertical-align:middle;">
-					<img src="show_graph.php?type=0&amp;game=<?php echo $game; ?>&amp;width=870&amp;height=200&amp;server_id=<?php echo $server_id ?>&amp;bgcolor=<?php echo $g_options['graphbg_load']; ?>&amp;color=<?php echo $g_options['graphtxt_load']; ?>&amp;range=3" alt="Last Month" />
+					<img src="show_graph.php?type=0&amp;game=<?php echo $game; ?>&amp;width=870&amp;height=200&amp;server_id=<?php echo $server_id ?>&amp;bgcolor=<?php echo $g_options['graphbg_load']; ?>&amp;color=<?php echo $g_options['graphtxt_load']; ?>&amp;range=3" alt="<?php echo eHtml(t('literal.last_month')); ?>" />
 				</td>
 			</tr>
 		</table>
 		<br /><br />
 		<table class="data-table">
 			<tr class="data-table-head">
-				<td class="fSmall">&nbsp;Last Year</td>
+				<td class="fSmall">&nbsp;<?php echo eHtml(t('literal.last_year')); ?></td>
 			</tr>
 			<tr class="data-table-row">
 				<td style="text-align:center; height: 200px; vertical-align:middle;">
-					<img src="show_graph.php?type=0&amp;game=<?php echo $game; ?>&amp;width=870&amp;height=200&amp;server_id=<?php echo $server_id ?>&amp;bgcolor=<?php echo $g_options['graphbg_load']; ?>&amp;color=<?php echo $g_options['graphtxt_load']; ?>&amp;range=4" alt="Last Year" />
+					<img src="show_graph.php?type=0&amp;game=<?php echo $game; ?>&amp;width=870&amp;height=200&amp;server_id=<?php echo $server_id ?>&amp;bgcolor=<?php echo $g_options['graphbg_load']; ?>&amp;color=<?php echo $g_options['graphtxt_load']; ?>&amp;range=4" alt="<?php echo eHtml(t('literal.last_year')); ?>" />
 				</td>
 			</tr>
 		</table>

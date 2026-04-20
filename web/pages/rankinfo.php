@@ -155,10 +155,10 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 
 <div class="block">
-    <?php printSectionTitle('Rank Details'); ?>
+    <?php printSectionTitle(t('literal.rank_details')); ?>
 	<div class="subblock">
 		<div style="float:right;">
-			Back to <a href="<?php echo $g_options['scripturl'] . "?mode=awards&amp;game=$game&tab=ranks"; ?>">Ranks</a>
+			<?php echo eHtml(t('literal.back_to')); ?> <a href="<?php echo $g_options['scripturl'] . "?mode=awards&amp;game=$game&tab=ranks"; ?>"><?php echo eHtml(t('literal.ranks')); ?></a>
 		</div>
 		<div style="clear:both;"></div>
 	</div>

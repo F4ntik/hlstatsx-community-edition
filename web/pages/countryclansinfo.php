@@ -105,7 +105,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 
 <div class="block">
-	<?php printSectionTitle('Country Information'); ?>
+	<?php printSectionTitle(t('literal.country_information')); ?>
 
 	<div class="subblock">
 		<div style="float:left;width:48.5%;">

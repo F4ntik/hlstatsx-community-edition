@@ -237,14 +237,14 @@ For support and installation notes visit http://www.hlxcommunity.com
 	}
 ?>
 <div class="block">
-	<?php printSectionTitle('Action Details'); ?>
+	<?php printSectionTitle(t('literal.action_details')); ?>
 
 	<div class="subblock">
 		<div style="float:left;">
-			<strong><?php echo $act_name; ?></strong> from a total of <strong><?php echo number_format(intval($totalact)); ?></strong> achievements (Last <?php echo $g_options['DeleteDays']; ?> Days)
+			<strong><?php echo eHtml($act_name); ?></strong> <?php echo t('literal.from_total_achievements_last_days', array('total' => number_format(intval($totalact)), 'days' => $g_options['DeleteDays'])); ?>
 		</div>
 		<div style="float:right;">
-			Back to <a href="<?php echo $g_options['scripturl'] . "?mode=actions&amp;game=$game"; ?>">Action Statistics</a>
+			<?php echo eHtml(t('literal.back_to')); ?> <a href="<?php echo $g_options['scripturl'] . "?mode=actions&amp;game=$game"; ?>"><?php echo eHtml(t('literal.action_statistics')); ?></a>
 		</div>
 	</div>
 	<div style="clear:both;padding:2px;"></div>
@@ -320,10 +320,10 @@ For support and installation notes visit http://www.hlxcommunity.com
 		list($numitems, $totalact) = $db->fetch_row($resultCount);
 ?>
 <div class="block">
-	<a name="victims"><?php printSectionTitle("Action Victim Details"); ?></a>
+	<a name="victims"><?php printSectionTitle(t('literal.action_victim_details')); ?></a>
 	<div class="subblock">
 		<div style="float:left;">
-			<strong>Victims of <?php echo $act_name; ?></strong> (Last <?php echo $g_options['DeleteDays']; ?> Days)
+			<?php echo t('literal.victims_of_last_days', array('item' => eHtml($act_name), 'days' => $g_options['DeleteDays'])); ?>
 		</div>
 	</div>
 	<div style="clear:both;padding:2px;"></div>

@@ -545,7 +545,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 <div class="block">
 <?php
-	printSectionTitle('Player Event History (Last '.$g_options['DeleteDays'].' Days)');
+	printSectionTitle(t('literal.player_event_history', array('days' => $g_options['DeleteDays'])));
 	if ($numitems > 0)
 	{
 		$table->draw($result, $numitems, 95);
@@ -553,7 +553,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?><br /><br />
 	<div class="subblock">
 		<div style="float:right;">
-			Go to: <a href="<?php echo $g_options['scripturl'] . "?mode=playerinfo&amp;player=$player"; ?>"><?php echo $pl_name; ?>'s Statistics</a>
+			<?php echo eHtml(t('literal.go_to')); ?>: <a href="<?php echo $g_options['scripturl'] . "?mode=playerinfo&amp;player=$player"; ?>"><?php echo t('literal.player_statistics_link', array('player' => $pl_name)); ?></a>
 		</div>
 	</div>
 </div>

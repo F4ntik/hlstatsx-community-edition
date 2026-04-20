@@ -1,8 +1,8 @@
 <?php
 
 	pageHeader(
-		array('Ventrilo viewer'),
-		array('Ventrilo viewer'=>'')
+		array(t('ventrilo.viewer')),
+		array(t('ventrilo.viewer')=>'')
 	);
 
 	require_once(PAGE_PATH . '/ventrilostatus.php');
@@ -194,22 +194,22 @@ function show($tpl, $array)
 		"os" => $os,
 		"uptime" => time_convert($uptime),
 		"user" => $user,
-		"t_name" => "Server name",
-		"t_os" => "Operating system",
+		"t_name" => t('voice.server_name'),
+		"t_os" => t('voice.operating_system'),
 		"uchannels" => $chan,
 		"info" => $info,
-		"t_uptime" => "Uptime",
-		"t_channels" => "Channels",
-		"t_user" => "Users",
-		"head" => "Ventrilo Overview",
-		"users_head" => "User Information",
-		"player" => "User",
-		"channel" => "Channel",
-		"channel_head" => "Channel Information",
+		"t_uptime" => t('voice.uptime'),
+		"t_channels" => t('voice.channels'),
+		"t_user" => t('voice.users'),
+		"head" => t('voice.ventrilo_overview'),
+		"users_head" => t('voice.user_information'),
+		"player" => t('voice.user'),
+		"channel" => t('voice.channel'),
+		"channel_head" => t('voice.channel_information'),
 		"max" => $max,
 		"channels" => $cAmount,
-		"logintime" => "Login time",
-		"idletime" => "Idle time",
+		"logintime" => t('voice.login_time'),
+		"idletime" => t('voice.idle_time'),
 		"channelstats" => $channelstats,
 		"userstats" => $userstats
 	));

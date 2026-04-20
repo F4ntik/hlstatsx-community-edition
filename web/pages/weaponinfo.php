@@ -93,7 +93,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			),
 			new TableColumn(
 				'frags',
-				ucfirst($weapon) . ' kills',
+				t('literal.weapon_kills_label', array('weapon' => ucfirst($weapon))),
 				'width=15&align=right'
 			),
 			new TableColumn(
@@ -156,7 +156,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 
 <div class="block">
-	<?php printSectionTitle('Weapon Details'); ?>
+	<?php printSectionTitle(t('literal.weapon_details')); ?>
     <div class="subblock">
 	<?php // figure out URL and absolute path of image
 		$image = getImage("/games/$game/weapons/$weapon");
@@ -170,10 +170,10 @@ For support and installation notes visit http://www.hlxcommunity.com
 		}
 ?>
 		<div style="float:left;">
-			<?php echo $wep_content ?>&nbsp;From a total of <b><?php echo number_format(intval($totalkills)); ?></b> kills with <b><?php echo number_format($totalheadshots); ?></b> headshots (Last <?php echo $g_options['DeleteDays']; ?> Days)
+			<?php echo $wep_content; ?>&nbsp;<?php echo t('literal.from_total_kills_headshots_last_days', array('kills' => number_format(intval($totalkills)), 'headshots' => number_format($totalheadshots), 'days' => $g_options['DeleteDays'])); ?>
 		</div>
 		<div style="float:right;">
-			Back to <a href="<?php echo $g_options['scripturl']. "?mode=weapons&amp;game=$game"; ?>">Weapon Statistics</a>
+			<?php echo eHtml(t('literal.back_to')); ?> <a href="<?php echo $g_options['scripturl']. "?mode=weapons&amp;game=$game"; ?>"><?php echo eHtml(t('literal.weapon_statistics')); ?></a>
 		</div>
 		<div style="clear:both;padding:2px;"></div>
 	</div>

@@ -42,8 +42,8 @@ For support and installation notes visit http://www.hlxcommunity.com
 	require(PAGE_PATH . '/search-class.php');
 	pageHeader
 	(
-		array ('Search'),
-		array ('Search' => '')
+		array (t('literal.search')),
+		array (t('literal.search') => '')
 	);
 
 	$sr_query = $_GET['q'];
