@@ -79,8 +79,8 @@ For support and installation notes visit http://www.hlxcommunity.com
 	("
 		(
 		SELECT
-			hlstats_Actions.code,
-			hlstats_Actions.description,
+			MAX(hlstats_Actions.code) AS code,
+			MAX(hlstats_Actions.description) AS description,
 			COUNT(hlstats_Events_PlayerActions.id) AS obj_count,
 			SUM(hlstats_Events_PlayerActions.bonus) AS obj_bonus
 		FROM
@@ -97,8 +97,8 @@ For support and installation notes visit http://www.hlxcommunity.com
 		UNION ALL
 		(
 		SELECT
-			hlstats_Actions.code,
-			hlstats_Actions.description,
+			MAX(hlstats_Actions.code) AS code,
+			MAX(hlstats_Actions.description) AS description,
 			COUNT(hlstats_Events_PlayerPlayerActions.id) AS obj_count,
 			SUM(hlstats_Events_PlayerPlayerActions.bonus) AS obj_bonus
 		FROM
@@ -166,8 +166,8 @@ For support and installation notes visit http://www.hlxcommunity.com
 	$result = $db->query
 	("
 		SELECT
-			hlstats_Actions.code,
-			hlstats_Actions.description,
+			MAX(hlstats_Actions.code) AS code,
+			MAX(hlstats_Actions.description) AS description,
 			COUNT(hlstats_Events_PlayerPlayerActions.id) AS obj_count,
 			SUM(hlstats_Events_PlayerPlayerActions.bonus) * -1 AS obj_bonus
 		FROM

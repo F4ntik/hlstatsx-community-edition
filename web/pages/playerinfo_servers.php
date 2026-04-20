@@ -118,7 +118,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	// leave the join on this one, we do groupings..
 	$result = $db->query("
 		SELECT
-			hlstats_Servers.name AS server,
+			MAX(hlstats_Servers.name) AS server,
 			SUM(hlstats_Events_Frags.killerId = $player) AS kills,
 			SUM(hlstats_Events_Frags.victimId = $player) AS deaths,
 			SUM(hlstats_Events_Frags.killerId = $player) / IF(SUM(hlstats_Events_Frags.victimId = $player) = 0, 1, SUM(hlstats_Events_Frags.victimId = $player)) AS kpd,
@@ -133,12 +133,12 @@ For support and installation notes visit http://www.hlxcommunity.com
 			hlstats_Servers
 		ON
 			hlstats_Servers.serverId = hlstats_Events_Frags.serverId
+			AND hlstats_Servers.game = '$game'
 		WHERE
-			hlstats_Servers.game = '$game'
-			AND hlstats_Events_Frags.killerId = '$player'
+			hlstats_Events_Frags.killerId = '$player'
 			OR hlstats_Events_Frags.victimId = '$player'
 		GROUP BY
-			hlstats_Servers.name
+			hlstats_Events_Frags.serverId
 		ORDER BY
 			$tblServers->sort $tblServers->sortorder,
 			$tblServers->sort2 $tblServers->sortorder

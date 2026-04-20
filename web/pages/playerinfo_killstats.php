@@ -167,8 +167,6 @@ For support and installation notes visit http://www.hlxcommunity.com
 			hlstats_Events_Frags
 		WHERE
 			hlstats_Events_Frags.killerId = $player
-		GROUP BY
-			hlstats_Events_Frags.id
 	");
 	$db->query
 	("
@@ -205,7 +203,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	$db->query
 	("
 		SELECT
-			hlstats_Players.lastName AS name
+			MAX(hlstats_Players.lastName) AS name
 		FROM
 			hlstats_Frags_Kills,
 			hlstats_Players
@@ -220,9 +218,9 @@ For support and installation notes visit http://www.hlxcommunity.com
 	$result = $db->query
 	("
 		SELECT
-			hlstats_Players.lastName AS name,
-			hlstats_Players.flag AS flag,
-			hlstats_Players.country AS country,
+			MAX(hlstats_Players.lastName) AS name,
+			MAX(hlstats_Players.flag) AS flag,
+			MAX(hlstats_Players.country) AS country,
 			COUNT(hlstats_Frags_Kills.kills) AS kills,
 			COUNT(hlstats_Frags_Kills.deaths) AS deaths,
 			ROUND(COUNT(hlstats_Frags_Kills.kills) / $realkills * 100, 2) AS kpercent,

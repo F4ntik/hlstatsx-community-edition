@@ -133,7 +133,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	$result = $db->query("
 		SELECT
 			hlstats_Events_Frags.weapon,
-			IFNULL(hlstats_Weapons.modifier, 1.00) AS modifier,
+			IFNULL(MAX(hlstats_Weapons.modifier), 1.00) AS modifier,
 			COUNT(hlstats_Events_Frags.weapon) AS kills,
 			ROUND(COUNT(hlstats_Events_Frags.weapon) / $realkills * 100, 2) AS kpercent,
 			SUM(hlstats_Events_Frags.headshot = 1) AS headshots,
@@ -144,14 +144,10 @@ For support and installation notes visit http://www.hlxcommunity.com
 		LEFT JOIN
 			hlstats_Weapons
 		ON
-			hlstats_Weapons.code = hlstats_Events_Frags.weapon
+			hlstats_Weapons.game = '$game'
+			AND hlstats_Weapons.code = hlstats_Events_Frags.weapon
 		WHERE
 			hlstats_Events_Frags.killerId = $player
-			AND
-			(
-				hlstats_Weapons.game = '$game'
-				OR hlstats_Weapons.weaponId IS NULL
-			)
 		GROUP BY
 			hlstats_Events_Frags.weapon
 		ORDER BY

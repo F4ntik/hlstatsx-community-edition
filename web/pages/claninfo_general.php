@@ -180,7 +180,8 @@ printSectionTitle('Clan Information');
 						WHERE   
 							clan=$clan
 						GROUP BY
-							hlstats_Events_Entries.serverId
+							hlstats_Events_Entries.serverId,
+							hlstats_Servers.name
 						ORDER BY
 							cnt DESC
 						LIMIT 1  	
@@ -234,7 +235,8 @@ printSectionTitle('Clan Information');
 						INNER JOIN
 							hlstats_Weapons
 						ON
-							hlstats_Weapons.code = hlstats_Events_Frags.weapon
+							hlstats_Weapons.game = '$game'
+							AND hlstats_Weapons.code = hlstats_Events_Frags.weapon
 						INNER JOIN 
                             hlstats_Players
 						ON
@@ -244,7 +246,8 @@ printSectionTitle('Clan Information');
 						AND
 						    hlstats_Weapons.game='$game'
 						GROUP BY
-							hlstats_Events_Frags.weapon
+							hlstats_Events_Frags.weapon,
+							hlstats_Weapons.name
 						ORDER BY
 							kills desc, headshots desc
 						LIMIT 1

@@ -101,7 +101,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	$result = $db->query
 	("
 		SELECT
-			IFNULL(hlstats_Teams.name, hlstats_Events_ChangeTeam.team) AS name,
+			IFNULL(MAX(hlstats_Teams.name), hlstats_Events_ChangeTeam.team) AS name,
 			COUNT(hlstats_Events_ChangeTeam.id) AS teamcount,
 			ROUND((COUNT(hlstats_Events_ChangeTeam.id) / $numteamjoins) * 100, 2) AS percent
 		FROM
@@ -110,9 +110,9 @@ For support and installation notes visit http://www.hlxcommunity.com
 			hlstats_Teams
 		ON
 			hlstats_Events_ChangeTeam.team = hlstats_Teams.code
+			AND hlstats_Teams.game = '$game'
 		WHERE
-			hlstats_Teams.game = '$game'
-			AND hlstats_Events_ChangeTeam.playerId = $player
+			hlstats_Events_ChangeTeam.playerId = $player
 			AND
 			(
 				hidden <> '1'
@@ -305,19 +305,20 @@ For support and installation notes visit http://www.hlxcommunity.com
 	$result = $db->query
 	("
 		SELECT
-			IFNULL(hlstats_Roles.name, hlstats_Events_ChangeRole.role) AS name,
-			IFNULL(hlstats_Roles.code, hlstats_Events_ChangeRole.role) AS code,
+			IFNULL(MAX(hlstats_Roles.name), hlstats_Events_ChangeRole.role) AS name,
+			IFNULL(MAX(hlstats_Roles.code), hlstats_Events_ChangeRole.role) AS code,
 			COUNT(hlstats_Events_ChangeRole.id) AS rolecount,
 			ROUND(COUNT(hlstats_Events_ChangeRole.id) / IF($numrolejoins = 0, 1, $numrolejoins) * 100, 2) AS percent,
-			hlstats_Frags_as_res.killsTotal,
-			hlstats_Frags_as_res.deathsTotal,
-			ROUND(hlstats_Frags_as_res.killsTotal / IF(hlstats_Frags_as_res.deathsTotal = 0, 1, hlstats_Frags_as_res.deathsTotal), 2) AS kpd
+			IFNULL(MAX(hlstats_Frags_as_res.killsTotal), 0) AS killsTotal,
+			IFNULL(MAX(hlstats_Frags_as_res.deathsTotal), 0) AS deathsTotal,
+			ROUND(IFNULL(MAX(hlstats_Frags_as_res.killsTotal), 0) / IF(IFNULL(MAX(hlstats_Frags_as_res.deathsTotal), 0) = 0, 1, IFNULL(MAX(hlstats_Frags_as_res.deathsTotal), 0)), 2) AS kpd
 		FROM
 			hlstats_Events_ChangeRole
 		LEFT JOIN
 			hlstats_Roles
 		ON
 			hlstats_Events_ChangeRole.role = hlstats_Roles.code
+			AND hlstats_Roles.game = '$game'
 		LEFT JOIN
 			hlstats_Frags_as_res
 		ON
@@ -329,7 +330,6 @@ For support and installation notes visit http://www.hlxcommunity.com
 				hidden <> '1'
 				OR hidden IS NULL
 			)
-			AND hlstats_Roles.game = '$game'
 		GROUP BY
 			hlstats_Events_ChangeRole.role
 		ORDER BY
