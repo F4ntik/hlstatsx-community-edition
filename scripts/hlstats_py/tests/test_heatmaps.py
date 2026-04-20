@@ -8,6 +8,8 @@ from hlstats_py.heatmaps import (
     HeatmapGenerator,
     HeatmapRepository,
     HeatmapSettings,
+    apply_brush_opacity,
+    build_points_query,
     load_settings,
     select_target_maps,
 )
@@ -131,6 +133,59 @@ def _make_config() -> HeatmapConfig:
     )
 
 
+def _make_rows(map_name: str) -> dict[str, list[tuple[object, ...]]]:
+    return {
+        "hlstats_Heatmap_Config": [
+            (
+                "cstrike",
+                "cstrike",
+                map_name,
+                32,
+                32,
+                0,
+                0,
+                0,
+                30,
+                "small",
+                1.0,
+                10,
+                0.25,
+                0.25,
+                0,
+                0,
+                0,
+                0,
+            )
+        ],
+        "WHERE hidden='0'": [("cstrike",)],
+        "hlstats_Events_Frags": [
+            ("frag", 1, map_name, "cstrike", datetime(2026, 4, 19, 12, 0, 0), 0, 0)
+        ],
+    }
+
+
+def _assert_generated_outputs(
+    settings: HeatmapSettings,
+    map_name: str,
+    results,
+) -> None:
+    output_file = (
+        settings.web_root
+        / "hlstatsimg"
+        / "games"
+        / "cstrike"
+        / "heatmaps"
+        / f"{map_name}-kill.jpg"
+    )
+    thumb_file = output_file.with_name(f"{map_name}-kill-thumb.jpg")
+    cache_file = settings.cache_root / "cstrike" / f"{map_name}_1713520000.png"
+
+    assert [result.generated for result in results] == [True]
+    assert output_file.exists()
+    assert thumb_file.exists()
+    assert cache_file.exists()
+
+
 def test_load_settings_resolves_legacy_default_paths(tmp_path: Path) -> None:
     settings = _make_settings(tmp_path)
 
@@ -157,6 +212,33 @@ def test_select_target_maps_uses_visible_games_when_no_filter() -> None:
     assert list(selected["cstrike"]) == ["de_dust2"]
 
 
+def test_build_points_query_wraps_limited_selects_for_mysql_union() -> None:
+    query, params = build_points_query(
+        _make_config(),
+        ignore_infected=False,
+        kill_limit=100,
+        start_timestamp=None,
+    )
+
+    assert "(\n            SELECT" in query
+    assert "\n        )\n\n        UNION ALL\n\n        (\n            SELECT" in query
+    assert "LIMIT 100" in query
+    assert params[0] == "de_dust2"
+    assert params[3] == "de_dust2"
+
+
+def test_apply_brush_opacity_handles_fully_opaque_pixels() -> None:
+    brush = Image.new("RGBA", (2, 1))
+    brush.putpixel((0, 0), (255, 255, 255, 0))
+    brush.putpixel((1, 0), (255, 255, 255, 255))
+
+    adjusted = apply_brush_opacity(brush, 50)
+
+    assert adjusted.size == brush.size
+    assert adjusted.getpixel((0, 0))[3] <= 255
+    assert adjusted.getpixel((1, 0))[3] <= 255
+
+
 def test_heatmap_generator_writes_legacy_outputs_and_cache(tmp_path: Path) -> None:
     settings = _make_settings(tmp_path)
     asset_dir = settings.assets_root / "cstrike"
@@ -170,55 +252,43 @@ def test_heatmap_generator_writes_legacy_outputs_and_cache(tmp_path: Path) -> No
         format="PNG",
     )
 
-    rows_by_match = {
-        "hlstats_Heatmap_Config": [
-            (
-                "cstrike",
-                "cstrike",
-                "de_dust2",
-                32,
-                32,
-                0,
-                0,
-                0,
-                30,
-                "small",
-                1.0,
-                10,
-                0.25,
-                0.25,
-                0,
-                0,
-                0,
-                0,
-            )
-        ],
-        "WHERE hidden='0'": [("cstrike",)],
-        "hlstats_Events_Frags": [
-            ("frag", 1, "de_dust2", "cstrike", datetime(2026, 4, 19, 12, 0, 0), 0, 0)
-        ],
-    }
+    rows_by_match = _make_rows("de_dust2")
     adapter = FakeAdapter(rows_by_match)
     repository = HeatmapRepository(adapter)  # type: ignore[arg-type]
     generator = HeatmapGenerator(settings, repository, clock=lambda: 1_713_520_000.0)
 
     results = generator.run()
 
-    output_file = (
-        settings.web_root
-        / "hlstatsimg"
-        / "games"
-        / "cstrike"
-        / "heatmaps"
-        / "de_dust2-kill.jpg"
+    assert adapter.connected is True
+    assert adapter.closed is True
+    _assert_generated_outputs(settings, "de_dust2", results)
+    assert any("hlstats_Events_Frags" in query for query in adapter.executed)
+
+
+def test_heatmap_generator_writes_legacy_outputs_for_2x2_map_name(tmp_path: Path) -> None:
+    settings = _make_settings(tmp_path)
+    asset_dir = settings.assets_root / "cstrike"
+    asset_dir.mkdir(parents=True)
+    settings.cache_root.mkdir(parents=True)
+    settings.web_root.mkdir(parents=True)
+
+    Image.new("RGB", (64, 64), (40, 40, 40)).save(
+        asset_dir / "de_dust2_2x2.jpg",
+        format="JPEG",
     )
-    thumb_file = output_file.with_name("de_dust2-kill-thumb.jpg")
-    cache_file = settings.cache_root / "cstrike" / "de_dust2_1713520000.png"
+    Image.new("RGBA", (17, 17), (255, 255, 255, 255)).save(
+        settings.assets_root / "brush_small.png",
+        format="PNG",
+    )
+
+    rows_by_match = _make_rows("de_dust2_2x2")
+    adapter = FakeAdapter(rows_by_match)
+    repository = HeatmapRepository(adapter)  # type: ignore[arg-type]
+    generator = HeatmapGenerator(settings, repository, clock=lambda: 1_713_520_000.0)
+
+    results = generator.run()
 
     assert adapter.connected is True
     assert adapter.closed is True
-    assert [result.generated for result in results] == [True]
-    assert output_file.exists()
-    assert thumb_file.exists()
-    assert cache_file.exists()
+    _assert_generated_outputs(settings, "de_dust2_2x2", results)
     assert any("hlstats_Events_Frags" in query for query in adapter.executed)

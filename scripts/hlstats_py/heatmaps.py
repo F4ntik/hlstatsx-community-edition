@@ -521,47 +521,51 @@ def build_points_query(
     boundary = start_timestamp if start_timestamp is not None else timescope
     ignore_clause = 'AND hef.victimRole != "infected"\n' if ignore_infected else ""
     query = f"""
-        SELECT
-            "frag" AS killtype,
-            hef.id,
-            hef.map,
-            hs.game,
-            hef.eventTime,
-            hef.pos_x,
-            hef.pos_y
-        FROM
-            hlstats_Events_Frags AS hef,
-            hlstats_Servers AS hs
-        WHERE 1=1
-        AND hef.map = %s
-        AND hs.serverId = hef.serverId
-        AND hs.game = %s
-        AND hef.pos_x IS NOT NULL
-        AND hef.pos_y IS NOT NULL
-        AND hef.eventTime {comparator} FROM_UNIXTIME(%s)
-        {ignore_clause}LIMIT {kill_limit}
+        (
+            SELECT
+                "frag" AS killtype,
+                hef.id,
+                hef.map,
+                hs.game,
+                hef.eventTime,
+                hef.pos_x,
+                hef.pos_y
+            FROM
+                hlstats_Events_Frags AS hef,
+                hlstats_Servers AS hs
+            WHERE 1=1
+            AND hef.map = %s
+            AND hs.serverId = hef.serverId
+            AND hs.game = %s
+            AND hef.pos_x IS NOT NULL
+            AND hef.pos_y IS NOT NULL
+            AND hef.eventTime {comparator} FROM_UNIXTIME(%s)
+            {ignore_clause}LIMIT {kill_limit}
+        )
 
         UNION ALL
 
-        SELECT
-            "teamkill" AS killtype,
-            hef.id,
-            hef.map,
-            hs.game,
-            hef.eventTime,
-            hef.pos_x,
-            hef.pos_y
-        FROM
-            hlstats_Events_Teamkills AS hef,
-            hlstats_Servers AS hs
-        WHERE 1=1
-        AND hef.map = %s
-        AND hs.serverId = hef.serverId
-        AND hs.game = %s
-        AND hef.pos_x IS NOT NULL
-        AND hef.pos_y IS NOT NULL
-        AND hef.eventTime {comparator} FROM_UNIXTIME(%s)
-        LIMIT {kill_limit}
+        (
+            SELECT
+                "teamkill" AS killtype,
+                hef.id,
+                hef.map,
+                hs.game,
+                hef.eventTime,
+                hef.pos_x,
+                hef.pos_y
+            FROM
+                hlstats_Events_Teamkills AS hef,
+                hlstats_Servers AS hs
+            WHERE 1=1
+            AND hef.map = %s
+            AND hs.serverId = hef.serverId
+            AND hs.game = %s
+            AND hef.pos_x IS NOT NULL
+            AND hef.pos_y IS NOT NULL
+            AND hef.eventTime {comparator} FROM_UNIXTIME(%s)
+            LIMIT {kill_limit}
+        )
     """
     params = (config.map_name, config.code, boundary, config.map_name, config.code, boundary)
     return query, params
@@ -658,12 +662,12 @@ def apply_brush_opacity(brush: Image.Image, opacity_percent: int) -> Image.Image
                 min_alpha = alpha
 
     opacity_ratio = opacity_percent / 100.0
+    min_gd_alpha = round((255 - min_alpha) * 127 / 255)
     for x in range(width):
         for y in range(height):
             red, green, blue, alpha = pixels[x, y]
             gd_alpha = round((255 - alpha) * 127 / 255)
-            if min_alpha != 255:
-                min_gd_alpha = round((255 - min_alpha) * 127 / 255)
+            if min_gd_alpha != 127:
                 new_gd_alpha = 127 + 127 * opacity_ratio * (gd_alpha - 127) / (127 - min_gd_alpha)
             else:
                 new_gd_alpha = gd_alpha + 127 * opacity_ratio
