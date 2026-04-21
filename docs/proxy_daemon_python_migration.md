@@ -135,7 +135,9 @@
 Открытые хвосты за пределами runtime-миграции:
 
 - `HLStatsFTP` и `ImportBans` не переносились и по-прежнему остаются legacy Perl-утилитами.
-- `STDIN`-режим совместимости `hlstats.pl` не реализован в Python worker.
+- `hlstats_py.runtime --stdin` уже реализован как runnable offline-import path, но exact parity
+  с `hlstats.pl --stdin` для import-tail metadata (`connection_time`, `lastuse`, `numuses`)
+  ещё не закрыт и должен измеряться отдельным direct legacy-vs-Python diff.
 - Экспорт Prometheus `/metrics` для runtime пока не реализован.
 - Heatmaps частично перенесены: batch-генератор
   `python -m hlstats_py.heatmaps` уже заменяет legacy entrypoint
@@ -147,13 +149,15 @@
   `heatmaps/src/<game>/<map>.jpg` assets не хранятся в репозитории и требуют
   отдельной установки.
 
-## 6. Оценка трудоёмкости
-- Анализ и дизайн: 1-2 дня.
-- Реализация конфигурации и БД: 1 день.
-- Сетевой слой и обработчики: 2-3 дня.
-- Балансировка и heartbeat: 1-2 дня.
-- Тестирование и фиксы: 2 дня.
-- Всего: ~7-10 рабочих дней для одного разработчика, с учётом ревью и развёртывания.
+## 6. Оценка оставшегося объёма работ
+- Exact `--stdin` parity и явная фиксация import-tail non-goals: 1-2 дня.
+- Python-порт `HLStatsFTP` поверх уже существующего `hlstats_py.runtime --stdin`: 1-2 дня.
+- Python-порт `ImportBans` как отдельной maintenance-утилиты: 1 день.
+- Опциональный Prometheus `/metrics` для runtime observability: 0.5-1 день.
+- Реальная heatmap parity-проверка на установленном production map-pack: 0.5-1 день.
+- Всего по post-runtime backlog: ~4-7 рабочих дней для одного разработчика после
+  подтверждения, что import-tail metadata либо не нужна продукту, либо вынесена
+  в отдельный parity target.
 
 ## 7. Риски и рекомендации
 - **Зависимости Perl**: убедиться, что логика `HLstats.plib` полностью воспроизведена в Python.

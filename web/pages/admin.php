@@ -36,12 +36,13 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 For support and installation notes visit http://www.hlxcommunity.com
 */
 
-    if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
-    }
+if (!defined('IN_HLSTATS')) {
+    die('Do not access this file directly.');
+}
 
-if ( empty($game) )
-{
+global $db;
+
+if (empty($game)) {
 	$resultGames = $db->query("
         SELECT
             code,
@@ -55,6 +56,7 @@ if ( empty($game) )
         LIMIT 0,1
 
 	");
+
 	list($game) = $db->fetch_row($resultGames);
 }
 
@@ -72,11 +74,14 @@ class Auth
 	{
 		//@session_start();
 
-		if (valid_request($_POST['authusername'], false))
-		{
-			$this->username = valid_request($_POST['authusername'], false);
-			$this->password = valid_request($_POST['authpassword'], false);
-			$this->savepass = valid_request($_POST['authsavepass'], false);
+        $authUsername = isset($_POST['authusername']) ? $_POST['authusername'] : '';
+        $authPassword = isset($_POST['authpassword']) ? $_POST['authpassword'] : '';
+        $authSavePass = isset($_POST['authsavepass']) ? $_POST['authsavepass'] : '';
+
+		if (!empty($authUsername) && valid_request($authUsername, false)) {
+			$this->username = valid_request($authUsername, false);
+			$this->password = valid_request($authPassword, false);
+			$this->savepass = valid_request($authSavePass, false);
 			$this->sessionStart = 0;
 
 			# clear POST vars so as not to confuse the receiving page
@@ -85,17 +90,14 @@ class Auth
 
 			$this->session = false;
 
-			if($this->checkPass()==true)
-			{
+			if ($this->checkPass() == true) {
 				// if we have success, save it in this users SESSION
-				$_SESSION['username']=$this->username;
-				$_SESSION['password']=$this->password;
-				$_SESSION['authsessionStart']=time();
+				$_SESSION['username'] = $this->username;
+				$_SESSION['password'] = $this->password;
+				$_SESSION['authsessionStart'] = time();
 				$_SESSION['acclevel'] = $this->userdata['acclevel'];
 			}
-		}
-		elseif (isset($_SESSION['loggedin']))
-		{
+		} elseif (isset($_SESSION['loggedin'])) {
 			$this->username = $_SESSION['username'];
 			$this->password = $_SESSION['password'];
 			$this->savepass = 0;
@@ -104,13 +106,10 @@ class Auth
 			$this->error = false;
 			$this->session = true;
 			
-			if(!$this->checkPass())
-			{
+			if (!$this->checkPass()) {
 				unset($_SESSION['loggedin']);
 			}
-		}
-		else
-		{
+		} else {
 			$this->ok = false;
 			$this->error = false;
 
@@ -125,14 +124,14 @@ class Auth
 		global $db;
 
 		$db->query("
-				SELECT
-					*
-				FROM
-					hlstats_Users
-				WHERE
-					username='$this->username'
-				LIMIT 1
-			");
+            SELECT
+                *
+            FROM
+                hlstats_Users
+            WHERE
+                username = '$this->username'
+            LIMIT 1
+        ");
 
 		if ($db->num_rows() == 1)
 		{
@@ -331,7 +330,7 @@ class EditList
 
 		$okcols = 0;
 		foreach ($this->columns as $col) {
-			$value = (!empty($_POST["new_$col->name"])) ? mystripslashes($_POST["new_$col->name"]) : '';
+			$value = (!empty($_POST["new_$col->name"])) ? $_POST["new_$col->name"] : '';
 			//  legacy code that should have never been here. these should never be html-escaped in the db.
 			//  if there's a problem with removing this, it needs to be fixed on the web/display end
 			//  -psychonic
@@ -434,7 +433,7 @@ class EditList
 						continue;
 					}
 
-					$value = (!empty($_POST[$row . "_" . $col->name])) ? mystripslashes($_POST[$row . "_" . $col->name]) : null;
+					$value = (!empty($_POST[$row . "_" . $col->name])) ? $_POST[$row . "_" . $col->name] : null;
 					
 					//  legacy code that should have never been here. these should never be html-escaped in the db.
 					//  if there's a problem with removing this, it needs to be fixed on the web/display end
@@ -628,13 +627,13 @@ class EditList
 				$keyval = 'new';
 				$rowdata[$col->name] = $rowdata["new_$col->name"];
 				if ($stripslashes)
-					$rowdata[$col->name] = mystripslashes($rowdata[$col->name]);
+					$rowdata[$col->name] = $rowdata[$col->name];
 			}
 			else
 			{
 				$keyval = $rowdata[$this->keycol];
 				if ($stripslashes)
-					$keyval = mystripslashes($keyval);
+					$keyval = $keyval;
 
 			}
 
@@ -870,19 +869,20 @@ class PropertyPage
 				}
 				else
 				{
-					$setstrings[] = $prop->name . "='" . valid_request($_POST[$prop->name], 0) . "'";
+                    $postValue = isset($_POST[$prop->name]) ? $_POST[$prop->name] : '';
+					$setstrings[] = $prop->name . "='" . valid_request($postValue, 0) . "'";
 				}
 			}
 		}
 
 		$db->query("
-				UPDATE
-					" . $this->table . "
-				SET
-					" . implode(",\n", $setstrings) . "
-				WHERE
-					" . $this->keycol . "='" . $db->escape($this->keyval) . "'
-			");
+            UPDATE
+                " . $this->table . "
+            SET
+                " . implode(",\n", $setstrings) . "
+            WHERE
+                " . $this->keycol . "='" . $db->escape($this->keyval) . "'
+        ");
 	}
 }
 
@@ -995,17 +995,15 @@ function message($icon, $msg)
 <?php
 }
 
-
 $auth = new Auth;
-if($auth->ok===false)
-{
+if ($auth->ok === false) {
 	return;
 }
 
 pageHeader(array('Admin'), array('Admin' => ''));
 
-$selTask = valid_request($_GET['task'], false);
-$selGame = valid_request($_GET['game'], false);
+$selTask = isset($_GET['task']) ? valid_request($_GET['task'], false) : '';
+$selGame = isset($_GET['game']) ? valid_request($_GET['game'], false) : '';
 ?>
 
 <table width="100%" align="center" border="0" cellspacing="0" cellpadding="0">
@@ -1037,7 +1035,7 @@ $admintasks['ranks'] = new AdminTask('Ranks (triggered by Kills)', 80, 'game');
 $admintasks['ribbons'] = new AdminTask('Ribbons (triggered by Awards)', 80, 'game');
 
 // Tools
-$admintasks['tools_perlcontrol'] = new AdminTask('HLstatsX Runtime Control', 80, 'tool', 'Reload or stop your HLX: CE Python runtime services.');
+$admintasks['tools_perlcontrol'] = new AdminTask('HLstatsX: CE Daemon Control', 80, 'tool', 'Reload or stop your HLX: CE Daemons');
 $admintasks['tools_editdetails'] = new AdminTask('Edit Player or Clan Details', 80, 'tool', 'Edit a player or clan\'s profile information.');
 $admintasks['tools_adminevents'] = new AdminTask('Admin-Event History', 80, 'tool', 'View event history of logged Rcon commands and Admin Mod messages.');
 $admintasks['tools_ipstats'] = new AdminTask('Host Statistics', 80, 'tool', 'See which ISPs your players are using.');

@@ -36,6 +36,31 @@ This is enough for smoke-testing the path:
 
 `game server/plugin -> proxy daemon -> hlstats worker -> MySQL -> PHP web`
 
+## Web smoke expectations
+
+The full-stack test web image intentionally diverges from a raw legacy web
+checkout in two narrow runtime-only ways so the contour can be smoke-tested on
+PHP 8.2 without manual cleanup:
+
+- the `web/updater` directory is removed from the container image, so the main
+  page must not stop on the legacy "Update Notice" warning
+- `E_DEPRECATED` output is suppressed in the test config so legacy `pChart`
+  deprecations do not corrupt image responses such as `trend_graph.php`
+
+Quick smoke checks:
+
+```bash
+curl -I http://127.0.0.1:8080/
+curl -I http://127.0.0.1:8080/hlstats.php
+curl -I "http://127.0.0.1:8080/trend_graph.php?player=1"
+```
+
+Expected results:
+
+- `/` redirects to `hlstats.php`
+- `hlstats.php` responds with `200 OK` and does not show the updater warning
+- `trend_graph.php` redirects to a generated PNG under `hlstatsimg/progress`
+
 ## Stop
 
 ```bash

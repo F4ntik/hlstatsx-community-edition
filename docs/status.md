@@ -128,6 +128,9 @@ noise instead of being treated as a Python runtime mismatch.
 - Added targeted heatmap regression coverage for CLI defaults / path handling
   plus a smoke generation path that writes legacy-named outputs and cache
   artifacts from synthetic assets.
+- Synchronized the migration docs with the current runtime state so the
+  runnable Python `--stdin` path and the remaining post-runtime backlog are
+  described consistently across plan/runbook surfaces.
 - Keeping the post-runtime migration backlog explicit:
   exact Python `--stdin`, `HLStatsFTP`, `ImportBans`, optional `/metrics`, and
   the remaining real-map parity gate for legacy heatmap generation.
@@ -304,6 +307,9 @@ noise instead of being treated as a Python runtime mismatch.
   (`python -m hlstats_py.heatmaps`) with legacy-compatible DB selection,
   asset/cache/output paths, and targeted smoke tests; the remaining open item
   is a manual parity run on real map-pack assets outside the repository.
+- 2026-04-21: synchronized the migration docs and plan with the current code
+  state so Python `--stdin` is tracked as runnable with a narrower
+  import-tail-parity backlog instead of as a missing feature.
 
 ## Smoke/demo checks
 

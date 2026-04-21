@@ -201,6 +201,69 @@ Definition of done:
 - Switching to Russian changes translated UI strings only.
 - Behavior and routing remain identical.
 
+### M4. Complete the visible frontend translation pass
+- Audit and translate every user-facing frontend surface that still renders English after the initial i18n skeleton.
+- Keep product names, protocol terms, commands, and code identifiers untranslated when they are intentional technical terms.
+- Polish the existing Russian dictionary so the RU locale reads naturally instead of looking machine-translated or copied from English.
+
+Definition of done:
+- The visible PHP frontend and frontend JS no longer expose untranslated English in the audited UI surfaces, except for intentional technical terms.
+- `web/lang/ru.php` reads naturally and preserves placeholders, counts, and short labels.
+- Admin, public, ingame, status, and interactive JS surfaces are covered by the same translation rules.
+
+Backlog captured from the latest audit:
+- Dictionary quality pass:
+  - `web/lang/ru.php` `literal.help_aliases`
+  - `web/lang/ru.php` `literal.help_set_3`
+  - `web/lang/ru.php` `literal.joined`
+  - `web/lang/ru.php` `kill_streak_short`
+  - `web/lang/ru.php` `awards.ribbon_class`
+  - remaining RU wording that is technically correct but awkward in UI context
+- Admin surfaces:
+  - `web/pages/adminauth.php`
+  - `web/pages/admin.php`
+  - `web/pages/admintasks/options.php`
+  - `web/pages/admintasks/newserver.php`
+  - `web/pages/admintasks/adminusers.php`
+  - `web/pages/admintasks/actions.php`
+  - `web/pages/admintasks/clantags.php`
+  - `web/pages/admintasks/games.php`
+  - `web/pages/admintasks/hostgroups.php`
+  - `web/pages/admintasks/roles.php`
+  - `web/pages/admintasks/teams.php`
+  - `web/pages/admintasks/servers.php`
+  - `web/pages/admintasks/serversettings.php`
+  - `web/pages/admintasks/ribbons.php`
+  - `web/pages/admintasks/ribbons_trigger.php`
+  - `web/pages/admintasks/tools_editdetails.php`
+  - `web/pages/admintasks/tools_editdetails_clan.php`
+  - `web/pages/admintasks/tools_editdetails_player.php`
+  - `web/pages/admintasks/weapons.php`
+  - `web/pages/admintasks/voicecomm.php`
+  - `web/pages/admintasks/tools_perlcontrol.php`
+  - `web/pages/admintasks/tools_reset.php`
+  - `web/pages/admintasks/tools_reset_2.php`
+  - `web/pages/admintasks/tools_resetdbcollations.php`
+  - `web/pages/admintasks/tools_settings_copy.php`
+  - `web/pages/admintasks/tools_synchronize.php`
+  - `web/pages/admintasks/tools_optimize.php`
+- Public surfaces:
+  - `web/status.php`
+  - `web/show_graph.php`
+  - `web/pages/ingame/claninfo.php`
+  - `web/pages/ingame/accuracy.php`
+  - `web/pages/teamspeak_class.php`
+  - `web/includes/js/search-suggestions.js`
+  - `web/includes/js/tabs.js`
+  - `web/includes/js/syntax.js`
+  - any similar user-facing leftovers discovered in the same scan pattern
+
+Validation:
+- File-level scan for user-facing English text in the audited frontend surfaces.
+- Browser smoke checks for the translated admin shell and representative public pages.
+- PHP syntax validation for every changed PHP file.
+- Manual review of short labels and placeholders after translation so UI layout does not regress.
+
 ## Tests to run
 - Manual smoke:
   - open `hlstats.php` with default settings and verify English output remains unchanged

@@ -63,14 +63,14 @@ For support and installation notes visit http://www.hlxcommunity.com
 					$db->escape(clean_data($_POST['server_name'])),
 					$db->escape($selGame),
 					$db->escape(clean_data($_POST['public_address'])),
-					$db->escape(mystripslashes($_POST['server_rcon']))
+					$db->escape($_POST['server_rcon'])
 				));
 				$insert_id = $db->insert_id();
 				$db->query("INSERT INTO `hlstats_Servers_Config` (`serverId`, `parameter`, `value`)
 						SELECT '" . $insert_id . "', `parameter`, `value`
-						FROM `hlstats_Mods_Defaults` WHERE `code` = '" . $db->escape(mystripslashes($_POST['game_mod'])) . "';");
+						FROM `hlstats_Mods_Defaults` WHERE `code` = '" . $db->escape($_POST['game_mod']) . "';");
 				$db->query("INSERT INTO `hlstats_Servers_Config` (`serverId`, `parameter`, `value`) VALUES
-						('" . $insert_id . "', 'Mod', '" . $db->escape(mystripslashes($_POST['game_mod'])) . "');");
+						('" . $insert_id . "', 'Mod', '" . $db->escape($_POST['game_mod']) . "');");
 				$db->query("INSERT INTO `hlstats_Servers_Config` (`serverId`, `parameter`, `value`)
 						SELECT '" . $insert_id . "', `parameter`, `value`
 						FROM `hlstats_Games_Defaults` WHERE `code` = '" . $db->escape($game) . "'
@@ -90,7 +90,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	
 	function clean_data($data)
 	{
-		return trim(htmlspecialchars(mystripslashes($data)));
+		return trim(htmlspecialchars($data));
 	}
 
     $server_ip = (!empty($_POST['server_address'])) ? clean_data($_POST['server_address']) : "";
@@ -100,7 +100,7 @@ For support and installation notes visit http://www.hlxcommunity.com
     $server_public_address = (!empty($_POST['public_address'])) ? clean_data($_POST['public_address']) : "";
 ?>
 Enter the address of a server that you want to accept data from.<br /><br />
-The "Public Address" should be the address you want shown to users. If left blank, it will be generated from the IP Address and Port. If you are using a log relay or proxy runtime, set the IP Address and Port to the relay endpoint and set the Public Address to the real address of the game server. You will need a separate relay path for each game server. You can specify a hostname (or anything at all) in the Public Address.<p>
+The "Public Address" should be the address you want shown to users. If left blank, it will be generated from the IP Address and Port. If you are using any kind of log relaying utility (i.e. hlstats.pl will not be receiving data directly from the game servers), you will want to set the IP Address and Port to the address of the log relay program, and set the Public Address to the real address of the game server. You will need a separate log relay for each game server. You can specify a hostname (or anything at all) in the Public Address.<p>
 
 <table width="100%" border="0" cellspacing="0" cellpadding="0">
 

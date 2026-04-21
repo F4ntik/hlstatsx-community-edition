@@ -39,6 +39,10 @@ For support and installation notes visit http://www.hlxcommunity.com
     if (!defined('IN_HLSTATS')) {
         die('Do not access this file directly.');
     }
+
+    $container = require ROOT_PATH . '/bootstrap.php';
+    $playerRepo = $container->get(\Repository\PlayerRepository::class);
+
 ?>
 
 	<?php printSectionTitle('Player Information'); ?>
@@ -161,19 +165,21 @@ For support and installation notes visit http://www.hlxcommunity.com
 						?>
 					</td>
 				</tr>
+
 				<tr class="bg2">
 					<td>E-mail Address:</td>
+
 					<td>
-						<?php
-							if ($email = getEmailLink($playerdata['email']))
-							{
-								echo $email;
-							}
-							else
-								echo "(<a href=\"" . $g_options['scripturl'] . '?mode=help#set"><em>Not Specified</em></a>)';
-						?>
+						<?php $emailLinkSafe = getEmailLink($playerdata['email']); ?>
+
+                        <?php if (!empty($emailLinkSafe)) : ?>
+                            <?=$emailLinkSafe;?>
+                        <?php else : ?>
+                            (<a href="<?=eHtml($g_options['scripturl']);?>?mode=help#set"><em>Not Specified</em></a>)
+                        <?php endif; ?>
 					</td>
 				</tr>
+
 				<tr class="bg1">
 					<td>Home Page:</td>
 					<td>
@@ -187,19 +193,22 @@ For support and installation notes visit http://www.hlxcommunity.com
 						?>
 					</td>
 				</tr>
+
 				<tr class="bg2">
-                                        <td>MM Rank:</td>
-                                        <td>
-                                                <?php
-                                                        if ($playerdata['mmrank'])
-                                                        {
-                                                                echo '<img src=hlstatsimg/mmranks/' . $playerdata['mmrank'] . '.png alt="rank" style=\"height:20px;width:50px; />';
-                                                        }
-                                                        else
-								echo '<img src=hlstatsimg/mmranks/0.png alt="rank" style=\"height:20px;width:50px; />';
-                                                ?>
-                                        </td>
-                                </tr>
+                        <td>MM Rank:</td>
+
+                        <td>
+                            <?php
+                                if ($playerdata['mmrank'])
+                                {
+                                        echo '<img src=hlstatsimg/mmranks/' . $playerdata['mmrank'] . '.png alt="rank" style=\"height:20px;width:50px; />';
+                                }
+                                else
+                                echo '<img src=hlstatsimg/mmranks/0.png alt="rank" style=\"height:20px;width:50px; />';
+                            ?>
+                        </td>
+                </tr>
+
 				<tr class="bg1">
 					<td>Last Connect:*</td>
 					<td>
@@ -393,31 +402,33 @@ For support and installation notes visit http://www.hlxcommunity.com
 					<td style="width:45%;">Rank:</td>
 					<td style="width:55%;" colspan="2">
 						<?php
-							if (($playerdata['activity'] > 0) && ($playerdata['hideranking'] == 0))
-							{
-								$rank = get_player_rank($playerdata);
-							}
-							else
-							{
-								if ($playerdata['hideranking'] == 1)
-								{
+                            $rank = 'Unknown';
+
+							if ($playerdata['activity'] > 0 && $playerdata['hideranking'] == 0)  {
+                                $plGame = $playerdata['game'];
+                                $rankType = $g_options['rankingtype'];
+                                $plValue = $playerdata[$rankType];
+                                $plKills = $playerdata['kills'];
+                                $playerDeaths = $playerdata['deaths'];
+
+                                $rank = $playerRepo->getPlayerRank($plGame, $rankType, $plValue, $plKills, $playerDeaths);
+
+                                if (is_null($rank)) {
+                                    $rank = 'Unknown';
+                                }
+							} else {
+								if ($playerdata['hideranking'] == 1) {
 									$rank = "Hidden";
-								}
-								elseif ($playerdata['hideranking'] == 2)
-								{
+								} elseif ($playerdata['hideranking'] == 2) {
 									$rank = "<span style=\"color:red;\">Banned</span>";
-								}
-								else
-								{
+								} else {
 									$rank = 'Not active';
 								}
-							} 
-							if (is_numeric($rank))
-							{
-								echo '<b>' . number_format($rank) . '</b>';
 							}
-							else
-							{
+
+							if (is_numeric($rank)) {
+								echo '<b>' . number_format($rank) . '</b>';
+							} else {
 								echo "<b> $rank</b>";
 							}
 						?>
@@ -863,7 +874,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			hlstats_Ribbons.game = '$game'
 			AND
 			(
-				ISNULL(hlstats_Players_Ribbons.playerId)
+				hlstats_Players_Ribbons.playerId IS NOT NULL
 				OR hlstats_Players_Ribbons.playerId = ".$playerdata['playerId']."
 			)
 		ORDER BY
@@ -872,6 +883,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			hlstats_Ribbons.special,
 			hlstats_Ribbons.awardCount DESC
 	");
+
 	$ribbonList = '';
 	$lastImage = '';
 	$awards_done = array ();

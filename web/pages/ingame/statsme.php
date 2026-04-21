@@ -4,7 +4,7 @@ HLstatsX Community Edition - Real-time player and clan rankings and statistics
 Copyleft (L) 2008-20XX Nicholas Hastings (nshastings@gmail.com)
 http://www.hlxcommunity.com
 
-HLstatsX Community Edition is a continuation of 
+HLstatsX Community Edition is a continuation of
 ELstatsNEO - Real-time player and clan rankings and statistics
 Copyleft (L) 2008-20XX Malte Bayer (steam@neo-soft.org)
 http://ovrsized.neo-soft.org/
@@ -18,7 +18,7 @@ HLstatsX is an enhanced version of HLstats made by Simon Garner
 HLstats - Real-time player and clan rankings and statistics for Half-Life
 http://sourceforge.net/projects/hlstats/
 Copyright (C) 2001  Simon Garner
-            
+
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
 as published by the Free Software Foundation; either version 2
@@ -36,12 +36,14 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 For support and installation notes visit http://www.hlxcommunity.com
 */
 
+    // Player Details
     if (!defined('IN_HLSTATS')) {
         die('Do not access this file directly.');
     }
 
-	// Player Details
-	
+    $container = require ROOT_PATH . '/bootstrap.php';
+    $playerRepo = $container->get(\Repository\PlayerRepository::class);
+
 	$player = valid_request(intval($_GET['player']), true);
 	$uniqueid  = valid_request(strval($_GET['uniqueid']), false);
 	$game = valid_request(strval($_GET['game']), false);
@@ -62,7 +64,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 				uniqueId='$uniqueid'
 				AND game='$game'
 		");
-		
+
 		if ($db->num_rows() > 1) {
 			header('Location: ' . $g_options['scripturl'] . "&mode=search&st=uniqueid&q=$uniqueid&game=$game");
 			exit;
@@ -75,7 +77,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	} elseif (!$player && !$uniqueid) {
 		error('No player ID specified.');
 	}
-	
+
 	$db->query("
 		SELECT
 			hlstats_Players.playerId,
@@ -118,7 +120,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 	$playerdata = $db->fetch_array();
 	$db->free_result();
-	
+
 	$pl_name = $playerdata['lastName'];
 	if (strlen($pl_name) > 10) {
 		$pl_shortname = substr($pl_name, 0, 8) . '...';
@@ -129,7 +131,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	$pl_name = htmlspecialchars($pl_name, ENT_COMPAT);
 	$pl_shortname = htmlspecialchars($pl_shortname, ENT_COMPAT);
 	$pl_urlname = urlencode($playerdata['lastName']);
-	
+
 	$game = $playerdata['game'];
 	$db->query("SELECT name FROM hlstats_Games WHERE code='$game'");
 
@@ -148,7 +150,7 @@ For support and installation notes visit http://www.hlxcommunity.com
             <td class="fSmall">Name:</td>
             <td colspan="2" class="fSmall"><?php
                 if ($g_options['countrydata'] == 1)
-					echo '<img src="'.getFlag($playerdata['flag']).'" alt="'.strtolower($playerdata['country']).'" title="'.strtolower($playerdata['country']).'">&nbsp;';   
+					echo '<img src="'.getFlag($playerdata['flag']).'" alt="'.strtolower($playerdata['country']).'" title="'.strtolower($playerdata['country']).'">&nbsp;';
 				echo '<strong>' . htmlspecialchars($playerdata['lastName'], ENT_COMPAT) . '</strong>';
             ?></td>
         </tr>
@@ -166,18 +168,32 @@ For support and installation notes visit http://www.hlxcommunity.com
 		</tr>
 		<tr class="bg1">
 			<td style="width:45%;" class="fSmall">Rank:</td>
-			<td colspan="2" style="width:55%;" class="fSmall"><?php
-				if ($playerdata['activity'] > 0) {            
-					$rank = get_player_rank($playerdata);
-				} else {
-					$rank = 'Not active';
-				}
+			<td colspan="2" style="width:55%;" class="fSmall">
+                <?php
+                    $rank = 'Unknown';
 
-				if (is_numeric($rank))
-					echo '<strong>' . number_format($rank) . '</strong>';
-				else
-					echo "<strong>$rank</strong>";
-			?></td>
+                    if ($playerdata['activity'] > 0) {
+                        $plGame = $playerdata['game'];
+                        $rankType = $g_options['rankingtype'];
+                        $plValue = $playerdata[$rankType];
+                        $plKills = $playerdata['kills'];
+                        $playerDeaths = $playerdata['deaths'];
+
+                        $rank = $playerRepo->getPlayerRank($plGame, $rankType, $plValue, $plKills, $playerDeaths);
+
+                        if (is_null($rank)) {
+                            $rank = 'Unknown';
+                        }
+                    } else {
+                        $rank = 'Not active';
+                    }
+
+                    if (is_numeric($rank))
+                        echo '<strong>' . number_format($rank) . '</strong>';
+                    else
+                        echo "<strong>$rank</strong>";
+                ?>
+            </td>
 		</tr>
 		<tr class="bg2">
 			<td class="fSmall">Points:</td>
@@ -256,10 +272,10 @@ For support and installation notes visit http://www.hlxcommunity.com
 						hlstats_Servers.serverId=hlstats_Events_Frags.serverId
 					WHERE
 						hlstats_Servers.game='$game' AND killerId='$player'
-						AND headshot=1		
+						AND headshot=1
 				");
 				list($realheadshots) = $db->fetch_row();
-				if ($playerdata['headshots'] == 0) 
+				if ($playerdata['headshots'] == 0)
 					echo number_format($realheadshots);
 				else
 					echo number_format($playerdata['headshots']);
@@ -269,7 +285,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 		<tr class="bg1">
 			<td class="fSmall">Headshots per Kill:</td>
 			<td colspan="2" class="fSmall"><?php
-   				$db->query("
+				$db->query("
 						SELECT
 							IFNULL(SUM(headshot=1)/COUNT(*), '-') AS hpk
 						FROM

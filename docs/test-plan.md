@@ -31,6 +31,9 @@ the resulting database state.
 ## Smoke coverage
 
 - Legacy stack responds on local web port.
+- Full-stack test web contour serves the main page without the legacy updater
+  notice; the test image removes `web/updater` intentionally so smoke runs do
+  not depend on manual post-update cleanup.
 - Legacy daemon binds local UDP replay port.
 - DB accepts application connections.
 - After reset, admin pages remain functional.
@@ -41,6 +44,8 @@ the resulting database state.
   `172.19.0.1:27015`.
 - Python replay reaches the tail of `L0415056.log` without dropping the final
   stat packets.
+- Python worker can import one legacy `.log` directly via `hlstats_py.runtime --stdin`
+  when `--server-ip` / `--server-port` are supplied explicitly.
 
 ## Acceptance gates
 
@@ -115,8 +120,8 @@ the resulting database state.
 
 - Exact Python `--stdin` mode:
   compare one identical `.log` imported through `hlstats.pl --stdin` and the
-  future Python `hlstats_py --stdin` path, including import-tail metadata when
-  that parity target is explicitly enabled.
+  current Python `hlstats_py.runtime --stdin` path, including import-tail
+  metadata only when that parity target is explicitly enabled.
 - `HLStatsFTP` port:
   validate `mtime` checkpointing, skipping the active tail file, idempotent
   repeated runs, and delegation into Python `--stdin` without Perl.

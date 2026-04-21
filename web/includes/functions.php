@@ -40,26 +40,89 @@ if (!defined('IN_HLSTATS')) {
 	die('Do not access this file directly.');
 }
 
-/**
- * getOptions()
- * 
- * @return Array All the options from the options/perlconfig table
- */
-function getOptions()
+function checkValidGame(string $gameStr, array $allowedGames, ?string &$retError) : bool
 {
-	global $db;
-	$result = $db->query("SELECT `keyname`,`value` FROM hlstats_Options WHERE opttype >= 1");
-	while ($rowdata = $db->fetch_row($result))
-	{
-		$options[$rowdata[0]] = $rowdata[1];
+	// Not object and array
+	if (!is_string($gameStr)) {
+		$retError = 'Invalid game parameter.';
+		return false;
 	}
-	if ( !count($options) )
-	{
-		error('Warning: Could not find any options in table <b>hlstats_Options</b>, database <b>' .
-			DB_NAME . '</b>. Check HLstats configuration.');
+
+	$gameStr = trim($gameStr);
+	if ($gameStr === '') {
+		$retError = 'Game parameter missing.';
+		return false;
 	}
-	$options['MinActivity'] = $options['MinActivity'] * 86400;
-	return $options;
+
+	// Path traversal and XSS fixes
+	if (!preg_match('/^[a-zA-Z0-9_]+$/', $gameStr)) {
+		$retError = 'Invalid game code.';
+		return false;
+	}
+
+	if (!is_array($allowedGames) || empty($allowedGames)) {
+		$retError = 'Failed to get list of allowed games.';
+		return false;
+	}
+
+	if (!in_array($gameStr, $allowedGames, true)) {
+		$retError = 'This game is not allowed.';
+		return false;
+	}
+
+	return true;
+}
+
+function buildSearchSqlSafe($db, $search)
+{
+	$search = trim($search);
+	if ($search === '') {
+		return "";
+	}
+
+	$len = mb_strlen($search, 'UTF-8');
+	$like_filter = $db->escape(addcslashes($search, '%_'));
+	$match_filter = $db->escape($search);
+
+	// 'MATCH' - doesn't work for text shorter than 4 characters. Fixed without editing the mysql cfg.
+	if ($len <= 3) {
+		if ($len == 1) {
+			return " AND hlstats_Events_Chat.message LIKE '%{$like_filter}%'";
+		}
+
+		return " AND (
+			hlstats_Events_Chat.message = '{$like_filter}'
+			OR hlstats_Events_Chat.message LIKE '{$like_filter} %'
+			OR hlstats_Events_Chat.message LIKE '% {$like_filter}'
+			OR hlstats_Events_Chat.message LIKE '% {$like_filter} %'
+		)";
+	}
+
+	return " AND MATCH (hlstats_Events_Chat.message) AGAINST ('{$match_filter}' IN BOOLEAN MODE)";
+}
+
+// Support for legacy code, it used array $_REQUEST, for _GET, and _POST?
+// Filter arrays
+function getChatFilterParam()
+{
+	$retFilter = '';
+
+	$postFilter = filter_input(INPUT_POST, 'filter', FILTER_UNSAFE_RAW);
+	$getFilter = filter_input(INPUT_GET, 'filter', FILTER_UNSAFE_RAW);
+
+	if ($postFilter !== null && $postFilter !== false) {
+		$retFilter = $postFilter;
+	} elseif ($getFilter !== null && $getFilter !== false) {
+		$retFilter = $getFilter;
+	}
+
+	$retFilter = (string)$retFilter;
+	return trim($retFilter);
+}
+
+function eHtml($str)
+{
+    return htmlspecialchars($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 }
 
 // Test if flags exists
@@ -93,12 +156,6 @@ function valid_request($str, $numeric = false)
 	$str = preg_replace($search_pattern, $replace_pattern, $str);
 
 	if (!$numeric) {
-		// Deprecated, throws an warning in php 7.4 and above
-		/*if ( get_magic_quotes_gpc() )
-			return $str = htmlspecialchars(stripslashes($str), ENT_QUOTES);
-		else
-			return $str = htmlspecialchars($str, ENT_QUOTES);*/
-
 		return htmlspecialchars($str, ENT_QUOTES);
 	}
 
@@ -146,22 +203,30 @@ function timestamp_to_str($seconds)
  * @param bool $exit
  * @return void
  */
-function error($message, $exit = true)
+function error(string $message, bool $exit = true) : void
 {
-	global $g_options;
-?>
-<table border="1" cellspacing="0" cellpadding="5">
-<tr>
-<td class="errorhead">ERROR</td>
-</tr>
-<tr>
-<td class="errortext"><?php echo $message; ?></td>
-</tr>
-</table>
-<?php if ($exit)
-		exit;
-}
+    $html = '<table style="border:1px solid red;padding:1em;margin:1em;background:#fee;">';
 
+    $html .= '<thead style="text-align:center; color:#673636;">';
+    $html .= '<tr>';
+    $html .= '<td class="errorhead">ERROR</td>';
+    $html .= '</tr>';
+    $html .= '</thead>';
+
+    $html .= '<tbody>';
+    $html .= '<tr>';
+    $html .= '<td class="errortext">' . eHtml($message) . '</td>';
+    $html .= '</tr>';
+    $html .= '</tbody>';
+
+    $html .= '</table>';
+
+    echo $html;
+
+    if ($exit) {
+        exit;
+    }
+}
 
 //
 // string makeQueryString (string key, string value, [array notkeys])
@@ -182,21 +247,16 @@ function error($message, $exit = true)
  */
 function makeQueryString($key, $value, $notkeys = array())
 {
-	if (!is_array($notkeys)) {
-		$notkeys = array();
+	$params = $_GET;
+	$params[$key] = $value;
+
+	// We remove disabled keys (for example, "page" when changing sorting)
+	foreach ($notkeys as $remove) {
+		unset($params[$remove]);
 	}
 
-	$querystring = '';
-	foreach ($_GET as $k => $v) {
-		$v = valid_request($v, false);
-		if ($k && $k != $key && !in_array($k, $notkeys)) {
-			$querystring .= urlencode($k) . '=' . rawurlencode($v) . '&amp;';
-		}
-	}
-
-	$querystring .= urlencode($key) . '=' . urlencode($value);
-
-	return $querystring;
+	// Building a query string
+	return http_build_query($params);
 }
 
 //
@@ -217,6 +277,8 @@ function pageHeader($title = '', $location = '')
 	global $db, $g_options;
 	if ( defined('PAGE') && PAGE == 'HLSTATS' )
 		include (PAGE_PATH . '/header.php');
+	elseif ( defined('PAGE') && PAGE == 'INGAME' )
+		include (PAGE_PATH . '/ingame/header.php');
 }
 
 
@@ -236,6 +298,8 @@ function pageFooter()
 	global $g_options;
 	if ( defined('PAGE') && PAGE == 'HLSTATS' )
 		include (PAGE_PATH . '/footer.php');
+	elseif ( defined('PAGE') && PAGE == 'INGAME' )
+		include (PAGE_PATH . '/ingame/footer.php');
 }
 
 /**
@@ -399,36 +463,50 @@ function getLink($url, $type = 'http://', $target = '_blank')
 }
 
 /**
- * getEmailLink()
- * 
- * @param string $email
- * @param integer $maxlength
- * @return string Formatted email tag
+ * Generate a safe mailto link for an email address.
+ * Validates the email, trims it, blocks dangerous characters,
+ * converts to lowercase, and safely truncates display text.
+ *
+ * Note: does not support ASCII characters.
+ *
+ * @param string|null $email The email address to link
+ * @param int $maxLength Maximum length of the displayed email
+ * @return string HTML link or empty string if invalid
  */
-function getEmailLink($email, $maxlength = 40)
+function getEmailLink(?string $email, int $maxLength = 40) : string
 {
-	if (preg_match('/(.+)@(.+)/', $email, $regs))
-	{
-		if (strlen($email) > $maxlength)
-		{
-			$email_title = substr($email, 0, $maxlength - 3) . '...';
-		}
-		else
-		{
-			$email_title = $email;
-		}
-
-		$email = str_replace('"', urlencode('"'), $email);
-		$email = str_replace('<', urlencode('<'), $email);
-		$email = str_replace('>', urlencode('>'), $email);
-
-		return "<a href=\"mailto:$email\">" . htmlspecialchars($email_title, ENT_COMPAT) . '</a>';
-	}
-
-	else
-	{
+	// 1. Return empty string if email is null or empty
+	if (!$email) {
 		return '';
 	}
+
+	// 2. Remove leading/trailing whitespace
+	$email = trim($email);
+
+	// 3. Validate email format using PHP filter
+	if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+		return '';
+	}
+
+	// 4. Block dangerous characters for mailto and HTML
+	// Disallow: double/single quotes, <, >, ?, and whitespace
+	if (preg_match('/[?"\'<>\s]/', $email)) {
+		return '';
+	}
+
+	// 5. Normalize email to lowercase for consistent display
+	$email = mb_strtolower($email, 'UTF-8');
+
+	// 6. Trim the email for display if it exceeds max length
+	// mb_strimwidth ensures multibyte safe truncation
+	$display = mb_strimwidth($email, 0, $maxLength, '...', 'UTF-8');
+
+	// 7. Construct the mailto URL
+	$url = 'mailto:' . $email;
+
+	// 8. Return safe HTML link
+	// eHtml should escape HTML special characters to prevent XSS
+	return sprintf('<a href="%s">%s</a>', eHtml($url), eHtml($display));
 }
 
 /**
@@ -473,95 +551,46 @@ function getImage($filename)
     return false;
 }
 
-function mystripslashes($text)
+function printSectionTitle($title, $echo = true)
 {
-	// Deprecated, throws an warning in php 7.4 and above
-	// return get_magic_quotes_gpc() ? stripslashes($text) : $text;
-	return $text;
-}
+	$html = '<span class="fHeading">';
+	$html .= '&nbsp;<img src="' . TITLE_IMAGE . '" alt="">';
+	$html .= '&nbsp;' . eHtml($title);
+	$html .= '</span>';
+	$html .= '<br><br>';
 
-function getRealGame($game)
-{
-	global $db;
-	$result = $db->query("SELECT realgame from hlstats_Games WHERE code='$game'");
-	list($realgame) = $db->fetch_row($result);
-	return $realgame;
-}
+	if (!$echo) {
+		return $html;
+	}
 
-function printSectionTitle($title)
-{
-	echo '<span class="fHeading">&nbsp;<img src="'.IMAGE_PATH."/downarrow.gif\" alt=\"\" />&nbsp;$title</span><br /><br />\n";
-}
-
-function getStyleText($style)
-{
-	return "\t<link rel=\"stylesheet\" type=\"text/css\" href=\"./css/$style.css\" />\n";
-}
-
-function getJSText($js)
-{
-	return "\t<script type=\"text/javascript\" src=\"".INCLUDE_PATH."/js/$js.js\"></script> \n";
-}
-
-function get_player_rank($playerdata) {
-	global $db, $g_options;
-	
-	$rank = 0;
-	$tempdeaths = $playerdata['deaths'];
-	if ($tempdeaths == 0)
-		$tempdeaths = 1;
-
-	$query = "
-		SELECT
-			COUNT(*)
-		FROM
-			hlstats_Players
-		WHERE
-			game='".$playerdata['game']."'
-			AND hideranking = 0
-			AND kills >= 1
-			AND (
-					(".$g_options['rankingtype']." > '".$playerdata[$g_options['rankingtype']]."') OR (
-						(".$g_options['rankingtype']." = '".$playerdata[$g_options['rankingtype']]."') AND (kills/IF(deaths=0,1,deaths) > ".($playerdata['kills']/$tempdeaths).")
-					)
-			)
-	";
-	$db->query($query);
-	list($rank) = $db->fetch_row();
-	$rank++;
-
-	return $rank;
-}
-
-if (!function_exists('file_get_contents')) {
-      function file_get_contents($filename, $incpath = false, $resource_context = null)
-      {
-          if (false === $fh = fopen($filename, 'rb', $incpath)) {
-              trigger_error('file_get_contents() failed to open stream: No such file or directory', E_USER_WARNING);
-              return false;
-          }
-  
-          clearstatcache();
-          if ($fsize = @filesize($filename)) {
-              $data = fread($fh, $fsize);
-          } else {
-              $data = '';
-              while (!feof($fh)) {
-                  $data .= fread($fh, 8192);
-              }
-          }
-  
-          fclose($fh);
-          return $data;
-      }
+	echo $html;
 }
 
 /**
- * Convert colors Usage:  color::hex2rgb("FFFFFF")
- * 
- * @author      Tim Johannessen <root@it.dk>
- * @version    1.0.1
+ * Convert hex color to RGB array.
+ *
+ * @param string $hexVal Color in hex format (e.g. "FF00CC" or "#FF00CC").
+ * @return array{red: int, green: int, blue: int}|null Associative array or null on failure.
  */
+function tryHexToRgb($hexVal = '') : ?array
+{
+	$hexVal = ltrim($hexVal, '#');
+
+	if (!preg_match('/^[0-9A-F]{6}$/i', $hexVal)) {
+		return null;
+	}
+
+	$parts = str_split($hexVal, 2);
+	$rgb = array_map('hexdec', $parts);
+
+	return [
+		'red'   => $rgb[0],
+		'green' => $rgb[1],
+		'blue'  => $rgb[2],
+	];
+}
+
+// Deprecated function
 function hex2rgb($hexVal = '')
 {
 	$hexVal = preg_replace('[^a-fA-F0-9]', '', $hexVal);
@@ -573,5 +602,3 @@ function hex2rgb($hexVal = '')
 	$arrTmp = array_map('hexdec', $arrTmp);
 	return array('red' => $arrTmp[0], 'green' => $arrTmp[1], 'blue' => $arrTmp[2]);
 }
-
-?>

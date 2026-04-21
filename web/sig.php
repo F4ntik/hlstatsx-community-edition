@@ -71,6 +71,10 @@ require ('config.php');
 require (INCLUDE_PATH . '/class_db.php');
 require (INCLUDE_PATH . '/functions.php');
 
+$container = require ROOT_PATH . '/bootstrap.php';
+$playerRepo = $container->get(\Repository\PlayerRepository::class);
+$optionService = $container->get(\Service\OptionService::class);
+
 $db_classname = 'DB_' . DB_TYPE;
 if (class_exists($db_classname))
 {
@@ -81,7 +85,10 @@ else
 	error('Database class does not exist.  Please check your config.php file for DB_TYPE');
 }
 
-$g_options = getOptions();
+$g_options = $optionService->getAllOptions();
+if (empty($g_options)) {
+	error('Warning: Could not find any options in the database. Check HLStats configuration.');
+}
 
 @error_reporting(E_ALL ^ E_NOTICE);
 
@@ -124,9 +131,6 @@ function f_num($number) {
 		}
 	}
 }
-
-	if (!isset($g_options['scripturl']))
-		$g_options['scripturl'] = isset($_SERVER['PHP_SELF']) ? $_SERVER['PHP_SELF'] : getenv('PHP_SELF');
 
 	$player_id = 0;  
 	if (isset($_GET['player_id'])) {
@@ -264,15 +268,28 @@ if ($player_id > 0) {
 	$pl_count = $db->fetch_array();
 	$db->free_result();
 
-	if (($playerdata['activity'] > 0) && ($playerdata['hideranking'] == 0)) {
-		$rank = get_player_rank($playerdata);
+	$rank = 'Unknown';
+
+	if ($playerdata['activity'] > 0 && $playerdata['hideranking'] == 0) {
+		$plGame = $playerdata['game'];
+		$rankType = $g_options['rankingtype'];
+		$plValue = $playerdata[$rankType];
+		$plKills = $playerdata['kills'];
+		$playerDeaths = $playerdata['deaths'];
+
+		$rank = $playerRepo->getPlayerRank($plGame, $rankType, $plValue, $plKills, $playerDeaths);
+
+		if (is_null($rank)) {
+			$rank = 'Unknown';
+		}
 	} else {
-		if ($playerdata['hideranking'] == 1)
+		if ($playerdata['hideranking'] == 1) {
 			$rank = 'Hidden';
-		elseif ($playerdata['hideranking'] == 2)
+		} elseif ($playerdata['hideranking'] == 2) {
 			$rank = 'Banned';
-		else
+		} else {
 			$rank = 'Not active';
+		}
 	}
 
 	if ($playerdata['activity'] == -1)

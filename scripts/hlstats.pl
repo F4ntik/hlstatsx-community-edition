@@ -110,7 +110,7 @@ sub removePlayer
 	}
 	else
 	{
-		&::printEvent("400", "Bad attempted delete ($saddr) ($id/$uniqueid)");
+		&::printEvent(400, "Bad attempted delete ($saddr) ($id/$uniqueid)");
 	}
 
 	if ($deleteplayer == 1) {
@@ -138,7 +138,12 @@ sub checkBonusRound
 	return 0;
 }
 
-sub is_number ($) { ( $_[0] ^ $_[0] ) eq '0' }
+sub is_number
+{
+	my ($str) = @_;
+	return 0 unless defined $str;
+	return $str =~ /^-?\d+$/;
+}
 
 
 #

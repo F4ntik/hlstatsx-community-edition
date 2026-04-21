@@ -38,6 +38,9 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 define('IN_HLSTATS', true);
 require('config.php');
+
+define('TITLE_IMAGE', IMAGE_PATH . "/downarrow.gif");
+
 $historical_cache=0;
 if(defined('HISTORICAL_CACHE'))
 {
@@ -134,11 +137,20 @@ else
 	error('Database class does not exist.  Please check your config.php file for DB_TYPE');
 }
 
-$g_options = getOptions();
+$container = require ROOT_PATH . '/bootstrap.php';
+$optionService = $container->get(\Service\OptionService::class);
 
-if (!isset($g_options['scripturl'])) {
-	$g_options['scripturl'] = isset($_SERVER['PHP_SELF']) ? $_SERVER['PHP_SELF'] : getenv('PHP_SELF');
+$g_options = $optionService->getAllOptions();
+if (empty($g_options)) {
+	error('Warning: Could not find any options in the database. Check HLStats configuration.');
 }
+
+$cacheCleaner = $container->get(\Cache\CacheCleaner::class);
+$deleteFiles = $cacheCleaner->cleanOldTrendCache(
+	null,
+	TREND_CACHE_STORAGE_TIME,
+	TREND_CACHE_MAX_FILES_PER_PLAYER
+);
 
 ////
 //// Main
@@ -159,7 +171,9 @@ else
 
 if (!$realgame && $game)
 {
-	$realgame = getRealGame($game);
+	$gameRepo = $container->get(\Repository\GameRepository::class);
+	$realgame = $gameRepo->getGameByCode($game, 'realgame');
+
 	$_SESSION['realgame'] = $realgame;
 }
 

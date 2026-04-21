@@ -88,7 +88,7 @@ Stop-and-fix rule:
 - If the reset leaves replay-sensitive tables dirty, identify the residue
   before building comparison automation.
 
-### [~] M3. Fork the baseline into legacy and Python comparison stacks
+### [x] M3. Fork the baseline into legacy and Python comparison stacks
 
 Goal:
 Create two isolated local stacks from the same baseline: one legacy, one Python.
@@ -222,3 +222,98 @@ Stop-and-fix rule:
 - Recommended execution order:
   finish exact `--stdin` parity first, because `HLStatsFTP` depends on it and
   `ImportBans` is operationally independent from the replay/runtime path.
+
+## Remaining milestones
+
+### [ ] M5. Measure exact Python `--stdin` parity boundaries
+
+Goal:
+Promote the runnable Python `--stdin` path from replay support tooling to an
+explicitly bounded legacy-compatibility surface.
+
+Tasks:
+- Diff one identical fixture through legacy `hlstats.pl --stdin` and Python
+  `hlstats_py.runtime --stdin`.
+- Record which import-tail fields are still expected to drift
+  (`connection_time`, `lastuse`, `numuses`) and whether they are product
+  requirements or intentional non-goals for gameplay parity.
+- Keep the canonical compact diff focused on replay semantics unless the team
+  explicitly decides to widen the parity target.
+
+Definition of done:
+- The repo documents whether exact import-finalize metadata parity is required.
+- Python `--stdin` is described consistently across plan/status/runbook docs as
+  runnable today, with any remaining mismatch narrowed to a named field set.
+
+Validation:
+- `Get-Content -Raw scripts\replay_baseline\artifacts\L0415056.log | docker run --rm -i --network legacy_hlstatsx_legacy_net startersclan/hlstatsx-community-edition:1.11.4-daemon --stdin --server-ip=172.19.0.1 --server-port=27015 --db-host=db:3306 --db-name=hlstatsxce --db-username=hlstatsxce --db-password=hlx123 --nodns-resolveip`
+- `cd scripts\proxy_daemon_py`
+- `$env:PYTHONPATH='..'; Get-Content -Raw ..\replay_baseline\artifacts\L0415056.log | poetry run python -m hlstats_py.runtime --configfile ..\hlstats.conf --stdin --server-ip 172.19.0.1 --server-port 27015`
+- `python scripts\replay_baseline\compare_stats_dbs.py`
+
+Known risks:
+- Legacy `--stdin` finalization blends gameplay semantics with daemon-timing
+  artefacts, which can reopen noisy diffs if the field set is widened too early.
+
+Stop-and-fix rule:
+- Do not start `HLStatsFTP` porting until the exact role of import-tail metadata
+  is documented and accepted.
+
+### [ ] M6. Port the remaining operational utilities
+
+Goal:
+Remove the last required Perl-only operational scripts from the post-runtime
+workflow.
+
+Tasks:
+- Port `HLStatsFTP/hlstats-ftp.pl` to Python using `hlstats_py.runtime --stdin`
+  as the ingestion backend.
+- Port `ImportBans/importbans.pl` to Python as a standalone maintenance CLI.
+- Add optional `/metrics` export only after the runtime surface is stable.
+
+Definition of done:
+- The repo contains Python replacements for `HLStatsFTP` and `ImportBans`.
+- Operators can run the common maintenance/import flows without invoking Perl.
+- `/metrics` stays optional and does not alter the existing replay/runtime path.
+
+Validation:
+- `$env:PYTHONPATH='scripts;scripts/proxy_daemon_py'; python -m pytest scripts\hlstats_py\tests\test_runtime.py scripts\hlstats_py\tests\test_storage.py scripts\hlstats_py\tests\test_protocol.py scripts\hlstats_py\tests\test_events.py scripts\hlstats_py\tests\test_validation.py -q`
+- Targeted utility tests for FTP checkpointing and ban import normalization.
+
+Known risks:
+- `HLStatsFTP` correctness depends on idempotent replay, checkpoint persistence,
+  and active-tail file handling rather than only on parser parity.
+- `ImportBans` may need an explicit product decision on `ban`-only parity
+  versus a richer `ban/unban` sync model.
+
+Stop-and-fix rule:
+- Keep `ImportBans` and `/metrics` out of the runtime-critical path if
+  `HLStatsFTP` or direct replay parity still needs fixes.
+
+### [ ] M7. Validate Python heatmaps on real map-pack assets
+
+Goal:
+Close the remaining heatmap migration gap with a real legacy-vs-Python parity
+check on production-style assets.
+
+Tasks:
+- Install the external `heatmaps/src/<game>/<map>.jpg` map-pack used by legacy.
+- Run the legacy and Python generators on 1-2 representative production maps.
+- Compare published `*-kill.jpg`, `*-kill-thumb.jpg`, and cache behaviour.
+
+Definition of done:
+- The Python heatmap generator is validated on real assets, not only synthetic
+  smoke fixtures.
+- The PHP web layer resolves the generated assets without path or naming changes.
+
+Validation:
+- `$env:PYTHONPATH='scripts;scripts/proxy_daemon_py'; python -m pytest scripts\hlstats_py\tests\test_heatmaps.py -q`
+- Manual or scripted comparison on 1-2 installed production maps.
+
+Known risks:
+- The required map-pack is external to this repository and can block parity
+  work even when the generator implementation itself is already correct.
+
+Stop-and-fix rule:
+- Do not weaken the current synthetic heatmap regression suite while waiting for
+  external asset parity runs.
