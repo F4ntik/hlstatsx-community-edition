@@ -55,8 +55,8 @@ For support and installation notes visit http://www.hlxcommunity.com
 	$db->free_result();
 	pageHeader
 	(
-		array ($gamename, 'Weapon Statistics'),
-		array ($gamename => "%s?game=$game", 'Weapon Statistics' => '')
+		array($gamename, t('literal.weapon_statistics')),
+		array($gamename => "%s?game=$game", t('literal.weapon_statistics') => '')
 	);
 	$result = $db->query
 	("
@@ -80,20 +80,20 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'weapon',
-				'Weapon',
+				t('literal.weapon'),
 				'width=20&type=weaponimg&align=center&link=' . urlencode("mode=weaponinfo&amp;weapon=%k&amp;game=$game"),
 				$fname
 			),
 			new TableColumn
 			(
 				'modifier',
-				'Modifier',
+				t('literal.modifier'),
 				'width=8&align=right'
 			),
 			new TableColumn
 			(
 				'kills',
-				'Kills',
+				t('literal.kills'),
 				'width=8&align=right'
 			),
 			new TableColumn
@@ -105,13 +105,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'kpercent',
-				'Ratio',
+				t('literal.ratio'),
 				'width=18&sort=no&type=bargraph'
 			),
 			new TableColumn
 			(
 				'headshots',
-				'Headshots',
+				t('literal.headshots'),
 				'width=8&align=right'
 			),
 			new TableColumn
@@ -123,13 +123,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'hpercent',
-				'Ratio',
+				t('literal.ratio'),
 				'width=18&sort=no&type=bargraph'
 			),
 			new TableColumn
 			(
 				'hpk',
-				'HS:K',
+				t('literal.hpk_cap'),
 				'width=5&align=right'
 			)
 			
@@ -178,7 +178,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 
 <div class="block">
-	<?php printSectionTitle('Weapon Statistics'); ?>
+	<?php printSectionTitle(t('literal.weapon_statistics')); ?>
 	<div class="subblock">
 		<?php echo t('literal.from_total_kills_headshots', array('kills' => number_format($realkills), 'headshots' => number_format($realheadshots))); ?>
 	</div>

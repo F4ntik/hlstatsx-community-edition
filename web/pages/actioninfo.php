@@ -79,11 +79,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 		list($gamename) = $db->fetch_row();
 		
 	pageHeader(
-		array($gamename, 'Action Details', $act_name),
+		array($gamename, t('literal.action_details'), $act_name),
 		array(
 			$gamename=>$g_options['scripturl'] . "?game=$game",
-			'Action Statistics'=>$g_options['scripturl'] . "?mode=actions&game=$game",
-			'Action Details'=>''
+			t('literal.action_statistics')=>$g_options['scripturl'] . "?mode=actions&game=$game",
+			t('literal.action_details')=>''
 		),
 		$act_name
 	);
@@ -93,17 +93,17 @@ For support and installation notes visit http://www.hlxcommunity.com
 		array(
 			new TableColumn(
 				'playerName',
-				'Player',
+				t('literal.player'),
 				'width=45&align=left&flag=1&link=' . urlencode('mode=playerinfo&amp;player=%k') 
 			),
 			new TableColumn(
 				'obj_count',
-				'Achieved',
+				t('literal.achieved'),
 				'width=25&align=right'
 			),
 			new TableColumn(
 				'obj_bonus',
-				'Skill Bonus Total',
+				t('literal.skill_bonus_total'),
 				'width=25&align=right&sort=no'
 			)
 		),
@@ -258,17 +258,17 @@ For support and installation notes visit http://www.hlxcommunity.com
 		array(
 			new TableColumn(
 				'playerName',
-				'Player',
+				t('literal.player'),
 				'width=45&align=left&flag=1&link=' . urlencode('mode=playerinfo&amp;player=%k') 
 			),
 			new TableColumn(
 				'obj_count',
-				'Times Victimized',
+				t('literal.times_victimized'),
 				'width=25&align=right'
 			),
 			new TableColumn(
 				'obj_bonus',
-				'Skill Bonus Total',
+				t('literal.skill_bonus_total'),
 				'width=25&align=right&sort=no'
 			)
 		),

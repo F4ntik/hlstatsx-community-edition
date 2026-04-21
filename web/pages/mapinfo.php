@@ -52,11 +52,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 	}
 
 	pageHeader(
-		array($gamename, 'Map Details', $map),
+		array($gamename, t('literal.map_details'), $map),
 		array(
 			$gamename=>$g_options['scripturl'] . "?game=$game",
-			'Map Statistics' => $g_options['scripturl'] . "?mode=maps&game=$game",
-			'Map Details' => ''
+			t('literal.map_statistics') => $g_options['scripturl'] . "?mode=maps&game=$game",
+			t('literal.map_details') => ''
 		),
 		$map
 	);
@@ -65,22 +65,22 @@ For support and installation notes visit http://www.hlxcommunity.com
 		array(
 			new TableColumn(
 				'killerName',
-				'Player',
+				t('literal.player'),
 				'width=50&align=left&flag=1&link=' . urlencode('mode=playerinfo&amp;player=%k') 
 			),
 			new TableColumn(
 				'frags',
-				"Kills on $map",
+				t('literal.map_kills_label', array('map' => $map)),
 				'width=25&align=right'
 			),
 			new TableColumn(
 				'headshots',
-				'Headshots',
+				t('literal.headshots'),
 				'width=15&align=right'
 			),
 			new TableColumn(
 				'hpk',
-				'Hpk',
+				t('literal.hpk_cap'),
 				'width=5&align=right'
 			),
 			

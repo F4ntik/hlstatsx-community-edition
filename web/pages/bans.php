@@ -77,61 +77,61 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'lastName',
-				'Player',
+				t('literal.player'),
 				'width=26&flag=1&link=' . urlencode('mode=playerinfo&amp;player=%k')
 			),
 			new TableColumn
 			(
 				'ban_date',
-				'Ban Date',
+				t('literal.ban_date'),
 				'width=15&align=right'
 			),
 			new TableColumn
 			(
 				'skill',
-				'Points',
+				t('literal.points'),
 				'width=6&align=right'
 			),
 			new TableColumn
 			(
 				'activity',
-				'Activity',
+				t('literal.activity'),
 				'width=10&sort=no&type=bargraph'
 			),
 			new TableColumn
 			(
 				'kills',
-				'Kills',
+				t('literal.kills'),
 				'width=5&align=right'
 			),
 			new TableColumn
 			(
 				'deaths',
-				'Deaths',
+				t('literal.deaths'),
 				'width=5&align=right'
 			),
 			new TableColumn
 			(
 				'headshots',
-				'Headshots',
+				t('literal.headshots'),
 				'width=7&align=right'
 			),
 			new TableColumn
 			(
 				'kpd',
-				'K:D',
+				t('literal.kpd_cap'),
 				'width=10&align=right'
 			),
 			new TableColumn
 			(
 				'hpk',
-				'HS:K',
+				t('literal.hpk_cap'),
 				'width=5&align=right'
 			),
 			new TableColumn
 			(
 				'acc',
-				'Accuracy',
+				t('literal.accuracy'),
 				'width=6&align=right&append=' . urlencode('%')
 			)
 		),

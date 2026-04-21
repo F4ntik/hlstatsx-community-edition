@@ -87,13 +87,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 	pageHeader
 	(
-		array ($gamename, 'Event History', $pl_name),
+		array ($gamename, t('literal.event_history'), $pl_name),
 		array
 		(
 			$gamename=>$g_options['scripturl'] . "?game=$game",
-			'Player Rankings'=>$g_options['scripturl'] . "?mode=players&game=$game",
-			'Player Details'=>$g_options['scripturl'] . "?mode=playerinfo&player=$player",
-			'Event History'=>''
+			t('literal.player_rankings')=>$g_options['scripturl'] . "?mode=players&game=$game",
+			t('literal.player_details')=>$g_options['scripturl'] . "?mode=playerinfo&player=$player",
+			t('literal.event_history')=>''
 		),
 		$playername = ""
 	);
@@ -105,31 +105,31 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'eventTime',
-				'Date',
+				t('literal.date'),
 				'width=20'
 			),
 			new TableColumn
 			(
 				'eventType',
-				'Type',
+				t('literal.type'),
 				'width=10&align=center'
 			),
 			new TableColumn
 			(
 				'eventDesc',
-				'Description',
+				t('literal.description'),
 				'width=40&sort=no&append=.&embedlink=yes'
 			),
 			new TableColumn
 			(
 				'serverName',
-				'Server',
+				t('literal.server'),
 				'width=20'
 			),
 			new TableColumn
 			(
 				'map',
-				'Map',
+				t('literal.map'),
 				'width=10'
 			)
 		),

@@ -72,11 +72,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 	$db->free_result();
 	
 	pageHeader(
-		array($gamename, 'Ribbon Details', $act_name),
+		array($gamename, t('literal.ribbon_details'), $act_name),
 		array(
 			$gamename => $g_options['scripturl']."?game=$game",
-			'Ribbons' => $g_options['scripturl']."mode=awards&game=$game&tab=ribbons",
-			'Ribbon Details' => ''
+			t('literal.ribbons') => $g_options['scripturl']."mode=awards&game=$game&tab=ribbons",
+			t('literal.ribbon_details') => ''
 		),
 		$act_name
 	);
@@ -86,13 +86,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'playerName',
-				'Player',
+				t('literal.player'),
 				'width=45&align=left&flag=1&link=' . urlencode('mode=playerinfo&amp;player=%k')
 			),
 			new TableColumn
 			(
 				'numawards',
-				'Daily awards',
+				t('literal.daily_awards_count'),
 				'width=10&align=right&append=' . urlencode(' times')
 			),
 			new TableColumn

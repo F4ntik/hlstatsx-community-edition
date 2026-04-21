@@ -73,11 +73,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 	}
 
 	pageHeader(
-		array($gamename, 'Roles Details', htmlspecialchars($role_name)),
+		array($gamename, t('literal.role_details'), htmlspecialchars($role_name)),
 		array(
 			$gamename => $g_options['scripturl']."?game=$game",
-			'Roles Statistics' => $g_options['scripturl']."?mode=roles&game=$game",
-			'Role Details' => ''
+			t('literal.role_statistics') => $g_options['scripturl']."?mode=roles&game=$game",
+			t('literal.role_details') => ''
 		),
 		$role_name
 	);
@@ -91,7 +91,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			),
 			new TableColumn(
 				'frags',
-				ucfirst($role_name) . ' kills',
+				t('literal.role_kills_label', array('role' => ucfirst($role_name))),
 				'width=35&align=right'
 			),
 		),
@@ -142,7 +142,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 
 <div class="block">
-	<?php printSectionTitle('Role Details'); ?>
+	<?php printSectionTitle(t('literal.role_details')); ?>
 	<div class="subblock">
 <?php // figure out URL and absolute path of image
 

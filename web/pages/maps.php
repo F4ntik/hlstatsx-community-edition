@@ -58,8 +58,8 @@ For support and installation notes visit http://www.hlxcommunity.com
 	$db->free_result();
 
 	pageHeader(
-		array ($gamename, 'Map Statistics'),
-		array ($gamename=>"%s?game=$game", 'Map Statistics'=>'')
+		array($gamename, t('literal.map_statistics')),
+		array($gamename => "%s?game=$game", t('literal.map_statistics') => '')
 	);
 
 	$tblMaps = new Table
@@ -69,13 +69,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'map',
-				'Map',
+				t('literal.map'),
 				'width=20&align=left&link=' . urlencode("mode=mapinfo&amp;map=%k&amp;game=$game")
 			),
 			new TableColumn
 			(
 				'kills',
-				'Kills',
+				t('literal.kills'),
 				'width=8&align=right'
 			),
 			new TableColumn
@@ -87,13 +87,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'kpercent',
-				'Ratio',
+				t('literal.ratio'),
 				'width=16&sort=no&type=bargraph'
 			),
 			new TableColumn
 			(
 				'headshots',
-				'Headshots',
+				t('literal.headshots'),
 				'width=8&align=right'
 			),
 			new TableColumn
@@ -105,19 +105,19 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'hpercent',
-				'Ratio',
+				t('literal.ratio'),
 				'width=16&sort=no&type=bargraph'
 			),
 			new TableColumn
 			(
 				'hpk',
-				'HS:K',
+				t('literal.hpk_cap'),
 				'width=9&align=right'
 			),
 			new TableColumn
 			(
 				'map',
-				'HeatMap',
+				t('literal.heatmap'),
 				'width=4&type=heatmap'
 			)
 		),
@@ -162,7 +162,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 
 <div class="block">
-	<?php printSectionTitle('Map Statistics'); ?>
+	<?php printSectionTitle(t('literal.map_statistics')); ?>
 	<div class="subblock">
 		<div style="float:left;">
 		<?php echo t('literal.from_total_kills_headshots', array('kills' => number_format($realkills), 'headshots' => number_format($realheadshots))); ?>

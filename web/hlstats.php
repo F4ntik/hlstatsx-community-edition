@@ -47,7 +47,7 @@ init_i18n();
 
 if (!empty($_GET['logout']) && $_GET['logout'] == '1') {
 	unset($_SESSION['loggedin']);
-	header('Location: ' . lang_url(current_lang()));
+	header('Location: ' . lang_url(current_lang(), array('logout', '_smoke')));
 	die;
 }
 
@@ -77,8 +77,6 @@ if ($historical_cache == 1)
 		die;
 	}
 }
-
-ob_start('translate_output_html');
 
 // Several stuff added by Malte Bayer
 global $scripttime, $siteurlneo;
@@ -254,3 +252,5 @@ else
 }
 
 ?>
+
+

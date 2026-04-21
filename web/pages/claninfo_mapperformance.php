@@ -159,7 +159,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 	<div style="clear:both;padding-top:20px;"></div>
 <?php
-	printSectionTitle('Map Performance *');
+	printSectionTitle(t('literal.map_performance'));
 	$tblMaps->draw($result, $db->num_rows($result), 95);
 ?>
 <br /><br />

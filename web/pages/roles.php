@@ -55,8 +55,8 @@ For support and installation notes visit http://www.hlxcommunity.com
 	$db->free_result();
 	pageHeader
 	(
-		array ($gamename, 'Role Statistics'),
-		array ($gamename => "%s?game=$game", 'Role Statistics' => '')
+		array($gamename, t('literal.role_statistics')),
+		array($gamename => "%s?game=$game", t('literal.role_statistics') => '')
 	);
 	$result = $db->query
 	("
@@ -194,7 +194,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 
 <div class="block">
-	<?php printSectionTitle('Role Statistics'); ?>
+	<?php printSectionTitle(t('literal.role_statistics')); ?>
 	<div class="subblock">
 		<?php echo t('literal.from_total_kills_deaths', array('kills' => number_format($realkills), 'deaths' => number_format($realdeaths))); ?>
 	</div>

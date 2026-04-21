@@ -122,11 +122,11 @@
 	}
 
 	pageHeader(
-		array($gamename, 'Clan Details', $cl_full),
+		array($gamename, t('literal.clan_details'), $cl_full),
 		array(
 			$gamename=>$g_options['scripturl'] . "?game=$game",
-			'Clan Rankings'=>$g_options['scripturl'] . "?mode=clans&game=$game",
-			'Clan Details'=>''
+			t('literal.clan_rankings')=>$g_options['scripturl'] . "?mode=clans&game=$game",
+			t('literal.clan_details')=>''
 		),
 		$clandata['name']
 	);

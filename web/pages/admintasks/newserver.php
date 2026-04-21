@@ -36,19 +36,19 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 For support and installation notes visit http://www.hlxcommunity.com
 */
 
-    if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+	if (!defined('IN_HLSTATS')) {
+        die(t('admin.direct_access'));
     }
 
 	if ($auth->userdata["acclevel"] < 80) {
-        die ("Access denied!");
+        die(t('admin.access_denied'));
 	}
 	
 	if ( count($_POST) > 0 ) {
 		$db->query("SELECT * FROM `hlstats_Servers` WHERE `address` = '" . $db->escape(clean_data($_POST['server_address'])) . "' AND `port` = '" . $db->escape(clean_data($_POST['server_port'])) . "'");
 		
 		if ( $row = $db->fetch_array() )
-			message("warning", "Server [" . $row['name'] . "] already exists");
+			message("warning", t('admin.server_already_exists', array('server' => $row['name'])));
 		else
 		{
 			$db->query("SELECT `realgame` FROM `hlstats_Games` WHERE `code` = '" . $db->escape($selGame) . "'");
@@ -99,8 +99,8 @@ For support and installation notes visit http://www.hlxcommunity.com
     $server_rcon = (!empty($_POST['server_rcon'])) ? clean_data($_POST['server_rcon']) : "";
     $server_public_address = (!empty($_POST['public_address'])) ? clean_data($_POST['public_address']) : "";
 ?>
-Enter the address of a server that you want to accept data from.<br /><br />
-The "Public Address" should be the address you want shown to users. If left blank, it will be generated from the IP Address and Port. If you are using any kind of log relaying utility (i.e. hlstats.pl will not be receiving data directly from the game servers), you will want to set the IP Address and Port to the address of the log relay program, and set the Public Address to the real address of the game server. You will need a separate log relay for each game server. You can specify a hostname (or anything at all) in the Public Address.<p>
+<?php echo t('admin.newserver.instructions'); ?><br /><br />
+<?php echo t('admin.newserver.public_address_help'); ?><p>
 
 <table width="100%" border="0" cellspacing="0" cellpadding="0">
 
@@ -109,11 +109,11 @@ The "Public Address" should be the address you want shown to users. If left blan
 		<script type="text/javascript">
 		function checkMod() {
 			if (!document.newserverform.server_address.value.match(/^\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b$/)) {
-				alert('Server address must be a valid IP address');
+				alert('<?php echo addslashes(t('admin.server_address_invalid')); ?>');
 				return false;
 			}
 			if (document.newserverform.game_mod.value == 'PLEASESELECT') {
-				alert('You must make a selection for Admin Mod');
+				alert('<?php echo addslashes(t('admin.select_admin_mod')); ?>');
 				return false;
 			}
 			document.newserverform.submit();
@@ -121,30 +121,30 @@ The "Public Address" should be the address you want shown to users. If left blan
 		</script>
 		<table width="100%" border=0 cellspacing=1 cellpadding=4>
 			<tr valign="bottom" class="head">
-				<td class='fSmall'>Server IP Address</td>
+				<td class='fSmall'><?php echo eHtml(t('admin.server_ip_address')); ?></td>
 				<td class='fSmall'><input type="text" name="server_address" maxlength="15" size="15" value="<?=$server_ip;?>" /></td>
 			</tr>
 			<tr valign="bottom" class="head">
-				<td class='fSmall'>Server Port</td>
+				<td class='fSmall'><?php echo eHtml(t('admin.server_port')); ?></td>
 				<td class='fSmall'><input type="text" name="server_port" maxlength="5" size="5" value="<?=$server_port;?>" /></td>
 			</tr>
 			<tr valign="bottom" class="head">
-				<td class='fSmall'>Server Name</td>
+				<td class='fSmall'><?php echo eHtml(t('literal.server_name')); ?></td>
 				<td class='fSmall'><input type="text" name="server_name" maxlength="255" size="35" value="<?=$server_name;?>" /></td>
 			</tr>
 			<tr valign="bottom" class="head">
-				<td class='fSmall'>Rcon Password</td>
+				<td class='fSmall'><?php echo eHtml(t('admin.rcon_password')); ?></td>
 				<td class='fSmall'><input type="text" name="server_rcon" maxlength="128" size="15" value="<?=$server_rcon;?>" /></td>
 			</tr>
 			<tr valign="bottom" class="head">
-				<td class='fSmall'>Public Address</td>
+				<td class='fSmall'><?php echo eHtml(t('admin.public_address')); ?></td>
 				<td class='fSmall'><input type="text" name="public_address" maxlength="128" size="15" value="<?=$server_public_address;?>" /></td>
 			</tr>
 			<tr valign="bottom" class="head">
-				<td class='fSmall'>Admin Mod</td>
+				<td class='fSmall'><?php echo eHtml(t('admin.admin_mod')); ?></td>
 				<td class='fSmall'>
 					<select name="game_mod">
-					<option value="PLEASESELECT">PLEASE SELECT</option>
+					<option value="PLEASESELECT"><?php echo eHtml(t('admin.please_select')); ?></option>
 					<?php
                         $db->query("SELECT code, name FROM `hlstats_Mods_Supported`");
 
@@ -160,6 +160,6 @@ The "Public Address" should be the address you want shown to users. If left blan
 </tr>
 	<table width="75%" border=0 cellspacing=0 cellpadding=0>
         <tr>
-            <td align="center"><input type="submit" value="  Add Server  " class="submit" onclick="checkMod();return false;"></td>
+            <td align="center"><input type="submit" value="  <?php echo eHtml(t('admin.add_server')); ?>  " class="submit" onclick="checkMod();return false;"></td>
         </tr>
 	</table>

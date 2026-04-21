@@ -66,8 +66,8 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 	pageHeader
 	(
-		array ($gamename, 'Player Rankings'),
-		array ($gamename=>"%s?game=$game", 'Player Rankings'=>'')
+		array($gamename, t('literal.player_rankings')),
+		array($gamename => "%s?game=$game", t('literal.player_rankings') => '')
 	);
 
 	$rank_type = filter_input(INPUT_GET, 'rank_type', FILTER_VALIDATE_INT, [
@@ -158,67 +158,67 @@ For support and installation notes visit http://www.hlxcommunity.com
 					new TableColumn
 					(
 						'lastName',
-						'Player',
+						t('literal.player'),
 						'width=26&flag=1&link=' . urlencode('mode=playerinfo&amp;player=%k')
 					),
 					new TableColumn
 					(
 							'mmrank',
-							'Rank',
+							t('literal.rank'),
 							'width=4&type=elorank'
 					),
 					new TableColumn
 					(
 						'skill',
-						'Points',
+						t('literal.points'),
 						'width=7&align=right&skill_change=1'
 					),
 					new TableColumn
 					(
 						'activity',
-						'Activity',
+						t('literal.activity'),
 						'width=10&sort=no&type=bargraph'
 					),
 					new TableColumn
 					(
 						'connection_time',
-						'Connection Time',
+						t('literal.connection_time'),
 						'width=10&align=right&type=timestamp'
 					),
 					new TableColumn
 					(
 						'kills',
-						'Kills',
+						t('literal.kills'),
 						'width=7&align=right'
 					),
 					new TableColumn
 					(
 						'deaths',
-						'Deaths',
+						t('literal.deaths'),
 						'width=7&align=right'
 					),
 					new TableColumn
 					(
 						'kpd',
-						'K:D',
+						t('literal.kpd_cap'),
 						'width=6&align=right'
 					),
 					new TableColumn
 					(
 						'headshots',
-						'Headshots',
+						t('literal.headshots'),
 						'width=6&align=right'
 					),
 					new TableColumn
 					(
 						'hpk',
-						'HS:K',
+						t('literal.hpk_cap'),
 						'width=6&align=right'
 					),
 					new TableColumn
 					(
 						'acc',
-						'Accuracy',
+						t('literal.accuracy'),
 						'width=6&align=right&append=' . urlencode('%')
 					)
 				),
@@ -237,61 +237,61 @@ For support and installation notes visit http://www.hlxcommunity.com
 					new TableColumn
 					(
 						'lastName',
-						'Player',
+						t('literal.player'),
 						'width=30&flag=1&link=' . urlencode('mode=playerinfo&amp;player=%k')
 					),
 					new TableColumn
 					(
 						'activity',
-						'Activity',
+						t('literal.activity'),
 						'width=10&sort=no&type=bargraph'
 						),
 					new TableColumn
 					(
 						'kills',
-						'Kills',
+						t('literal.kills'),
 						'width=7&align=right'
 					),
 					new TableColumn
 					(
 						'deaths',
-						'Deaths',
+						t('literal.deaths'),
 						'width=7&align=right'
 					),
 					new TableColumn
 					(
 						'kpd',
-						'K:D',
+						t('literal.kpd_cap'),
 						'width=6&align=right'
 					),
 					new TableColumn
 					(
 						'headshots',
-						'Headshots',
+						t('literal.headshots'),
 						'width=6&align=right'
 					),
 					new TableColumn
 					(
 						'hpk',
-						'HS:K',
+						t('literal.hpk_cap'),
 						'width=6&align=right'
 					),
 					new TableColumn
 					(
 						'acc',
-						'Accuracy',
+						t('literal.accuracy'),
 						'width=6&align=right&append=' . urlencode('%')
 					),
 					new TableColumn
 					(
 						'skill',
-						'Points',
+						t('literal.points'),
 						'width=7&align=right&skill_change=1'
 					),
 					new TableColumn
 					(
 						'connection_time',
-						'Connection Time',
+						t('literal.connection_time'),
 						'width=10&align=right&type=timestamp'
 					)
 				),
@@ -430,3 +430,5 @@ For support and installation notes visit http://www.hlxcommunity.com
 		</div>	
 	</div>
 </div>
+
+

@@ -96,13 +96,13 @@
 
 	pageHeader
 	(
-		array ($gamename, 'Chat History', $pl_name),
+		array ($gamename, t('literal.chat_history'), $pl_name),
 		array
 		(
 			$gamename => $g_options['scripturl'] . "?game={$game}",
-			'Player Rankings' => $g_options['scripturl'] . "?mode=players&game={$game}",
-			'Player Details' => $g_options['scripturl'] . "?mode=playerinfo&player={$player}",
-			'Chat History' => ''
+			t('literal.player_rankings') => $g_options['scripturl'] . "?mode=players&game={$game}",
+			t('literal.player_details') => $g_options['scripturl'] . "?mode=playerinfo&player={$player}",
+			t('literal.chat_history') => ''
 		),
 
 		$playername = ""
@@ -116,26 +116,26 @@
 			new TableColumn
 			(
 				'eventTime',
-				'Date',
+				t('literal.date'),
 				'width=16'
 			),
 
 			new TableColumn
 			(
 				'message',
-				'Message',
+				t('literal.message'),
 				'width=44&sort=no&append=.&embedlink=yes'
 			),
 			new TableColumn
 			(
 				'serverName',
-				'Server',
+				t('literal.server'),
 				'width=24'
 			),
 			new TableColumn
 			(
 				'map',
-				'Map',
+				t('literal.map'),
 				'width=16'
 			)
 		),

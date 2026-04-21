@@ -169,19 +169,19 @@ For support and installation notes visit http://www.hlxcommunity.com
 						new TableColumn
 						(
 							'player_id',
-							'ID',
+							t('search.id'),
 							'width=5&align=right'
 						),
 						new TableColumn
 						(
 							'name',
-							'Player',
+							t('literal.player'),
 							'width=65&flag=1&link=' . urlencode($link_player)
 						),
 						new TableColumn
 						(
 							'gamename',
-							'Game',
+							t('ui.game'),
 							'width=30'
 						)
 					),
@@ -266,19 +266,19 @@ For support and installation notes visit http://www.hlxcommunity.com
 						new TableColumn
 						(
 							'lastName',
-							'Player',
+							t('literal.player'),
 							'width=50&flag=1&link=' . urlencode($link_player)
 						),
 						new TableColumn
 						(
 							'gamename',
-							'Game',
+							t('ui.game'),
 							'width=30'
 						),
 						new TableColumn
 						(
 							'playerId',
-							'ID',
+							t('search.id'),
 							'width=5&align=right'
 						)
 					),
@@ -356,19 +356,19 @@ For support and installation notes visit http://www.hlxcommunity.com
 						new TableColumn
 						(
 							'player_id',
-							'ID',
+							t('search.id'),
 							'width=5&align=right'
 						),
 						new TableColumn
 						(
 							'name',
-							'Player',
+							t('literal.player'),
 							'width=65&flag=1&link=' . urlencode($link_player)
 						),
 						new TableColumn
 						(
 							'gamename',
-							'Game',
+							t('ui.game'),
 							'width=30'
 						)
 					),
@@ -471,19 +471,19 @@ For support and installation notes visit http://www.hlxcommunity.com
 						new TableColumn
 						(
 							'name',
-							'Name',
+							t('literal.name'),
 							'width=50&icon=clan&link=' . urlencode($link_clan)
 						),
 						new TableColumn
 						(
 							'gamename',
-							'Game',
+							t('ui.game'),
 							'width=30'
 						),
 						new TableColumn
 						(
 							'clanId',
-							'ID',
+							t('search.id'),
 							'width=5&align=right'
 						)
 					),
@@ -551,3 +551,4 @@ For support and installation notes visit http://www.hlxcommunity.com
 		}
 	}
 ?>
+

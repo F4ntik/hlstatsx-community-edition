@@ -65,13 +65,17 @@ For support and installation notes visit http://www.hlxcommunity.com
 			header('Location: ' . $g_options['scripturl'] . "&mode=search&st=uniqueid&q=$uniqueid&game=$game");
 			exit;
 		} elseif ($db->num_rows() < 1) {
-			error("No players found matching uniqueId '$uniqueid'");
+			error(t(
+				'ingame.player_not_found_by_uniqueid',
+				array('uniqueid' => $uniqueid),
+				"No players found matching uniqueId ':uniqueid'"
+			));
 		} else {
 			list($player) = $db->fetch_row();
 			$player = intval($player);
 		}
 	} elseif (!$player && !$uniqueid) {
-		error('No player ID specified.');
+		error(t('literal.no_player_id'));
 	}
 	
 	$db->query("
@@ -85,7 +89,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 			playerId='$player'
 	");
 	if ($db->num_rows() != 1)
-		error("No such player '$player'.");
+		error(t(
+			'ingame.no_such_player',
+			array('player' => $player),
+			"No such player ':player'."
+		));
 	
 	$playerdata = $db->fetch_array();
 	$db->free_result();
@@ -115,47 +123,47 @@ For support and installation notes visit http://www.hlxcommunity.com
 		array(
 			new TableColumn(
 				'smweapon',
-				'Weapon',
+				t('literal.weapon'),
 				'width=10&type=weaponimg&align=center&link=' . urlencode("mode=weaponinfo&weapon=%k&game=$game")
 			),
 			new TableColumn(
 				'smshots',
-				'Shots',
+				t('literal.shots'),
 				'width=10&align=right'
 			),
 			new TableColumn(
 				'smhits',
-				'Hits',
+				t('literal.hits'),
 				'width=10&align=right'
 			),
 			new TableColumn(
 				'smdamage',
-				'Damage',
+				t('literal.damage'),
 				'width=10&align=right'
 			),
 			new TableColumn(
 				'smheadshots',
-				'Headshots',
+				t('literal.headshots'),
 				'width=9&align=right'
 			),
 			new TableColumn(
 				'smkills',
-				'Kills',
+				t('literal.kills'),
 				'width=9&align=right'
 			),
 			new TableColumn(
 				'smaccuracy',
-				'Accuracy',
+				t('literal.accuracy'),
 				'width=9&align=right&append=' . urlencode('%')
 			),
 			new TableColumn(
 				'smdhr',
-				'Damage Per Hit',
+				t('literal.damage_per_hit'),
 				'width=14&align=right'
 			),
 			new TableColumn(
 				'smspk',
-				'Shots Per Kill',
+				t('literal.shots_per_kill'),
 				'width=14&align=right'
 			)
 		),

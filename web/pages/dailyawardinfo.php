@@ -71,11 +71,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 	$db->free_result();
 	
 	pageHeader(
-		array($gamename, 'Award Details', $awardname),
+		array($gamename, t('literal.daily_award_details'), $awardname),
 		array(
 			$gamename=>$g_options['scripturl'] . "?game=$game",
-			'Awards Statistics' => $g_options['scripturl'] . "?mode=awards&game=$game",
-			'Awards Details' => ''
+			t('literal.daily_awards') => $g_options['scripturl'] . "?mode=awards&game=$game",
+			t('literal.daily_award_details') => ''
 		),
 		$awardname
 	);
@@ -84,17 +84,17 @@ For support and installation notes visit http://www.hlxcommunity.com
 		array(
 			new TableColumn(
 				'awardTime',
-				'Day',
+				t('literal.day'),
 				'width=20&align=left'
 			),
 			new TableColumn(
 				'lastName',
-				'Player',
+				t('literal.player'),
 				'width=40&align=left&flag=1&link=' . urlencode('mode=playerinfo&amp;player=%k') 
 			),
 			new TableColumn(
 				'count',
-				'Count for the Day',
+				t('literal.count_for_day'),
 				'width=35&align=right&append=' . urlencode(" $awardverb")
 			)
 		),

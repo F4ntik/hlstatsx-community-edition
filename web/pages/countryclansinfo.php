@@ -94,11 +94,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 	}	
 	
 	pageHeader(
-		array($gamename, 'Country Details', $cl_full),
+		array($gamename, t('literal.country_details'), $cl_full),
 		array(
-			$gamename=>$g_options['scripturl'] . "?game=$game",
-			'Country Rankings'=>$g_options['scripturl'] . "?mode=countryclans&game=$game",
-			'Country Details'=>''
+			$gamename => $g_options['scripturl'] . "?game=$game",
+			t('literal.country_rankings') => $g_options['scripturl'] . "?mode=countryclans&game=$game",
+			t('literal.country_details') => ''
 		),
 		$clandata['name']
 	);
@@ -111,10 +111,10 @@ For support and installation notes visit http://www.hlxcommunity.com
 		<div style="float:left;width:48.5%;">
 			<table class="data-table">
 				<tr class="data-table-head">
-					<td colspan="3">Statistics Summary</td>
+					<td colspan="3"><?php echo eHtml(t('literal.statistics_summary')); ?></td>
 				</tr>
 				<tr class="bg1">
-					<td>Country:</td>
+					<td><?php echo eHtml(t('literal.country')); ?>:</td>
 					<td colspan="2"><?php
 						echo '<img src="'.getFlag($clandata['flag']).'" alt="'.strtolower($playerdata['country']).'" title="'.strtolower($playerdata['country']).'" />&nbsp;'; 
 						echo '<strong>' . $clandata['name'] . '</strong>';
@@ -122,7 +122,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 				</tr>
 				<tr class="bg2">
 					<td style="width:45%;"><?php
-						echo 'Activity:';
+						echo eHtml(t('literal.activity')) . ':';
 					?></td>
 					<td align="left" width="40%">
 		                                <meter min="0" max="100" low="25" high="50" optimum="75" value="<?php
@@ -133,10 +133,10 @@ For support and installation notes visit http://www.hlxcommunity.com
 					?></td>
 				</tr>
 				<tr class="bg1">
-					<td>Members:</td>
+					<td><?php echo eHtml(t('literal.members')); ?>:</td>
 					<td colspan="2">
 						<strong><?php echo $clandata['nummembers']; ?></strong>
-						<em>active members</em>
+						<em><?php echo eHtml(t('literal.active_members')); ?></em>
 					</td>
 				</tr>
 	
@@ -162,7 +162,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 				</tr>
 				
 				<tr class="bg1">
-					<td>Kills per Death:</td>
+					<td><?php echo eHtml(t('literal.kills_per_death')); ?>:</td>
 					<td colspan="2"><?php
 						if ($clandata['deaths'] != 0)
 						{
@@ -343,6 +343,6 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 <div class="block" style="padding-top:10px;">
 <?php
-	printSectionTitle('Members');
+	printSectionTitle(t('literal.members'));
 	$tblMembers->draw($result, $numitems, 95);
 ?></div>

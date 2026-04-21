@@ -284,19 +284,19 @@
 	function getChatColumns($showserver) {
 		if ($showserver == 0) {
 			return [
-				new TableColumn('eventTime', 'Date', 'width=16'),
-				new TableColumn('lastName', 'Player', 'width=17&sort=no&flag=1&link=' . urlencode('mode=playerinfo&amp;player=%k')),
-				new TableColumn('message', 'Message', 'width=34&sort=no&embedlink=yes'),
-				new TableColumn('serverName', 'Server', 'width=23&sort=no'),
-				new TableColumn('map', 'Map', 'width=10&sort=no')
+				new TableColumn('eventTime', t('literal.date'), 'width=16'),
+				new TableColumn('lastName', t('literal.player'), 'width=17&sort=no&flag=1&link=' . urlencode('mode=playerinfo&amp;player=%k')),
+				new TableColumn('message', t('literal.message'), 'width=34&sort=no&embedlink=yes'),
+				new TableColumn('serverName', t('literal.server'), 'width=23&sort=no'),
+				new TableColumn('map', t('literal.map'), 'width=10&sort=no')
 			];
 		}
 
 		return [
-			new TableColumn('eventTime', 'Date', 'width=16'),
-			new TableColumn('lastName', 'Player', 'width=24&sort=no&flag=1&link=' . urlencode('mode=playerinfo&amp;player=%k')),
-			new TableColumn('message', 'Message', 'width=44&sort=no&embedlink=yes'),
-			new TableColumn('map', 'Map', 'width=16&sort=no')
+			new TableColumn('eventTime', t('literal.date'), 'width=16'),
+			new TableColumn('lastName', t('literal.player'), 'width=24&sort=no&flag=1&link=' . urlencode('mode=playerinfo&amp;player=%k')),
+			new TableColumn('message', t('literal.message'), 'width=44&sort=no&embedlink=yes'),
+			new TableColumn('map', t('literal.map'), 'width=16&sort=no')
 		];
 	}
 ?>

@@ -87,25 +87,25 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 	pageHeader
 	(
-		array ($gamename, 'Awards History', $pl_name),
+		array ($gamename, t('literal.awards_history'), $pl_name),
 		array
 		(
 			$gamename=>$g_options['scripturl'] . "?game=$game",
-			'Player Rankings'=>$g_options['scripturl'] . "?mode=players&game=$game",
-			'Player Details'=>$g_options['scripturl'] . "?mode=playerinfo&player=$player",
-			'Awards History'=>''
+			t('literal.player_rankings')=>$g_options['scripturl'] . "?mode=players&game=$game",
+			t('literal.player_details')=>$g_options['scripturl'] . "?mode=playerinfo&player=$player",
+			t('literal.awards_history')=>''
 		),
 		$playername = ""
 	);
 
 	flush();
-	$cnttext = 'Earned';
+	$cnttext = t('literal.earned');
 	$lnktext = '&link='.urlencode("mode=playerawards&player=".$player."&amp;awardId=%k");
 	if (isset($_GET['awardId'])) {
 		$awardId = valid_request($_GET['awardId'], true) or error("No clan ID specified."); 
 	}
 
-	$cnttext = 'Kills on Day';
+	$cnttext = t('literal.kills_on_day');
 	$lnktext = '';
 
 	$table = new Table
@@ -115,17 +115,17 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'awardTime',
-				(isset($awardId))?'Date':'Date Last Earned',
+				(isset($awardId)) ? t('literal.date') : t('literal.date_last_earned'),
 				'width=17'
 			),
 			new TableColumn(
 				'name',
-				'Name',
+				t('literal.name'),
 				'width=23'
 			),
 			new TableColumn(
 				'verb',
-				'Description',
+				t('literal.description'),
 				'width=50'.$lnktext
 			),
 			new TableColumn(

@@ -138,7 +138,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			$tblWeapons->sort2 $tblWeapons->sortorder
 	");
 
-	printSectionTitle('Weapon Usage *');
+	printSectionTitle(t('literal.weapon_usage'));
 	$tblWeapons->draw($result, $db->num_rows($result), 95);
 ?>
 	<br /><br />
@@ -244,7 +244,7 @@ For support and installation notes visit http://www.hlxcommunity.com
     
 if ($db->num_rows($result) != 0)
 {
-	printSectionTitle('Weapon Stats *');
+	printSectionTitle(t('literal.weapon_statistics_star'));
 	$tblWeaponstats->draw($result, $db->num_rows($result), 95);
 ?>
 	<br /><br />
@@ -410,7 +410,7 @@ if ($db->num_rows($result) != 0)
 
 if ($db->num_rows($result) != 0)
 {
-	printSectionTitle('Weapon Targets *');
+	printSectionTitle(t('literal.weapon_targets'));
 	if ($g_options['show_weapon_target_flash'] == 1)
 	{
 ?>

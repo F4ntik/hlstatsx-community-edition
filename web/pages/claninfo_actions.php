@@ -122,7 +122,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	
 	if ($numitems > 0)
 	{
-		printSectionTitle('Player Actions *');
+		printSectionTitle(t('literal.player_actions'));
 		$tblPlayerActions->draw($result, $numitems, 95);
 ?>
 		<br /><br />
@@ -185,7 +185,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	
 	if ($numitems > 0)
 	{
-		printSectionTitle('Victims of Player-Player Actions *');
+		printSectionTitle(t('literal.victims_of_player_player_actions'));
 		$tblPlayerPlayerActionsV->draw($result, $numitems, 95);
 ?>
 	<br /><br />

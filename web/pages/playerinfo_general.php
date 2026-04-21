@@ -65,7 +65,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 							");
 							list($uqid, $coid) = $db->fetch_row();
 						
-							$status = 'Unknown';
+							$status = t('literal.unknown');
 							$avatar_full = IMAGE_PATH."/unknown.jpg";
 						
 							if ($coid !== '76561197960265728') {
@@ -86,7 +86,20 @@ For support and installation notes visit http://www.hlxcommunity.com
 							}
 						
 							if ($xmlDoc) {
-								$status = ucwords($xmlDoc->onlineState);
+								$steamStatus = strtolower((string) $xmlDoc->onlineState);
+								$statusMap = array(
+									'offline' => 'profile_status.offline',
+									'online' => 'profile_status.online',
+									'in-game' => 'profile_status.in_game',
+									'in-game server' => 'profile_status.in_game',
+									'away' => 'profile_status.away',
+									'busy' => 'profile_status.busy',
+									'snooze' => 'profile_status.snooze',
+									'looking to trade' => 'profile_status.looking_to_trade',
+									'looking to play' => 'profile_status.looking_to_play',
+								);
+								$statusKey = $statusMap[$steamStatus] ?? null;
+								$status = $statusKey ? t($statusKey) : ucwords((string) $xmlDoc->onlineState);
 								$avatar_full = $xmlDoc->avatarFull;
 							}
 						
@@ -129,7 +142,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 					</td>
 				</tr>
 				<tr class="bg1">
-					<td><?php echo eHtml(t('literal.status')); ?>: <strong><?php echo eHtml(translate_ui_literal($status)); ?></strong></td>
+					<td><?php echo eHtml(t('literal.status')); ?>: <strong><?php echo eHtml($status); ?></strong></td>
 				</tr>
 				<tr class="bg2">
 					<td>
@@ -282,8 +295,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 								WHERE 
 									hlstats_Events_Entries.playerId = '$player'
 								GROUP BY
-									hlstats_Events_Entries.serverId,
-									hlstats_Servers.name
+									hlstats_Events_Entries.serverId
 								ORDER BY
 									cnt DESC
 								LIMIT
@@ -337,8 +349,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 								WHERE
 									hlstats_Events_Frags.killerId=$player
 								GROUP BY
-									hlstats_Events_Frags.weapon,
-									hlstats_Weapons.name
+									hlstats_Events_Frags.weapon
 								ORDER BY
 									kills desc, headshots desc
 								LIMIT
@@ -354,7 +365,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 							}
 
 							if ($fav_weapon == '') {
-								$fav_weapon = 'Unknown';
+								$fav_weapon = t('literal.unknown');
                             }
 
 							$image = getImage("/games/$game/weapons/$fav_weapon");
@@ -835,8 +846,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 				OR hlstats_Ribbons.special = 2
 			)
 		GROUP BY
-			hlstats_Ribbons.awardCode,
-			hlstats_Ribbons.image
+			hlstats_Ribbons.awardCode
 	");
 	$res = $db->query
 	("

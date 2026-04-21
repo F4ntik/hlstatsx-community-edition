@@ -50,7 +50,7 @@ For support and installation notes visit http://www.hlxcommunity.com
   
 	// visit counter
 	if (isset($_COOKIE['ELstatsNEO_Visit']) && $_COOKIE['ELstatsNEO_Visit'] == 0) {
-		// kein cookie gefunden, also visitcounter erh�hen und cookie setzen
+		// kein cookie gefunden, also visitcounter erh?hen und cookie setzen
 		$db->query("UPDATE hlstats_Options SET value=value+1 WHERE keyname='counter_visits';");
 		@setcookie('ELstatsNEO_Visit', '1', time() + ($g_options['counter_visit_timeout'] * 60), '/');   
 	}
@@ -120,7 +120,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	echo $g_options['sitename']; 
 	foreach ($title as $t)
 	{
-		echo ' - ' . translate_ui_literal($t);
+		echo ' - ' . eHtml($t);
 	}
 ?>
 	</title>
@@ -216,9 +216,9 @@ For support and installation notes visit http://www.hlxcommunity.com
 				$url = preg_replace('/&/', '&amp;', $url);
 				echo ' <span class="arrow">&raquo;</span></li><li>';
 				if ($url) {
-					echo '<a href="' . $url . '">' . eHtml(translate_ui_literal($l)) . '</a>';
+					echo '<a href="' . $url . '">' . eHtml($l) . '</a>';
 				} else {
-					echo '<strong>' . eHtml(translate_ui_literal($l)) . '</strong>';
+					echo '<strong>' . eHtml($l) . '</strong>';
 				}
 				$i++;
 		}
@@ -327,7 +327,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	}
 ?>
 			<li><a href="<?php echo $g_options['scripturl'] . "?mode=weapons&amp;game=$game"; ?>" class="fHeading"><?php echo eHtml(t('literal.weapons')); ?></a></li>
-			<li><a href="<?php echo $g_options['scripturl'] . "?mode=maps&amp;game=$game"; ?>" class="fHeading"><?php echo eHtml(t('literal.maps')); ?></a></li>
+				<li><a href="<?php echo $g_options['scripturl'] . "?mode=maps&amp;game=$game"; ?>" class="fHeading"><?php echo eHtml(t('literal.maps')); ?></a></li>
 <?php
 	$result = $db->query("SELECT game from hlstats_Roles WHERE game='$game' AND hidden = '0'");
 	$numitems = $db->num_rows($result);
@@ -338,7 +338,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	}
 	if ($g_options['nav_cheaters'] == 1) {
 ?>
-			<li><a href="<?php echo $g_options['scripturl'] . "?mode=bans&amp;game=$game"; ?>" class="fHeading">Bans</a></li>
+			<li><a href="<?php echo $g_options['scripturl'] . "?mode=bans&amp;game=$game"; ?>" class="fHeading"><?php echo eHtml(t('literal.bans', array(), 'Bans')); ?></a></li>
 <?php
 	} 
 ?>
@@ -346,3 +346,5 @@ For support and installation notes visit http://www.hlxcommunity.com
 <?php
 	}
 ?>  
+
+

@@ -40,7 +40,7 @@ For support and installation notes visit http://www.hlxcommunity.com
         die('Do not access this file directly.');
     }
 
-printSectionTitle('Clan Information');
+printSectionTitle(t('literal.clan_information'));
 ?>
 <div class="subblock">
 	<div style="float:left;vertical-align:top;width:48.5%;">
@@ -64,13 +64,13 @@ printSectionTitle('Clan Information');
 					}
 					else
 					{
-						echo '(Not specified.)';
+						echo eHtml(t('literal.not_specified'));
 					}
 				?></td>
 			</tr>
 
 			<tr class="bg1">
-				<td style="width:45%;">Activity:</td>
+				<td style="width:45%;"><?php echo eHtml(t('literal.activity')); ?>:</td>
 				<td style="width:40%;">
 				<meter min="0" max="100" low="25" high="50" optimum="75" value="<?php
 					echo $clandata['activity'] ?>"></meter>
@@ -119,7 +119,7 @@ printSectionTitle('Clan Information');
 			</tr>
 				
 			<tr class="bg1">
-				<td>Kills per Death:</td>
+				<td><?php echo eHtml(t('literal.kills_per_death')); ?>:</td>
 				<td colspan="2"><?php
 					if ($clandata['deaths'] != 0)
 					{
@@ -262,7 +262,7 @@ printSectionTitle('Clan Information');
 					}
 
 					if ($fav_weapon == '')
-						$fav_weapon = 'Unknown';
+						$fav_weapon = t('literal.unknown');
 					$image = getImage("/games/$game/weapons/$fav_weapon");
                     // check if image exists
 					$weaponlink = "<a href=\"hlstats.php?mode=weaponinfo&amp;weapon=$fav_weapon&amp;game=$game\">";
@@ -406,7 +406,7 @@ printSectionTitle('Clan Information');
 
 <div style="clear:both;padding-top:20px;"></div>
 <?php 
-	printSectionTitle('Members');
+	printSectionTitle(t('literal.members'));
 	$tblMembers->draw($result, $numitems, 95);
 ?>
 <br /><br />

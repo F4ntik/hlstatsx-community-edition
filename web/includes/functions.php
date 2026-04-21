@@ -125,19 +125,20 @@ function eHtml($str)
     return htmlspecialchars($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 }
 
-function translate_ui_literal($text)
+function translate_ui_literal_key($text)
 {
 	if (!is_string($text) || $text === '') {
+		return null;
+	}
+
+	if (strpos($text, '.') !== false) {
 		return $text;
 	}
 
-	$map = array(
-		'Contents' => 'literal.contents',
-		'Games' => 'ui.games',
-		'Game' => 'ui.game',
-		'Search' => 'ui.search',
-		'Help' => 'ui.help',
+	static $map = array(
 		'Name' => 'literal.name',
+		'Username' => 'admin.username',
+		'Password' => 'admin.password',
 		'Players' => 'literal.players',
 		'Player' => 'literal.player',
 		'Clans' => 'literal.clans',
@@ -152,50 +153,15 @@ function translate_ui_literal($text)
 		'Roles' => 'literal.roles',
 		'Ribbons' => 'literal.ribbons',
 		'Ranks' => 'literal.ranks',
-		'Player Rankings' => 'literal.player_rankings',
-		'Clan Rankings' => 'literal.clan_rankings',
-		'Player Details' => 'literal.player_details',
-		'Clan Details' => 'literal.clan_details',
-		'Weapon Statistics' => 'literal.weapon_statistics',
-		'Action Statistics' => 'literal.action_statistics',
-		'Role Statistics' => 'literal.role_statistics',
-		'Map Statistics' => 'literal.map_statistics',
-		'Awards Info' => 'literal.awards_info',
-		'Questions' => 'literal.questions',
-		'Answers' => 'literal.answers',
-		'Participating Servers' => 'literal.participating_servers',
-		'General Statistics' => 'literal.general_statistics',
-		'Server Live View' => 'literal.server_live_view',
-		'Server Load History' => 'literal.server_load_history',
-		'Server Load Graph' => 'literal.server_load_graph',
-		'Player Information' => 'literal.player_information',
-		'Clan Information' => 'literal.clan_information',
-		'Player Profile' => 'literal.player_profile',
-		'Statistics Summary' => 'literal.statistics_summary',
-		'Miscellaneous Statistics' => 'literal.misc_statistics',
-		'Player Kill Statistics *' => 'literal.player_kill_statistics',
 		'Player Action' => 'literal.player_action',
-		'Player Actions *' => 'literal.player_actions',
-		'Victims of Player-Player Actions *' => 'literal.victims_of_player_player_actions',
 		'PlyrPlyr Action' => 'literal.plyrplyr_action',
 		'Team Action' => 'literal.team_action',
 		'World Action' => 'literal.world_action',
 		'Action' => 'literal.action',
-		'Action Statistics' => 'literal.action_statistics',
 		'Weapon' => 'literal.weapon',
-		'Weapon Usage *' => 'literal.weapon_usage',
-		'Weapon Statistics *' => 'literal.weapon_statistics_star',
-		'Weapon Stats *' => 'literal.weapon_statistics_star',
-		'Weapon Targets *' => 'literal.weapon_targets',
 		'Team' => 'literal.team',
-		'Team Selection *' => 'literal.team_selection',
 		'Role' => 'literal.role',
-		'Role Selection *' => 'literal.role_selection',
-		'Role Statistics' => 'literal.role_statistics',
-		'Map Performance *' => 'literal.map_performance',
-		'Map Statistics' => 'literal.map_statistics',
 		'Server' => 'literal.server',
-		'Server Activity *' => 'literal.server_activity',
 		'Address' => 'literal.address',
 		'Connection Time' => 'literal.connection_time',
 		'Map Name' => 'literal.map_name',
@@ -236,8 +202,20 @@ function translate_ui_literal($text)
 		'Joined' => 'literal.joined',
 		'Accuracy' => 'literal.accuracy',
 		'Suicides' => 'literal.suicides',
+		'Profile' => 'admin.profile',
+		'Real Name' => 'literal.real_name',
+		'E-mail Address' => 'literal.email_address',
+		'Homepage URL' => 'admin.homepage_url',
+		'Country Flag' => 'admin.country_flag',
+		'Hide Ranking' => 'admin.hide_ranking',
+		'Force Default Avatar Image (note that this overrides images in hlstatsimg/avatars)' => 'admin.force_default_avatar',
+		'Clan Name' => 'admin.clan_name',
+		'Map Region' => 'admin.map_region',
+		'1 = Hide from clan list' => 'admin.hide_from_clan_list',
+		'IP Address' => 'search.ip_address',
 		'Aliases' => 'literal.aliases',
 		'Last Use' => 'literal.last_use',
+		'Last Used' => 'literal.last_use',
 		'Hidden' => 'literal.hidden',
 		'Banned' => 'literal.banned',
 		'In good standing' => 'literal.in_good_standing',
@@ -245,22 +223,42 @@ function translate_ui_literal($text)
 		'Members' => 'literal.members',
 		'(None)' => 'literal.none',
 		'(Not specified.)' => 'literal.not_specified',
-		'Player List' => 'literal.player_list',
-		'Daily Awards' => 'literal.daily_awards',
-		'Global Awards' => 'literal.global_awards',
-		'Awards (hover over image to see name)' => 'literal.awards_hover',
 		'Time' => 'literal.time_label',
 		'Skill' => 'literal.skill_label',
 		'Hpk' => 'literal.hpk_cap',
 		'Kpd' => 'literal.kpd_cap',
 		'K:D' => 'literal.kpd_cap',
+		'Game' => 'ui.game',
+		'Games' => 'ui.games',
+		'Authorization Required' => 'admin.auth_required',
+		'Access denied!' => 'admin.access_denied',
+		'Operation successful.' => 'admin.operation_successful',
+		'Profile updated successfully.' => 'admin.profile_updated',
+		'No help text available' => 'admin.no_help_text',
+		'Server IP Address' => 'admin.server_ip_address',
+		'Server Port' => 'admin.server_port',
+		'Server Name' => 'literal.server_name',
+		'Rcon Password' => 'admin.rcon_password',
+		'Public Address' => 'admin.public_address',
+		'Admin Mod' => 'admin.admin_mod',
+		'PLEASE SELECT' => 'admin.please_select',
 	);
 
-	if (!isset($map[$text])) {
+	return $map[$text] ?? null;
+}
+
+function translate_ui_literal($text)
+{
+	if (!is_string($text) || $text === '') {
 		return $text;
 	}
 
-	return t($map[$text], array(), $text);
+	$key = translate_ui_literal_key($text);
+	if ($key === null) {
+		return $text;
+	}
+
+	return t($key, array(), $text);
 }
 
 function format_compact_duration($seconds)
@@ -331,7 +329,7 @@ function getFlag($flag, $type='url')
  */
 function valid_request($str, $numeric = false)
 {
-	$search_pattern = array("/[^A-Za-z0-9\[\]*.,=()!\"$%&^`ґ':;ЯІі#+~_\-|<>\/\\\\@{}дцьДЦЬ ]/");
+	$search_pattern = array("/[^A-Za-z0-9\[\]*.,=()!\"$%&^`?':;???#+~_\-|<>\/\\\\@{}?????? ]/");
 	$replace_pattern = array('');
 	$str = preg_replace($search_pattern, $replace_pattern, $str);
 
@@ -728,7 +726,7 @@ function printSectionTitle($title, $echo = true)
 {
 	$html = '<span class="fHeading">';
 	$html .= '&nbsp;<img src="' . TITLE_IMAGE . '" alt="">';
-	$html .= '&nbsp;' . eHtml(translate_ui_literal($title));
+	$html .= '&nbsp;' . eHtml($title);
 	$html .= '</span>';
 	$html .= '<br><br>';
 

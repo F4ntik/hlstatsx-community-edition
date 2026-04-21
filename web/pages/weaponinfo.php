@@ -75,11 +75,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 	}
 		
 	pageHeader(
-		array($gamename, 'Weapon Details', htmlspecialchars($wep_name)),
+		array($gamename, t('literal.weapon_details'), htmlspecialchars($wep_name)),
 		array(
 			$gamename=>$g_options['scripturl']."?game=$game",
-			'Weapon Statistics' => $g_options['scripturl']."?mode=weapons&game=$game",
-			'Weapon Details' => ''
+			t('literal.weapon_statistics') => $g_options['scripturl']."?mode=weapons&game=$game",
+			t('literal.weapon_details') => ''
 		),
 		$wep_name
 	);
@@ -88,7 +88,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 		array(
 			new TableColumn(
 				'killerName',
-				'Player',
+				t('literal.player'),
 				'width=60&align=left&flag=1&link=' . urlencode('mode=playerinfo&amp;player=%k') 
 			),
 			new TableColumn(
@@ -98,12 +98,12 @@ For support and installation notes visit http://www.hlxcommunity.com
 			),
 			new TableColumn(
 				'headshots',
-				'Headshots',
+				t('literal.headshots'),
 				'width=15&align=right'
 			),
 			new TableColumn(
 				'hpk',
-				'Hpk',
+				t('literal.hpk_cap'),
 				'width=5&align=right'
 			),
 		),

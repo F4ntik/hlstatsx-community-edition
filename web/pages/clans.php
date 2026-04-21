@@ -66,8 +66,8 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 	pageHeader
 	(
-		array ($gamename, 'Clan Rankings'),
-		array ($gamename=>"%s?game=$game", 'Clan Rankings' => '')
+		array($gamename, t('literal.clan_rankings')),
+		array($gamename => "%s?game=$game", t('literal.clan_rankings') => '')
 	);
 
 	$table = new Table
@@ -193,7 +193,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 
 <div class="block">
-	<?php printSectionTitle('Clan Rankings');	?>
+	<?php printSectionTitle(t('literal.clan_rankings'));	?>
 	<div class="subblock">
 		<div style="float:left;">
 			<form method="get" action="<?php echo $g_options['scripturl']; ?>">

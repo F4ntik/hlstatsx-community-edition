@@ -68,11 +68,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 	}
 		
 	pageHeader(
-		array($gamename, 'Rank Details', $act_name),
+		array($gamename, t('literal.rank_details'), $act_name),
 		array(
 			$gamename => $g_options['scripturl']."?game=$game",
-			'Ranks' => $g_options['scripturl']."?mode=awards&game=$game&tab=ranks",
-			'Rank Details'=>''
+			t('literal.ranks') => $g_options['scripturl']."?mode=awards&game=$game&tab=ranks",
+			t('literal.rank_details')=>''
 		),
 		$act_name
 	);
@@ -81,17 +81,17 @@ For support and installation notes visit http://www.hlxcommunity.com
 		array(
 			new TableColumn(
 				'playerName',
-				'Player',
+				t('literal.player'),
 				'width=45&align=left&flag=1&link=' . urlencode('mode=playerinfo&amp;player=%k') 
 			),
 			new TableColumn(
 				'kills',
-				'Kills',
+				t('literal.kills'),
 				'width=25&align=right'
 			),
 			new TableColumn(
 				'skill',
-				'Skill',
+				t('literal.skill_label'),
 				'width=25&align=right'
 			)
 		),

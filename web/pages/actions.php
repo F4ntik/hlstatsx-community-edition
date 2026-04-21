@@ -61,8 +61,8 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 	pageHeader
 	(
-		array ($gamename, 'Action Statistics'),
-		array ($gamename=>"%s?game=$game", 'Action Statistics'=>'')
+		array($gamename, t('literal.action_statistics')),
+		array($gamename => "%s?game=$game", t('literal.action_statistics') => '')
 	);
 
 	$tblPlayerActions = new Table
@@ -72,19 +72,19 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'description',
-				'Action',
+				t('literal.action'),
 				'width=45&link=' . urlencode('mode=actioninfo&amp;action=%k&amp;game='.$game)
 			),
 			new TableColumn
 			(
 				'obj_count',
-				'Earned',
+				t('literal.earned'),
 				'width=25&align=right&append=+times'
 			),
 			new TableColumn
 			(
 				'obj_bonus',
-				'Reward',
+				t('literal.reward'),
 				'width=25&align=right'
 			)
 		),
@@ -117,7 +117,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	");
 ?>
 <div class="block">
-	<?php printSectionTitle('Action Statistics'); ?>
+	<?php printSectionTitle(t('literal.action_statistics')); ?>
 	<div class="subblock">
 		<?php
 			$db->query
