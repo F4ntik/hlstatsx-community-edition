@@ -1,5 +1,19 @@
 # Plan: HLstatsX Legacy vs Python Replay Baseline
 
+## Repo role
+
+This repository is the Python migration donor lane.
+
+- It owns replay parity, Python runtime migration, proxy daemon, operational
+  tooling, and heatmap migration work.
+- It is not the standalone product repository.
+- The integrated product lane now lives separately at
+  `D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n`.
+
+This donor lane should stay focused on clean Python/runtime work that can be
+imported into the standalone product repo without carrying the upstream RU PR
+scope with it.
+
 ## Scope
 
 Build a local, reproducible baseline that mirrors the current production HLstatsX
@@ -14,7 +28,8 @@ Python runtime on identical replayed logs.
   ports, credentials, and seeded data shape as production.
 - Baseline reset will be performed by the user in the HLstatsX admin UI after
   the local legacy stack is up.
-- Weekly game logs will be replayed into both stacks after the baseline reset.
+- Production game-log fixtures will be replayed into both stacks after the
+  baseline reset, with a smaller clean subset retained for fast parity gates.
 - Acceptance focuses on HLstats statistical tables first; runtime heartbeat and
   other volatile fields are secondary and reported separately.
 
@@ -129,11 +144,11 @@ Stop-and-fix rule:
 ### [x] M4. Automate replay and DB diff
 
 Goal:
-Run the same weekly log set through both stacks and produce actionable
+Run the same production log corpus through both stacks and produce actionable
   differences.
 
 Tasks:
-- Copy weekly production logs locally.
+- Copy production log fixtures locally.
 - Implement replay tooling for legacy and Python.
 - Validate the replay path first on legacy using offline STDIN import of a real
   production log into a clean restored baseline.
@@ -209,6 +224,9 @@ Stop-and-fix rule:
 
 - Keep the canonical loop unchanged:
   `restore baseline -> legacy smoke -> Python replay -> compare_stats_dbs.py`.
+- Keep standalone product packaging and EN/RU product validation in
+  `hlstatsx-community-edition-python-i18n`; this branch remains the donor lane
+  for Python/runtime work.
 - Extend the clean fixture set further now that `L0417065.log` is covered by
   the transport-noise normalization in the compact diff.
 - Keep exact legacy offline `--stdin` Unicode corruption outside the canonical

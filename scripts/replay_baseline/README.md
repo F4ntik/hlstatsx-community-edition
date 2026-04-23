@@ -16,7 +16,8 @@ runtime against the Python migration on identical replayed production logs.
 - `restore-baseline.ps1`:
   restore that baseline into either comparison DB.
 - `artifacts/`:
-  downloaded production data such as DB dumps, image archives, and weekly logs.
+  downloaded production data such as DB dumps, image archives, and production
+  log archives.
 
 ## Current intent
 
@@ -39,6 +40,9 @@ runtime against the Python migration on identical replayed production logs.
   `artifacts/baseline_reset_20260418.sql.gz`.
 - Legacy comparison stack is available on `http://127.0.0.1:8181/hlstats.php`.
 - Python comparison stack web is available on `http://127.0.0.1:8281/hlstats.php`.
+- Local artifacts now include the full production gameplay corpus snapshot
+  `artifacts/hlstats_logs_all_20260421.tgz` plus `1420` unpacked `L*.log`
+  files from `L0402000.log` to `L0421033.log`.
 - Legacy replay smoke on `L0415056.log` succeeded from a clean baseline and
   recreated stats in the DB.
 - Python worker/proxy startup against the restored baseline is fixed; both
@@ -68,6 +72,14 @@ runtime against the Python migration on identical replayed production logs.
   `compare_stats_dbs.py` normalizes the known legacy offline `--stdin`
   non-ASCII chat corruption in `hlstats_Events_Chat.message`. Python runtime
   storage still preserves the original Unicode payload.
+- The widened full-corpus replay has also been loaded into both comparison
+  contours for higher-volume testing. That run is intentionally tracked
+  separately from the small clean parity gate:
+  legacy currently shows `23` players / `1079` frags / `195` chat rows;
+  python shows `24` players / `973` frags / `180` chat rows.
+- On the widened full corpus (`L0402000.log` .. `L0421033.log`), the compact
+  diff is not yet clean:
+  `compare_stats_dbs.py` currently reports logical drift in `18` tables.
 - After rebuilding the Python comparison contour from the current workspace on
   `2026-04-18`, `hlstats_Players_History` is now populated on Python; the
   remaining work is matching legacy's event-date / skill / streak semantics
@@ -109,6 +121,9 @@ runtime against the Python migration on identical replayed production logs.
 - On the current multi-fixture loop, the compact replay diff is also clean on:
   `L0415056.log`, `L0415058.log`, `L0416053.log`, `L0417051.log`, and
   `L0417065.log`.
+- On the widened full-corpus loop (`L0402000.log` .. `L0421033.log`), the
+  compact replay diff is currently not clean and should be treated as a larger
+  regression/stress fixture rather than a fast parity gate.
 - Legacy offline `--stdin` non-ASCII chat corruption is handled in the compact
   diff: normalize it during comparison and keep it out of the gameplay
   parity gate unless exact byte-for-byte import emulation becomes

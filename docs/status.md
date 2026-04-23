@@ -1,4 +1,11 @@
-﻿# Status: HLstatsX Replay Baseline
+# Status: HLstatsX Replay Baseline
+
+## Repo role
+
+- This repository is the Python migration donor lane.
+- The standalone integrated product lane now lives separately at
+  `D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n`.
+- Product-level Python+i18n packaging should not expand the scope of this lane.
 
 ## Current phase
 
@@ -8,7 +15,11 @@ legacy smoke passes, Python replay is deterministic, preserves
 `172.19.0.1:27015`, and the compact DB diff is clean on the confirmed
 multi-fixture set. The legacy `--stdin` Unicode chat corruption case on
 `L0417065.log` is now explicitly normalized in the diff layer as transport
-noise instead of being treated as a Python runtime mismatch.
+noise instead of being treated as a Python runtime mismatch. The full
+production corpus is now also loaded locally and replayed into both comparison
+contours; on that widened input set, `compare_stats_dbs.py` currently reports
+logical drift in `18` tables, so full-history parity work is reopened beyond
+the smaller clean fixture gate.
 
 ## Done
 
@@ -106,14 +117,24 @@ noise instead of being treated as a Python runtime mismatch.
   `--stdin` import still stores the non-ASCII payload as question marks, but
   the compact parity gate now classifies that encoding loss as replay-external
   transport noise instead of a gameplay mismatch.
+- Downloaded and unpacked the full production CS log corpus locally:
+  `scripts/replay_baseline/artifacts/hlstats_logs_all_20260421.tgz`
+  plus `1420` unpacked `L*.log` files from `L0402000.log` to `L0421033.log`.
+- Replayed the full combined production corpus into both clean comparison
+  contours to seed higher-volume test data.
+- Verified the widened full-corpus load produced populated comparison DBs:
+  legacy=`23` players / `1079` frags / `195` chat rows;
+  python=`24` players / `973` frags / `180` chat rows.
+- Verified the widened full-corpus compact diff is not yet clean:
+  `compare_stats_dbs.py` reports logical replay differences in `18` tables.
 
 ## In progress
 
 - Keeping the reset baseline and replay workflow documented as the canonical
   migration path.
-- Extending the clean replay loop to more production fixtures now that the
-  known legacy `--stdin` Unicode chat corruption has been pushed out of the
-  canonical parity gate.
+- Chasing full-corpus parity now that the complete production log history is
+  available locally and reproduces new drift beyond the smaller clean fixture
+  gate.
 - Landed the first runnable Python `--stdin` path in `hlstats_py.runtime`:
   the worker can now read raw legacy log lines directly from STDIN when given
   `--server-ip/--server-port`, route them through the same dispatcher/storage
@@ -138,6 +159,7 @@ noise instead of being treated as a Python runtime mismatch.
 ## Next
 
 - Restore the reset baseline before every comparison run.
+- Keep donor-lane changes scoped to Python/runtime work that can later be imported into the standalone product repo.
 - Replay the same fixture set into both contours.
 - Run the compact DB diff as the canonical parity gate for replay-semantic
   tables.
@@ -310,6 +332,16 @@ noise instead of being treated as a Python runtime mismatch.
 - 2026-04-21: synchronized the migration docs and plan with the current code
   state so Python `--stdin` is tracked as runnable with a narrower
   import-tail-parity backlog instead of as a missing feature.
+- 2026-04-21: confirmed the full production game-log path at
+  `/var/lib/docker/volumes/mix1_pugmod-cs1-serverfiles/_data/cstrike/logs`
+  and counted `1420` gameplay `L*.log` files from `L0402000.log` to
+  `L0421033.log`.
+- 2026-04-21: downloaded
+  `scripts/replay_baseline/artifacts/hlstats_logs_all_20260421.tgz`
+  and unpacked the full production corpus into local artifacts.
+- 2026-04-21: restored the canonical baseline into both comparison DBs,
+  replayed the full combined corpus into `legacy` and `python`, and captured
+  the widened full-history drift (`18` tables in `compare_stats_dbs.py`).
 
 ## Smoke/demo checks
 

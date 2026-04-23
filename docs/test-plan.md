@@ -1,10 +1,17 @@
 # Test Plan: HLstatsX Legacy vs Python Replay
 
+This test plan applies to the Python migration donor lane only.
+
+- Product-level Python+i18n validation now lives in
+  `D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n`.
+- Upstream RU web PR validation stays in
+  `D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-web-ru-i18n`.
+
 ## Objective
 
-Validate the Python migration by replaying the same production weekly logs into
-two isolated local stacks derived from one common reset baseline and comparing
-the resulting database state.
+Validate the Python migration by replaying the same production log fixtures
+into two isolated local stacks derived from one common reset baseline and
+comparing the resulting database state.
 
 ## Test levels
 
@@ -23,7 +30,9 @@ the resulting database state.
 - Production-like legacy compose stack.
 - Production-derived MariaDB dataset.
 - User-triggered admin reset baseline dump.
-- Weekly production game logs from the CS server.
+- Production game logs from the CS server.
+- Full local corpus snapshot as of `2026-04-21`:
+  `1420` gameplay `L*.log` files from `L0402000.log` to `L0421033.log`.
 - Current parity fixture set:
   `L0415056.log`, `L0415058.log`, `L0416053.log`, `L0417051.log`,
   `L0417065.log`.
@@ -65,6 +74,8 @@ the resulting database state.
 - Legacy offline `--stdin` non-ASCII chat corruption is treated as transport
   noise in the compact diff by normalizing chat payloads to the legacy-safe
   comparison form instead of changing Python runtime storage fidelity.
+- The smaller clean parity subset and the widened full-corpus load are tracked
+  separately: a clean subset gate does not imply full-history parity.
 
 ## Comparison policy
 
@@ -137,3 +148,43 @@ the resulting database state.
   `*-kill-thumb.jpg`, and overlay cache behaviour against legacy PHP output,
   and confirm the PHP web pages continue to resolve the published assets
   without path/name changes.
+
+---
+
+## Code Review Findings (Cascade Agent)
+
+**Agent:** Code Review Agent (Cascade)  
+**Date:** 2026-04-21  
+**Scope:** Python runtime, protocol, storage, events; comparison with legacy Perl  
+**Status:** Pending user triage – see decision checklist below
+
+### Immediate Next Steps (High Priority)
+
+| # | Item | Location | Risk if not addressed | User Decision |
+|---|------|----------|----------------------|---------------|
+| 1 | Document headshot coordinate nulling logic | `storage.py:437-438` | Future maintainers may treat as bug | [ ] Accept [ ] Reject [ ] Modify |
+| 2 | Document `--stdin` finalize omissions (`connection_time`, `numuses`, `lastuse`) | `storage.py:347-351` | Misalignment with legacy behavior expectations | [ ] Accept [ ] Reject [ ] Modify |
+| 3 | Add per-table diff logging to `compare_stats_dbs.py` | `scripts/replay_baseline/` | Cannot localize 18-table drift without manual DB spelunking | [ ] Accept [ ] Reject [ ] Modify |
+| 4 | Review Steam ID normalization for `STEAM_ID_LAN` / `BOT` edge cases | `protocol.py:279-282` | Player-cache misses on legacy LAN / bot logs | [ ] Accept [ ] Reject [ ] Modify |
+| 5 | Remove dead `reason` parameter from `_build_message` | `events/handlers.py:48-72` | Dead code accumulation | [ ] Accept [ ] Reject [ ] Modify |
+| 6 | Add threaded stress test for query ordering under concurrency | `tests/test_storage.py` | Race conditions undetected in current fake-cursor tests | [ ] Accept [ ] Reject [ ] Modify |
+
+### Additional Recommendations
+
+#### Security & Stability
+- [ ] **Control host validation too narrow** – `_is_local_control_host` only allows `127.0.0.1`, `::1`, `localhost`. Docker control packets from `172.18.0.1` / `192.168.x.x` may be rejected. Legacy Perl likely did not validate source IP or used `$opt_proxy_ip`.
+- [ ] **No healthcheck endpoint** – Python runtime lacks `/health` or `/ready`; needed for K8s/Docker Compose.
+- [ ] **DB reconnect logic** – `SyncDatabaseAdapter.connect()` called once at startup; if MariaDB restarts, worker fails. Legacy DBI may have implicit reconnect.
+
+#### Architecture / Process
+- [ ] **Connection pooling** – Every `_connection()` call goes through adapter synchronously; higher overhead than Perl DBI single-handle. Document as known operational delta or implement pooling.
+- [ ] **Unified Dockerfile for worker** – Product lane lacks `Dockerfile` for `hlstats_py.runtime`; currently requires ad-hoc `PYTHONPATH`.
+- [ ] **Rollback tags** – Add `scripts/build-images.sh` or `docker-bake.hcl` for versioned runtime images.
+
+### Open Questions for User
+
+1. Is exact `--stdin` import-finalize metadata parity (`connection_time`, `lastuse`, `numuses`) required for your product use case, or is gameplay-semantics parity sufficient?
+2. Should the 18-table full-corpus drift be the immediate priority, or should focus remain on the compact 5-fixture gate?
+3. Do you want the Python runtime to support the same IP-based control validation as legacy Perl, or relax it for Docker environments?
+
+**Next Action Required:** User to tick decision boxes above and route accepted items to implementation agent.
