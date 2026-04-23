@@ -37,36 +37,36 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+        die(t('admin.direct_access'));
     }
 
 	if ($auth->userdata["acclevel"] < 80) {
-        die ("Access denied!");
+        die(t('admin.access_denied'));
 	}
 
 	$edlist = new EditList("id", "hlstats_Actions", "game", false);
-	$edlist->columns[] = new EditListColumn("game", "Game", 0, true, "hidden", $gamecode);
-	$edlist->columns[] = new EditListColumn("code", "Action Code", 15, true, "text", "", 64);
-	$edlist->columns[] = new EditListColumn("for_PlayerActions", "Player Action", 0, false, "checkbox");
-	$edlist->columns[] = new EditListColumn("for_PlayerPlayerActions", "PlyrPlyr Action", 0, false, "checkbox");
-	$edlist->columns[] = new EditListColumn("for_TeamActions", "Team Action", 0, false, "checkbox");
-	$edlist->columns[] = new EditListColumn("for_WorldActions", "World Action", 0, false, "checkbox");
-	$edlist->columns[] = new EditListColumn("reward_player", "Player Points Reward", 4, false, "text", "0");
-	$edlist->columns[] = new EditListColumn("reward_team", "Team Points Reward", 4, false, "text", "0");
-	$edlist->columns[] = new EditListColumn("team", "Team", 0, false, "select", "hlstats_Teams.name/code/game='$gamecode'");
-	$edlist->columns[] = new EditListColumn("description", "Action Description", 23, true, "text", "", 128);
+	$edlist->columns[] = new EditListColumn("game", t('admin.field.game'), 0, true, "hidden", $gamecode);
+	$edlist->columns[] = new EditListColumn("code", t('admin.field.action_code'), 15, true, "text", "", 64);
+	$edlist->columns[] = new EditListColumn("for_PlayerActions", t('literal.player_action'), 0, false, "checkbox");
+	$edlist->columns[] = new EditListColumn("for_PlayerPlayerActions", t('literal.plyrplyr_action'), 0, false, "checkbox");
+	$edlist->columns[] = new EditListColumn("for_TeamActions", t('literal.team_action'), 0, false, "checkbox");
+	$edlist->columns[] = new EditListColumn("for_WorldActions", t('literal.world_action'), 0, false, "checkbox");
+	$edlist->columns[] = new EditListColumn("reward_player", t('literal.player_reward'), 4, false, "text", "0");
+	$edlist->columns[] = new EditListColumn("reward_team", t('literal.team_reward'), 4, false, "text", "0");
+	$edlist->columns[] = new EditListColumn("team", t('literal.team'), 0, false, "select", "hlstats_Teams.name/code/game='$gamecode'");
+	$edlist->columns[] = new EditListColumn("description", t('admin.field.action_description'), 23, true, "text", "", 128);
 
 	if ($_POST)
 	{
 		if ($edlist->update())
-			message("success", "Operation successful.");
+			message("success", t('admin.operation_successful'));
 		else
 			message("warning", $edlist->error());
 	}
 	
 ?>
 
-You can make an action map-specific by prepending the map name and an underscore to the Action Code. For example, if the map "<b>rock2</b>" has an action "<b>goalitem</b>" then you can either make the action code just "<b>goalitem</b>" (in which case it will match all maps) or you can make it "<b>rock2_goalitem</b>" to match only on the "rock2" map.<p>
+<?php echo t('admin.help.actions_map_specific'); ?>
 
 <?php
 	
@@ -95,7 +95,7 @@ You can make an action map-specific by prepending the map name and an underscore
 
 <table width="75%" border=0 cellspacing=0 cellpadding=0>
 <tr>
-	<td align="center"><input type="submit" value="  Apply  " class="submit"></td>
+	<td align="center"><input type="submit" value="  <?php echo t('ui.apply'); ?>  " class="submit"></td>
 </tr>
 </table>
 

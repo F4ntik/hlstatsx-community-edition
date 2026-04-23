@@ -37,25 +37,28 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+        die(t('admin.direct_access'));
     }
 
 	if ($auth->userdata['acclevel'] < 80) {
-        die ('Access denied!');
+        die(t('admin.access_denied'));
 	}
 
+	$serverTypeOptions = '0/' . t('admin.voice.server_type.teamspeak')
+		. ';1/' . t('admin.voice.server_type.ventrilo');
+
 	$edlist = new EditList('serverId', 'hlstats_Servers_VoiceComm', '', false);
-	$edlist->columns[] = new EditListColumn('name', 'Server Name', 45, true, 'text', '', 64);
-	$edlist->columns[] = new EditListColumn('addr', 'Server IP or Hostname', 20, true, 'text', '', 64);
-	$edlist->columns[] = new EditListColumn('password', 'Password', 20, false, 'text', '', 64);
-	$edlist->columns[] = new EditListColumn('UDPPort', 'UDP Port (TS only)', 6, false, 'text', '8767', 64);
-	$edlist->columns[] = new EditListColumn('queryPort', 'Query Port (TS)/Connect Port (Vent)', 6, true, 'text', '51234', 64);
-	$edlist->columns[] = new EditListColumn('descr', 'Notes', 40, false, 'text', '', 64);
-	$edlist->columns[] = new EditListColumn('serverType', 'Server Type', 20, true, 'select', '0/Teamspeak;1/Ventrilo');
+	$edlist->columns[] = new EditListColumn('name', t('voice.server_name'), 45, true, 'text', '', 64);
+	$edlist->columns[] = new EditListColumn('addr', t('admin.field.server_ip_or_hostname'), 20, true, 'text', '', 64);
+	$edlist->columns[] = new EditListColumn('password', t('admin.password'), 20, false, 'text', '', 64);
+	$edlist->columns[] = new EditListColumn('UDPPort', t('admin.field.udp_port_ts_only'), 6, false, 'text', '8767', 64);
+	$edlist->columns[] = new EditListColumn('queryPort', t('admin.field.query_port_connect_port'), 6, true, 'text', '51234', 64);
+	$edlist->columns[] = new EditListColumn('descr', t('admin.field.notes'), 40, false, 'text', '', 64);
+	$edlist->columns[] = new EditListColumn('serverType', t('admin.field.server_type'), 20, true, 'select', $serverTypeOptions);
 	
 	if ($_POST) {
 		if ($edlist->update())
-			message('success', 'Operation successful.');
+			message('success', t('admin.operation_successful'));
 		else
 			message('warning', $edlist->error());
 	}
@@ -86,7 +89,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 <table width="75%" border="0" cellspacing="0" cellpadding="0">
 <tr>
-	<td align="center"><input type="submit" value="  Apply  " class="submit"></td>
+	<td align="center"><input type="submit" value="  <?php echo t('ui.apply'); ?>  " class="submit"></td>
 </tr>
 </table>
 

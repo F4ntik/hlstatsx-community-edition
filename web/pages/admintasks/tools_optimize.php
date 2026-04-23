@@ -37,18 +37,18 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+        die(t('admin.direct_access'));
     }
 
 	if ($auth->userdata["acclevel"] < 100) {
-        die ("Access denied!");
+        die(t('admin.access_denied'));
 	}
 ?>
 
 &nbsp;&nbsp;&nbsp;&nbsp;<img src="<?php echo IMAGE_PATH; ?>/downarrow.gif" width="9" height="6" class="imageformat"><b>&nbsp;<?php echo $task->title; ?></b><p>
 
 
-<span style="padding-left:35px;">Optimizing tables...</span></td>
+<span style="padding-left:35px;"><?php echo t('admin.tools_optimize.optimizing_tables'); ?></span></td>
 </tr>
 </table><br /><br />
 
@@ -71,22 +71,22 @@ For support and installation notes visit http://www.hlxcommunity.com
 			array(
 				new TableColumn(
 					"Table",
-					"Table",
+					t('literal.table'),
 					"width=30&sort=no"
 				),
 				new TableColumn(
 					"Op",
-					"Operation",
+					t('literal.operation'),
 					"width=12&sort=no"
 				),
 				new TableColumn(
 					"Msg_type",
-					"Msg. Type",
+					t('admin.tools_optimize.message_type'),
 					"width=12&sort=no"
 				),
 				new TableColumn(
 					"Msg_text",
-					"Message",
+					t('literal.message'),
 					"width=46&sort=no"
 				)
 			),
@@ -106,7 +106,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 <table style="width:90%;text-align:center;border:0" cellspacing="0" cellpadding="2">
 
 <tr>
-	<td class="fNormal">Analyzing tables...</td>
+	<td class="fNormal"><?php echo t('admin.tools_optimize.analyzing_tables'); ?></td>
 </tr>
 </table><br /><br />
 	
@@ -115,22 +115,22 @@ For support and installation notes visit http://www.hlxcommunity.com
 			array(
 				new TableColumn(
 					"Table",
-					"Table",
+					t('literal.table'),
 					"width=30&sort=no"
 				),
 				new TableColumn(
 					"Op",
-					"Operation",
+					t('literal.operation'),
 					"width=12&sort=no"
 				),
 				new TableColumn(
 					"Msg_type",
-					"Msg. Type",
+					t('admin.tools_optimize.message_type'),
 					"width=12&sort=no"
 				),
 				new TableColumn(
 					"Msg_text",
-					"Message",
+					t('literal.message'),
 					"width=46&sort=no"
 				)
 			),

@@ -37,11 +37,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+        die(t('admin.direct_access'));
     }
 
 	if ($auth->userdata['acclevel'] < 80) {
-		die ('Access denied!');
+		die(t('admin.access_denied'));
     }
 
     function setdefaults($key)
@@ -66,7 +66,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	}
 	
 	if ($key==0)
-		die('Server ID not set!');
+		die(t('admin.serversettings.server_id_not_set'));
 	
 	if (isset($_POST['sourceId'])) {
 		$sourceId = valid_request(intval($_POST['sourceId']),true);
@@ -83,7 +83,7 @@ For support and installation notes visit http://www.hlxcommunity.com
         
         <tr bgcolor="#FF0000">
             <td class="fNormal" style="color: #FFF; font-weight: bold; font-size: medium;" align="center">
-				Note: For changes on this page to take effect, you <strong>must</strong> <a href="<?php echo $g_options['scripturl'] . "?mode=admin&amp;task=tools_perlcontrol"; ?>">reload</a> or restart the HLX:CE daemon.
+				<?php echo t('admin.help.serversettings_reload_notice', array('reload_url' => $g_options['scripturl'] . '?mode=admin&amp;task=tools_perlcontrol')); ?>
 			</td>
         </tr>
         
@@ -102,9 +102,9 @@ For support and installation notes visit http://www.hlxcommunity.com
 	
 	$footerscript = $edlist->setHelp('helpdiv','parameter',$helptexts);
 
-	$edlist->columns[] = new EditListColumn('serverId', 'Server ID', 0, true, 'hidden', $key);
-	$edlist->columns[] = new EditListColumn('parameter', 'Server parameter name', 30, true, 'readonly', '', 50);
-	$edlist->columns[] = new EditListColumn('value', 'Parameter value', 60, false, 'text', '', 128);
+	$edlist->columns[] = new EditListColumn('serverId', t('admin.field.server_id'), 0, true, 'hidden', $key);
+	$edlist->columns[] = new EditListColumn('parameter', t('admin.field.server_parameter_name'), 30, true, 'readonly', '', 50);
+	$edlist->columns[] = new EditListColumn('value', t('admin.field.parameter_value'), 60, false, 'text', '', 128);
 	
 	if ($_POST)
 	if ($_POST['setdefaults']=='defaults') {
@@ -119,13 +119,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 			$r = $db->fetch_array();
 		} else {
 			if ($edlist->update())
-				message('success', 'Operation successful.');
+				message('success', t('admin.operation_successful'));
 			else
 				message('warning', $edlist->error());
 		}
 	
 ?>
-These are the actual server parameters used by the hlstats.pl script.<br>
+<?php echo t('admin.help.serversettings_intro'); ?>
 
 <?php
 
@@ -168,14 +168,14 @@ These are the actual server parameters used by the hlstats.pl script.<br>
 <table width="75%" border=0 cellspacing=0 cellpadding=0>
 <tr>
 	<td align="center">
-	<INPUT TYPE="checkbox" NAME="setdefaults" VALUE="defaults"> Reset all settings to default!<br>
-	Set all options like existing server configuration: 
+	<INPUT TYPE="checkbox" NAME="setdefaults" VALUE="defaults"> <?php echo t('admin.help.serversettings_reset_defaults'); ?><br>
+	<?php echo t('admin.help.serversettings_copy_from_existing'); ?> 
   <SELECT NAME="sourceId">
-	 <OPTION VALUE="0">Select a server
+	 <OPTION VALUE="0"><?php echo t('admin.help.serversettings_select_server'); ?>
 	 <?php echo $sourceIds; ?>
 	</SELECT><br> 
 	 
-  <input type="submit" value="  Apply  " class="submit"></td>
+  <input type="submit" value="  <?php echo t('ui.apply'); ?>  " class="submit"></td>
 </tr>
 </table>
 

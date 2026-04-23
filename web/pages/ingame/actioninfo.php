@@ -37,14 +37,14 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
 	if (!defined('IN_HLSTATS')) {
-		die('Do not access this file directly.');
+		die(t('admin.direct_access'));
 	}
 
 	// Action Details
 
 	// Addon created by Rufus (rufus@nonstuff.de)
 	
-	$action = valid_request($_GET['action'], true) or error('No action ID specified.');
+	$action = valid_request($_GET['action'], true) or error(t('literal.no_action_id'));
 	
 	$db->query("
 		SELECT
@@ -66,28 +66,28 @@ For support and installation notes visit http://www.hlxcommunity.com
 	
 	$db->query("SELECT name FROM hlstats_Games WHERE code='$game'");
 	if ($db->num_rows() != 1) {
-		error('Invalid or no game specified.');
+		error(t('literal.no_such_game_named', array('game' => $game)));
 	} else {
 		list($gamename) = $db->fetch_row();
 	}
 
 	$table = new Table(
 		array(
-			new TableColumn(
-				'playerName',
-				'Player',
-				'width=45&align=left&flag=1&link=' . urlencode("mode=statsme&amp;player=%k") 
-			),
-			new TableColumn(
-				'obj_count',
-				'Achieved',
-				'width=25&align=right'
-			),
-			new TableColumn(
-				'obj_bonus',
-				'Skill Bonus Total',
-				'width=25&align=right&sort=no'
-			)
+				new TableColumn(
+					'playerName',
+					t('ui.player'),
+					'width=45&align=left&flag=1&link=' . urlencode("mode=statsme&amp;player=%k") 
+				),
+				new TableColumn(
+					'obj_count',
+					t('literal.achieved'),
+					'width=25&align=right'
+				),
+				new TableColumn(
+					'obj_bonus',
+					t('literal.skill_bonus_total'),
+					'width=25&align=right&sort=no'
+				)
 		),
 		'playerId',
 		'obj_count',

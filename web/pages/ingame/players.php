@@ -37,13 +37,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
 	if (!defined('IN_HLSTATS')) {
-		die('Do not access this file directly.');
+		die(t('admin.direct_access'));
 	}
 
 	// Player Rankings
 	$db->query("SELECT name FROM hlstats_Games WHERE code='$game'");
 	if ($db->num_rows() < 1) {
-		error("No such game '$game'.");
+		error(t('literal.no_such_game_named', array('game' => $game)));
 	}
 
 	list($gamename) = $db->fetch_row();
@@ -60,61 +60,61 @@ For support and installation notes visit http://www.hlxcommunity.com
 				new TableColumn
 				(
 					'lastName',
-					'Player',
+					t('ui.player'),
 					'width=30&flag=1&link=' . urlencode('mode=statsme&amp;player=%k')
 				),
 				new TableColumn
 				(
 					'skill',
-					'Points',
+					t('ui.points'),
 					'width=7&align=right&skill_change=1'
 				),
 				new TableColumn
 				(
 					'activity',
-					'Activity',
+					t('ui.activity'),
 					'width=10&sort=no&type=bargraph'
 				),
 				new TableColumn
 				(
 					'connection_time',
-					'Connection Time',
+					t('ui.connection_time'),
 					'width=10&align=right&type=timestamp'
 				),
 				new TableColumn
 				(
 					'kills',
-					'Kills',
+					t('ui.kills'),
 					'width=7&align=right'
 				),
 				new TableColumn
 				(
 					'deaths',
-					'Deaths',
+					t('ui.deaths'),
 					'width=7&align=right'
 				),
 				new TableColumn
 				(
 					'kpd',
-					'K:D',
+					t('literal.kpd_cap'),
 					'width=6&align=right'
 				),
 				new TableColumn
 				(
 					'headshots',
-					'Headshots',
+					t('literal.headshots'),
 					'width=6&align=right'
 				),
 				new TableColumn
 				(
 					'hpk',
-					'HS:K',
+					t('literal.hpk_cap'),
 					'width=6&align=right'
 				),
 				new TableColumn
 				(
 					'acc',
-					'Accuracy',
+					t('literal.accuracy'),
 					'width=6&align=right&append=' . urlencode('%')
 				)
 			),
@@ -133,61 +133,61 @@ For support and installation notes visit http://www.hlxcommunity.com
 				new TableColumn
 				(
 					'lastName',
-					'Player',
+					t('ui.player'),
 					'width=30&flag=1&link=' . urlencode('mode=statsme&amp;player=%k')
 				),
 				new TableColumn
 				(
 					'activity',
-					'Activity',
+					t('ui.activity'),
 					'width=10&sort=no&type=bargraph'
 					),
 				new TableColumn
 				(
 					'kills',
-					'Kills',
+					t('ui.kills'),
 					'width=7&align=right'
 				),
 				new TableColumn
 				(
 					'deaths',
-					'Deaths',
+					t('ui.deaths'),
 					'width=7&align=right'
 				),
 				new TableColumn
 				(
 					'kpd',
-					'K:D',
+					t('literal.kpd_cap'),
 					'width=6&align=right'
 				),
 				new TableColumn
 				(
 					'headshots',
-					'Headshots',
+					t('literal.headshots'),
 					'width=6&align=right'
 				),
 				new TableColumn
 				(
 					'hpk',
-					'HS:K',
+					t('literal.hpk_cap'),
 					'width=6&align=right'
 				),
 				new TableColumn
 				(
 					'acc',
-					'Accuracy',
+					t('literal.accuracy'),
 					'width=6&align=right&append=' . urlencode('%')
 				),
 				new TableColumn
 				(
 					'skill',
-					'Points',
+					t('ui.points'),
 					'width=7&align=right&skill_change=1'
 				),
 				new TableColumn
 				(
 					'connection_time',
-					'Connection Time',
+					t('ui.connection_time'),
 					'width=10&align=right&type=timestamp'
 				)
 			),

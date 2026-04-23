@@ -54,23 +54,23 @@ For support and installation notes visit http://www.hlxcommunity.com
 		array(
 			new TableColumn(
 				'weapon',
-				'Weapon',
+				t('literal.weapon'),
 				'width=15&type=weaponimg&align=center&link=' . urlencode("mode=weaponinfo&amp;weapon=%k&amp;game=$game"),
 				$fname
 			),
 			new TableColumn(
 				'modifier',
-				'Points Modifier',
+				t('literal.points_modifier'),
 				'width=10&align=right'
 			),
 			new TableColumn(
 				'kills',
-				'Kills',
+				t('literal.kills'),
 				'width=11&align=right'
 			),
 			new TableColumn(
 				'kpercent',
-				'Percentage of Kills',
+				t('literal.percentage_of_kills'),
 				'width=18&sort=no&type=bargraph'
 			),
 			new TableColumn(
@@ -80,12 +80,12 @@ For support and installation notes visit http://www.hlxcommunity.com
 			),
 			new TableColumn(
 				'headshots',
-				'Headshots',
+				t('literal.headshots'),
 				'width=8&align=right'
 			),
 			new TableColumn(
 				'hpercent',
-				'Percentage of Headshots',
+				t('literal.percentage_of_headshots'),
 				'width=18&sort=no&type=bargraph'
 			),
 			new TableColumn(
@@ -95,7 +95,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			),
 			new TableColumn(
 				'hpk',
-				'Hpk',
+				t('literal.hpk_cap'),
 				'width=5&align=right'
 			)
 		),
@@ -151,53 +151,53 @@ For support and installation notes visit http://www.hlxcommunity.com
 		array(
 			new TableColumn(
 				'smweapon',
-				'Weapon',
+				t('literal.weapon'),
 				'width=15&type=weaponimg&align=center&link=' . urlencode("mode=weaponinfo&amp;weapon=%k&amp;game=$game"),
 				$fname
 			),
 			new TableColumn(
 				'smshots',
-				'Shots',
+				t('literal.shots'),
 				'width=8&align=right'
 			),
 			new TableColumn(
 				'smhits',
-				'Hits',
+				t('literal.hits'),
 				'width=8&align=right'
 			),
 			new TableColumn(
 				'smdamage',
-				'Damage',
+				t('literal.damage'),
 				'width=8&align=right'
 			),
 			new TableColumn(
 				'smheadshots',
-				'Headshots',
+				t('literal.headshots'),
 				'width=8&align=right'
 			),
 			new TableColumn(
 				'smkills',
-				'Kills',
+				t('literal.kills'),
 				'width=7&align=right'
 			),
 			new TableColumn(
 				'smkdr',
-				'Kills per Death',
+				t('literal.kills_per_death'),
 				'width=12&align=right'
 			),
 			new TableColumn(
 				'smaccuracy',
-				'Accuracy',
+				t('literal.accuracy'),
 				'width=8&align=right&append=' . urlencode('%')
 			),
 			new TableColumn(
 				'smdhr',
-				'Damage per Hit',
+				t('literal.damage_per_hit'),
 				'width=10&align=right'
 			),
 			new TableColumn(
 				'smspk',
-				'Shots per Kill',
+				t('literal.shots_per_kill'),
 				'width=11&align=right'
 			)
 		),
@@ -260,28 +260,28 @@ if ($db->num_rows($result) != 0)
 			array(
 				new TableColumn(
 					'smweapon',
-					'Weapon',
+					t('literal.weapon'),
 					'width=35&type=weaponimg&align=center&link='.urlencode("javascript:switch_weapon('%k');"),
 					$fname
 				),
 				new TableColumn(
 					'smhits',
-					'Hits',
+					t('literal.hits'),
 					'width=15&align=right'
 				),
 				new TableColumn(
 					'smleft',
-					'Left',
+					t('literal.left'),
 					'width=15&align=right&append=' . urlencode('%')
 				),
 				new TableColumn(
 					'smmiddle',
-					'Middle',
+					t('literal.middle'),
 					'width=15&align=right&append=' . urlencode('%')
 				),
 				new TableColumn(
 					'smright',
-					'Right',
+					t('literal.right'),
 					'width=15&align=right&append=' . urlencode('%')
 				)
 			),
@@ -302,63 +302,63 @@ if ($db->num_rows($result) != 0)
 		array(
 			new TableColumn(
 				'smweapon',
-				'Weapon',
+				t('literal.weapon'),
 				'width=15&type=weaponimg&align=center&link=' . urlencode("mode=weaponinfo&amp;weapon=%k&amp;game=$game"),
 				$fname
 			),
 			new TableColumn(
 				'smhits',
-				'Hits',
+				t('literal.hits'),
 				'width=7&align=right'
 			),
 			new TableColumn(
 				'smhead',
-				'Head',
+				t('literal.head'),
 				'width=7&align=right'
 			),
 			new TableColumn(
 				'smchest',
-				'Chest',
+				t('literal.chest'),
 				'width=7&align=right'
 			),
 			new TableColumn(
 				'smstomach',
-				'Stomach',
+				t('literal.stomach'),
 				'width=7&align=right'
 			),
 			new TableColumn(
 				'smleftarm',
-				'Left Arm',
+				t('literal.left_arm'),
 				'width=7&align=right'
 			),
 			new TableColumn(
 				'smrightarm',
-				'Right Arm',
+				t('literal.right_arm'),
 				'width=7&align=right'
 			),
 			new TableColumn(
 				'smleftleg',
-				'Left Leg',
+				t('literal.left_leg'),
 				'width=7&align=right'
 			),
 			new TableColumn(
 				'smrightleg',
-				'Right Leg',
+				t('literal.right_leg'),
 				'width=7&align=right'
 			),
 			new TableColumn(
 				'smleft',
-				'Left',
+				t('literal.left'),
 				'width=8&align=right&append=' . urlencode('%')
 			),
 			new TableColumn(
 				'smmiddle',
-				'Middle',
+				t('literal.middle'),
 				'width=8&align=right&append=' . urlencode('%')
 			),
 			new TableColumn(
 				'smright',
-				'Right',
+				t('literal.right'),
 				'width=8&align=right&append=' . urlencode('%')
 			)
 		),

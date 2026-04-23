@@ -37,25 +37,25 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+        die(t('admin.direct_access'));
     }
 
 	if ($auth->userdata["acclevel"] < 80) {
-        die ("Access denied!");
+        die(t('admin.access_denied'));
 	}
 	
 	$edlist = new EditList("awardId", "hlstats_Awards", "award", false);
-	$edlist->columns[] = new EditListColumn("game", "Game", 0, true, "hidden", $gamecode);
-	$edlist->columns[] = new EditListColumn("awardType", "Type", 0, true, "hidden", "O");
-	$edlist->columns[] = new EditListColumn("code", "Action", 0, true, "select", "hlstats_Actions.description/code/game='$gamecode' AND for_PlayerActions='1'");
-	$edlist->columns[] = new EditListColumn("name", "Award Name", 20, true, "text", "", 128);
-	$edlist->columns[] = new EditListColumn("verb", "Verb Plural", 20, true, "text", "", 64);
+	$edlist->columns[] = new EditListColumn("game", t('admin.field.game'), 0, true, "hidden", $gamecode);
+	$edlist->columns[] = new EditListColumn("awardType", t('literal.type'), 0, true, "hidden", "O");
+	$edlist->columns[] = new EditListColumn("code", t('literal.action'), 0, true, "select", "hlstats_Actions.description/code/game='$gamecode' AND for_PlayerActions='1'");
+	$edlist->columns[] = new EditListColumn("name", t('admin.field.award_name'), 20, true, "text", "", 128);
+	$edlist->columns[] = new EditListColumn("verb", t('admin.field.verb_plural'), 20, true, "text", "", 64);
 	
 	
 	if ($_POST)
 	{
 		if ($edlist->update())
-			message("success", "Operation successful.");
+			message("success", t('admin.operation_successful'));
 		else
 			message("warning", $edlist->error());
 	}
@@ -81,7 +81,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 <table width="75%" border=0 cellspacing=0 cellpadding=0>
 <tr>
-	<td align="center"><input type="submit" value="  Apply  " class="submit"></td>
+	<td align="center"><input type="submit" value="  <?php echo t('ui.apply'); ?>  " class="submit"></td>
 </tr>
 </table>
 

@@ -261,6 +261,30 @@ function translate_ui_literal($text)
 	return t($key, array(), $text);
 }
 
+function localized_no_such_game_message($game)
+{
+	return t('literal.no_such_game_named', array('game' => $game), "No such game '$game'.");
+}
+
+function localized_no_such_player_message($player)
+{
+	return t('literal.no_such_player', array('player' => $player), "No such player '$player'.");
+}
+
+function localized_no_such_country_message($country)
+{
+	return t('literal.no_such_country', array('country' => $country), "No such country '$country'.");
+}
+
+function localized_no_players_matching_uniqueid_message($uniqueid)
+{
+	return t(
+		'literal.no_players_matching_uniqueid',
+		array('uniqueid' => $uniqueid),
+		"No players found matching unique ID '$uniqueid'."
+	);
+}
+
 function format_compact_duration($seconds)
 {
 	$seconds = max(0, (int) round($seconds));
@@ -501,26 +525,27 @@ function getSortArrow($sort, $sortorder, $name, $longname, $var_sort = 'sort', $
 		$othersortorder = 'asc';
 	}
 	
-	$arrowstring = '<a href="' . $g_options['scripturl'] . '?' . makeQueryString($var_sort, $name,
-		array($var_sortorder));
+	$sortUrl = $g_options['scripturl'] . '?' . makeQueryString($var_sort, $name, array($var_sortorder));
 
 	if ($sort == $name)
 	{
-		$arrowstring .= "&amp;$var_sortorder=$othersortorder";
+		$sortUrl .= "&$var_sortorder=$othersortorder";
 		$jsarrow = "'" . $var_sortorder . "': '" . $othersortorder . "'";
 	}
 	else
 	{
-		$arrowstring .= "&amp;$var_sortorder=$sortorder";
+		$sortUrl .= "&$var_sortorder=$sortorder";
 		$jsarrow = "'" . $var_sortorder . "': '" . $sortorder . "'";
 	}
 
 	if ($sorthash)
 	{
-		$arrowstring .= "#$sorthash";
+		$sortUrl .= "#$sorthash";
 	}
 
-	$arrowstring .= '" class="head"';
+	$arrowstring = '<a href="' . eHtml($sortUrl) . '"';
+
+	$arrowstring .= ' class="head"';
 	
 	if ( $ajax )
 	{

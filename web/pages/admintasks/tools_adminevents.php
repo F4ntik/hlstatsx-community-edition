@@ -37,44 +37,49 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+        die(t('admin.direct_access'));
     }
 
 	if ($auth->userdata["acclevel"] < 80) {
-        die ("Access denied!");
+        die(t('admin.access_denied'));
 	}
+
+    $rconSuffix = $db->escape(t('admin.tools_adminevents.rcon_suffix'));
+    $sourcePrefix = $db->escape(t('admin.tools_adminevents.source_prefix'));
+    $passwordLabel = $db->escape(t('admin.tools_adminevents.password_label'));
+    $unknownLabel = $db->escape(t('literal.unknown'));
 ?>
 
-&nbsp;&nbsp;&nbsp;&nbsp;<img src="<?php echo IMAGE_PATH; ?>/downarrow.gif" width=9 height=6 class="imageformat"><b>&nbsp;<?php echo $task->title; ?></b> (Last <?php echo $g_options["DeleteDays"]; ?> Days)<p>
+&nbsp;&nbsp;&nbsp;&nbsp;<img src="<?php echo IMAGE_PATH; ?>/downarrow.gif" width=9 height=6 class="imageformat"><b>&nbsp;<?php echo $task->title; ?></b> <?php echo t('admin.common.last_days', array('days' => $g_options["DeleteDays"])); ?><p>
 
 <?php
 	$table = new Table(
 		array(
-			new TableColumn(
-				"eventTime",
-				"Date",
-				"width=20"
-			),
-			new TableColumn(
-				"eventType",
-				"Type",
-				"width=10&align=center"
-			),
-			new TableColumn(
-				"eventDesc",
-				"Description",
-				"width=40&sort=no&append=.&embedlink=yes"
-			),
-			new TableColumn(
-				"serverName",
-				"Server",
-				"width=20"
-			),
-			new TableColumn(
-				"map",
-				"Map",
-				"width=10"
-			)
+				new TableColumn(
+					"eventTime",
+					t('literal.date'),
+					"width=20"
+				),
+				new TableColumn(
+					"eventType",
+					t('literal.type'),
+					"width=10&align=center"
+				),
+				new TableColumn(
+					"eventDesc",
+					t('literal.description'),
+					"width=40&sort=no&append=.&embedlink=yes"
+				),
+				new TableColumn(
+					"serverName",
+					t('literal.server'),
+					"width=20"
+				),
+				new TableColumn(
+					"map",
+					t('literal.map'),
+					"width=10"
+				)
 		),
 		"eventTime",
 		"eventTime",
@@ -122,10 +127,10 @@ For support and installation notes visit http://www.hlxcommunity.com
 	
 	insertEvents("Rcon", "
 		SELECT
-			CONCAT(<table>.type, ' Rcon'),
+			CONCAT(<table>.type, '$rconSuffix'),
 			<table>.eventTime,
-			CONCAT('\"', command, '\"\nFrom: %A%".$g_options['scripturl']."?mode=search&q=', remoteIp, '&st=ip&game=%', remoteIp, '%/A%', IF(password<>'',CONCAT(', password: \"', password, '\"'),'')),
-			IFNULL(hlstats_Servers.name, 'Unknown'),
+			CONCAT('\"', command, '\"\n$sourcePrefix %A%".$g_options['scripturl']."?mode=search&q=', remoteIp, '&st=ip&game=%', remoteIp, '%/A%', IF(password<>'',CONCAT(', $passwordLabel \"', password, '\"'),'')),
+			IFNULL(hlstats_Servers.name, '$unknownLabel'),
 			<table>.map
 		FROM
 			<table>
@@ -141,7 +146,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 				CONCAT('\"', playerName, '\": ', message),
 				message
 			),
-			IFNULL(hlstats_Servers.name, 'Unknown'),
+			IFNULL(hlstats_Servers.name, '$unknownLabel'),
 			<table>.map
 		FROM
 			<table>
@@ -190,7 +195,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 <input type="hidden" name="sort" value="<?php echo $sort; ?>" />
 <input type="hidden" name="sortorder" value="<?php echo $sortorder; ?>" />
 
-<b style="padding-left:35px;">&#149;</b> Show only events of type: <?php
+<b style="padding-left:35px;">&#149;</b> <?php echo t('admin.tools_adminevents.show_only_type'); ?> <?php
 	$resultTypes = $db->query("
 		SELECT
 			DISTINCT eventType
@@ -200,7 +205,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			eventType ASC
 	");
 	
-	$types[""] = "(All)";
+	$types[""] = t('search.all');
 	
 	while (list($k) = $db->fetch_row($resultTypes)) {
 		$types[$k] = $k;
@@ -208,7 +213,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	
 	echo getSelect("type", $types, $select_type);
 ?>
-<input type="submit" value="Filter" class="smallsubmit" /><br /><br />
+<input type="submit" value="<?php echo t('ui.filter'); ?>" class="smallsubmit" /><br /><br />
 </form>
 <?php
 	$table->draw($result, $numitems, 95, "center");

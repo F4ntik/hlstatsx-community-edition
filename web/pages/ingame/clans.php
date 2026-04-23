@@ -37,13 +37,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
 	if (!defined('IN_HLSTATS')) {
-		die('Do not access this file directly.');
+		die(t('admin.direct_access'));
 	}
 
 	// Clan Rankings
 	$db->query("SELECT name FROM hlstats_Games WHERE code='$game'");
 	if ($db->num_rows() < 1) {
-		error("No such game '$game'.");
+		error(t('literal.no_such_game_named', array('game' => $game)));
 	}
 	
 	list($gamename) = $db->fetch_row();
@@ -62,55 +62,55 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'name',
-				'Clan',
+				t('literal.clan'),
 				'width=25&icon=clan&link=' . urlencode('mode=claninfo&amp;clan=%k')
 			),
 			new TableColumn
 			(
 				'tag',
-				'Tag',
+				t('literal.tag'),
 				'width=15&align=center'
 			),
 			new TableColumn
 			(
 				'skill',
-				'Avg. Points',
+				t('literal.avg_points'),
 				'width=8&align=right&skill_change=1'
 			),
 			new TableColumn
 			(
 				'nummembers',
-				'Members',
+				t('literal.members'),
 				'width=5&align=right'
 			),
 			new TableColumn
 			(
 				'activity',
-				'Activity',
+				t('ui.activity'),
 				'width=8&type=bargraph'
 			),
 			new TableColumn
 			(
 				'connection_time',
-				'Connection Time',
+				t('ui.connection_time'),
 				'width=13&align=right&type=timestamp'
 			),
 			new TableColumn
 			(
 				'kills',
-				'Kills',
+				t('ui.kills'),
 				'width=7&align=right'
 			),
 			new TableColumn
 			(
 				'deaths',
-				'Deaths',
+				t('ui.deaths'),
 				'width=7&align=right'
 			),
 			new TableColumn
 			(
 				'kpd',
-				'K:D',
+				t('literal.kpd_cap'),
 				'width=7&align=right'
 			)
 		),

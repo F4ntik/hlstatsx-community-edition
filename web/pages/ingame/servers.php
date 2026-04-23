@@ -37,7 +37,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+        die(t('admin.direct_access'));
     }
 
 	$server_id = 1;
@@ -47,11 +47,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 	<table class="data-table">
 		<tr class="data-table-head">
-			<td style="width:55%;" class="fSmall">&nbsp;Participating Servers</td>
-			<td style="width:23%;" class="fSmall">&nbsp;Address</td>
-			<td style="width:6%;text-align:center;" class="fSmall">&nbsp;Map</td>
-			<td style="width:6%;text-align:center;" class="fSmall">&nbsp;Played</td>
-			<td style="width:10%;text-align:center;" class="fSmall">&nbsp;Players</td>
+			<td style="width:55%;" class="fSmall">&nbsp;<?php echo t('literal.participating_servers'); ?></td>
+			<td style="width:23%;" class="fSmall">&nbsp;<?php echo t('literal.address'); ?></td>
+			<td style="width:6%;text-align:center;" class="fSmall">&nbsp;<?php echo t('literal.map'); ?></td>
+			<td style="width:6%;text-align:center;" class="fSmall">&nbsp;<?php echo t('literal.played'); ?></td>
+			<td style="width:10%;text-align:center;" class="fSmall">&nbsp;<?php echo t('status.players'); ?></td>
 		</tr>
         
 <?php

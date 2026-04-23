@@ -37,93 +37,28 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+        die(t('admin.direct_access'));
     }
 
 	if ($auth->userdata["acclevel"] < 80) {
-        die ("Access denied!");
+        die(t('admin.access_denied'));
 	}
 
 	$edlist = new EditList("id", "hlstats_ClanTags", "clan", false);
-	$edlist->columns[] = new EditListColumn("pattern", "Pattern", 40, true, "text", "", 64);
-	$edlist->columns[] = new EditListColumn("position", "Match Position", 0, true, "select", "EITHER/EITHER;START/START only;END/END only");
+	$edlist->columns[] = new EditListColumn("pattern", t('admin.clantags.field.pattern'), 40, true, "text", "", 64);
+	$edlist->columns[] = new EditListColumn("position", t('admin.clantags.field.match_position'), 0, true, "select", "EITHER/" . t('admin.clantags.position.either') . ";START/" . t('admin.clantags.position.start_only') . ";END/" . t('admin.clantags.position.end_only'));
 	
 	if ($_POST)
 	{
 		if ($edlist->update())
-			message("success", "Operation successful.");
+			message("success", t('admin.operation_successful'));
 		else
 			message("warning", $edlist->error());
 	}
 	
 ?>
 
-Here you can define the patterns used to determine what clan a player is in. These patterns are applied to players' names when they connect or change name.<p>
-
-Special characters in the pattern:<p>
-
-<table border=0 cellspacing=0 cellpadding=4>
-
-<tr class="head">
-	<td class="fSmall">Character</td>
-	<td class="fSmall">Description</td>
-</tr>
-
-<tr>
-	<td class="fNormal"><tt>A</tt></td>
-	<td class="fNormal">Matches one character  (i.e. a character is required)</td>
-</tr>
-
-<tr>
-	<td class="fNormal"><tt>X</tt></td>
-	<td class="fNormal">Matches zero or one characters  (i.e. a character is optional)</td>
-</tr>
-
-<tr>
-	<td class="fNormal"><tt>a</tt></td>
-	<td class="fNormal">Matches literal A or a</td>
-</tr>
-
-<tr>
-	<td class="fNormal"><tt>x</tt></td>
-	<td class="fNormal">Matches literal X or x</td>
-</tr>
-
-</table><p>
-
-Example patterns:<p>
-
-<table border=0 cellspacing=0 cellpadding=4>
-
-<tr class="head">
-	<td class="fSmall">Pattern</td>
-	<td class="fSmall">Description</td>
-	<td class="fSmall">Example</td>
-</tr>
-
-<tr>
-	<td class="fNormal"><tt>[AXXXXX]</tt></td>
-	<td class="fNormal">Matches 1 to 6 characters inside square braces</td>
-	<td class="fNormal"><tt>[ZOOM]Player</tt></td>
-</tr>
-
-<tr>
-	<td class="fNormal"><tt>{AAXX}</tt></td>
-	<td class="fNormal">Matches 2 to 4 characters inside curly braces</td>
-	<td class="fNormal"><tt>{S3G}Player</tt></td>
-</tr>
-
-<tr>
-	<td class="fNormal"><tt>rex>></tt></td>
-	<td class="fNormal">Matches the string "rex>>", "REX>>", etc.</td>
-	<td class="fNormal"><tt>REX>>Tyranno</tt></td>
-</tr>
-
-</table><p>
-
-Avoid adding patterns to the database that are too generic. Always ensure you have at least one literal (non-special) character in the pattern -- for example if you were to add the pattern "AXXA", it would match any player with 2 or more letters in their name!<p>
-
-The Match Position field sets which end of the player's name the clan tag is allowed to appear.<p>
+<?php echo t('admin.clantags.help_html'); ?>
 
 <?php
 	
@@ -143,7 +78,7 @@ The Match Position field sets which end of the player's name the clan tag is all
 
 <table width="75%" border=0 cellspacing=0 cellpadding=0>
 <tr>
-	<td align="center"><input type="submit" value="  Apply  " class="submit"></td>
+	<td align="center"><input type="submit" value="  <?php echo t('ui.apply'); ?>  " class="submit"></td>
 </tr>
 </table>
 

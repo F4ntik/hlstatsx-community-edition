@@ -92,7 +92,7 @@
 
 	$gamename = getGameNameByCode($db, $checkGame);
 	if ($gamename === false) {
-		error("No such game '{$gameSafeHtml}'.");
+		error(localized_no_such_game_message($checkGame));
 	}
 
 	pageHeader
@@ -117,6 +117,7 @@
 
 	$serversList = getServersByGame($db, $checkGame);
 	$filter = getChatFilterParam();
+	$clearChatUrl = eHtml('?mode=chat&game=' . urlencode($checkGame));
 
 	$deleteDaysSafe = isset($g_options['DeleteDays']) ? (int)$g_options['DeleteDays'] : 30;
 	$pageTitle = t('literal.server_chat_log', array('server' => trim($gamename . ' ' . $servername), 'days' => $deleteDaysSafe));
@@ -332,7 +333,7 @@
 					<?php echo eHtml(t('ui.filter')); ?>: <input type="text" name="filter" value="<?=eHtml($filter);?>"> 
 
 					<input type="submit" value="<?php echo eHtml(t('ui.view')); ?>" class="smallsubmit">
-					<input type="button" value="<?php echo eHtml(t('ui.clear')); ?>" class="smallsubmit" onclick="window.location.href='?mode=chat&game=<?= urlencode($checkGame); ?>';">
+					<input type="button" value="<?php echo eHtml(t('ui.clear')); ?>" class="smallsubmit" onclick="window.location.href='<?php echo $clearChatUrl; ?>';">
 				</form>
 			</span>
 

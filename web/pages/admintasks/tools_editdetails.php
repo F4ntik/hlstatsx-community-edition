@@ -37,23 +37,23 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+        die(t('admin.direct_access'));
     }
 
 	if ($auth->userdata["acclevel"] < 80) {
-        die ("Access denied!");
+        die(t('admin.access_denied'));
 	}
     
 ?>
 
 &nbsp;&nbsp;&nbsp;&nbsp;<img src="<?php echo IMAGE_PATH; ?>/downarrow.gif" width=9 height=6 class="imageformat"><b>&nbsp;<?php echo $task->title; ?></b><p>
 
-<span style="padding-left:35px;">You can enter a player or clan ID number directly, or you can search for a player or clan.</span><p>
+<span style="padding-left:35px;"><?php echo t('admin.tools_editdetails.intro'); ?></span><p>
 
 <table border="0" width="95%" align="center" border=0 cellspacing=0 cellpadding=0>
 
 <tr valign="top">
-	<td width="100%" class="fNormal">&nbsp;<img src="<?php echo IMAGE_PATH; ?>/downarrow.gif" width=9 height=6 class="imageformat"><b>&nbsp;Jump Direct</b><p>
+	<td width="100%" class="fNormal">&nbsp;<img src="<?php echo IMAGE_PATH; ?>/downarrow.gif" width=9 height=6 class="imageformat"><b>&nbsp;<?php echo t('admin.tools_editdetails.jump_direct'); ?></b><p>
 	
 		<form method="GET" action="<?php echo $g_options["scripturl"]; ?>">
 		<input type="hidden" name="mode" value="admin">
@@ -68,20 +68,20 @@ For support and installation notes visit http://www.hlxcommunity.com
 					<td>
 						<table width="100%" border=0 cellspacing=1 cellpadding=4>
 						<tr valign="middle" class="bg1">
-							<td nowrap width="45%" class="fNormal">Type:</td>
+							<td nowrap width="45%" class="fNormal"><?php echo t('literal.type'); ?>:</td>
 							<td width="55%">
 								<?php
 									echo getSelect("task",
 										array(
-											"tools_editdetails_player"=>"Player",
-											"tools_editdetails_clan"=>"Clan"
+											"tools_editdetails_player" => t('literal.player'),
+											"tools_editdetails_clan" => t('literal.clan')
 										)
 									);
 								?></td>
 						</tr>
 						
 						<tr valign="middle" class="bg1">
-							<td nowrap width="45%" class="fNormal">ID Number:</td>
+							<td nowrap width="45%" class="fNormal"><?php echo t('admin.tools_editdetails.id_number'); ?></td>
 							<td width="55%"><input type="text" name="id" size=15 maxlength=12 class="textbox"></td>
 						</tr>
 						
@@ -89,7 +89,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 					<td align="right">
 						<table border=0 cellspacing=0 cellpadding=10>
 						<tr>
-							<td><input type="submit" value=" Edit &gt;&gt; " class="submit"></td>
+							<td><input type="submit" value=" <?php echo t('admin.tools_editdetails.edit_button'); ?> " class="submit"></td>
 						</tr>
 						</table></td>
 				</tr>

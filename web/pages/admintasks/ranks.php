@@ -37,32 +37,31 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+        die(t('admin.direct_access'));
     }
 	 
 	if ($auth->userdata["acclevel"] < 80) {
-        die ("Access denied!");
+        die(t('admin.access_denied'));
 	}
 
 	$edlist = new EditList("rankId", "hlstats_Ranks", "", false);
-	$edlist->columns[] = new EditListColumn("game", "Game", 0, true, "hidden", $gamecode);
-	$edlist->columns[] = new EditListColumn("image", "Image file", 45, true, "text", "", 64);
-	$edlist->columns[] = new EditListColumn("minKills", "Minimum kills", 15, true, "text", "", 64);
-	$edlist->columns[] = new EditListColumn("maxKills", "Maximum kills", 15, true, "text", "", 64);
-	$edlist->columns[] = new EditListColumn("rankName", "Rank Name", 45, true, "text", "", 64);
+	$edlist->columns[] = new EditListColumn("game", t('admin.field.game'), 0, true, "hidden", $gamecode);
+	$edlist->columns[] = new EditListColumn("image", t('admin.field.image_file'), 45, true, "text", "", 64);
+	$edlist->columns[] = new EditListColumn("minKills", t('admin.field.minimum_kills'), 15, true, "text", "", 64);
+	$edlist->columns[] = new EditListColumn("maxKills", t('admin.field.maximum_kills'), 15, true, "text", "", 64);
+	$edlist->columns[] = new EditListColumn("rankName", t('admin.field.rank_name'), 45, true, "text", "", 64);
 	
 	if ($_POST)
 	{
 		if ($edlist->update())
-			message("success", "Operation successful.");
+			message("success", t('admin.operation_successful'));
 		else
 			message("warning", $edlist->error());
 	}
 	
 ?>
 
-Note: be sure to set the minKills/maxKills values correctly (no gap).<br>
-Images have to be given without ".gif" and "_small" extension!<p>
+<?php echo t('admin.help.ranks_note'); ?>
 
 <?php
 	
@@ -87,7 +86,7 @@ Images have to be given without ".gif" and "_small" extension!<p>
 
 <table width="75%" border=0 cellspacing=0 cellpadding=0>
 <tr>
-	<td align="center"><input type="submit" value="  Apply  " class="submit"></td>
+	<td align="center"><input type="submit" value="  <?php echo t('ui.apply'); ?>  " class="submit"></td>
 </tr>
 </table>
 

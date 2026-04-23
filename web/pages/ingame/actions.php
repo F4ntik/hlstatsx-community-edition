@@ -37,7 +37,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
 	if (!defined('IN_HLSTATS')) {
-		die('Do not access this file directly.');
+		die(t('admin.direct_access'));
 	}
 	
 	// Action Statistics
@@ -46,28 +46,28 @@ For support and installation notes visit http://www.hlxcommunity.com
 	$uniqueid  = valid_request(strval($_GET['uniqueid']), false);
 
 	$db->query("SELECT name FROM hlstats_Games WHERE code='$game'");
-	if ($db->num_rows() < 1) error("No such game '$game'.");
+	if ($db->num_rows() < 1) error(t('literal.no_such_game_named', array('game' => $game)));
 	
 	list($gamename) = $db->fetch_row();
 	$db->free_result();
 
 	$tblPlayerActions = new Table(
 		array(
-			new TableColumn(
-				'description',
-				'Action',
-				'width=45&link=' . urlencode("mode=actioninfo&amp;action=%k&amp;game=$game")
-			),
-			new TableColumn(
-				'obj_count',
-				'Achieved',
-				'width=25&align=right&append=+times'
-			),
-			new TableColumn(
-				'obj_bonus',
-				'Skill Bonus',
-				'width=25&align=right'
-			)
+				new TableColumn(
+					'description',
+					t('literal.action'),
+					'width=45&link=' . urlencode("mode=actioninfo&amp;action=%k&amp;game=$game")
+				),
+				new TableColumn(
+					'obj_count',
+					t('literal.achieved'),
+					'width=25&align=right&append=+times'
+				),
+				new TableColumn(
+					'obj_bonus',
+					t('literal.skill_bonus'),
+					'width=25&align=right'
+				)
 		),
 		'code',
 		'obj_count',

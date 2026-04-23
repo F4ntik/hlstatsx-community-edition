@@ -41,7 +41,7 @@ For support and installation notes visit http://www.hlxcommunity.com
     }
 
     // Player History
-	$player = valid_request(intval($_GET['player']), true) or error('No player ID specified.');
+	$player = valid_request(intval($_GET['player']), true) or error(t('literal.no_player_id'));
 
 	$db->query("
 		SELECT
@@ -54,7 +54,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	");
 
 	if ($db->num_rows() != 1) {
-		error("No such player '$player'.");
+	error(localized_no_such_player_message($player));
 	}
 
 	$playerdata = $db->fetch_array();

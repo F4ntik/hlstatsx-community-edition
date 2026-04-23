@@ -37,36 +37,35 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+        die(t('admin.direct_access'));
     }
 
 	if ($auth->userdata["acclevel"] < 100) {
-        die ("Access denied!");
+        die(t('admin.access_denied'));
 	}
 
+	$accessLevelOptions = '0/' . t('admin.access_level.no_access')
+		. ';80/' . t('admin.access_level.restricted')
+		. ';100/' . t('admin.access_level.administrator');
+
 	$edlist = new EditList("username", "hlstats_Users", "user", false);
-	$edlist->columns[] = new EditListColumn("username", "Username", 15, true, "text", "", 16);
-	$edlist->columns[] = new EditListColumn("password", "Password", 15, true, "password", "", 16);
-	$edlist->columns[] = new EditListColumn("acclevel", "Access Level", 25, true, "select", "0/No Access;80/Restricted;100/Administrator");
+	$edlist->columns[] = new EditListColumn("username", t('admin.username'), 15, true, "text", "", 16);
+	$edlist->columns[] = new EditListColumn("password", t('admin.password'), 15, true, "password", "", 16);
+	$edlist->columns[] = new EditListColumn("acclevel", t('admin.field.access_level'), 25, true, "select", $accessLevelOptions);
 
 	if ($_POST)
 	{
 		if ($edlist->update())
-			message("success", "Operation successful.");
+			message("success", t('admin.operation_successful'));
 		else
 			message("warning", $edlist->error());
 	}
 	
 ?>
 
-Usernames and passwords can be set up for access to this HLstats Admin area. For most sites you will only want one admin user - yourself. Some sites may however need to give administration access to several people.<p>
-
-<b>Note</b> Passwords are encrypted in the database and so cannot be viewed. However, you can change a user's password by entering a new plain text value in the Password field.<p>
-
-<b>Access Levels</b><br>
-
-&#149; <i>Restricted</i> users only have access to the Host Groups, Clan Tag Patterns, Weapons, Teams, Awards and Actions configuration areas. This means these users cannot set Options or add new Games, Servers or Admin Users to HLstats, or use any of the admin Tools.<br>
-&#149; <i>Administrator</i> users have full, unrestricted access.<p>
+<?php echo t('admin.help.adminusers_intro'); ?>
+<?php echo t('admin.help.adminusers_password_note'); ?>
+<?php echo t('admin.help.adminusers_access_levels'); ?>
 
 <?php
 	
@@ -86,7 +85,7 @@ Usernames and passwords can be set up for access to this HLstats Admin area. For
 
 <table width="75%" border=0 cellspacing=0 cellpadding=0>
 <tr>
-	<td align="center"><input type="submit" value="  Apply  " class="submit"></td>
+	<td align="center"><input type="submit" value="  <?php echo t('ui.apply'); ?>  " class="submit"></td>
 </tr>
 </table>
 

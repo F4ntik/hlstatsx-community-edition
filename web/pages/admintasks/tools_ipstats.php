@@ -37,12 +37,14 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+        die(t('admin.direct_access'));
     }
 
 	if ($auth->userdata["acclevel"] < 80) {
-        die ("Access denied!");
+        die(t('admin.access_denied'));
 	}
+
+    $unresolvedLabel = t('admin.tools_ipstats.unresolved_ip_addresses');
 ?>
 
 &nbsp;&nbsp;&nbsp;&nbsp;<img src="<?php echo IMAGE_PATH; ?>/downarrow.gif" width=9 height=6 class="imageformat"><b>&nbsp;<?php
@@ -56,7 +58,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 		echo "</a>";
 	}
 
-?></b> (Last <?php echo $g_options["DeleteDays"]; ?> Days)<?php
+?></b> <?php echo t('admin.common.last_days', array('days' => $g_options["DeleteDays"])); ?><?php
     if (isset($_GET['hostgroup']))
 	{
 ?><br>
@@ -76,17 +78,17 @@ For support and installation notes visit http://www.hlxcommunity.com
 			array(
 				new TableColumn(
 					"host",
-					"Host",
+					t('admin.tools_ipstats.host'),
 					"width=41"
 				),
 				new TableColumn(
 					"freq",
-					"Connects",
+					t('admin.tools_ipstats.connects'),
 					"width=12&align=right"
 				),
 				new TableColumn(
 					"percent",
-					"Percentage of Connects",
+					t('admin.tools_ipstats.connect_percentage'),
 					"width=30&sort=no&type=bargraph"
 				),
 				new TableColumn(
@@ -102,7 +104,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			50				// numperpage
 		);
 		
-		if ($hostgroup == "(Unresolved IP Addresses)")
+		if ($hostgroup == $unresolvedLabel)
 			$hostgroup = "";
 		
 		$result = $db->query("
@@ -143,17 +145,17 @@ For support and installation notes visit http://www.hlxcommunity.com
 			array(
 				new TableColumn(
 					"hostgroup",
-					"Host",
+					t('admin.tools_ipstats.host'),
 					"width=41&icon=server&link=" . urlencode("mode=admin&task=tools_ipstats&hostgroup=%k")
 				),
 				new TableColumn(
 					"freq",
-					"Connects",
+					t('admin.tools_ipstats.connects'),
 					"width=12&align=right"
 				),
 				new TableColumn(
 					"percent",
-					"Percentage of Connects",
+					t('admin.tools_ipstats.connect_percentage'),
 					"width=30&sort=no&type=bargraph"
 				),
 				new TableColumn(
@@ -181,7 +183,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 		
 		$result = $db->query("
 			SELECT
-				IF(hostgroup='', '(Unresolved IP Addresses)', hostgroup) AS hostgroup,
+				IF(hostgroup='', '".$db->escape($unresolvedLabel)."', hostgroup) AS hostgroup,
 				COUNT(hostgroup) AS freq,
 				(COUNT(hostgroup) / $totalconnects) * 100 AS percent
 			FROM

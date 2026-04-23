@@ -37,11 +37,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+        die(t('admin.direct_access'));
     }
 	 
 	if ($auth->userdata["acclevel"] < 80) {
-        die ("Access denied!");
+        die(t('admin.access_denied'));
 	}
 	
     function delete_game($game)
@@ -106,11 +106,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 			{
 				echo "<li>$srvt ... ";
 				$db->query("DELETE FROM $srvt WHERE serverId IN $serverlist");
-				echo "OK</li>\n";
+				echo t('admin.tools_reset.status.ok') . "</li>\n";
 			}
 			echo "<li>hlstats_server_load ... ";
 			$db->query("DELETE FROM hlstats_server_load WHERE server_id IN $serverlist");
-			echo "OK</li>\n";
+			echo t('admin.tools_reset.status.ok') . "</li>\n";
 		}
 		
 		$resultPlayers = $db->query("SELECT playerId FROM hlstats_Players WHERE game = '$game'");
@@ -126,7 +126,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			{
 				echo "<li>$plt ... ";
 				$db->query("DELETE FROM $plt WHERE playerId IN $playerlist");
-				echo "OK</li>\n";
+				echo t('admin.tools_reset.status.ok') . "</li>\n";
 			}
 		}
 		
@@ -138,9 +138,9 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 		echo "<li>hlstats_Games ...";
 		$db->query("DELETE FROM hlstats_Games WHERE code='$game'");
-		echo "OK\n";
+		echo t('admin.tools_reset.status.ok') . "\n";
 		echo "</ul><p>\n";
-		echo "Done.<p>";
+		echo t('admin.games.delete.done') . "<p>";
     }
 	
 	function removeGameSettings($table, $game) {
@@ -149,11 +149,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 		$r = $db->fetch_array();
 		if ($r['cnt'] == 0)
 		{
-			$ret = "No data existent for selected gametype.";
+			$ret = t('admin.games.delete.no_data');
 		}
 		else
 		{
-			$ret = $r['cnt']." entries deleted!";
+			$ret = t('admin.games.delete.entries_deleted', array('count' => $r['cnt']));
 			$SQL = "DELETE FROM $table WHERE game='$game';";
 			$db->query($SQL);
 		}
@@ -161,27 +161,23 @@ For support and installation notes visit http://www.hlxcommunity.com
 	}
 	
 	$edlist = new EditList("code", "hlstats_Games", "game", false, false, "", 'delete_game');
-	$edlist->columns[] = new EditListColumn("code", "Game Code", 10, true, "readonly", "", 16);
-	$edlist->columns[] = new EditListColumn("name", "Display Name", 30, true, "text", "", 128);
-	$edlist->columns[] = new EditListColumn("realgame", "Game", 50, true, "select", "hlstats_Games_Supported.name/code/", 128);
-	$edlist->columns[] = new EditListColumn("hidden", "<center>Hide Game</center>", 0, false, "checkbox");
+	$edlist->columns[] = new EditListColumn("code", t('admin.games.field.game_code'), 10, true, "readonly", "", 16);
+	$edlist->columns[] = new EditListColumn("name", t('admin.games.field.display_name'), 30, true, "text", "", 128);
+	$edlist->columns[] = new EditListColumn("realgame", t('admin.field.game'), 50, true, "select", "hlstats_Games_Supported.name/code/", 128);
+	$edlist->columns[] = new EditListColumn("hidden", "<center>" . t('admin.games.field.hide_game') . "</center>", 0, false, "checkbox");
 	
 	
 	if ($_POST)
 	{
 		if ($edlist->update())
-			message("success", "Operation successful.");
+			message("success", t('admin.operation_successful'));
 		else
 			message("warning", $edlist->error());
 	}
 	
 ?>
 
-Enter the codes and full names for all the games you want to collect statistics for. (Game codes should be the same as the mod folder name, e.g. "valve".)<br /><br />
-
-After creating a game, you will be able to configure servers, awards, etc. for that game under Game Settings.<br /><br />
-
-<strong>NOTE</strong>: Be cautious of deleting a game. Deleting a game will remove all related settings, including servers, players, and events for that game (and may take a while). You will have to manually remove any images yourself. IF YOU DELETE THE LAST GAME OF A TYPE, THERE IS NO EASY WAY TO MAKE A NEW GAME OF THAT TYPE. If you want to delete and that is the case, you are probably better off deleting all servers for that game and then just hiding the game.<br /><br />
+<?php echo t('admin.games.help_html'); ?>
 
 <?php
 	
@@ -202,7 +198,7 @@ After creating a game, you will be able to configure servers, awards, etc. for t
 
 <table style="width:75%;border:0;" cellspacing="0" cellpadding="0">
 <tr>
-	<td align="center"><input type="submit" value="  Apply  " class="submit"></td>
+	<td align="center"><input type="submit" value="  <?php echo t('ui.apply'); ?>  " class="submit"></td>
 </tr>
 </table>
 

@@ -1,5 +1,17 @@
 # Plans
 
+## Repo role
+
+This repository is the upstream-friendly RU web i18n donor lane.
+
+- It owns the explicit `web/` i18n runtime cleanup and EN/RU page coverage.
+- It does not own Python runtime integration or standalone product packaging.
+- The integrated product lane now lives separately at
+  `D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n`.
+
+This branch should stay reviewable for an upstream PR into
+`A1mDev/hlstatsx-community-edition`.
+
 ## Source
 - Task: prepare an upstream-friendly web RU i18n PR for `A1mDev/hlstatsx-community-edition`, then remediate the highest-priority review findings and continue the RU i18n cleanup on remaining admin/runtime surfaces
 - Canonical input:
@@ -37,9 +49,9 @@
 | --- | --- | --- | --- |
 | M1 | Isolate PR scope from SQL and non-i18n changes | - | [x] |
 | M2 | Replace hybrid translation flow with explicit i18n runtime | M1 | [x] |
-| M3 | Reconcile public page coverage on direct `t(...)` calls | M2 | [~] |
+| M3 | Reconcile public page coverage on direct `t(...)` calls | M2 | [x] |
 | M4 | Remediate review findings on targeted admin/ingame/status surfaces | M3 | [x] |
-| M5 | Fix runtime edge cases and validate EN/RU behavior | M4 | [ ] |
+| M5 | Fix runtime edge cases and validate EN/RU behavior | M4 | [x] |
 | M6 | Prepare reviewable commit stack and PR handoff | M5 | [ ] |
 
 ## M1. Isolate PR scope from SQL and non-i18n changes `[x]`
@@ -107,20 +119,25 @@ docker exec hlstatsx-web-ru-web php -l /var/www/html/hlstats.php
 ### Stop-and-Fix Rule
 - If any page still depends on whole-document translation to render RU correctly, translate that page explicitly before proceeding.
 
-## M3. Reconcile public page coverage on direct `t(...)` calls `[~]`
+## M3. Reconcile public page coverage on direct `t(...)` calls `[x]`
 ### Goal
 - Public pages render RU via explicit translation keys and maintain EN fallback without hidden translation layers.
 
 ### Tasks
 - [x] Review shared public entry points: `header.php`, `footer.php`, `search-class.php`, `search.php`, `class_table.php`, `functions.php`.
-- [~] Review list pages: `contents.php`, `game.php`, `players.php`, `clans.php`, `countryclans.php`, `maps.php`, `weapons.php`, `actions.php`, `roles.php`.
-- [~] Review detail pages already touched for RU coverage: `playerinfo*`, `claninfo*`, `chat.php`, `livestats.php`, `servers.php`, `awards*`.
+- [x] Review list pages: `contents.php`, `game.php`, `players.php`, `clans.php`, `countryclans.php`, `maps.php`, `weapons.php`, `actions.php`, `roles.php`.
+- [x] Review detail pages already touched for RU coverage: `playerinfo*`, `claninfo*`, `chat.php`, `livestats.php`, `servers.php`, `awards*`.
 - [x] Add or normalize dictionary keys in `web/lang/en.php` and `web/lang/ru.php`.
-- [ ] Remove dictionary keys that existed only to support global HTML post-processing.
+- [x] Remove dictionary keys that existed only to support global HTML post-processing.
 
 ### Definition of Done
 - Main public flows no longer rely on hybrid translation behavior.
 - Dictionary keys match the explicit copy rendered by the retained pages.
+
+### Notes
+- The remaining public error paths now use explicit dictionary-backed messages instead of raw English literals, including repeated `no such game/player` and missing-ID branches across `players`, `chat`, `playerinfo`, `playerhistory`, `playerawards`, `playersessions`, and related detail pages.
+- Residual public table/header literals in `claninfo_actions.php`, `claninfo_mapperformance.php`, `claninfo_weapons.php`, and `countryclansinfo.php` were moved to direct `t(...)` lookups so the last visible list/detail surfaces no longer depend on untranslated English fallback text.
+- Confirmed-dead dictionary leftovers from the old global HTML post-processing path were removed from `web/lang/en.php` / `web/lang/ru.php`, including unused `lang.*`, `footer.home_link`, and obsolete split-help fragments that were replaced earlier by explicit sentence keys.
 
 ### Validation
 ```sh
@@ -174,7 +191,7 @@ powershell -Command "Invoke-WebRequest -Uri 'http://localhost:8381/status.php?la
 ### Stop-and-Fix Rule
 - If a touched page still emits visible English after the remediation pass, keep converting that page until the reviewed surface is coherent.
 
-## M5. Fix runtime edge cases and validate EN/RU behavior `[ ]`
+## M5. Fix runtime edge cases and validate EN/RU behavior `[x]`
 ### Goal
 - Language switching, fallback behavior, caching, and logout all behave correctly in both languages.
 
@@ -182,9 +199,9 @@ powershell -Command "Invoke-WebRequest -Uri 'http://localhost:8381/status.php?la
 - [x] Fix logout redirect so it does not preserve `logout=1`.
 - [x] Ensure `lang_url(...)` can produce a clean URL without transient query params.
 - [x] Keep historical cache keys language-aware.
-- [ ] Verify fresh-session fallback to EN.
+- [x] Verify fresh-session fallback to EN.
 - [x] Verify RU persistence through query param, cookie, and session, including invalid `lang` fallback behavior.
-- [ ] Verify generated HTML stays structurally valid without XML/document corruption.
+- [x] Verify generated HTML stays structurally valid without XML/document corruption.
 
 ### Definition of Done
 - No logout redirect loop remains.
@@ -196,6 +213,9 @@ powershell -Command "Invoke-WebRequest -Uri 'http://localhost:8381/status.php?la
 - `lang_url(...)` now returns the base URL cleanly when all transient params were removed, instead of appending a dangling `?`.
 - The runtime checks confirmed that historical-cache request hashing is still language-aware because `current_lang()` is injected into the cache key input in `web/hlstats.php`.
 - The same pass also cleaned remaining shared admin UI strings in `web/pages/admin.php` and moved `adminauth.php` / `tools_editdetails_*` form labels off fragile raw English literals where direct keys already existed.
+- A follow-up runtime pass verified that a fresh session with no `lang` cookie/query now renders EN by default on `mode=contents`.
+- `getSortArrow()` now HTML-escapes the fully assembled sort URL before rendering, which removes raw `&` from sortable table links and avoids malformed `href` attributes on translated pages.
+- The last remaining chat-page HTML parse warning was closed by escaping the reset button's `onclick` target URL; representative EN/RU pages now parse cleanly apart from expected HTML5-vs-legacy-parser noise on `<nav>` and `<meter>`.
 
 ### Validation
 ```sh
@@ -205,7 +225,9 @@ powershell -Command "Invoke-WebRequest -Uri 'http://localhost:8381/hlstats.php?l
 powershell -Command "Invoke-WebRequest -Uri 'http://localhost:8381/hlstats.php?lang=en&mode=search' -UseBasicParsing | Out-Null"
 powershell -Command "Invoke-WebRequest -Uri 'http://localhost:8381/hlstats.php?lang=ru&mode=search' -UseBasicParsing | Out-Null"
 powershell -Command "$session = New-Object Microsoft.PowerShell.Commands.WebRequestSession; Invoke-WebRequest -Uri 'http://localhost:8381/hlstats.php?lang=ru&mode=contents' -WebSession $session -UseBasicParsing | Out-Null; Invoke-WebRequest -Uri 'http://localhost:8381/hlstats.php?lang=zz&mode=contents' -WebSession $session -UseBasicParsing | Out-Null"
+powershell -Command "$session = New-Object Microsoft.PowerShell.Commands.WebRequestSession; $resp = Invoke-WebRequest -Uri 'http://localhost:8381/hlstats.php?mode=contents' -WebSession $session -UseBasicParsing; if (-not $resp.Content.Contains('Contents')) { exit 1 }"
 powershell -Command "Invoke-WebRequest -Uri 'http://localhost:8381/hlstats.php?lang=ru&mode=admin' -UseBasicParsing | Out-Null"
+python -c "import urllib.request; from lxml import html, etree; routes=['http://localhost:8381/hlstats.php?lang=en&mode=contents','http://localhost:8381/hlstats.php?lang=ru&mode=contents','http://localhost:8381/hlstats.php?lang=ru&mode=players&game=cstrike','http://localhost:8381/hlstats.php?lang=ru&mode=chat&game=cstrike','http://localhost:8381/hlstats.php?lang=ru&mode=help&game=cstrike']; parser_errors=[]; [parser_errors.append((url, len((lambda p: (html.document_fromstring(urllib.request.urlopen(url).read(), parser=p), p.error_log)[1])(etree.HTMLParser(recover=True))))) for url in routes]; print(parser_errors)"
 ```
 
 ### Known Risks
@@ -227,6 +249,7 @@ powershell -Command "Invoke-WebRequest -Uri 'http://localhost:8381/hlstats.php?l
 - [ ] Keep SQL fixes out of this stack.
 - [ ] Write a compact PR description with strict scope and validation notes.
 - [ ] Update handoff docs if the plan changed materially during cleanup.
+- [ ] Keep standalone product-repo integration work out of this PR stack.
 
 ### Definition of Done
 - The final branch history is clean enough for upstream review.
@@ -245,3 +268,162 @@ git -C D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-web-ru-i18n log --one
 
 ### Stop-and-Fix Rule
 - If a commit message cannot be described as one coherent upstream concern, split or reorder it before handoff.
+
+---
+
+## Post-M6 Backlog: Admin/Ingame Translation Coverage
+
+**Last audited**: 2026-04-21
+**Scope**: Complete admin and ingame page coverage for full RU i18n
+**Note**: The user expanded scope on 2026-04-21 and this section is now the active execution sweep after the M6 baseline cleanup.
+
+### Audit Summary
+
+| Area | Translated | Remaining | Total |
+|------|-----------|-----------|-------|
+| admintasks/ | 10 | **23** | 33 |
+| ingame/ | 3 | **18** | 21 |
+| **Total** | 13 | **41** | 54 |
+
+### Common Untranslated Patterns
+
+1. **EditListColumn headers** (admintasks): "Game", "Weapon Code", "Weapon Name", "Action Code", etc.
+2. **TableColumn headers** (ingame): "Player", "Points", "Kills", "Deaths", "K:D", "Activity"
+3. **Error messages**: `error("No such game")`, `error("Access denied!")`, `error("No player ID specified")`
+4. **Success messages**: `message("success", "Operation successful.")`
+5. **HTML instruction blocks** outside PHP tags
+
+---
+
+### admintasks/ — Remaining 23 Files (HIGH PRIORITY)
+
+**Quick wins** (simple EditListColumn/TableColumn headers):
+- [x] `actions.php` — Action configuration
+- [x] `weapons.php` — Weapon configuration  
+- [x] `roles.php` — Role configuration
+- [x] `teams.php` — Team configuration
+- [x] `ranks.php` — Rank configuration
+- [x] `servers.php` — Server management
+- [x] `clantags.php` — Clan tag patterns
+
+**Medium complexity** (forms + instructions):
+- [x] `adminusers.php` — User management with access level dropdowns
+- [x] `games.php` — Game configuration with delete confirmations
+- [x] `ribbons.php` — Ribbon setup
+- [x] `ribbons_trigger.php` — Ribbon triggers
+
+**Awards configuration** (similar structure, batch together):
+- [x] `awards_plyractions.php`
+- [x] `awards_plyrplyractions.php`
+- [x] `awards_plyrplyractions_victim.php`
+- [x] `awards_weapons.php`
+
+**Tools** (mixed complexity):
+- [x] `tools_adminevents.php` — Admin events
+- [x] `tools_editdetails.php` — Edit details base
+- [x] `tools_ipstats.php` — IP statistics
+- [x] `tools_optimize.php` — Database optimization
+- [ ] `tools_resetdbcollations.php` — Collation reset
+- [ ] `tools_settings_copy.php` — Settings copy
+- [ ] `tools_synchronize.php` — Data synchronization
+- [x] `voicecomm.php` — Voice communication
+
+---
+
+### ingame/ — Remaining 18 Files (MEDIUM PRIORITY)
+
+**Player/Clan stats** (high visibility):
+- [x] `players.php` — Player rankings table
+- [x] `clans.php` — Clan rankings
+- [ ] `claninfo.php` — Clan details
+- [ ] `kills.php` — Kill statistics
+
+**Weapon/Action/Map stats** (similar table structures):
+- [ ] `weapons.php` — Weapon statistics
+- [x] `actions.php` — Action statistics  
+- [ ] `maps.php` — Map statistics
+- [x] `actioninfo.php` — Action details
+- [ ] `mapinfo.php` — Map details
+- [ ] `weaponinfo.php` — Weapon details
+
+**Server/Utility pages**:
+- [x] `servers.php` — Server list
+- [x] `bans.php` — Bans list
+- [ ] `targets.php` — Target statistics
+- [x] `load.php` — Loader/startup
+- [ ] `motd.php` — Message of the day
+
+**Common UI elements** (affects all ingame pages):
+- [x] `header.php` — Shared header
+- [x] `footer.php` — Shared footer
+
+---
+
+### Translation Keys Needed
+
+**New dictionary keys to add** (suggested naming):
+```php
+// EditList/Table headers
+'admin.actions.code' => 'Action Code'
+'admin.actions.description' => 'Action Description'
+'admin.weapons.modifier' => 'Points Modifier'
+'admin.users.access_level' => 'Access Level'
+
+// Error messages  
+'error.access_denied' => 'Access denied!'
+'error.no_such_game' => 'No such game :game'
+'error.no_player_id' => 'No player ID specified'
+
+// Success messages
+'success.operation' => 'Operation successful'
+
+// Common table headers
+'table.player' => 'Player'
+'table.points' => 'Points'
+'table.kills' => 'Kills'
+'table.deaths' => 'Deaths'
+'table.kd_ratio' => 'K:D'
+```
+
+---
+
+### Suggested Implementation Order
+
+**Phase 1** (2-3 hours): Quick wins — admintasks simple forms
+- actions.php, weapons.php, roles.php, teams.php
+
+**Phase 2** (3-4 hours): Admin forms with instructions  
+- adminusers.php, games.php, ribbons.php
+
+**Phase 3** (2-3 hours): Awards batch
+- All awards_*.php files
+
+**Phase 4** (3-4 hours): Ingame player/clan stats
+- players.php, clans.php, claninfo.php, kills.php
+
+**Phase 5** (2-3 hours): Ingame weapon/action/map
+- weapons.php, actions.php, maps.php + info pages
+
+**Phase 6** (2 hours): Shared UI + remaining
+- header.php, footer.php, server/utility pages
+
+**Total estimate**: 14-19 hours for complete coverage
+
+---
+
+### Agent Handoff Notes
+
+**Per-file checklist**:
+1. Search for hardcoded strings in: `EditListColumn`, `TableColumn`, `error()`, `message()`, HTML outside `?php ?>`
+2. Add appropriate keys to `web/lang/en.php` and `web/lang/ru.php`
+3. Use `t('key')` for headers, `t('key', ['param' => $val])` for parameterized messages
+4. Run `docker exec hlstatsx-web-ru-web php -l` for syntax check
+5. Test EN and RU rendering in browser
+
+**Fast grep for untranslated strings**:
+```sh
+grep -n "new EditListColumn.*\"[A-Z]" web/pages/admintasks/*.php
+grep -n "new TableColumn.*\"[A-Z]" web/pages/ingame/*.php
+grep -n "error(\"[A-Z]" web/pages/admintasks/*.php web/pages/ingame/*.php
+grep -n "message.*\"[A-Z]" web/pages/admintasks/*.php
+```

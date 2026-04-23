@@ -1,7 +1,13 @@
 # Test Plan
 
+This test plan applies to the RU donor lane only.
+
+- It validates upstream-friendly RU `web/` scope.
+- It does not validate the standalone Python+i18n product lane, which now lives
+  in `D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n`.
+
 ## Source
-- Task: prepare a reviewable upstream PR for web RU i18n without hybrid translation or SQL fixes, then remediate the highest-priority review findings
+- Task: prepare a reviewable upstream PR for web RU i18n without hybrid translation or SQL fixes, then continue through the broader admin and ingame RU i18n sweep
 - Plan file: `docs/plans.md`
 - Status file: `docs/status.md`
 - Repo context: `web/` public PHP frontend in `hlstatsx-community-edition-web-ru-i18n`
@@ -16,11 +22,11 @@
   - shared UI translation paths in header, footer, search, tables, lists, and selected detail pages
   - targeted remediation of the reviewed admin/ingame/status files
   - follow-up cleanup on the shared admin/auth/editdetails/newserver surfaces
+  - full admin list/form translation coverage where strings are owned by `web/pages/admintasks/*.php`
+  - progressive ingame page translation coverage where strings are owned by `web/pages/ingame/*.php`
   - logout redirect behavior
   - syntax validity of touched PHP files through the Docker PHP runtime
 - Out of scope:
-  - full admin area translation sweep
-  - full ingame area translation sweep
   - SQL strict-mode fixes
   - Perl/Python/worker behavior
   - DB-content translation
@@ -33,6 +39,7 @@
   - container `hlstatsx-web-ru-web` is running
   - target site remains reachable on port `8381`
   - syntax checks use `docker exec ... php -l` because host `php` is unavailable
+  - live HTTP smoke is currently blocked until the local web runtime can resolve the `mysql` hostname again
 
 ## Test Levels
 
@@ -78,6 +85,7 @@
 - RU response does not inject XML preamble or collapse the HTML document structure.
 - Search and list pages still render when JavaScript is effectively absent and `nojs` branch is active.
 - The targeted admin/ingame/status pages render without exposing the reviewed hardcoded English strings.
+- The broader admin/ingame sweep pages render without PHP syntax errors even when live DB-backed smoke checks are temporarily unavailable.
 
 ## Acceptance Gates
 - [x] Translation PR diff no longer contains SQL semantics changes
@@ -85,6 +93,7 @@
 - [ ] EN smoke checks pass on the retained public pages
 - [x] RU smoke checks pass on the retained public pages
 - [x] The five cited review findings are resolved on the touched pages and dictionary entries
+- [x] The new admin and ingame sweep files pass Docker `php -l`
 - [ ] Logout redirect is clean and non-looping
 - [ ] No whole-document post-processing remains in the final implementation
 - [ ] Final commit stack is reviewable and matches PR scope
@@ -125,9 +134,50 @@ curl.exe -s -D - -o NUL "http://localhost:8381/hlstats.php?lang=ru&mode=contents
 - Removing hybrid translation may temporarily expose untranslated text that was previously hidden by post-processing.
 - HTTP smoke checks will not catch every markup regression that a real browser could surface.
 - The local dataset may not cover every translated page equally well, especially clan-related edge cases.
+- The current local web runtime is temporarily unhealthy for DB-backed smoke checks because `mysql` hostname resolution is failing.
 
 ## Deferred Coverage
-- Full admin and ingame translation beyond the cited files
+- Remaining noisy admin operational pages and the last ingame detail/stat pages not yet converted in this sweep
 - Full browser-based validation for every touched public page
 - SQL strict-mode verification in the separate non-i18n branch
 - Asset-level localization for graphical navigation labels
+
+---
+
+## Code Review Findings (Cascade Agent)
+
+**Agent:** Code Review Agent (Cascade)  
+**Date:** 2026-04-21  
+**Scope:** PHP i18n layer (`i18n.php`, `functions.php`, `lang/*.php`, web pages)  
+**Status:** Pending user triage – see decision checklist below
+
+### Immediate Next Steps (High Priority)
+
+| # | Item | Location | Risk if not addressed | User Decision |
+|---|------|----------|----------------------|---------------|
+| 1 | Remove `$_GET` / `$_REQUEST` mutation from `init_i18n()` | `includes/i18n.php:113-117` | Side effects surprise downstream code (pagination, etc.) | [ ] Accept [ ] Reject [ ] Modify |
+| 2 | Replace `@setcookie` with explicit `headers_sent()` guard | `includes/i18n.php:119` | Debug-mode errors masked; broken flows hidden | [ ] Accept [ ] Reject [ ] Modify |
+| 3 | Add `debug_mode` key-leakage logging to `t()` | `includes/i18n.php:89-120` | Untranslated keys surface as technical labels to users | [ ] Accept [ ] Reject [ ] Modify |
+| 4 | Add null-guard for `$g_options` in `lang_url()` | `includes/i18n.php:162-177` | PHP notice in strict environments if `$g_options` undefined | [ ] Accept [ ] Reject [ ] Modify |
+| 5 | Verify `literal.player_rankings` key exists in EN dictionary | `pages/players.php:69` | Missing key renders literal string to user | [ ] Accept [ ] Reject [ ] Modify |
+| 6 | Implement CI dictionary sync check (EN/RU key parity) | CI pipeline | Key drift between dictionaries over time | [ ] Accept [ ] Reject [ ] Modify |
+
+### Additional Recommendations
+
+#### Security
+- [ ] **SQL injection risk in `buildSearchSqlSafe()`** – `addcslashes` is legacy; consider prepared statements for `$like_filter` / `$match_filter` if DB layer supports it (out of scope for i18n PR, but track for product lane).
+- [ ] **XSS via `lang_url()`** – `$_SERVER['PHP_SELF']` not passed through `htmlspecialchars` before rendering in `<a href="...">` language switcher.
+- [ ] **Validation errors not through `t()`** – `checkValidGame()` returns raw English strings; should use keys `error.invalid_game_param` / `error.game_param_missing`.
+
+#### Architecture / Process
+- [ ] **Dictionary versioning** – Add `dict_rev` to `meta` array; invalidate historical cache on mismatch to prevent stale-key issues.
+- [ ] **PR scope split** – Current ~70+ PHP file changes. Consider 2–3 stacked PRs: (1) runtime + lang selection, (2) shared dictionary, (3) public page coverage for upstream reviewability.
+- [ ] **Key ordering** – `ru.php` and `en.php` have different key ordering; makes diff review harder. Standardize or add automated sort check.
+
+### Open Questions for User
+
+1. Should `init_i18n()` mutate superglobals to canonicalize language, or expose `resolved_lang()` helper without mutation?
+2. Is SQL-strict mode fix integration acceptable in a follow-up PR, or must i18n PR stay completely free of SQL semantics?
+3. Do you want the `debug_mode` flag to log missing keys to a file, stderr, or admin-visible panel?
+
+**Next Action Required:** User to tick decision boxes above and route accepted items to implementation agent.

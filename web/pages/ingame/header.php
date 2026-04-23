@@ -37,7 +37,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+        die(t('admin.direct_access'));
     }
 	
 	
@@ -66,7 +66,7 @@ $lastpage = isset($_SERVER['HTTP_REFERER'])?$_SERVER['HTTP_REFERER']:"";
 	if ($lastpage) {
 		?>
 		<div style="position: absolute; bottom:45%; right:0; color #FFFFFF;">
-			<a href="<?php echo $lastpage; ?>">&laquo;&nbsp;&nbsp;Go Back</a>
+			<a href="<?php echo $lastpage; ?>">&laquo;&nbsp;&nbsp;<?php echo t('ui.go_back'); ?></a>
 		</div>
 		<?php 
 	} ?>

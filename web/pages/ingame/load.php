@@ -37,7 +37,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+        die(t('admin.direct_access'));
     }
 
 	$server_id = 1;
@@ -79,7 +79,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 					$hpk = sprintf('%.2f', ($total_headshots/$total_kills)*100);
 				else
 					$hpk = sprintf('%.2f', 0);
-				echo 'Tracking <strong>'.number_format($total_players).'</strong> players with <strong>'.number_format($total_kills).'</strong> kills and <strong>'.number_format($total_headshots)."</strong> headshots (<strong>$hpk%</strong>) on <strong>$total_servers</strong> servers"; ?>
+				echo t('contents.tracking_summary', array(
+					'players' => number_format($total_players),
+					'kills' => number_format($total_kills),
+					'headshots' => number_format($total_headshots),
+					'hpk' => $hpk,
+					'servers' => $total_servers
+				)); ?>
 			</td>
 		</tr>	
 	</table>

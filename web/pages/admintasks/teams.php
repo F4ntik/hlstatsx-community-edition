@@ -37,30 +37,30 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+        die(t('admin.direct_access'));
     }
 
 	if ($auth->userdata["acclevel"] < 80) {
-        die ("Access denied!");
+        die(t('admin.access_denied'));
 	}
 
 	$edlist = new EditList("teamId", "hlstats_Teams", "team", false);
-	$edlist->columns[] = new EditListColumn("game", "Game", 0, true, "hidden", $gamecode);
-	$edlist->columns[] = new EditListColumn("code", "Team Code", 20, true, "text", "", 32);
-	$edlist->columns[] = new EditListColumn("name", "Team Name", 20, true, "text", "", 64);
-	$edlist->columns[] = new EditListColumn("playerlist_color", "Color Code", 20, false, "text", "", 64);
-	$edlist->columns[] = new EditListColumn("playerlist_bgcolor", "Bg Color Code", 20, false, "text", "", 64);
-	$edlist->columns[] = new EditListColumn("hidden", "<center>Hide Team</center>", 0, false, "checkbox");
+	$edlist->columns[] = new EditListColumn("game", t('admin.field.game'), 0, true, "hidden", $gamecode);
+	$edlist->columns[] = new EditListColumn("code", t('admin.field.team_code'), 20, true, "text", "", 32);
+	$edlist->columns[] = new EditListColumn("name", t('admin.field.team_name'), 20, true, "text", "", 64);
+	$edlist->columns[] = new EditListColumn("playerlist_color", t('admin.field.color_code'), 20, false, "text", "", 64);
+	$edlist->columns[] = new EditListColumn("playerlist_bgcolor", t('admin.field.bg_color_code'), 20, false, "text", "", 64);
+	$edlist->columns[] = new EditListColumn("hidden", "<center>" . t('admin.field.hide_team') . "</center>", 0, false, "checkbox");
 
 	if ($_POST) {
 		if ($edlist->update())
-			message("success", "Operation successful.");
+			message("success", t('admin.operation_successful'));
 		else
 			message("warning", $edlist->error());
 	}
 ?>
 
-You can specify descriptive names for each game's team codes.<p>
+<?php echo t('admin.help.teams_descriptive_names'); ?>
 
 <?php $result = $db->query("
 		SELECT
@@ -83,7 +83,7 @@ You can specify descriptive names for each game's team codes.<p>
 
 <table width="75%" border=0 cellspacing=0 cellpadding=0>
 <tr>
-	<td align="center"><input type="submit" value="  Apply  " class="submit"></td>
+	<td align="center"><input type="submit" value="  <?php echo t('ui.apply'); ?>  " class="submit"></td>
 </tr>
 </table>
 

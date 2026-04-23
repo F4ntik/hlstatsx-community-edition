@@ -43,8 +43,8 @@
 	// Player Chat History
 	$player = filter_input(INPUT_GET, 'player', FILTER_VALIDATE_INT);
 	if ($player === null || $player === false) {
-		error('No player ID specified or invalid ID.');
-		die('No player ID specified or invalid ID.');
+		error(t('literal.no_player_id_invalid'));
+		die(t('literal.no_player_id_invalid'));
 	}
 
 	$player = (int)$player;
@@ -61,7 +61,7 @@
 	");
 
 	if ($db->num_rows() != 1) {
-		error("No such player '$player'.");
+		error(localized_no_such_player_message($player));
 	}
 
 	$playerdata = $db->fetch_array();

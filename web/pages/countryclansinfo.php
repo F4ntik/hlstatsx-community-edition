@@ -42,7 +42,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 	// Country Details
 	
-	$flag = valid_request($_GET['flag'], false) or error('No country ID specified.');
+	$flag = valid_request($_GET['flag'], false) or error(t('literal.no_country_id'));
 
 	$SQL = "
 		SELECT
@@ -73,7 +73,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	
 	$db->query($SQL);
 	if ($db->num_rows() != 1)
-		error("No such countryclan '$flag'.");
+		error(localized_no_such_country_message($flag));
 	
 	$clandata = $db->fetch_array();
 	$db->free_result();
@@ -141,14 +141,14 @@ For support and installation notes visit http://www.hlxcommunity.com
 				</tr>
 	
 				<tr class="bg2">
-					<td>Total Kills:</td>
+					<td><?php echo eHtml(t('literal.total_kills')); ?>:</td>
 					<td colspan="2"><?php
 						echo number_format($clandata['kills']);
 					?></td>
 				</tr>
 				
 				<tr class="bg1">
-					<td>Total Deaths:</td>
+					<td><?php echo eHtml(t('literal.total_deaths')); ?>:</td>
 					<td colspan="2"><?php
 						echo number_format($clandata['deaths']);
 					?></td>
@@ -176,7 +176,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 				</tr>
         
 				<tr class="bg2">
-					<td style="width:45%;">Kills per Minute:</td>
+					<td style="width:45%;"><?php echo eHtml(t('literal.kills_per_minute')); ?>:</td>
 					<td colspan="2" style="width:55%;"><?php
 						if ($clandata['connection_time'] > 0) {
 							echo sprintf('%.2f', ($clandata['kills'] / ($clandata['connection_time'] / 60)));
@@ -187,14 +187,14 @@ For support and installation notes visit http://www.hlxcommunity.com
 				</tr>
 
 				<tr class="bg1">
-					<td>Avg. Member Points:</td>
+					<td><?php echo eHtml(t('literal.avg_member_points')); ?>:</td>
 					<td colspan="2"><?php
 						echo '<strong>' . number_format($clandata['avgskill']) . '</strong>';
 					?></td>
 				</tr>
 
 				<tr class="bg2">
-					<td >Avg. Connection Time:</td>
+					<td><?php echo eHtml(t('literal.avg_connection_time')); ?>:</td>
 					<td  colspan="2"><?php
 						if ($clandata['connection_time'] > 0) {
 							echo timestamp_to_str($clandata['connection_time'] / ($clandata['nummembers']));
@@ -205,7 +205,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 				</tr>
                     
 				<tr class="bg1">
-					<td>Total Connection Time:</td>
+					<td><?php echo eHtml(t('literal.total_connection_time')); ?>:</td>
 					<td colspan="2"><?php
 						echo timestamp_to_str($clandata['connection_time']);
 					?></td>
@@ -232,37 +232,37 @@ For support and installation notes visit http://www.hlxcommunity.com
 		array(
 			new TableColumn(
 				'lastName',
-				'Name',
+				t('literal.name'),
 				'width=28&flag=1&link=' . urlencode('mode=playerinfo&amp;player=%k')
 			),
                         new TableColumn(
                                 'mmrank',
-                                'Rank',
+                                t('literal.rank'),
                                 'width=4&type=elorank'
                         ),
 			new TableColumn(
 				'skill',
-				'Points',
+				t('literal.points'),
 				'width=6&align=right'
 			),
 			new TableColumn(
 				'activity',
-				'Activity',
+				t('literal.activity'),
 				'width=10&sort=no&type=bargraph'
 			),
 			new TableColumn(
 				'connection_time',
-				'Time',
+				t('literal.time_label'),
 				'width=13&align=right&type=timestamp'
 			),
 			new TableColumn(
 				'kills',
-				'Kills',
+				t('literal.kills'),
 				'width=6&align=right'
 			),
 			new TableColumn(
 				'percent',
-				'Clan Kills',
+				t('literal.clan_kills'),
 				'width=10&sort=no&type=bargraph'
 			),
 			new TableColumn(
@@ -272,12 +272,12 @@ For support and installation notes visit http://www.hlxcommunity.com
 			),
 			new TableColumn(
 				'deaths',
-				'Deaths',
+				t('literal.deaths'),
 				'width=6&align=right'
 			),
 			new TableColumn(
 				'kpd',
-				'Kpd',
+				t('literal.kpd_cap'),
 				'width=6&align=right'
 			),
 		),

@@ -46,7 +46,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	
 	$db->query("SELECT name FROM hlstats_Games WHERE code='$game'");
 	if ($db->num_rows() != 1) {
-		error('Invalid or no game specified.');
+error(t('literal.invalid_game'));
 	} else {
 		list($gamename) = $db->fetch_row();
 	}

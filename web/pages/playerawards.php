@@ -41,7 +41,7 @@ For support and installation notes visit http://www.hlxcommunity.com
     }
 
     // Player Awards History
-	$player = valid_request($_GET['player'], true) or error("No player ID specified.");
+	$player = valid_request($_GET['player'], true) or error(t('literal.no_player_id'));
 
 	$db->query("
 		SELECT
@@ -54,7 +54,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	");
 
 	if ($db->num_rows() != 1) {
-		error("No such player '$player'.");
+		error(localized_no_such_player_message($player));
 	}
 
 	$playerdata = $db->fetch_array();
@@ -102,7 +102,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	$cnttext = t('literal.earned');
 	$lnktext = '&link='.urlencode("mode=playerawards&player=".$player."&amp;awardId=%k");
 	if (isset($_GET['awardId'])) {
-		$awardId = valid_request($_GET['awardId'], true) or error("No clan ID specified."); 
+		$awardId = valid_request($_GET['awardId'], true) or error(t('literal.no_award_id')); 
 	}
 
 	$cnttext = t('literal.kills_on_day');

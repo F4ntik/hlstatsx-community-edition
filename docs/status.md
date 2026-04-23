@@ -1,7 +1,13 @@
 # Status
 
+## Repo role
+- This repository is the RU web i18n donor lane for an upstream-friendly PR.
+- The standalone integrated product lane now lives separately at
+  `D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n`.
+- Product-level Python+i18n packaging should not expand the scope of this branch.
+
 ## Snapshot
-- Current phase: M5. Fix runtime edge cases and validate EN/RU behavior
+- Current phase: M7. Full admin and ingame RU i18n sweep
 - Plan file: `docs/plans.md`
 - Status: yellow
 - Last updated: 2026-04-21
@@ -37,12 +43,28 @@
 - Replaced the remaining hardcoded auth/editdetails/newserver literals in `web/pages/adminauth.php`, `web/pages/admintasks/newserver.php`, `web/pages/admintasks/tools_editdetails_player.php`, and `web/pages/admintasks/tools_editdetails_clan.php`, and moved the editdetails form labels to direct keys where those keys already existed.
 - Verified Docker `php -l` for the newly touched runtime/admin files after syncing the changed `web/` files into the validation container.
 - Verified live HTTP behavior for RU admin auth, invalid-language persistence fallback, and logout redirect cleanup.
+- Finished the remaining M3 public-page sweep by moving repeated raw-English error branches and residual list/detail table headers onto explicit dictionary-backed text in the remaining public pages.
+- Removed the confirmed-dead dictionary leftovers that only served the old HTML post-processing path, including unused `lang.*`, `footer.home_link`, and obsolete split-help fragments.
+- Added explicit placeholder-backed public error keys for missing country/award IDs and named `no such game/player/country` / `no players matching unique ID` responses in `web/lang/en.php` and `web/lang/ru.php`.
+- Verified fresh-session fallback to EN on `mode=contents` with no prior `lang` cookie or query param.
+- Fixed malformed sort-link HTML by escaping the full sort URL in `getSortArrow()`, removing raw `&` and the broken doubled quote in sortable `href` attributes.
+- Fixed the last remaining public HTML attribute issue on `chat.php` by escaping the reset button target URL inside `onclick`.
+- Re-ran Docker `php -l` across all newly touched public runtime/page files and confirmed they all pass.
+- Re-ran representative EN/RU HTML parse checks for `contents`, `players`, `chat`, and `help`; only legacy parser warnings for HTML5 `<nav>` / `<meter>` remain, with no XML/document-corruption regressions.
+- Localized the remaining low-risk admin list/form pages by moving column labels, help text, select options, success messages, and submit buttons onto dictionary-backed `t(...)` lookups in `web/pages/admintasks/actions.php`, `adminusers.php`, `awards_*.php`, `clantags.php`, `games.php`, `hostgroups.php`, `ranks.php`, `ribbons*.php`, `roles.php`, `servers.php`, `serversettings.php`, `teams.php`, `voicecomm.php`, and `weapons.php`.
+- Localized the next admin-tools batch in `web/pages/admintasks/tools_editdetails.php`, `tools_adminevents.php`, `tools_ipstats.php`, and `tools_optimize.php`.
+- Extended ingame direct-key coverage in `web/pages/ingame/actions.php`, `actioninfo.php`, `bans.php`, `clans.php`, `footer.php`, `header.php`, `load.php`, `players.php`, and `servers.php`.
+- Added the shared admin/ingame dictionary support those pages needed in `web/lang/en.php` and `web/lang/ru.php`.
+- Verified Docker `php -l` for all newly touched admin/ingame pages and the updated dictionaries.
+- Confirmed that live HTTP smoke checks for the new ingame routes are currently blocked by the local runtime environment, not by PHP syntax: `http://localhost:8381/hlstats.php?...` now fails with `mysqli_sql_exception` because `mysql` host resolution is broken in the local web stack.
 
 ## In Progress
-- Final validation and handoff after the runtime/admin follow-up pass.
+- Continuing the full admin/ingame RU i18n sweep before final commit-stack and PR handoff work.
 
 ## Next
-- Decide whether to continue deeper into the remaining admin/ingame translation backlog or switch to upstream PR preparation (`M6`) from the now-cleaner runtime/admin baseline.
+- Finish the remaining noisy admin operational pages (`tools_resetdbcollations.php`, `tools_settings_copy.php`, `tools_synchronize.php`, `tools_reset_2.php`, `tools_perlcontrol.php`) and the remaining ingame detail/stat pages (`claninfo.php`, `kills.php`, `maps.php`, `mapinfo.php`, `weaponinfo.php`, `weapons.php`, `targets.php`, `motd.php`, and adjacent leftovers).
+- Restore local web runtime DB connectivity so representative RU HTTP smoke checks can run again.
+- After the sweep stabilizes, return to the reviewable commit stack and upstream handoff (`M6`).
 
 ## Decisions Made
 - The upstream PR will target public `web/` RU i18n only.
@@ -51,12 +73,13 @@
 - The cleanup should preserve `GET lang -> cookie -> session -> en` unless a concrete defect forces a narrower behavior change.
 - The follow-up remediation pass may touch the cited admin and ingame pages because the user explicitly requested fixes for the concrete review findings.
 - The broader continuation pass may also touch adjacent admin/auth/editdetails pages because the user explicitly requested that the RU i18n work continue and approved per-file agent assistance.
+- The user explicitly expanded scope again on 2026-04-21 from targeted remediation to a full admin and ingame RU i18n sweep in this repo.
 
 ## Assumptions In Force
 - `upstream/master` remains the correct merge target.
 - The local Docker container `hlstatsx-web-ru-web` is the validation environment for PHP syntax and smoke checks.
 - Existing handoff docs in `docs/web_frontend_i18n_plan.md` and `docs/web_frontend_i18n_handoff.md` remain useful background but are no longer the primary source of truth.
-- This pass is still not a full admin/ingame translation sweep; only the reviewed files are in scope.
+- The final PR still needs a clean reviewable commit stack even though the working tree now includes admin/ingame sweep work.
 
 ## Commands
 ```sh
@@ -71,6 +94,7 @@ curl.exe -s -D - -o NUL "http://localhost:8381/hlstats.php?lang=ru&mode=contents
 ## Current Blockers
 - None for planning.
 - Execution blocker to watch: host shell has no `php` binary in `PATH`, so syntax validation must use Docker.
+- Runtime blocker: local HTTP smoke checks for `http://localhost:8381/hlstats.php` currently fail with `mysqli_sql_exception` because the app cannot resolve the `mysql` hostname in `includes/class_db.php`.
 
 ## Audit Log
 | Date | Milestone | Files | Commands | Result | Next |
@@ -81,6 +105,9 @@ curl.exe -s -D - -o NUL "http://localhost:8381/hlstats.php?lang=ru&mode=contents
 | 2026-04-20 | M3 | `web/pages/header.php`, `web/includes/functions.php`, `web/lang/en.php`, `web/lang/ru.php`, remaining public search/chat/history/detail/list pages, `docs/plans.md`, `docs/status.md` | `git grep`, `docker cp`, `docker exec php -l`, `fetch(...)` smoke via `js_repl` | removed helper usage from title/breadcrumb/section rendering, normalized high-visibility shared labels to explicit keys, and validated EN/RU on live `game=cstrike` routes | decide whether to remove the residual shared table fallback before M4 |
 | 2026-04-21 | M4 | `web/pages/admintasks/tools_reset.php`, `web/pages/ingame/help.php`, `web/status.php`, `web/pages/ingame/accuracy.php`, `web/lang/en.php`, `web/lang/ru.php`, `docs/plans.md`, `docs/status.md`, `docs/test-plan.md` | review findings audit, targeted file reads, parallel worker pass, `docker exec ... php -l`, focused HTTP smoke checks | remediation pass completed for the five concrete findings; page copy now routes through dictionary lookups and reviewed RU wording was corrected | decide whether to continue with broader upstream handoff work |
 | 2026-04-21 | M5 follow-up | `web/includes/i18n.php`, `web/pages/admin.php`, `web/pages/adminauth.php`, `web/pages/admintasks/newserver.php`, `web/pages/admintasks/tools_editdetails_player.php`, `web/pages/admintasks/tools_editdetails_clan.php`, `web/lang/en.php`, `web/lang/ru.php`, `docs/plans.md`, `docs/status.md` | parallel explorer audit, `docker exec ... php -l`, targeted `docker cp`, `Invoke-WebRequest`, `curl.exe -D -` | fixed invalid-language persistence fallback, cleaned `lang_url(...)`, localized shared admin edit-list strings, and validated RU admin auth plus logout/runtime persistence on live HTTP routes | decide between further admin backlog cleanup and M6 PR prep |
+| 2026-04-21 | M3/M5 closeout | `web/includes/functions.php`, `web/lang/en.php`, `web/lang/ru.php`, remaining public `web/pages/*.php`, `docs/plans.md`, `docs/status.md` | `git diff --name-only -- web`, `docker exec ... php -l`, `Invoke-WebRequest`, `python + lxml HTML parser checks` | moved the last repeated public error/table literals to explicit `t(...)`, removed dead post-processing dictionary keys, verified EN fresh-session fallback, and removed malformed sortable-link / chat-reset HTML attributes | start M6 commit-stack and PR handoff |
+| 2026-04-21 | Post-M6 audit | `web/pages/admintasks/*.php`, `web/pages/ingame/*.php`, `docs/plans.md` | `git ls-files`, `read_file` sampling | completed audit of 54 admin/ingame files: 13 translated, 41 remaining; documented full backlog in `docs/plans.md` Post-M6 Backlog section with prioritized phases, common patterns, and agent handoff notes | proceed per backlog priorities or hand off to next agent |
+| 2026-04-21 | M7 sweep pass 1 | `web/lang/en.php`, `web/lang/ru.php`, `web/pages/admintasks/*.php`, `web/pages/ingame/{actions,actioninfo,bans,clans,footer,header,load,players,servers}.php`, `docs/status.md`, `docs/test-plan.md`, `docs/plans.md` | parallel explorer audit, `docker exec ... php -l`, `Invoke-WebRequest` | localized the remaining low-risk admin forms/tools and a first ingame batch; Docker syntax checks pass, but live HTTP smoke is blocked by local `mysql` host-resolution failure | continue remaining ingame and noisy admin pages after runtime env recovery or with syntax-first validation |
 
 ## Smoke / Demo Checklist
 - [x] Clean translation-only diff prepared
@@ -98,5 +125,7 @@ curl.exe -s -D - -o NUL "http://localhost:8381/hlstats.php?lang=ru&mode=contents
 - [x] RU playerinfo / playerhistory / playersessions / chathistory / playerawards pages render correctly
 - [x] RU actioninfo / mapinfo / weaponinfo pages render correctly
 - [x] Logout no longer loops
+- [x] Fresh-session fallback with no `lang` state renders EN
+- [x] Representative EN/RU pages parse without XML/document corruption regressions
 - [x] Targeted review findings are fixed in code
 - [ ] PR description and commit stack are ready for upstream review

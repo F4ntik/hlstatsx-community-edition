@@ -64,7 +64,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	
 	$db->query("SELECT name FROM hlstats_Games WHERE code='$game'");
 	if ($db->num_rows() < 1) {
-		error("No such game '$game'.");
+	error(localized_no_such_game_message($game));
 	}
 	
 	list($gamename) = $db->fetch_row();
