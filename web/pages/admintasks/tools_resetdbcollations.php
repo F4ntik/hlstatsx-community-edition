@@ -37,11 +37,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+        die(localized_direct_access_message());
     }
 
     if ($auth->userdata['acclevel'] < 80) {
-        die ('Access denied!');
+        die(localized_access_denied_message());
     }
 ?>
 
@@ -54,7 +54,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 		$character_set = DB_CHARSET;
 
 		if ($_POST['printonly'] > 0) {
-			echo '<strong>Run these statements against your MySql database</strong><br><br>';
+			echo '<strong>' . eHtml(t('admin.task.tools_resetdbcollations.print_header')) . '</strong><br><br>';
 			echo "ALTER DATABASE `".DB_NAME."` DEFAULT CHARACTER SET $character_set COLLATE $convert_to;<br>";
 
 			$rs_tables = $db->query('SHOW TABLES') or die("DB:> Cannot SHOW TABLES");
@@ -75,7 +75,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 						$nullable = ' NULL ';
 					else
 						$nullable = ' NOT NULL';
-					if ( $row['Default'] === NULL && $nullable = ' NOT NULL ')
+					if ( $row['Default'] === NULL && $nullable == ' NOT NULL' )
 						$default = " DEFAULT ''";
 					else if ( $row['Default'] === NULL )
 						$default = ' DEFAULT NULL';
@@ -89,21 +89,21 @@ For support and installation notes visit http://www.hlxcommunity.com
 				}
 			}
 		} else {
-			echo "Converting database, table, and row collations to {$character_set}:<ul>\n";
+			echo eHtml(t('admin.task.tools_resetdbcollations.progress.start', array('charset' => $character_set))) . "<ul>\n";
 			set_time_limit(0);
-			echo '<li>Changing '.DB_NAME.' default character set and collation... ';
+			echo '<li>' . eHtml(t('admin.task.tools_resetdbcollations.progress.change_database', array('db_name' => DB_NAME)));
 			$db->query("ALTER DATABASE `".DB_NAME."` DEFAULT CHARACTER SET $character_set COLLATE $convert_to;") or die("DB:> Cannot ALTER DATABASE");
-			echo 'OK';
+			echo eHtml(t('admin.tools_reset.status.ok'));
 			$rs_tables = $db->query('SHOW TABLES') or die("DB:> Cannot SHOW TABLES");
 			while ($row_tables = $db->fetch_row($rs_tables))
 			{
 				$table = $db->escape($row_tables[0]);
 
-				echo "<li>Converting Table: $table ... ";
+				echo '<li>' . eHtml(t('admin.task.tools_resetdbcollations.progress.convert_table', array('table' => $table)));
 
 				$db->query("ALTER TABLE `$table` CONVERT TO CHARACTER SET $character_set COLLATE $convert_to;");
 
-				echo 'OK';
+				echo eHtml(t('admin.tools_reset.status.ok'));
 
 				$rs = $db->query("SHOW FULL FIELDS FROM `$table` WHERE collation is not null AND collation <> '{$convert_to}'") or die("DB:> Cannot SHOW FULL FIELDS");
 
@@ -115,7 +115,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 						$nullable = ' NULL ';
 					else
 						$nullable = ' NOT NULL';
-					if ( $row['Default'] === NULL && $nullable = ' NOT NULL ')
+					if ( $row['Default'] === NULL && $nullable == ' NOT NULL' )
 						$default = " DEFAULT ''";
 					else if ( $row['Default'] === NULL )
 						$default = ' DEFAULT NULL';
@@ -125,14 +125,14 @@ For support and installation notes visit http://www.hlxcommunity.com
 						$default = '';
 					
 					$field = $db->escape($row['Field']);
-					echo "<li>Converting Table: $table   Column: $field ... ";
+					echo '<li>' . eHtml(t('admin.task.tools_resetdbcollations.progress.convert_column', array('table' => $table, 'field' => $field)));
 					$db->query("ALTER TABLE `$table` CHANGE `$field` `$field` $row[Type] CHARACTER SET $character_set COLLATE $convert_to $nullable $default;");
-					echo 'OK';
+					echo eHtml(t('admin.tools_reset.status.ok'));
 				}
 			}
 			echo '</ul>';
 			
-			echo 'Done.<p>';
+			echo eHtml(t('admin.tools_reset.done')) . "<p>";
 		}
 		
     } else {
@@ -149,15 +149,15 @@ For support and installation notes visit http://www.hlxcommunity.com
         <tr class="bg1">
             <td class="fNormal">
 
-Resets DB Collations if you get collation errors after an upgrade from another HLstats(X)-based system. <br><br>
-You should not lose any data, but be sure to back up your database before running to be on the safe side.<br><br><br>
+<?php echo eHtml(t('admin.task.tools_resetdbcollations.intro')); ?><br><br>
+<?php echo eHtml(t('admin.task.tools_resetdbcollations.backup_notice')); ?><br><br><br>
 
 
 
 <input type="hidden" name="confirm" value="1">
-<input type="radio" name="printonly" value="0" checked> Run the commands on the database<br>
-<input type="radio" name="printonly" value="1"> Print the commands and I'll run them myself (recommended if you have a very large database likely to hang the script)<br>
-<center><input type="submit" value="Generate commands and do the above"></center>
+<input type="radio" name="printonly" value="0" checked> <?php echo eHtml(t('admin.task.tools_resetdbcollations.run_commands')); ?><br>
+<input type="radio" name="printonly" value="1"> <?php echo eHtml(t('admin.task.tools_resetdbcollations.print_commands')); ?><br>
+<center><input type="submit" value="<?php echo eHtml(t('admin.task.tools_resetdbcollations.submit_button')); ?>"></center>
 </td>
         </tr>
         

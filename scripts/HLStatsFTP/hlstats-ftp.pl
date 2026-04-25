@@ -10,6 +10,12 @@ use strict;
 use Getopt::Long;
 use Net::FTP;
 
+BEGIN {
+	print STDERR
+	  "hlstats-ftp.pl: DEPRECATED: use Python 'python -m hlstats_ftp_py' instead " .
+	  "(see scripts/hlstats_ftp_py/README.md). Perl FTP + hlstats.pl --stdin will be removed later.\n";
+}
+
 use constant VERSION => "0.42";
 use constant USAGE => <<EOT
 

@@ -37,7 +37,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
 	if (!defined('IN_HLSTATS')) {
-		die('Do not access this file directly.');
+		die(localized_direct_access_message());
 	}
 
 	// Player Details
@@ -66,13 +66,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 			header('Location: ' . $g_options['scripturl'] . "&mode=search&st=uniqueid&q=$uniqueid&game=$game");
 			exit;
 		} elseif ($db->num_rows() < 1) {
-			error("No players found matching uniqueId '$uniqueid'");
+			error(localized_no_players_matching_uniqueid_message($uniqueid));
 		} else {
 			list($player) = $db->fetch_row();
 			$player = intval($player);
 		}
 	} elseif (!$player && !$uniqueid) {
-		error('No player ID specified.');
+		error(t('literal.no_player_id'));
 	}
 	
 	$db->query("
@@ -87,7 +87,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	");
 
 	if ($db->num_rows() != 1) {
-		error("No such player '$player'.");
+		error(localized_no_such_player_message($player));
 	}
 
 	$playerdata = $db->fetch_array();

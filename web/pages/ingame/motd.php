@@ -45,7 +45,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
 	if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+        die(localized_direct_access_message());
     }
 	//
 	// Message of the day
@@ -57,7 +57,7 @@ For support and installation notes visit http://www.hlxcommunity.com
   
 	$db->query("SELECT name FROM hlstats_Games WHERE code='$game'");
 	if ($db->num_rows() < 1) {
-        error("No such game '$game'.");
+        error(localized_no_such_game_message($game));
 	}
 	
 	list($gamename) = $db->fetch_row();
@@ -73,13 +73,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 	$clans = 3;  
 	if (isset($_GET['clans']) && is_numeric($_GET['clans'])) {
-		$clans = valid_request($_GET['clans'], true;
+		$clans = valid_request($_GET['clans'], true);
 	}
 
 	$servers = 9001;  
 	if (isset($_GET['servers']) && is_numeric($_GET['servers'])) {
 		$servers = valid_request($_GET['servers'], true);
-    ]
+    }
 
 	//
 	// Top 10 Players
@@ -213,11 +213,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 	if ($servers > 0) { ?>
 		<table class="data-table" >
 			<tr class="data-table-head">
-				<td style="width:50%;" class="fSmall">&nbsp;Participating Servers</td>
-				<td style="width:20%;" class="fSmall">&nbsp;Address</td>
-				<td style="width:10%;text-align:center;" class="fSmall">&nbsp;Map</td>
-				<td style="width:10%;text-align:center;" class="fSmall">&nbsp;Played</td>
-				<td style="width:10%;" class="fSmall">&nbsp;Players</td>
+				<td style="width:50%;" class="fSmall">&nbsp;<?php echo eHtml(t('literal.participating_servers')); ?></td>
+				<td style="width:20%;" class="fSmall">&nbsp;<?php echo eHtml(t('literal.address')); ?></td>
+				<td style="width:10%;text-align:center;" class="fSmall">&nbsp;<?php echo eHtml(t('literal.map')); ?></td>
+				<td style="width:10%;text-align:center;" class="fSmall">&nbsp;<?php echo eHtml(t('literal.played')); ?></td>
+				<td style="width:10%;" class="fSmall">&nbsp;<?php echo eHtml(t('literal.players')); ?></td>
 			</tr>
         
 <?php

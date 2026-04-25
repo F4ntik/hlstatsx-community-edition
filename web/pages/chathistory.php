@@ -43,8 +43,8 @@
 	// Player Chat History
 	$player = filter_input(INPUT_GET, 'player', FILTER_VALIDATE_INT);
 	if ($player === null || $player === false) {
-		error('No player ID specified or invalid ID.');
-		die('No player ID specified or invalid ID.');
+		error(t('literal.no_player_id_invalid'));
+		die(t('literal.no_player_id_invalid'));
 	}
 
 	$player = (int)$player;
@@ -61,7 +61,7 @@
 	");
 
 	if ($db->num_rows() != 1) {
-		error("No such player '$player'.");
+		error(localized_no_such_player_message($player));
 	}
 
 	$playerdata = $db->fetch_array();
@@ -96,13 +96,13 @@
 
 	pageHeader
 	(
-		array ($gamename, 'Chat History', $pl_name),
+		array ($gamename, t('literal.chat_history'), $pl_name),
 		array
 		(
 			$gamename => $g_options['scripturl'] . "?game={$game}",
-			'Player Rankings' => $g_options['scripturl'] . "?mode=players&game={$game}",
-			'Player Details' => $g_options['scripturl'] . "?mode=playerinfo&player={$player}",
-			'Chat History' => ''
+			t('literal.player_rankings') => $g_options['scripturl'] . "?mode=players&game={$game}",
+			t('literal.player_details') => $g_options['scripturl'] . "?mode=playerinfo&player={$player}",
+			t('literal.chat_history') => ''
 		),
 
 		$playername = ""
@@ -116,26 +116,26 @@
 			new TableColumn
 			(
 				'eventTime',
-				'Date',
+				t('literal.date'),
 				'width=16'
 			),
 
 			new TableColumn
 			(
 				'message',
-				'Message',
+				t('literal.message'),
 				'width=44&sort=no&append=.&embedlink=yes'
 			),
 			new TableColumn
 			(
 				'serverName',
-				'Server',
+				t('literal.server'),
 				'width=24'
 			),
 			new TableColumn
 			(
 				'map',
-				'Map',
+				t('literal.map'),
 				'width=16'
 			)
 		),
@@ -196,7 +196,7 @@
 	list($numitems) = $db->fetch_row($resultCount);
 
 	$deleteDaysSafe = isset($g_options['DeleteDays']) ? (int)$g_options['DeleteDays'] : 30;
-	$pageTitle = sprintf('Player Chat History (Last %d Days)', $deleteDaysSafe);
+	$pageTitle = t('literal.player_chat_history', array('days' => $deleteDaysSafe));
 	$sectionTitle = printSectionTitle($pageTitle, false);
 
 	$playerInfoUrl = $urlSafe . "?mode=playerinfo&amp;player={$player}";
@@ -213,9 +213,9 @@
 				<input type="hidden" name="mode" value="chathistory" />
 				<input type="hidden" name="player" value="<?=$player;?>" />
 				<strong>&#8226;</strong>
-				Filter: <input type="text" name="filter" id="filter_input" value="<?=eHtml($filter);?>" /> 
-				<input type="submit" value="View" class="smallsubmit" />
-				<input type="button" value="Clear" class="smallsubmit" onclick="document.getElementById('filter_input').value=''; this.form.submit();">
+				<?php echo eHtml(t('ui.filter')); ?>: <input type="text" name="filter" id="filter_input" value="<?=eHtml($filter);?>" /> 
+				<input type="submit" value="<?php echo eHtml(t('ui.view')); ?>" class="smallsubmit" />
+				<input type="button" value="<?php echo eHtml(t('ui.clear')); ?>" class="smallsubmit" onclick="document.getElementById('filter_input').value=''; this.form.submit();">
 			</form>
 			</span>
 		</div>
@@ -231,7 +231,7 @@
 
 	<div class="subblock">
 		<div style="float:right;">
-			Go to: <a href="<?=$playerInfoUrl;?>"><?=$pl_name;?>'s Statistics</a>
+			<?php echo eHtml(t('literal.go_to')); ?>: <a href="<?=$playerInfoUrl;?>"><?php echo t('literal.player_statistics_link', array('player' => $pl_name)); ?></a>
 		</div>
 	</div>
 </div>

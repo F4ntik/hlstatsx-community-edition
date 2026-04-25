@@ -51,7 +51,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	");
 
 	if ($db->num_rows() < 1) {
-		error("No such game '$game'.");
+		error(localized_no_such_game_message($game));
 	}
 
 	list($gamename) = $db->fetch_row();
@@ -66,8 +66,8 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 	pageHeader
 	(
-		array ($gamename, 'Player Rankings'),
-		array ($gamename=>"%s?game=$game", 'Player Rankings'=>'')
+		array($gamename, t('literal.player_rankings')),
+		array($gamename => "%s?game=$game", t('literal.player_rankings') => '')
 	);
 
 	$rank_type = filter_input(INPUT_GET, 'rank_type', FILTER_VALIDATE_INT, [
@@ -91,9 +91,9 @@ For support and installation notes visit http://www.hlxcommunity.com
 	$i = 1;
 	$dates = array();
 	$options = [
-		0  => 'Total Ranking',
-		-1 => 'Last Week',
-		-2 => 'Last Month'
+		0  => t('players.total_ranking'),
+		-1 => t('players.last_week'),
+		-2 => t('players.last_month')
 	];
 
 	while ($rowdata = $db->fetch_array()) {
@@ -115,7 +115,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 
 <div class="block">
-	<?php printSectionTitle('Player Rankings');	?>
+	<?php printSectionTitle(t('literal.player_rankings'));	?>
 	<div class="subblock">
 		<div style="float:left;">
 			<link rel="stylesheet" type="text/css" href="css/search-suggestions.css">
@@ -125,9 +125,9 @@ For support and installation notes visit http://www.hlxcommunity.com
 				<input type="hidden" name="mode" value="search" />
 				<input type="hidden" name="game" value="<?php echo $game; ?>" />
 				<input type="hidden" name="st" value="player" />
-				<strong>&#8226;</strong> Find a player:
+				<strong>&#8226;</strong> <?php echo eHtml(t('players.find_player')); ?>:
 				<input type="text" name="q" size="20" maxlength="64" class="textbox" id="playersearch" />
-				<input type="submit" value="Search" class="smallsubmit" />
+				<input type="submit" value="<?php echo eHtml(t('ui.search')); ?>" class="smallsubmit" />
 			</form>
 		</div>
 		<div style="float:right;">
@@ -135,7 +135,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 				<input type="hidden" name="mode" value="players" />
 				<input type="hidden" name="game" value="<?php echo $game; ?>" />
 
-				<strong>&#8226;</strong> Ranking View
+				<strong>&#8226;</strong> <?php echo eHtml(t('players.ranking_view')); ?>
 
 				<select name="rank_type">
 					 <?php foreach ($options as $value => $label): ?>
@@ -143,7 +143,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 					<?php endforeach; ?>
 				</select>
 
-				<input type="submit" value="View" class="smallsubmit" />
+				<input type="submit" value="<?php echo eHtml(t('ui.view')); ?>" class="smallsubmit" />
 			</form>
 		</div>
 		<div style="clear:both;"></div><br /><br />
@@ -158,67 +158,67 @@ For support and installation notes visit http://www.hlxcommunity.com
 					new TableColumn
 					(
 						'lastName',
-						'Player',
+						t('literal.player'),
 						'width=26&flag=1&link=' . urlencode('mode=playerinfo&amp;player=%k')
 					),
 					new TableColumn
 					(
 							'mmrank',
-							'Rank',
+							t('literal.rank'),
 							'width=4&type=elorank'
 					),
 					new TableColumn
 					(
 						'skill',
-						'Points',
+						t('literal.points'),
 						'width=7&align=right&skill_change=1'
 					),
 					new TableColumn
 					(
 						'activity',
-						'Activity',
+						t('literal.activity'),
 						'width=10&sort=no&type=bargraph'
 					),
 					new TableColumn
 					(
 						'connection_time',
-						'Connection Time',
+						t('literal.connection_time'),
 						'width=10&align=right&type=timestamp'
 					),
 					new TableColumn
 					(
 						'kills',
-						'Kills',
+						t('literal.kills'),
 						'width=7&align=right'
 					),
 					new TableColumn
 					(
 						'deaths',
-						'Deaths',
+						t('literal.deaths'),
 						'width=7&align=right'
 					),
 					new TableColumn
 					(
 						'kpd',
-						'K:D',
+						t('literal.kpd_cap'),
 						'width=6&align=right'
 					),
 					new TableColumn
 					(
 						'headshots',
-						'Headshots',
+						t('literal.headshots'),
 						'width=6&align=right'
 					),
 					new TableColumn
 					(
 						'hpk',
-						'HS:K',
+						t('literal.hpk_cap'),
 						'width=6&align=right'
 					),
 					new TableColumn
 					(
 						'acc',
-						'Accuracy',
+						t('literal.accuracy'),
 						'width=6&align=right&append=' . urlencode('%')
 					)
 				),
@@ -237,61 +237,61 @@ For support and installation notes visit http://www.hlxcommunity.com
 					new TableColumn
 					(
 						'lastName',
-						'Player',
+						t('literal.player'),
 						'width=30&flag=1&link=' . urlencode('mode=playerinfo&amp;player=%k')
 					),
 					new TableColumn
 					(
 						'activity',
-						'Activity',
+						t('literal.activity'),
 						'width=10&sort=no&type=bargraph'
 						),
 					new TableColumn
 					(
 						'kills',
-						'Kills',
+						t('literal.kills'),
 						'width=7&align=right'
 					),
 					new TableColumn
 					(
 						'deaths',
-						'Deaths',
+						t('literal.deaths'),
 						'width=7&align=right'
 					),
 					new TableColumn
 					(
 						'kpd',
-						'K:D',
+						t('literal.kpd_cap'),
 						'width=6&align=right'
 					),
 					new TableColumn
 					(
 						'headshots',
-						'Headshots',
+						t('literal.headshots'),
 						'width=6&align=right'
 					),
 					new TableColumn
 					(
 						'hpk',
-						'HS:K',
+						t('literal.hpk_cap'),
 						'width=6&align=right'
 					),
 					new TableColumn
 					(
 						'acc',
-						'Accuracy',
+						t('literal.accuracy'),
 						'width=6&align=right&append=' . urlencode('%')
 					),
 					new TableColumn
 					(
 						'skill',
-						'Points',
+						t('literal.points'),
 						'width=7&align=right&skill_change=1'
 					),
 					new TableColumn
 					(
 						'connection_time',
-						'Connection Time',
+						t('literal.connection_time'),
 						'width=10&align=right&type=timestamp'
 					)
 				),
@@ -416,13 +416,19 @@ For support and installation notes visit http://www.hlxcommunity.com
 						}
 					}
 				?>
-				<strong>&#8226;</strong> Only show players with
-					<input type="text" name="minkills" size="4" maxlength="2" value="<?php echo $minkills; ?>" class="textbox" /> or more kills.
-					<input type="submit" value="Apply" class="smallsubmit" />
+				<strong>&#8226;</strong>
+				<?php
+					echo t('players.min_kills_filter', array(
+						'input' => '<input type="text" name="minkills" size="4" maxlength="2" value="' . eHtml($minkills) . '" class="textbox" />',
+					));
+				?>
+					<input type="submit" value="<?php echo eHtml(t('ui.apply')); ?>" class="smallsubmit" />
 			</form>
 		</div>
 		<div style="float:right;">
-			Go to: <a href="<?php echo $g_options["scripturl"] . "?mode=clans&amp;game=$game"; ?>">Clan Rankings</a>
+			<?php echo eHtml(t('literal.go_to')); ?>: <a href="<?php echo $g_options["scripturl"] . "?mode=clans&amp;game=$game"; ?>"><?php echo eHtml(t('literal.clan_rankings')); ?></a>
 		</div>	
 	</div>
 </div>
+
+

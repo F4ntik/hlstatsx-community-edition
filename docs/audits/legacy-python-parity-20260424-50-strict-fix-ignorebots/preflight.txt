@@ -1,0 +1,4 @@
+﻿legacy_players	0
+legacy_frags	0
+python_players	0
+python_frags	0

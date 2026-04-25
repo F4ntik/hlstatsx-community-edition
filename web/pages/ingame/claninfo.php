@@ -37,11 +37,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+        die(localized_direct_access_message());
     }
 	// Clan Details
 	
-	$clan = valid_request(intval($_GET['clan']), true) or error('No clan ID specified.');
+	$clan = valid_request(intval($_GET['clan']), true) or error(t('literal.no_clan_id'));
 	
 	$db->query("
 		SELECT
@@ -67,7 +67,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	");
 
 	if ($db->num_rows() != 1) {
-		error("No such clan '$clan'.");
+		error(localized_no_such_clan_message($clan));
 	}
 
 	$clandata = $db->fetch_array();
@@ -88,16 +88,16 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 	<table class="data-table">
 		<tr class="data-table-head">
-			<td colspan="3" class="fSmall"><?php echo 'Clan Profile Stats Summary' ?></td>
+			<td colspan="3" class="fSmall"><?php echo eHtml(translate_ui_literal('Clan Profile Stats Summary')); ?></td>
         </tr>
 		<tr class="bg1">
-			<td class="fSmall"><?php echo 'Clan Name' ?>:</td>
+			<td class="fSmall"><?php echo eHtml(t('admin.clan_name')); ?>:</td>
             <td colspan="2" class="fSmall"><?php
 				echo '<strong>'.$clandata['name'].'</strong>';
 			?></td>
 		</tr>
 		<tr class="bg2">
-			<td class="fSmall"><?php echo 'Home Page' ?>:</td>
+			<td class="fSmall"><?php echo eHtml(translate_ui_literal('Home Page')); ?>:</td>
 			<td colspan="2" class="fSmall"><?php
 				if ($url = getLink($clandata['homepage']))
 				{
@@ -105,24 +105,24 @@ For support and installation notes visit http://www.hlxcommunity.com
 				}
 				else
 				{
-					echo '(Not specified.)';
+					echo eHtml(t('literal.not_specified'));
 				}
 			?></td>
 		</tr>				
 		<tr class="bg1">
-			<td class="fSmall"><?php echo 'Number Of Members' ?>:</td>
+			<td class="fSmall"><?php echo eHtml(translate_ui_literal('Number Of Members')); ?>:</td>
 			<td colspan="2" class="fSmall"><?php
 				echo $clandata['nummembers'];
 			?></td>
 		</tr>
 		<tr class="bg2">
-			<td class="fSmall"><?php echo 'Avg. Member Points' ?>:</td>
+			<td class="fSmall"><?php echo eHtml(translate_ui_literal('Avg. Member Points')); ?>:</td>
 			<td colspan="2" class="fSmall"><?php
 				echo number_format($clandata['avgskill']);
 			?></td>
 		</tr>
         <tr class="bg1">
-			<td style="width:45%;" class="fSmall"><?php echo 'Activity' ?>:</td>
+			<td style="width:45%;" class="fSmall"><?php echo eHtml(translate_ui_literal('Activity')); ?>:</td>
 			<td style="width:40%;">
 				<?php
 					$width = sprintf('%d%%', $clandata['activity'] + 0.5);
@@ -135,19 +135,19 @@ For support and installation notes visit http://www.hlxcommunity.com
 			?></td>
 		</tr>
 		<tr class="bg2">
-			<td class="fSmall"><?php echo 'Total Kills' ?>:</td>
+			<td class="fSmall"><?php echo eHtml(translate_ui_literal('Total Kills')); ?>:</td>
 			<td colspan="2" class="fSmall"><?php
 				echo number_format($clandata['kills']);
 			?></td>
 		</tr>
 		<tr class="bg1">
-			<td class="fSmall"><?php echo 'Total Deaths' ?>:</td>
+			<td class="fSmall"><?php echo eHtml(translate_ui_literal('Total Deaths')); ?>:</td>
 			<td colspan="2" class="fSmall"><?php
 				echo number_format($clandata['deaths']);
 			?></td>
 		</tr>
 		<tr class="bg2">
-			<td class="fSmall"><?php echo 'Kills per Death' ?>:</td>
+			<td class="fSmall"><?php echo eHtml(translate_ui_literal('Kills per Death')); ?>:</td>
 			<td colspan="2" class="fSmall"><?php
 				if ($clandata['deaths'] != 0)
 				{
@@ -160,7 +160,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			?></td>
 		</tr>
 		<tr class="bg1">
-			<td class="fSmall"><?php echo 'Total Connection Time' ?>:</td>
+			<td class="fSmall"><?php echo eHtml(translate_ui_literal('Total Connection Time')); ?>:</td>
 			<td colspan="2" class="fSmall"><?php
 				echo timestamp_to_str($clandata['connection_time']);
 			?></td>

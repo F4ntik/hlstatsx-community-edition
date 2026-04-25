@@ -81,9 +81,13 @@ define('PAGE', 'INGAME');
 
 // Load required files
 require("config.php");
+require(INCLUDE_PATH . "/i18n.php");
 require(INCLUDE_PATH . "/class_db.php");
 require(INCLUDE_PATH . "/class_table.php");
 require(INCLUDE_PATH . "/functions.php");
+
+session_start();
+init_i18n();
 
 $db_classname = "DB_" . DB_TYPE;
 if ( class_exists($db_classname) )
@@ -92,7 +96,7 @@ if ( class_exists($db_classname) )
 }
 else
 {
-	error('Database class does not exist.  Please check your config.php file for DB_TYPE');
+	error(localized_text('error.database_class_missing', 'Database class does not exist. Please check your config.php file for DB_TYPE'));
 }
 
 $container = require ROOT_PATH . '/bootstrap.php';
@@ -100,7 +104,7 @@ $optionService = $container->get(\Service\OptionService::class);
 
 $g_options = $optionService->getAllOptions();
 if (empty($g_options)) {
-	error('Warning: Could not find any options in the database. Check HLStats configuration.');
+	error(localized_text('error.options_missing', 'Could not find any options in the database. Check HLStats configuration.'));
 }
 
 ////
@@ -146,7 +150,7 @@ pageHeader();
 if ( file_exists(PAGE_PATH . "/ingame/$mode.php") )
 	@include(PAGE_PATH . "/ingame/$mode.php");
 else
-	error('Unable to find ' . PAGE_PATH . "/ingame/$mode.php");
+	error(localized_text('error.page_missing', 'Unable to find :path', array('path' => PAGE_PATH . "/ingame/$mode.php")));
 
 pageFooter();
 

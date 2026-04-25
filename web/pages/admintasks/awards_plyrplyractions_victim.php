@@ -37,25 +37,25 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+die(localized_direct_access_message());
     }
 
     if ($auth->userdata['acclevel'] < 80) {
-        die ('Access denied!');
+        die(localized_access_denied_message());
     }
 	
 	$edlist = new EditList('awardId', 'hlstats_Awards', 'award', false);
-	$edlist->columns[] = new EditListColumn('game', 'Game', 0, true, 'hidden', $gamecode);
-	$edlist->columns[] = new EditListColumn('awardType', 'Type', 0, true, 'hidden', 'V');
-	$edlist->columns[] = new EditListColumn('code', 'Action', 0, true, 'select', "hlstats_Actions.description/code/game='$gamecode' AND for_PlayerPlayerActions='1'");
-	$edlist->columns[] = new EditListColumn('name', 'Award Name', 20, true, 'text', '', 128);
-	$edlist->columns[] = new EditListColumn('verb', 'Verb Plural', 20, true, 'text', '', 64);
+	$edlist->columns[] = new EditListColumn('game', t('literal.game'), 0, true, 'hidden', $gamecode);
+	$edlist->columns[] = new EditListColumn('awardType', t('literal.type'), 0, true, 'hidden', 'V');
+	$edlist->columns[] = new EditListColumn('code', t('literal.action'), 0, true, 'select', "hlstats_Actions.description/code/game='$gamecode' AND for_PlayerPlayerActions='1'");
+	$edlist->columns[] = new EditListColumn('name', t('literal.award_name'), 20, true, 'text', '', 128);
+	$edlist->columns[] = new EditListColumn('verb', t('literal.verb_plural'), 20, true, 'text', '', 64);
 	
 	
 	if ($_POST)
 	{
 		if ($edlist->update())
-			message('success', 'Operation successful.');
+			message('success', t('admin.operation_successful'));
 		else
 			message('warning', $edlist->error());
 	}
@@ -81,6 +81,6 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 <table width="75%" border=0 cellspacing=0 cellpadding=0>
 <tr>
-	<td align="center"><input type="submit" value="  Apply  " class="submit"></td>
+	<td align="center"><input type="submit" value="  <?php echo eHtml(t('ui.apply')); ?>  " class="submit"></td>
 </tr>
 </table>

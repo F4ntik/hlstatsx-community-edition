@@ -66,13 +66,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 			header("Location: " . $g_options['scripturl'] . "&mode=search&st=uniqueid&q=$uniqueid&game=$game");
 			exit;
 		} elseif ($db->num_rows() < 1) {
-			error("No players found matching uniqueId '$uniqueid'");
+			error(localized_no_players_matching_uniqueid_message($uniqueid));
 		} else {
 			list($player) = $db->fetch_row();
 			$player = intval($player);
 		}
 	} elseif (!$player && !$uniqueid) {
-		error("No player ID specified.");
+		error(t('literal.no_player_id'));
 	}
 
 	$db->query("
@@ -118,7 +118,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	");
 
 	if ($db->num_rows() != 1) {
-		error("No such player '$player'.");
+		error(localized_no_such_player_message($player));
 	}
 
 	$playerdata = $db->fetch_array();
@@ -153,10 +153,10 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 	$hideranking = $playerdata['hideranking'];
 
-    if ($hideranking == 2) {
-		$statusmsg = '<span style="color:red;font-weight:bold;">Banned</span>';
+	if ($hideranking == 2) {
+		$statusmsg = '<span style="color:red;font-weight:bold;">' . eHtml(t('literal.banned')) . '</span>';
 	} else {
-		$statusmsg = '<span style="color:green;font-weight:bold;">In good standing</span>';
+		$statusmsg = '<span style="color:green;font-weight:bold;">' . eHtml(t('literal.in_good_standing')) . '</span>';
 	}
 // Required on a few pages, just decided to add it here
 // May get moved in the future
@@ -226,12 +226,12 @@ $db->query("
 
 	pageHeader
 	(
-		array ($gamename, 'Player Details', $pl_name),
+		array ($gamename, t('literal.player_details'), $pl_name),
 		array
 		(
 			$gamename=>$g_options['scripturl'] . "?game=$game",
-			'Player Rankings'=>$g_options['scripturl'] . "?mode=players&game=$game",
-			'Player Details'=>""
+			t('literal.player_rankings')=>$g_options['scripturl'] . "?mode=players&game=$game",
+			t('literal.player_details')=>""
 		),
 		$pl_name
 	);
@@ -243,19 +243,19 @@ $db->query("
 ?>
 	<ul class="subsection_tabs" id="tabs_playerinfo">
 		<li>
-			<a href="#" id="tab_general_aliases">General</a>
+			<a href="#" id="tab_general_aliases"><?php echo eHtml(t('literal.general_tab')); ?></a>
 		</li>
 		<li>
-			<a href="#" id="tab_playeractions_teams">Teams &amp; Actions</a>
+			<a href="#" id="tab_playeractions_teams"><?php echo eHtml(t('literal.teams_actions_tab')); ?></a>
 		</li>
 		<li>
-			<a href="#" id="tab_weapons">Weapons</a>
+			<a href="#" id="tab_weapons"><?php echo eHtml(t('literal.weapons')); ?></a>
 		</li>
 		<li>
-			<a href="#" id="tab_mapperformance_servers">Maps &amp; Servers</a>
+			<a href="#" id="tab_mapperformance_servers"><?php echo eHtml(t('literal.maps_servers_tab')); ?></a>
 		</li>
 		<li>
-			<a href="#" id="tab_killstats">Killstats</a>
+			<a href="#" id="tab_killstats"><?php echo eHtml(t('literal.killstats_tab')); ?></a>
 		</li>
 	</ul><br />
 	<div id="main_content"></div>
@@ -303,16 +303,16 @@ $db->query("
 <div class="block" style="clear:both;padding-top:12px;">
 	<div class="subblock">
 		<div style="float:left;">
-			Items marked "*" above are generated from the last <?php echo $g_options['DeleteDays']; ?> days.
+			<?php echo t('literal.generated_last_days', array('days' => $g_options['DeleteDays'])); ?>
 		</div>
 		<div style="float:right;">
 			<?php
 				if (isset($_SESSION['loggedin']))
 				{
-					echo 'Admin Options: <a href="'.$g_options['scripturl']."?mode=admin&amp;task=tools_editdetails_player&amp;id=$player\">Edit Player Details</a><br />";
+					echo eHtml(t('literal.admin_options')) . ': <a href="'.$g_options['scripturl']."?mode=admin&amp;task=tools_editdetails_player&amp;id=$player\">" . eHtml(t('literal.edit_player_details')) . "</a><br />";
 				}
 			?>
-			Go to: <a href="<?php echo $g_options['scripturl'] . "?mode=players&amp;game=$game"; ?>">Player Rankings</a>
+			<?php echo eHtml(t('literal.go_to')); ?>: <a href="<?php echo $g_options['scripturl'] . "?mode=players&amp;game=$game"; ?>"><?php echo eHtml(t('literal.player_rankings')); ?></a>
 		</div>
 	</div>
 </div>

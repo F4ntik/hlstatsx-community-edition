@@ -75,7 +75,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 
 <div class="block">
-	<?php printSectionTitle('Ribbons'); ?>
+	<?php printSectionTitle(t('literal.ribbons')); ?>
 	<div class="subblock">
 		<table class="data-table">
 <?php
@@ -102,7 +102,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 				echo '</tr>';
 			}
 			$i = 0;
-			echo "<tr class=\"head\"><td colspan=\"5\"><strong>Ribbon Class #$i1 ($cnt awards required)</strong></td></tr>";
+			echo '<tr class="head"><td colspan="5"><strong>' . t('awards.ribbon_class', array('class' => $i1, 'count' => $cnt)) . '</strong></td></tr>';
 		}
 
 		if ($i == $cols)
@@ -133,7 +133,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 		if ($r['achievedcount'] > 0)
 		{
 			$image = "$link$image</a>";
-			$achvd = 'Achieved by '.$r['achievedcount'].' players';
+			$achvd = t('awards.achieved_by_players', array('count' => $r['achievedcount']));
 		}
 
 		echo "<td style=\"text-align:center;vertical-align:top;width:$colwidth%;\">

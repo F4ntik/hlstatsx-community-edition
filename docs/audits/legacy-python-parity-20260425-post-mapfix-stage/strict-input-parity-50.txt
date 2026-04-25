@@ -1,0 +1,12 @@
+legacy_input_count=50
+python_input_count=50
+input_match=True
+legacy_dropped_count=109
+python_dropped_count=109
+dropped_match=True
+
+[input_manifest_diff]
+none
+
+[dropped_lines_diff]
+none

@@ -1,0 +1,19 @@
+FROM php:8.2-apache
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        libfreetype6-dev \
+        libjpeg62-turbo-dev \
+        libpng-dev \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install gd mysqli pdo pdo_mysql \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /var/www/html
+
+COPY web /var/www/html
+COPY scripts/replay_baseline/comparison/python/web-config.php /var/www/html/config.php
+
+RUN rm -rf /var/www/html/updater \
+    && mkdir -p /var/www/html/hlstatsimg/progress \
+    && chown -R www-data:www-data /var/www/html

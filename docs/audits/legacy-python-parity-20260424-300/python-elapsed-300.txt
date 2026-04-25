@@ -1,0 +1,1 @@
+﻿python_elapsed_seconds=933.3846628

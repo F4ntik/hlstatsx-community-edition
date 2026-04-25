@@ -37,29 +37,29 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+die(localized_direct_access_message());
     }
 
 	if ($auth->userdata["acclevel"] < 80) {
-        die ("Access denied!");
+        die(localized_access_denied_message());
 	}
 
 	$edlist = new EditList("roleId", "hlstats_Roles", "role", false);
-	$edlist->columns[] = new EditListColumn("game", "Game", 0, true, "hidden", $gamecode);
-	$edlist->columns[] = new EditListColumn("code", "Role Code", 20, true, "text", "", 32);
-	$edlist->columns[] = new EditListColumn("name", "Role Name", 20, true, "text", "", 64);
-	$edlist->columns[] = new EditListColumn("hidden", "<center>Hide Role</center>", 0, false, "checkbox");
+	$edlist->columns[] = new EditListColumn("game", t('literal.game'), 0, true, "hidden", $gamecode);
+	$edlist->columns[] = new EditListColumn("code", t('literal.role_code'), 20, true, "text", "", 32);
+	$edlist->columns[] = new EditListColumn("name", t('literal.role_name'), 20, true, "text", "", 64);
+	$edlist->columns[] = new EditListColumn("hidden", "<center>" . eHtml(t('literal.hide_role')) . "</center>", 0, false, "checkbox");
 
 	if ($_POST)
 	{
 		if ($edlist->update())
-			message("success", "Operation successful.");
+			message("success", t('admin.operation_successful'));
 		else
 			message("warning", $edlist->error());
 	}
 ?>
 
-You can specify descriptive names for each game's role codes.<p>
+<?php echo eHtml(t('admin.task.roles.intro')); ?><p>
 
 <?php $result = $db->query("
 		SELECT
@@ -80,7 +80,7 @@ You can specify descriptive names for each game's role codes.<p>
 
 <table width="75%" border=0 cellspacing=0 cellpadding=0>
 <tr>
-	<td align="center"><input type="submit" value="  Apply  " class="submit"></td>
+	<td align="center"><input type="submit" value="  <?php echo eHtml(t('ui.apply')); ?>  " class="submit"></td>
 </tr>
 </table>
 

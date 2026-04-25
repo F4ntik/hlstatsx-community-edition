@@ -123,15 +123,15 @@ function printserverstats($server_id)
 <table class="livestats-table">
 	<tr class="data-table-head">
 		<td class="fSmall" style="width:2%;">&nbsp;#</td>
-		<td class="fSmall" style="width:42%;text-align:left;">&nbsp;Player</td>
-		<td class="fSmall" colspan="3" style="width:5%;">&nbsp;Kills</td>
-		<td class="fSmall" style="width:4%;">&nbsp;Hs</td>
-		<td class="fSmall" style="width:8%;">&nbsp;HS:K</td>
-		<td class="fSmall" style="width:6%;">&nbsp;Acc</td>
-		<td class="fSmall" style="width:6%;">&nbsp;Lat</td>
-		<td class="fSmall" style="width:10%;">&nbsp;Time</td>
+		<td class="fSmall" style="width:42%;text-align:left;">&nbsp;<?php echo eHtml(t('literal.player')); ?></td>
+		<td class="fSmall" colspan="3" style="width:5%;">&nbsp;<?php echo eHtml(t('literal.kills')); ?></td>
+		<td class="fSmall" style="width:4%;">&nbsp;<?php echo eHtml(t('literal.headshots_short')); ?></td>
+		<td class="fSmall" style="width:8%;">&nbsp;<?php echo eHtml(t('literal.hpk_cap')); ?></td>
+		<td class="fSmall" style="width:6%;">&nbsp;<?php echo eHtml(t('literal.accuracy')); ?></td>
+		<td class="fSmall" style="width:6%;">&nbsp;<?php echo eHtml(t('literal.latency_short')); ?></td>
+		<td class="fSmall" style="width:10%;">&nbsp;<?php echo eHtml(t('literal.connection_time')); ?></td>
 		<td class="fSmall" style="width:6%;">&nbsp;+/-</td>
-		<td class="fSmall" style="width:6%;">&nbsp;Skill</td>
+		<td class="fSmall" style="width:6%;">&nbsp;<?php echo eHtml(t('literal.skill_label')); ?></td>
 	</tr>
 
 <?php 
@@ -227,7 +227,7 @@ function printserverstats($server_id)
             $thisteam = $teamdata[$curteam];
 			$teamcolor = 'background:'.$thisteam['playerlist_bgcolor'].';color:'.$thisteam['playerlist_color'];
 			$bordercolor = 'background:'.$thisteam['playerlist_bgcolor'].';color:'.$thisteam['playerlist_color'].';border-top:1px '.$thisteam['playerlist_color'].' solid';
-            $team_display_name = empty($thisteam['name']) ? "Unknown team" : htmlspecialchars($thisteam['name']);
+            $team_display_name = empty($thisteam['name']) ? t('literal.unknown_team') : htmlspecialchars($thisteam['name']);
 
 			while (isset($playerdata[$curteam][$j]))
 			{
@@ -357,7 +357,7 @@ function printserverstats($server_id)
 					}
 					else
 					{
-						echo 'Unknown';
+						echo eHtml(t('literal.unknown'));
 					}
 				}
 				else
@@ -400,7 +400,7 @@ function printserverstats($server_id)
 				echo "<strong>$team_display_name</strong>";
 				if (($map_teama_wins > 0) || ($map_teamb_wins > 0))
 				{
-					echo '&nbsp;('.$map_teama_wins.' wins)';
+					echo '&nbsp;' . t('server.team_wins', array('wins' => $map_teama_wins));
 				}
 ?>		</td>
 		<td style="width:2%;text-align:right;<?php echo $bordercolor ?>" class="fSmall"><?php
@@ -499,7 +499,7 @@ function printserverstats($server_id)
 					}
 					else
 					{
-						echo 'Unknown';
+						echo eHtml(t('literal.unknown'));
 					}
 				}
 				else
@@ -532,7 +532,7 @@ function printserverstats($server_id)
 			echo '&nbsp;';  
 ?>		</td>
 		<td colspan="11" style="text-align:left;background:#EFEFEF;color:black"><?php 
-			echo "No Players";  
+			echo eHtml(t('literal.no_players'));  
 ?>		</td>
 	</tr>
 <?php

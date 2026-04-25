@@ -46,17 +46,17 @@ For support and installation notes visit http://www.hlxcommunity.com
 		array(
 			new TableColumn(
 				'map',
-				'Map Name',
+				t('literal.map_name'),
 				'width=15&align=left&link=' . urlencode("mode=mapinfo&amp;map=%k&amp;game=$game")
 			),
 			new TableColumn(
 				'kills',
-				'Kills',
+				t('literal.kills'),
 				'width=6&align=right'
 			),
 			new TableColumn(
 				'kpercent',
-				'Percentage of Kills',
+				t('literal.percentage_of_kills'),
 				'width=15&sort=no&type=bargraph'
 			),
 			new TableColumn(
@@ -66,22 +66,22 @@ For support and installation notes visit http://www.hlxcommunity.com
 			),
 			new TableColumn(
 				'deaths',
-				'Deaths',
+				t('literal.deaths'),
 				'width=6&align=right'
 			),
 			new TableColumn(
 				'kpd',
-				'Kills per Death',
+				t('literal.kills_per_death'),
 				'width=13&align=right'
 			),
 			new TableColumn(
 				'headshots',
-				'Headshots',
+				t('literal.headshots'),
 				'width=9&align=right'
 			),
 			new TableColumn(
 				'hpercent',
-				'Percentage of Headshots',
+				t('literal.percentage_of_headshots'),
 				'width=16&sort=no&type=bargraph'
 			),
 			new TableColumn(
@@ -91,7 +91,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			),
 			new TableColumn(
 				'hpk',
-				'Hpk',
+				t('literal.hpk_cap'),
 				'width=5&align=right'
 			)
 			
@@ -159,7 +159,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 	<div style="clear:both;padding-top:20px;"></div>
 <?php
-	printSectionTitle('Map Performance *');
+	printSectionTitle(t('literal.map_performance'));
 	$tblMaps->draw($result, $db->num_rows($result), 95);
 ?>
 <br /><br />

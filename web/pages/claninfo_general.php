@@ -40,23 +40,23 @@ For support and installation notes visit http://www.hlxcommunity.com
         die('Do not access this file directly.');
     }
 
-printSectionTitle('Clan Information');
+printSectionTitle(t('literal.clan_information'));
 ?>
 <div class="subblock">
 	<div style="float:left;vertical-align:top;width:48.5%;">
 		<table class="data-table">
 		
 			<tr class="data-table-head">
-				<td colspan="3">Statistics Summary</td>
+				<td colspan="3"><?php echo eHtml(t('literal.statistics_summary')); ?></td>
 			</tr>
 			
 			<tr class="bg1">
-				<td>Clan:</td>
+				<td><?php echo eHtml(t('literal.clan')); ?>:</td>
 				<td colspan="2"><strong><?php echo $clandata['name']; ?></strong></td>
 			</tr>
 
 			<tr class="bg2">
-				<td>Home Page:</td>
+				<td><?php echo eHtml(t('literal.home_page')); ?>:</td>
 				<td colspan="2"><?php
 					if ($url = getLink($clandata['homepage']))
 					{
@@ -64,13 +64,13 @@ printSectionTitle('Clan Information');
 					}
 					else
 					{
-						echo '(Not specified.)';
+						echo eHtml(t('literal.not_specified'));
 					}
 				?></td>
 			</tr>
 
 			<tr class="bg1">
-				<td style="width:45%;">Activity:</td>
+				<td style="width:45%;"><?php echo eHtml(t('literal.activity')); ?>:</td>
 				<td style="width:40%;">
 				<meter min="0" max="100" low="25" high="50" optimum="75" value="<?php
 					echo $clandata['activity'] ?>"></meter>
@@ -81,43 +81,45 @@ printSectionTitle('Clan Information');
 			</tr>
 
 			<tr class="bg2">
-				<td>Members:</td>
+				<td><?php echo eHtml(t('literal.members')); ?>:</td>
 				<td colspan="2"><?php
-					echo $clandata['nummembers'].
-					" active members ($totalclanplayers total)"; 
+					echo t('clan.active_members_total', array(
+						'active' => $clandata['nummembers'],
+						'total' => $totalclanplayers,
+					));
 				?></td>
 			</tr>
 
 			<tr class="bg1">
-				<td>Avg. Member Points:</td>
+				<td><?php echo eHtml(t('literal.avg_member_points')); ?>:</td>
 				<td colspan="2"><strong><?php
 					echo number_format($clandata['avgskill']);
 				?></strong></td>
 			</tr>
 
 			<tr class="bg2">
-				<td>Total Kills:</td>
+				<td><?php echo eHtml(t('literal.total_kills')); ?>:</td>
 				<td colspan="2"><?php
 					echo number_format($clandata['kills']);
 				?></td>
 			</tr>
 				
 			<tr class="bg1">
-				<td>Total Deaths:</td>
+				<td><?php echo eHtml(t('literal.total_deaths')); ?>:</td>
 				<td colspan="2"><?php
 					echo number_format($clandata['deaths']);
 				?></td>
 			</tr>
             
 			<tr class="bg2">
-				<td>Avg. Kills:</td>
+				<td><?php echo eHtml(t('literal.avg_kills')); ?>:</td>
 				<td colspan="2"><?php
 					echo number_format($clandata['kills'] / ($clandata['nummembers']));
 				?></td>
 			</tr>
 				
 			<tr class="bg1">
-				<td>Kills per Death:</td>
+				<td><?php echo eHtml(t('literal.kills_per_death')); ?>:</td>
 				<td colspan="2"><?php
 					if ($clandata['deaths'] != 0)
 					{
@@ -131,7 +133,7 @@ printSectionTitle('Clan Information');
 			</tr>
         
 			<tr class="bg2">
-		    	<td style="width:45%;">Kills per Minute:</td>
+		    	<td style="width:45%;"><?php echo eHtml(t('literal.kills_per_minute')); ?>:</td>
 				<td colspan="2" style="width:55%;"><?php
 					if ($clandata['connection_time'] > 0) {
 						echo sprintf("%.2f", ($clandata['kills'] / ($clandata['connection_time'] / 60)));
@@ -142,14 +144,14 @@ printSectionTitle('Clan Information');
 			</tr>
 
 			<tr class="bg1">
-				<td>Total Connection Time:</td>
+				<td><?php echo eHtml(t('literal.total_connection_time')); ?>:</td>
 				<td colspan="2"><?php
 					echo timestamp_to_str($clandata['connection_time']);
 				?></td>
 			</tr>
 
 			<tr class="bg2">
-				<td>Avg. Connection Time:</td>
+				<td><?php echo eHtml(t('literal.avg_connection_time')); ?>:</td>
 				<td colspan="2"><?php
 					if ($clandata['connection_time'] > 0) {
 						echo timestamp_to_str($clandata['connection_time'] / ($clandata['nummembers']));
@@ -160,7 +162,7 @@ printSectionTitle('Clan Information');
             </tr>
 
 			<tr class="bg1">
-				<td>Favorite Server:*</td>
+				<td><?php echo eHtml(t('literal.favorite_server')); ?>:*</td>
 				<td colspan="2"><?php
 					$db->query("
 						SELECT
@@ -193,7 +195,7 @@ printSectionTitle('Clan Information');
 		    </tr>
 
             <tr class="bg2">
-		    	<td>Favorite Map:*</td>
+		    	<td><?php echo eHtml(t('literal.favorite_map')); ?>:*</td>
     			<td colspan="2"><?php
 					$db->query("
 						SELECT
@@ -221,7 +223,7 @@ printSectionTitle('Clan Information');
 			</tr>
 
             <tr class="bg1">
-                <td>Favorite Weapon:*</td>
+                <td><?php echo eHtml(t('literal.favorite_weapon')); ?>:*</td>
                 <td colspan="2"><?php
 					$result = $db->query("
 						SELECT
@@ -260,7 +262,7 @@ printSectionTitle('Clan Information');
 					}
 
 					if ($fav_weapon == '')
-						$fav_weapon = 'Unknown';
+						$fav_weapon = t('literal.unknown');
 					$image = getImage("/games/$game/weapons/$fav_weapon");
                     // check if image exists
 					$weaponlink = "<a href=\"hlstats.php?mode=weaponinfo&amp;weapon=$fav_weapon&amp;game=$game\">";
@@ -281,7 +283,7 @@ printSectionTitle('Clan Information');
 	<div style="float:right;vertical-align:top;width:48.5%;">
 		<table class="data-table">
 			<tr class="data-table-head">
-				<td colspan="3">Player Locations</td>
+				<td colspan="3"><?php echo eHtml(t('literal.player_locations')); ?></td>
 			</tr>
 			<tr class="bg1">
 				<td>
@@ -404,7 +406,7 @@ printSectionTitle('Clan Information');
 
 <div style="clear:both;padding-top:20px;"></div>
 <?php 
-	printSectionTitle('Members');
+	printSectionTitle(t('literal.members'));
 	$tblMembers->draw($result, $numitems, 95);
 ?>
 <br /><br />

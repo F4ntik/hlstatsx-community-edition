@@ -37,13 +37,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+        die(t('admin.direct_access'));
     }
 
-	pageHeader(array('Admin'), array('Admin' => ''));
+	pageHeader(array(t('ui.admin')), array(t('ui.admin') => ''));
 ?>
 <div class="block">
-	<?php printSectionTitle('Authorization Required'); ?>
+	<?php printSectionTitle(t('admin.auth_required')); ?>
 	<div class="subblock">
 	<?php
 	if ($this->error)
@@ -59,21 +59,21 @@ For support and installation notes visit http://www.hlxcommunity.com
 	
 			<table class="data-table">
 				<tr style="vertical-align:middle;">
-					<td class="bg1" style="width:45%;border:0;">Username:</td>
+					<td class="bg1" style="width:45%;border:0;"><?php echo eHtml(t('admin.username')); ?>:</td>
 					<td class="bg1" style="width:55%;border:0;"><input type="text" name="authusername" size="20" maxlength="16" value="<?php echo $this->username; ?>" class="textbox"></td>
 				</tr>
 				<tr style="vertical-align:middle;">
-					<td class="bg1" style="width:45%;border:0;">Password:</td>
+					<td class="bg1" style="width:45%;border:0;"><?php echo eHtml(t('admin.password')); ?>:</td>
 					<td class="bg1" style="width:55%;border:0;"><input type="password" name="authpassword" size="20" maxlength="16" value="<?php echo $this->password; ?>" class="textbox"></td>
 				</tr>
 				<tr>
 					<td class="bg1" style="border:0;">&nbsp;</td>
-					<td class="bg1" style="border:0;"><input type="submit" value=" Login " id="authsubmit" class="submit"></td>
+					<td class="bg1" style="border:0;"><input type="submit" value=" <?php echo eHtml(t('admin.login')); ?> " id="authsubmit" class="submit"></td>
 				</tr>
 			
 			</table><br />
 				
-			Please ensure cookies are enabled in your browser security options.<br />
+			<?php echo eHtml(t('admin.enable_cookies')); ?><br />
 			<!-- <strong>Note</strong> Do not select "Save my password" if other people will use this computer.</span>	<br /><br /> -->
 		</form>
 		</div>

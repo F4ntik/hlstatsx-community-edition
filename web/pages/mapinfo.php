@@ -42,21 +42,21 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 	// Map Details
 	
-	$map = valid_request($_GET['map'], false) or error('No map specified.');
+	$map = valid_request($_GET['map'], false) or error(t('literal.no_map_specified'));
 	
 	$db->query("SELECT name FROM hlstats_Games WHERE code='$game'");
 	if ($db->num_rows() != 1) {
-		error('Invalid or no game specified.');
+error(t('literal.invalid_game'));
 	} else {
 		list($gamename) = $db->fetch_row();
 	}
 
 	pageHeader(
-		array($gamename, 'Map Details', $map),
+		array($gamename, t('literal.map_details'), $map),
 		array(
 			$gamename=>$g_options['scripturl'] . "?game=$game",
-			'Map Statistics' => $g_options['scripturl'] . "?mode=maps&game=$game",
-			'Map Details' => ''
+			t('literal.map_statistics') => $g_options['scripturl'] . "?mode=maps&game=$game",
+			t('literal.map_details') => ''
 		),
 		$map
 	);
@@ -65,22 +65,22 @@ For support and installation notes visit http://www.hlxcommunity.com
 		array(
 			new TableColumn(
 				'killerName',
-				'Player',
+				t('literal.player'),
 				'width=50&align=left&flag=1&link=' . urlencode('mode=playerinfo&amp;player=%k') 
 			),
 			new TableColumn(
 				'frags',
-				"Kills on $map",
+				t('literal.map_kills_label', array('map' => $map)),
 				'width=25&align=right'
 			),
 			new TableColumn(
 				'headshots',
-				'Headshots',
+				t('literal.headshots'),
 				'width=15&align=right'
 			),
 			new TableColumn(
 				'hpk',
-				'Hpk',
+				t('literal.hpk_cap'),
 				'width=5&align=right'
 			),
 			
@@ -134,13 +134,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 
 <div class="block">
-	<?php printSectionTitle('Map Details'); ?>
+	<?php printSectionTitle(t('literal.map_details')); ?>
 	<div class="subblock">
 		<div style="float:left;">
-			<strong><?php echo $map; ?></strong>: From a total of <strong><?php echo number_format(intval($totalkills)); ?></strong> kills (Last <?php echo $g_options['DeleteDays']; ?> Days)
+			<strong><?php echo eHtml($map); ?></strong>: <?php echo t('literal.from_total_kills_last_days', array('kills' => number_format(intval($totalkills)), 'days' => $g_options['DeleteDays'])); ?>
 		</div>
 		<div style="float:right;">
-			Back to <a href="<?php echo $g_options['scripturl'] . "?mode=maps&amp;game=$game"; ?>">Map Statistics</a>
+			<?php echo eHtml(t('literal.back_to')); ?> <a href="<?php echo $g_options['scripturl'] . "?mode=maps&amp;game=$game"; ?>"><?php echo eHtml(t('literal.map_statistics')); ?></a>
 		</div>
 		<div style="clear:both;"></div>
 	</div>

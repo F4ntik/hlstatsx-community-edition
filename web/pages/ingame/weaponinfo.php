@@ -37,7 +37,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
 	if (!defined('IN_HLSTATS')) {
-		die('Do not access this file directly.');
+		die(localized_direct_access_message());
 	}
 
 	// Weapon Details
@@ -65,7 +65,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	
 	$db->query("SELECT name FROM hlstats_Games WHERE code='$game'");
 	if ($db->num_rows() != 1) {
-		error('Invalid or no game specified.');
+		error(localized_invalid_or_no_game_message());
 	} else {
 		list($gamename) = $db->fetch_row();
 	}

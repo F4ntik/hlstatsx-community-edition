@@ -41,7 +41,7 @@ For support and installation notes visit http://www.hlxcommunity.com
     }
 
     // Player Awards History
-	$player = valid_request($_GET['player'], true) or error("No player ID specified.");
+	$player = valid_request($_GET['player'], true) or error(t('literal.no_player_id'));
 
 	$db->query("
 		SELECT
@@ -54,7 +54,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	");
 
 	if ($db->num_rows() != 1) {
-		error("No such player '$player'.");
+		error(localized_no_such_player_message($player));
 	}
 
 	$playerdata = $db->fetch_array();
@@ -87,25 +87,25 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 	pageHeader
 	(
-		array ($gamename, 'Awards History', $pl_name),
+		array ($gamename, t('literal.awards_history'), $pl_name),
 		array
 		(
 			$gamename=>$g_options['scripturl'] . "?game=$game",
-			'Player Rankings'=>$g_options['scripturl'] . "?mode=players&game=$game",
-			'Player Details'=>$g_options['scripturl'] . "?mode=playerinfo&player=$player",
-			'Awards History'=>''
+			t('literal.player_rankings')=>$g_options['scripturl'] . "?mode=players&game=$game",
+			t('literal.player_details')=>$g_options['scripturl'] . "?mode=playerinfo&player=$player",
+			t('literal.awards_history')=>''
 		),
 		$playername = ""
 	);
 
 	flush();
-	$cnttext = 'Earned';
+	$cnttext = t('literal.earned');
 	$lnktext = '&link='.urlencode("mode=playerawards&player=".$player."&amp;awardId=%k");
 	if (isset($_GET['awardId'])) {
-		$awardId = valid_request($_GET['awardId'], true) or error("No clan ID specified."); 
+		$awardId = valid_request($_GET['awardId'], true) or error(t('literal.no_award_id')); 
 	}
 
-	$cnttext = 'Kills on Day';
+	$cnttext = t('literal.kills_on_day');
 	$lnktext = '';
 
 	$table = new Table
@@ -115,17 +115,17 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'awardTime',
-				(isset($awardId))?'Date':'Date Last Earned',
+				(isset($awardId)) ? t('literal.date') : t('literal.date_last_earned'),
 				'width=17'
 			),
 			new TableColumn(
 				'name',
-				'Name',
+				t('literal.name'),
 				'width=23'
 			),
 			new TableColumn(
 				'verb',
-				'Description',
+				t('literal.description'),
 				'width=50'.$lnktext
 			),
 			new TableColumn(
@@ -225,7 +225,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 <div class="block">
 <?php
-	printSectionTitle('Player Awards History');
+	printSectionTitle(t('literal.player_awards_history'));
 	if ($numitems > 0)
 	{
 		$table->draw($result, $numitems, 95);
@@ -245,7 +245,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 				");
 				list($lastName) = $db->fetch_row();
 			?>
-			Go to: <a href="<?php echo $g_options['scripturl'] . "?mode=playerinfo&amp;player=$player"; ?>"><?php echo $lastName; ?>'s Statistics</a>
+			<?php echo eHtml(t('literal.go_to')); ?>: <a href="<?php echo $g_options['scripturl'] . "?mode=playerinfo&amp;player=$player"; ?>"><?php echo t('literal.player_statistics_link', array('player' => eHtml($lastName))); ?></a>
 		</div>
 	</div>
 </div>

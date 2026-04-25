@@ -37,11 +37,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+        die(localized_direct_access_message());
     }
 
 	if ($auth->userdata["acclevel"] < 80) {
-        die ("Access denied!");
+        die(localized_access_denied_message());
 	}
 ?>
 
@@ -52,41 +52,41 @@ For support and installation notes visit http://www.hlxcommunity.com
 		
 		echo "<ul>\n";
 
-      $dbt = "Deleting all inactive Players";
-			echo "<li>$dbt ... ";
+      $dbt = t('admin.task.tools_reset_2.progress.delete_inactive_players');
+			echo '<li>' . eHtml($dbt) . ' ';
 			$minTimestamp = date("U")-(3600*24*30);
 			$SQL = "DELETE FROM hlstats_Players WHERE last_event<$minTimestamp;";
-			if ($db->query($SQL)) echo "OK\n"; else echo "ERROR\n"; 
+			if ($db->query($SQL)) echo eHtml(t('admin.tools_reset.status.ok')) . "\n"; else echo eHtml(t('admin.tools_reset.status.error')) . "\n"; 
 
-      $dbt = "Deleting Clans without Players";
-			echo "<li>$dbt ... ";
+      $dbt = t('admin.task.tools_reset_2.progress.delete_empty_clans');
+			echo '<li>' . eHtml($dbt) . ' ';
 			$SQL = "DELETE FROM hlstats_Clans USING hlstats_Clans LEFT JOIN hlstats_Players ON (clan=clanId) WHERE isnull(clan);";
-			if ($db->query($SQL)) echo "OK\n"; else echo "ERROR\n"; 
+			if ($db->query($SQL)) echo eHtml(t('admin.tools_reset.status.ok')) . "\n"; else echo eHtml(t('admin.tools_reset.status.error')) . "\n"; 
     
-      $dbt = "Deleting Names from inactive Players";
-			echo "<li>$dbt ... ";
+      $dbt = t('admin.task.tools_reset_2.progress.delete_inactive_names');
+			echo '<li>' . eHtml($dbt) . ' ';
 			$SQL = "DELETE FROM hlstats_PlayerNames USING hlstats_PlayerNames LEFT JOIN hlstats_Players ON (hlstats_PlayerNames.playerId=hlstats_Players.playerId) WHERE isnull(hlstats_Players.playerId);";
-			if ($db->query($SQL)) echo "OK\n"; else echo "ERROR\n"; 
+			if ($db->query($SQL)) echo eHtml(t('admin.tools_reset.status.ok')) . "\n"; else echo eHtml(t('admin.tools_reset.status.error')) . "\n"; 
 
-      $dbt = "Deleting SteamIDs from inactive Players";
-			echo "<li>$dbt ... ";
+      $dbt = t('admin.task.tools_reset_2.progress.delete_inactive_uniqueids');
+			echo '<li>' . eHtml($dbt) . ' ';
 			$SQL = "DELETE FROM hlstats_PlayerUniqueIds USING hlstats_PlayerUniqueIds LEFT JOIN hlstats_Players ON (hlstats_PlayerUniqueIds.playerId=hlstats_Players.playerId) WHERE isnull(hlstats_Players.playerId);";
-			if ($db->query($SQL)) echo "OK\n"; else echo "ERROR\n"; 
+			if ($db->query($SQL)) echo eHtml(t('admin.tools_reset.status.ok')) . "\n"; else echo eHtml(t('admin.tools_reset.status.error')) . "\n"; 
 
-      $dbt = "Deleting Awards from inactive Players";
-			echo "<li>$dbt ... ";
+      $dbt = t('admin.task.tools_reset_2.progress.delete_inactive_awards');
+			echo '<li>' . eHtml($dbt) . ' ';
 			$SQL = "DELETE FROM hlstats_Players_Awards USING hlstats_Players_Awards LEFT JOIN hlstats_Players ON (hlstats_Players_Awards.playerId=hlstats_Players.playerId) WHERE isnull(hlstats_Players.playerId);";
-			if ($db->query($SQL)) echo "OK\n"; else echo "ERROR\n"; 
+			if ($db->query($SQL)) echo eHtml(t('admin.tools_reset.status.ok')) . "\n"; else echo eHtml(t('admin.tools_reset.status.error')) . "\n"; 
 	  
-	  $dbt = "Deleting Ribbons from inactvie Players";
-			echo "<li>$dbt ... ";
+	  $dbt = t('admin.task.tools_reset_2.progress.delete_inactive_ribbons');
+			echo '<li>' . eHtml($dbt) . ' ';
 			$SQL = "DELETE FROM hlstats_Players_Ribbons USING hlstats_Players_Ribbons LEFT JOIN hlstats_Players ON (hlstats_Players_Ribbons.playerId=hlstats_Players.playerId) WHERE isnull(hlstats_Players.playerId);";
-			if ($db->query($SQL)) echo "OK\n"; else echo "ERROR\n";
+			if ($db->query($SQL)) echo eHtml(t('admin.tools_reset.status.ok')) . "\n"; else echo eHtml(t('admin.tools_reset.status.error')) . "\n";
 
-      $dbt = "Deleting History from inactive Players";
-			echo "<li>$dbt ... ";
+      $dbt = t('admin.task.tools_reset_2.progress.delete_inactive_history');
+			echo '<li>' . eHtml($dbt) . ' ';
 			$SQL = "DELETE FROM hlstats_Players_History USING hlstats_Players_History LEFT JOIN hlstats_Players ON (hlstats_Players_History.playerId=hlstats_Players.playerId) WHERE isnull(hlstats_Players.playerId);";
-			if ($db->query($SQL)) echo "OK\n"; else echo "ERROR\n"; 
+			if ($db->query($SQL)) echo eHtml(t('admin.tools_reset.status.ok')) . "\n"; else echo eHtml(t('admin.tools_reset.status.error')) . "\n"; 
 
 
 //      $dbt = "Resetting Players count for all servers";
@@ -96,7 +96,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 		
 		echo "</ul>\n";
 		
-		echo "Done.<p>";
+		echo eHtml(t('admin.tools_reset.done')) . "<p>";
 	}
 	else
 	{
@@ -110,14 +110,15 @@ For support and installation notes visit http://www.hlxcommunity.com
 		<table width="100%" border=0 cellspacing=1 cellpadding=10>
 		
 		<tr class="bg1">
-			<td class="fNormal">
+			<td class="fNormal"><?php
+$stopDaemonLink = '<a href="' . $g_options['scripturl'] . '?mode=admin&amp;task=tools_perlcontrol">' . eHtml(t('admin.tools_reset.stop_daemon')) . '</a>';
+echo eHtml(t('admin.task.tools_reset_2.confirmation'));
+?><p>
 
-Are you sure you want to clean up all statistics? All inactive players, clans and events will be deleted from the database. (All other admin settings will be retained.)<p>
-
-<b>Note</b> You should kill <b>hlstats.pl</b> before resetting the stats. You can restart it after they are reset.<p>
+<b><?php echo eHtml(t('admin.tools_reset.note_label')); ?></b>: <?php echo t('admin.tools_reset.daemon_notice', array('link' => $stopDaemonLink)); ?><p>
 
 <input type="hidden" name="confirm" value="1">
-<center><input type="submit" value="  Reset Stats  "></center>
+<center><input type="submit" value="  <?php echo eHtml(t('admin.task.tools_reset_2.reset_button')); ?>  "></center>
 </td>
 		</tr>
 		

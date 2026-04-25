@@ -101,7 +101,11 @@ class DB_mysql
 				if ( !@mysqli_select_db($this->link, $db_name) )
 				{
 					@mysqli_close($this->link);
-					$this->error("Could not select database '$db_name'. Check that the value of DB_NAME in config.php is set correctly.");
+					$this->error(localized_text(
+						'db.select_database_failed',
+						"Could not select database ':db_name'. Check that the value of DB_NAME in config.php is set correctly.",
+						array('db_name' => $db_name)
+					));
 				}
 			}
 
@@ -109,7 +113,10 @@ class DB_mysql
 		}
 		else
 		{
-			$this->error('Could not connect to database server. Check that the values of DB_ADDR, DB_USER and DB_PASS in config.php are set correctly.');
+			$this->error(localized_text(
+				'db.connect_failed',
+				'Could not connect to database server. Check that the values of DB_ADDR, DB_USER and DB_PASS in config.php are set correctly.'
+			));
 		}
 	}
 
@@ -256,7 +263,7 @@ class DB_mysql
 		{
 			if ($showerror)
 			{
-				$this->error('Bad query.');
+				$this->error(localized_text('db.bad_query', 'Bad query.'));
 			}
 			else
 			{
@@ -291,15 +298,19 @@ class DB_mysql
 
 	function error($message, $exit=true)
 	{
-		error(
-			"<b>Database Error</b><br />\n<br />\n" .
-			"<i>Server Address:</i> $this->db_addr<br />\n" .
-			"<i>Server Username:</i> $this->db_user<br /><br />\n" .
-			"<i>Error Diagnostic:</i><br />\n$message<br /><br />\n" .
-			"<i>Server Error:</i> (" . @mysqli_errno($this->link) . ") " . @mysqli_error($this->link) . "<br /><br />\n" .
-			"<i>Last SQL Query:</i><br />\n<pre style=\"font-size:2px;\">$this->last_query</pre>",
-			$exit
+		$details = array(
+			localized_text('db.error_title', 'Database Error'),
+			localized_text('db.server_address', 'Server Address') . ': ' . $this->db_addr,
+			localized_text('db.server_username', 'Server Username') . ': ' . $this->db_user,
+			localized_text('db.error_diagnostic', 'Error Diagnostic') . ': ' . $message,
+			localized_text('db.server_error', 'Server Error') . ': (' . @mysqli_errno($this->link) . ') ' . @mysqli_error($this->link),
 		);
+
+		if ($this->last_query !== null && $this->last_query !== '') {
+			$details[] = localized_text('db.last_sql_query', 'Last SQL Query') . ': ' . $this->last_query;
+		}
+
+		error(implode("\n\n", $details), $exit);
 	}
 }
 ?>

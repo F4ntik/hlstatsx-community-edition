@@ -37,19 +37,224 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+        die(localized_direct_access_message());
     }
 
 	if ($auth->userdata['acclevel'] < 80) {
-        die ('Access denied!');
+        die(localized_access_denied_message());
 	}
 
 ?>
 	
 	<div style="width:60%;height:50px;border:0;padding:0;margin:auto;background-color:#F00;text-align:center;color:#FFF;font-size:medium;font-weight:bold;vertical-align:middle;">
-		Options with an asterisk (*) beside them require a restart of the perl daemon to fully take effect.</div>
+		<?php echo eHtml(t('admin.task.options.restart_notice')); ?></div>
 	<br />
 <?php
+
+	function admin_options_text($suffix, $fallback = null, array $params = array())
+	{
+		$key = 'admin.task.options.' . $suffix;
+		return t($key, $params, $fallback === null ? $suffix : $fallback);
+	}
+
+	function admin_options_group_title($title)
+	{
+		static $map = array(
+			'Site Settings' => 'section.site_settings',
+			'GeoIP data & Google Map settings' => 'section.geoip_google_maps',
+			'Awards settings' => 'section.awards',
+			'Hit counter settings' => 'section.hit_counter',
+			'Paths' => 'section.paths',
+			'Visual style settings' => 'section.visual_style',
+			'Ranking settings' => 'section.ranking',
+			'Daemon Settings' => 'section.daemon',
+			'Point calculation settings' => 'section.point_calculation',
+			'Proxy Settings' => 'section.proxy',
+		);
+
+		if (!isset($map[$title])) {
+			return $title;
+		}
+
+		return admin_options_text($map[$title], $title);
+	}
+
+	function admin_options_label($optionName, $fallback)
+	{
+		return admin_options_text('option.' . $optionName, $fallback);
+	}
+
+	function admin_options_choice($optionName, $value, $fallback)
+	{
+		static $choiceKeys = array(
+			'bannerdisplay' => array(
+				'0' => 'choice.none',
+				'1' => 'choice.all_pages',
+				'2' => 'choice.contents_page_only',
+			),
+			'playerinfo_tabs' => array(
+				'1' => 'choice.new_style_hide_sections',
+				'0' => 'choice.old_style_show_all',
+			),
+			'nav_globalchat' => array(
+				'1' => 'choice.show',
+				'0' => 'choice.hide',
+			),
+			'nav_cheaters' => array(
+				'0' => 'choice.hide',
+				'1' => 'choice.show',
+			),
+			'show_weapon_target_flash' => array(
+				'1' => 'choice.flash_hitbox',
+				'0' => 'choice.html_table',
+			),
+			'show_server_load_image' => array(
+				'1' => 'choice.show',
+				'0' => 'choice.hide',
+			),
+			'countrydata' => array(
+				'1' => 'choice.show',
+				'0' => 'choice.hide',
+			),
+			'gamehome_show_awards' => array(
+				'1' => 'choice.show',
+				'0' => 'choice.hide',
+			),
+			'show_google_map' => array(
+				'0' => 'choice.hide',
+				'1' => 'choice.show',
+			),
+			'google_map_region' => array(
+				'EUROPE' => 'choice.region.europe',
+				'NORTH AMERICA' => 'choice.region.north_america',
+				'SOUTH AMERICA' => 'choice.region.south_america',
+				'NORTH AFRICA' => 'choice.region.north_africa',
+				'SOUTH AFRICA' => 'choice.region.south_africa',
+				'NORTH EUROPE' => 'choice.region.north_europe',
+				'EAST EUROPE' => 'choice.region.east_europe',
+				'GERMANY' => 'choice.region.germany',
+				'FRANCE' => 'choice.region.france',
+				'SPAIN' => 'choice.region.spain',
+				'UNITED KINGDOM' => 'choice.region.united_kingdom',
+				'DENMARK' => 'choice.region.denmark',
+				'SWEDEN' => 'choice.region.sweden',
+				'NORWAY' => 'choice.region.norway',
+				'FINLAND' => 'choice.region.finland',
+				'NETHERLANDS' => 'choice.region.netherlands',
+				'BELGIUM' => 'choice.region.belgium',
+				'POLAND' => 'choice.region.poland',
+				'SUISSE' => 'choice.region.suisse',
+				'AUSTRIA' => 'choice.region.austria',
+				'ITALY' => 'choice.region.italy',
+				'TURKEY' => 'choice.region.turkey',
+				'ROMANIA' => 'choice.region.romania',
+				'BRAZIL' => 'choice.region.brazil',
+				'ARGENTINA' => 'choice.region.argentina',
+				'RUSSIA' => 'choice.region.russia',
+				'ASIA' => 'choice.region.asia',
+				'CHINA' => 'choice.region.china',
+				'JAPAN' => 'choice.region.japan',
+				'TAIWAN' => 'choice.region.taiwan',
+				'SOUTH KOREA' => 'choice.region.south_korea',
+				'AUSTRALIA' => 'choice.region.australia',
+				'WORLD' => 'choice.region.world',
+			),
+			'google_map_type' => array(
+				'HYBRID' => 'choice.map_type.hybrid',
+				'SATELLITE' => 'choice.map_type.satellite',
+				'MAP' => 'choice.map_type.normal',
+				'PHYSICAL' => 'choice.map_type.physical',
+			),
+			'slider' => array(
+				'1' => 'choice.enabled',
+				'0' => 'choice.disabled',
+			),
+			'modrewrite' => array(
+				'1' => 'choice.enabled',
+				'0' => 'choice.disabled',
+			),
+			'DNSResolveIP' => array(
+				'1' => 'literal.yes',
+				'0' => 'literal.no',
+			),
+			'Rcon' => array(
+				'1' => 'literal.yes',
+				'0' => 'literal.no',
+			),
+			'RconIgnoreSelf' => array(
+				'0' => 'literal.no',
+				'1' => 'literal.yes',
+			),
+			'RconRecord' => array(
+				'0' => 'literal.no',
+				'1' => 'literal.yes',
+			),
+			'Mode' => array(
+				'Normal' => 'choice.mode.steam_id_recommended',
+				'NameTrack' => 'choice.mode.player_name',
+				'LAN' => 'choice.mode.ip_address',
+			),
+			'UseTimestamp' => array(
+				'0' => 'literal.no',
+				'1' => 'literal.yes',
+			),
+			'AllowOnlyConfigServers' => array(
+				'0' => 'literal.no',
+				'1' => 'literal.yes',
+			),
+			'TrackStatsTrend' => array(
+				'0' => 'literal.no',
+				'1' => 'literal.yes',
+			),
+			'GlobalBanning' => array(
+				'0' => 'literal.no',
+				'1' => 'literal.yes',
+			),
+			'LogChat' => array(
+				'0' => 'literal.no',
+				'1' => 'literal.yes',
+			),
+			'LogChatAdmins' => array(
+				'0' => 'literal.no',
+				'1' => 'literal.yes',
+			),
+			'GlobalChat' => array(
+				'0' => 'choice.none',
+				'1' => 'choice.broadcast_to_all',
+				'2' => 'choice.broadcast_to_admins',
+			),
+			'rankingtype' => array(
+				'skill' => 'literal.skill_label',
+				'kills' => 'literal.kills',
+			),
+			'SkillRatioCap' => array(
+				'0' => 'literal.no',
+				'1' => 'literal.yes',
+			),
+			'UseGeoIPBinary' => array(
+				'0' => 'choice.geoip_database',
+				'1' => 'choice.geoip_binary',
+			),
+			'showqueries' => array(
+				'0' => 'literal.no',
+				'1' => 'literal.yes',
+			),
+			'display_gamelist' => array(
+				'1' => 'literal.yes',
+				'0' => 'literal.no',
+			),
+			'display_style_selector' => array(
+				'1' => 'literal.yes',
+				'0' => 'literal.no',
+			),
+		);
+
+		if (isset($choiceKeys[$optionName][$value])) {
+			return admin_options_text($choiceKeys[$optionName][$value], $fallback);
+		}
+
+		return translate_ui_literal($fallback);
+	}
 
 	class OptionGroup
 	{
@@ -65,7 +270,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 		{
 			global $g_options;
 ?>
-	<p><strong><?php echo $this->title; ?></strong></p>
+	<p><strong><?php echo admin_options_group_title($this->title); ?></strong></p>
 	<table class="data-table" style="width:75%">
 		<?php
 			foreach ($this->options as $opt)
@@ -152,7 +357,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 					<tr class="bg1" style="vertical-align:middle";>
 						<td class="fNormal" style="width:45%;"><?php
-			echo $this->title . ":";
+			echo admin_options_label($this->name, $this->title) . ":";
 						?></td>
 						<td style="width:55%;"><?php
 			switch ($this->type)
@@ -183,10 +388,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 					echo "<select name=\"$this->name\" style=\"width: 226px\">";
 					$result = $db->query("SELECT `value`,`text` FROM hlstats_Options_Choices WHERE keyname='$this->name' ORDER BY isDefault desc");
 					while ($rowdata = $db->fetch_array($result)) {
+						$choiceLabel = admin_options_choice($this->name, $rowdata['value'], $rowdata['text']);
 						if ($rowdata['value'] == $optiondata[$this->name]) {
-							echo '<option value="'.$rowdata['value'].'" selected="selected">'.$rowdata['text'];
+							echo '<option value="'.$rowdata['value'].'" selected="selected">'.eHtml($choiceLabel);
 						} else {
-							echo '<option value="'.$rowdata['value'].'">'.$rowdata['text'];
+							echo '<option value="'.$rowdata['value'].'">'.eHtml($choiceLabel);
 						}
 					}
 					echo '</select>';
@@ -230,7 +436,7 @@ RewriteRule sig-(.*)-(.*).png$ sig.php?player_id=$1&background=$2 [L]</textarea>
 	$optiongroups[1]->options[] = new Option('show_google_map', 'Show Google worldmap', 'select');
 	$optiongroups[1]->options[] = new Option('google_map_region', 'Google Maps Region', 'select');
 	$optiongroups[1]->options[] = new Option('google_map_type', 'Google Maps Type', 'select');
-	$optiongroups[1]->options[] = new Option('UseGeoIPBinary', '*Choose whether to use GeoCityLite data loaded into mysql database or from binary file. (If binary, GeoLiteCity.dat goes in perl/GeoLiteCity and Geo::IP::PurePerl module is required', 'select');
+	$optiongroups[1]->options[] = new Option('UseGeoIPBinary', '*Choose whether to use GeoCityLite data loaded into mysql database or from the bundled GeoLiteCity binary directory. Legacy binary mode requires the GeoLiteCity data files to be present on the runtime host.', 'select');
 
 	$optiongroups[2] = new OptionGroup('Awards settings');
 	$optiongroups[2]->options[] = new Option('gamehome_show_awards', 'Show daily award winners on Game Frontpage', 'select');
@@ -265,8 +471,8 @@ RewriteRule sig-(.*)-(.*).png$ sig.php?player_id=$1&background=$2 [L]</textarea>
 	$optiongroups[40]->options[] = new Option('Mode', '*Sets the player-tracking mode.<br><ul><LI><b>Steam ID</b>     - Recommended for public Internet server use. Players will be tracked by Steam ID.<LI><b>Player Name</b>  - Useful for shared-PC environments, such as Internet cafes, etc. Players will be tracked by nickname. <LI><b>IP Address</b>        - Useful for LAN servers where players do not have a real Steam ID. Players will be tracked by IP Address. </UL>', 'select');
 	$optiongroups[40]->options[] = new Option('AllowOnlyConfigServers', '*Allow only servers set up in admin panel to be tracked. Other servers will NOT automatically added and tracked! This is a big security thing', 'select');
 	$optiongroups[40]->options[] = new Option('DeleteDays', '*HLstatsX will automatically delete history events from the events tables when they are over this many days old. This is important for performance reasons. Set lower if you are logging a large number of game servers or find the load on the MySQL server is too high', 'text');
-	$optiongroups[40]->options[] = new Option('DNSResolveIP', '*Resolve player IP addresses to hostnames. Requires a working DNS setup (on the box running hlstats.pl)', 'select');
-	$optiongroups[40]->options[] = new Option('DNSTimeout', '*Time, in seconds, to wait for DNS queries to complete before cancelling DNS resolves. You may need to increase this if on a slow connection or if you find a lot of IPs are not being resolved; however, hlstats.pl cannot be parsing log data while waiting for an IP to resolve', 'text');
+	$optiongroups[40]->options[] = new Option('DNSResolveIP', '*Resolve player IP addresses to hostnames. Requires a working DNS setup on the machine running the statistics worker.', 'select');
+	$optiongroups[40]->options[] = new Option('DNSTimeout', '*Time, in seconds, to wait for DNS queries to complete before cancelling DNS resolves. Increase this if you see slow or incomplete hostname lookups; the statistics worker waits for DNS responses while resolving addresses.', 'text');
 	$optiongroups[40]->options[] = new Option('MailTo', '*E-mail address to mail database errors to', 'text');
 	$optiongroups[40]->options[] = new Option('MailPath', '*Path to the mail program -- usually /usr/sbin/sendmail on webhosts', 'text');
 	$optiongroups[40]->options[] = new Option('Rcon', '*Allow HLstatsX to send Rcon commands to the game servers', 'select');
@@ -287,7 +493,7 @@ RewriteRule sig-(.*)-(.*).png$ sig.php?player_id=$1&background=$2 [L]</textarea>
 
 	$optiongroups[60] = new OptionGroup('Proxy Settings');
 	$optiongroups[60]->options[] = new Option('Proxy_Key', '*Key to use when sending remote commands to Daemon, empty for disable', 'text');
-	$optiongroups[60]->options[] = new Option('Proxy_Daemons', '*List of daemons to send PROXY events from (used by proxy-daemon.pl), use "," as delimiter, eg &lt;ip&gt;:&lt;port&gt;,&lt;ip&gt;:&lt;port&gt;,... ', 'text');
+	$optiongroups[60]->options[] = new Option('Proxy_Daemons', '*List of downstream statistics workers that receive PROXY events from the proxy runtime. Use "," as delimiter, eg &lt;ip&gt;:&lt;port&gt;,&lt;ip&gt;:&lt;port&gt;,... ', 'text');
 	
 	if (!empty($_POST))
 	{
@@ -295,7 +501,7 @@ RewriteRule sig-(.*)-(.*).png$ sig.php?player_id=$1&background=$2 [L]</textarea>
 			{
 				$og->update();
 			}
-			message('success', 'Options updated successfully.');
+			message('success', t('admin.task.options.update_success'));
 	}
 	
 	
@@ -311,7 +517,7 @@ RewriteRule sig-(.*)-(.*).png$ sig.php?player_id=$1&background=$2 [L]</textarea>
 	}
 ?>
 	<tr style="height:50px;">
-		<td style="text-align:center;" colspan="2"><input type="submit" value="  Apply  " class="submit" /></td>
+		<td style="text-align:center;" colspan="2"><input type="submit" value="  <?php echo eHtml(t('ui.apply')); ?>  " class="submit" /></td>
 	</tr>
 </table>
 

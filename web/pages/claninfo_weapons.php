@@ -54,23 +54,23 @@ For support and installation notes visit http://www.hlxcommunity.com
 		array(
 			new TableColumn(
 				'weapon',
-				'Weapon',
+				t('literal.weapon'),
 				'width=15&type=weaponimg&align=center&link=' . urlencode("mode=weaponinfo&amp;weapon=%k&amp;game=$game"),
 				$fname
 			),
 			new TableColumn(
 				'modifier',
-				'Points Modifier',
+				t('literal.points_modifier'),
 				'width=10&align=right'
 			),
 			new TableColumn(
 				'kills',
-				'Kills',
+				t('literal.kills'),
 				'width=11&align=right'
 			),
 			new TableColumn(
 				'kpercent',
-				'Percentage of Kills',
+				t('literal.percentage_of_kills'),
 				'width=18&sort=no&type=bargraph'
 			),
 			new TableColumn(
@@ -80,12 +80,12 @@ For support and installation notes visit http://www.hlxcommunity.com
 			),
 			new TableColumn(
 				'headshots',
-				'Headshots',
+				t('literal.headshots'),
 				'width=8&align=right'
 			),
 			new TableColumn(
 				'hpercent',
-				'Percentage of Headshots',
+				t('literal.percentage_of_headshots'),
 				'width=18&sort=no&type=bargraph'
 			),
 			new TableColumn(
@@ -95,7 +95,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			),
 			new TableColumn(
 				'hpk',
-				'Hpk',
+				t('literal.hpk_cap'),
 				'width=5&align=right'
 			)
 		),
@@ -138,7 +138,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			$tblWeapons->sort2 $tblWeapons->sortorder
 	");
 
-	printSectionTitle('Weapon Usage *');
+	printSectionTitle(t('literal.weapon_usage'));
 	$tblWeapons->draw($result, $db->num_rows($result), 95);
 ?>
 	<br /><br />
@@ -151,53 +151,53 @@ For support and installation notes visit http://www.hlxcommunity.com
 		array(
 			new TableColumn(
 				'smweapon',
-				'Weapon',
+				t('literal.weapon'),
 				'width=15&type=weaponimg&align=center&link=' . urlencode("mode=weaponinfo&amp;weapon=%k&amp;game=$game"),
 				$fname
 			),
 			new TableColumn(
 				'smshots',
-				'Shots',
+				t('literal.shots'),
 				'width=8&align=right'
 			),
 			new TableColumn(
 				'smhits',
-				'Hits',
+				t('literal.hits'),
 				'width=8&align=right'
 			),
 			new TableColumn(
 				'smdamage',
-				'Damage',
+				t('literal.damage'),
 				'width=8&align=right'
 			),
 			new TableColumn(
 				'smheadshots',
-				'Headshots',
+				t('literal.headshots'),
 				'width=8&align=right'
 			),
 			new TableColumn(
 				'smkills',
-				'Kills',
+				t('literal.kills'),
 				'width=7&align=right'
 			),
 			new TableColumn(
 				'smkdr',
-				'Kills per Death',
+				t('literal.kills_per_death'),
 				'width=12&align=right'
 			),
 			new TableColumn(
 				'smaccuracy',
-				'Accuracy',
+				t('literal.accuracy'),
 				'width=8&align=right&append=' . urlencode('%')
 			),
 			new TableColumn(
 				'smdhr',
-				'Damage per Hit',
+				t('literal.damage_per_hit'),
 				'width=10&align=right'
 			),
 			new TableColumn(
 				'smspk',
-				'Shots per Kill',
+				t('literal.shots_per_kill'),
 				'width=11&align=right'
 			)
 		),
@@ -244,7 +244,7 @@ For support and installation notes visit http://www.hlxcommunity.com
     
 if ($db->num_rows($result) != 0)
 {
-	printSectionTitle('Weapon Stats *');
+	printSectionTitle(t('literal.weapon_statistics_star'));
 	$tblWeaponstats->draw($result, $db->num_rows($result), 95);
 ?>
 	<br /><br />
@@ -260,28 +260,28 @@ if ($db->num_rows($result) != 0)
 			array(
 				new TableColumn(
 					'smweapon',
-					'Weapon',
+					t('literal.weapon'),
 					'width=35&type=weaponimg&align=center&link='.urlencode("javascript:switch_weapon('%k');"),
 					$fname
 				),
 				new TableColumn(
 					'smhits',
-					'Hits',
+					t('literal.hits'),
 					'width=15&align=right'
 				),
 				new TableColumn(
 					'smleft',
-					'Left',
+					t('literal.left'),
 					'width=15&align=right&append=' . urlencode('%')
 				),
 				new TableColumn(
 					'smmiddle',
-					'Middle',
+					t('literal.middle'),
 					'width=15&align=right&append=' . urlencode('%')
 				),
 				new TableColumn(
 					'smright',
-					'Right',
+					t('literal.right'),
 					'width=15&align=right&append=' . urlencode('%')
 				)
 			),
@@ -302,63 +302,63 @@ if ($db->num_rows($result) != 0)
 		array(
 			new TableColumn(
 				'smweapon',
-				'Weapon',
+				t('literal.weapon'),
 				'width=15&type=weaponimg&align=center&link=' . urlencode("mode=weaponinfo&amp;weapon=%k&amp;game=$game"),
 				$fname
 			),
 			new TableColumn(
 				'smhits',
-				'Hits',
+				t('literal.hits'),
 				'width=7&align=right'
 			),
 			new TableColumn(
 				'smhead',
-				'Head',
+				t('literal.head'),
 				'width=7&align=right'
 			),
 			new TableColumn(
 				'smchest',
-				'Chest',
+				t('literal.chest'),
 				'width=7&align=right'
 			),
 			new TableColumn(
 				'smstomach',
-				'Stomach',
+				t('literal.stomach'),
 				'width=7&align=right'
 			),
 			new TableColumn(
 				'smleftarm',
-				'Left Arm',
+				t('literal.left_arm'),
 				'width=7&align=right'
 			),
 			new TableColumn(
 				'smrightarm',
-				'Right Arm',
+				t('literal.right_arm'),
 				'width=7&align=right'
 			),
 			new TableColumn(
 				'smleftleg',
-				'Left Leg',
+				t('literal.left_leg'),
 				'width=7&align=right'
 			),
 			new TableColumn(
 				'smrightleg',
-				'Right Leg',
+				t('literal.right_leg'),
 				'width=7&align=right'
 			),
 			new TableColumn(
 				'smleft',
-				'Left',
+				t('literal.left'),
 				'width=8&align=right&append=' . urlencode('%')
 			),
 			new TableColumn(
 				'smmiddle',
-				'Middle',
+				t('literal.middle'),
 				'width=8&align=right&append=' . urlencode('%')
 			),
 			new TableColumn(
 				'smright',
-				'Right',
+				t('literal.right'),
 				'width=8&align=right&append=' . urlencode('%')
 			)
 		),
@@ -410,7 +410,7 @@ if ($db->num_rows($result) != 0)
 
 if ($db->num_rows($result) != 0)
 {
-	printSectionTitle('Weapon Targets *');
+	printSectionTitle(t('literal.weapon_targets'));
 	if ($g_options['show_weapon_target_flash'] == 1)
 	{
 ?>
@@ -561,60 +561,101 @@ if ($db->num_rows($result) != 0)
 		$i = 1;
 		foreach ($weapon_data as $key => $entry) {
 			if ($key == 'total')
-				$key = 'All Weapons';
+				$key = t('literal.all_weapons');
 			echo "data_array['$key'] = ['".ucfirst($key)."',".$entry['head'].",".$entry['leftarm'].",".$entry['rightarm'].",".$entry['chest'].",".$entry['stomach'].",".$entry['leftleg'].",".$entry['rightleg'].",'".$entry['model']."'];\n";
 			$i++; 
 		}
 		$result = $db->query($query);
 
 ?>
-	function switch_weapon(weapon) {
-		if (document.embeds && document.embeds.hitbox) {
-			if (document.embeds.hitbox.LoadMovie) {
-				document.embeds.hitbox.LoadMovie(0, '<?php echo IMAGE_PATH; ?>/hitbox.swf?wname='+data_array[weapon][0]
-					+'&head='+data_array[weapon][1]+'&rightarm='+data_array[weapon][2]
-					+'&leftarm='+data_array[weapon][3]+'&chest='+data_array[weapon][4]
-					+'&stomach='+data_array[weapon][5]+'&rightleg='+data_array[weapon][6]
-					+'&leftleg='+data_array[weapon][7]+'&model='+data_array[weapon][8]
-					+'&numcolor_num=#<?php echo $g_options['graphtxt_load'] ?>&numcolor_pct=#<?php echo $g_options['graphtxt_load'] ?>&linecolor=#<?php echo $g_options['graphtxt_load'] ?>&barcolor=#FFFFFF&barbackground=#000000&textcolor=#FFFFFF&captioncolor=#FFFFFF&textcolor_total=#FFFFFF');
-			}
-		} else if (document.getElementById) { 
-			var obj = document.getElementById('hitbox'); 
-			if (typeof obj.LoadMovie != 'undefined') { 
-				obj.LoadMovie(0, '<?php echo IMAGE_PATH; ?>/hitbox.swf?wname='+data_array[weapon][0]
-					+'&head='+data_array[weapon][1]+'&rightarm='+data_array[weapon][2]
-					+'&leftarm='+data_array[weapon][3]+'&chest='+data_array[weapon][4]
-					+'&stomach='+data_array[weapon][5]+'&rightleg='+data_array[weapon][6]
-					+'&leftleg='+data_array[weapon][7]+'&model='+data_array[weapon][8]
-					+'&numcolor_num=#<?php echo $g_options['graphtxt_load'] ?>&numcolor_pct=#<?php echo $g_options['graphtxt_load'] ?>&linecolor=#<?php echo $g_options['graphtxt_load'] ?>&barcolor=#FFFFFF&barbackground=#000000&textcolor=#FFFFFF&captioncolor=#FFFFFF&textcolor_total=#FFFFFF');
-			}
+	function hlx_hitbox_ensure(cb) {
+		if (window.HLXHitboxModern) { cb(); return; }
+		if (window.__hlxHitboxLoading) {
+			window.__hlxHitboxLoading.push(cb);
+			return;
 		}
+		window.__hlxHitboxLoading = [cb];
+		var s = document.createElement('script');
+		s.src = '<?php echo INCLUDE_PATH; ?>/js/hitbox-modern.js';
+		s.onload = function () {
+			var queue = window.__hlxHitboxLoading || [];
+			window.__hlxHitboxLoading = null;
+			for (var i = 0; i < queue.length; i++) {
+				try { queue[i](); } catch (e) {}
+			}
+		};
+		s.onerror = function () { window.__hlxHitboxLoading = null; };
+		(document.head || document.getElementsByTagName('head')[0] || document.documentElement).appendChild(s);
+	}
+	var hlx_hitbox_i18n = {
+		head:      '<?php echo addslashes(t('literal.head')); ?>',
+		chest:     '<?php echo addslashes(t('literal.chest')); ?>',
+		leftarm:   '<?php echo addslashes(t('literal.left_arm')); ?>',
+		rightarm:  '<?php echo addslashes(t('literal.right_arm')); ?>',
+		stomach:   '<?php echo addslashes(t('literal.stomach')); ?>',
+		leftleg:   '<?php echo addslashes(t('literal.left_leg')); ?>',
+		rightleg:  '<?php echo addslashes(t('literal.right_leg')); ?>',
+		totalHits: '<?php echo addslashes(t('literal.total_hits')); ?>',
+		targets:   '<?php echo addslashes(t('literal.targets')); ?>'
+	};
+	function switch_weapon(weapon) {
+		if (!data_array[weapon]) {
+			return;
+		}
+		hlx_hitbox_ensure(function () {
+			var data = data_array[weapon];
+			window.HLXHitboxModern.render('hitbox-modern', {
+				wname: data[0],
+				head: data[1],
+				leftarm: data[3],
+				rightarm: data[2],
+				chest: data[4],
+				stomach: data[5],
+				leftleg: data[7],
+				rightleg: data[6],
+				model: data[8]
+			}, {
+				imageBase: '<?php echo IMAGE_PATH; ?>',
+				numcolor_num: '#<?php echo $g_options['graphtxt_load']; ?>',
+				numcolor_pct: '#<?php echo $g_options['graphtxt_load']; ?>',
+				linecolor: '#<?php echo $g_options['graphtxt_load']; ?>',
+				barcolor: '#FFFFFF',
+				barbackground: '#000000',
+				textcolor: '#FFFFFF',
+				captioncolor: '#FFFFFF',
+				textcolor_total: '#FFFFFF',
+				i18n: hlx_hitbox_i18n
+			});
+		});
+	}
+	function init_hitbox() {
+		switch_weapon('<?php echo addslashes(t('literal.all_weapons')); ?>');
+	}
+	if (document.getElementById('hitbox-modern')) {
+		init_hitbox();
+	} else if (window.addEventListener) {
+		window.addEventListener('load', init_hitbox, false);
+	} else if (window.attachEvent) {
+		window.attachEvent('onload', init_hitbox);
 	}
 </script>
 <?php
 		$tblWeaponstats2->draw($result, $db->num_rows($result), 100);
-		$flashlink = IMAGE_PATH.'/hitbox.swf?wname=All+Weapons&amp;head='.$weapon_data['total']['head'].'&amp;rightarm='.$weapon_data['total']['leftarm'].'&amp;leftarm='.$weapon_data['total']['rightarm'].'&amp;chest='.$weapon_data['total']['chest'].'&amp;stomach='.$weapon_data['total']['stomach'].'&amp;rightleg='.$weapon_data['total']['leftleg'].'&amp;leftleg='.$weapon_data['total']['rightleg'].'&amp;model='.$start_model.'&amp;numcolor_num=#'.$g_options['graphtxt_load'].'&amp;numcolor_pct=#'.$g_options['graphtxt_load'].'&amp;linecolor=#'.$g_options['graphtxt_load'].'&amp;barcolor=#FFFFFF&amp;barbackground=#000000&amp;textcolor=#FFFFFF&amp;captioncolor=#FFFFFF&amp;textcolor_total=#FFFFFF';
 ?>
 </div>
 	<div style="float:right;vertical-align:top;width:480px;">
 		<table class="data-table">
 			<tr class="data-table-head">
-				<td style="text-align:center;">Targets</td>
+				<td style="text-align:center;"><?php echo eHtml(t('literal.targets')); ?></td>
 			</tr>
 			<tr class="bg1">
 				<td style="text-align:center;">
-					<object width="470" height="360" align="middle" id="hitbox" data="<?php echo $flashlink; ?>" type="application/x-shockwave-flash">
-						<param name="movie" value="<?php echo $flashlink; ?>" />
-						<param name="quality" value="high" />
-						<param name="wmode" value="opaque" />
-						<param name="bgcolor" value="#<?php echo $g_options['graphbg_load'] ?>" />
-						The hitbox display requires <a href="http://www.adobe.com" target="_blank">Adobe Flash Player</a> to view.
-					</object>
+					<div id="hitbox-modern" style="width:470px;height:360px;margin:0 auto;background:#<?php echo $g_options['graphbg_load']; ?>;"></div>
 				</td>
 			</tr>
 			<tr class="bg2">
 				<td style="text-align:center;">
-					<a href="javascript:switch_weapon('All Weapons');">Show total target statistics</a>
+					<a href="javascript:switch_weapon('<?php echo eHtml(t('literal.all_weapons')); ?>');"><?php echo eHtml(t('literal.show_total_target_statistics')); ?></a>
 				</td>
 			</tr>
 		</table>

@@ -52,7 +52,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	");
 
     if ($db->num_rows() < 1) {
-        error("No such game '$game'.");
+	error(localized_no_such_game_message($game));
 	}
 
     list($gamename) = $db->fetch_row();
@@ -67,8 +67,8 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 	pageHeader
 	(
-		array ($gamename, 'Cheaters &amp; Banned Players'),
-		array ($gamename=>"%s?game=$game", 'Cheaters &amp; Banned Players'=>'')
+		array ($gamename, t('literal.cheaters')),
+		array ($gamename=>"%s?game=$game", t('literal.cheaters')=>'')
 	);
 
 	$table = new Table
@@ -77,61 +77,61 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'lastName',
-				'Player',
+				t('literal.player'),
 				'width=26&flag=1&link=' . urlencode('mode=playerinfo&amp;player=%k')
 			),
 			new TableColumn
 			(
 				'ban_date',
-				'Ban Date',
+				t('literal.ban_date'),
 				'width=15&align=right'
 			),
 			new TableColumn
 			(
 				'skill',
-				'Points',
+				t('literal.points'),
 				'width=6&align=right'
 			),
 			new TableColumn
 			(
 				'activity',
-				'Activity',
+				t('literal.activity'),
 				'width=10&sort=no&type=bargraph'
 			),
 			new TableColumn
 			(
 				'kills',
-				'Kills',
+				t('literal.kills'),
 				'width=5&align=right'
 			),
 			new TableColumn
 			(
 				'deaths',
-				'Deaths',
+				t('literal.deaths'),
 				'width=5&align=right'
 			),
 			new TableColumn
 			(
 				'headshots',
-				'Headshots',
+				t('literal.headshots'),
 				'width=7&align=right'
 			),
 			new TableColumn
 			(
 				'kpd',
-				'K:D',
+				t('literal.kpd_cap'),
 				'width=10&align=right'
 			),
 			new TableColumn
 			(
 				'hpk',
-				'HS:K',
+				t('literal.hpk_cap'),
 				'width=5&align=right'
 			),
 			new TableColumn
 			(
 				'acc',
-				'Accuracy',
+				t('literal.accuracy'),
 				'width=6&align=right&append=' . urlencode('%')
 			)
 		),
@@ -189,16 +189,16 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 
 <div class="block">
-	<?php printSectionTitle('Cheaters &amp; Banned Players'); ?>
+	<?php printSectionTitle(t('literal.cheaters')); ?>
 		<div class="subblock">
 			<div style="float:left;">
 				<form method="get" action="<?php echo $g_options['scripturl']; ?>">
 					<input type="hidden" name="mode" value="search" />
 					<input type="hidden" name="game" value="<?php echo $game; ?>" />
 					<input type="hidden" name="st" value="player" />
-					<strong>&#8226;</strong> Find a player:
+					<strong>&#8226;</strong> <?php echo eHtml(t('players.find_player')); ?>:
 					<input type="text" name="q" size="20" maxlength="64" class="textbox" />
-					<input type="submit" value="Search" class="smallsubmit" />
+					<input type="submit" value="<?php echo eHtml(t('ui.search')); ?>" class="smallsubmit" />
 				</form>
 			</div>
 		</div><br /><br />
@@ -217,13 +217,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 							}
 						}
 					?>
-					<strong>&#8226;</strong> Show only players with
-					<input type="text" name="minkills" size="4" maxlength="2" value="<?php echo $minkills; ?>" class="textbox" /> or more kills from a total <strong><?php echo number_format($numitems); ?></strong> banned players
-					<input type="submit" value="Apply" class="smallsubmit" />
+					<strong>&#8226;</strong>
+					<?php echo t('bans.min_kills_filter', array('input' => '<input type="text" name="minkills" size="4" maxlength="2" value="' . eHtml($minkills) . '" class="textbox" />', 'total' => number_format($numitems))); ?>
+					<input type="submit" value="<?php echo eHtml(t('ui.apply')); ?>" class="smallsubmit" />
 				</form>
 			</div>
 			<div style="float:right;">
-				Go to: <a href="<?php echo $g_options["scripturl"] . "?game=$game"; ?>"><?php echo $gamename; ?></a>
+				<?php echo eHtml(t('literal.go_to')); ?>: <a href="<?php echo $g_options["scripturl"] . "?game=$game"; ?>"><?php echo $gamename; ?></a>
 			</div>
 	</div>
 </div>

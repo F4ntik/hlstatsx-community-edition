@@ -1,0 +1,183 @@
+HLstatsX Community Edition - Counter-Strike	 
+ 
+  
+
+			 
+			 
+			 
+			 
+			 
+			 
+			  
+	
+	 
+		 
+			   
+		 
+
+		 
+			 
+				     
+				     
+								
+				     
+			 
+
+		 
+	 
+	 
+		 
+  HLstatsX Community Edition   &raquo;    HLstatsX   &raquo;    Counter-Strike 			 
+		 
+
+	 
+	  
+ 
+
+ 
+      
+ 
+        
+
+    
+		 
+		 
+			  Servers  
+
+			  Chat  
+			  Players  
+			  Clans  
+
+			  Countries  
+			  Awards  
+ 
+			  Actions  
+			  Weapons  
+			  Maps  
+	  
+  
+
+ 
+
+ &nbsp; &nbsp;Participating Servers   
+		 
+     
+
+        Tracking  127  players ( +105  new players last 24h) with  1,076  kills ( +-211  last 24h) and  481  headshots ( 44.70% ) on  2  servers 
+       
+       
+		 &nbsp;Server 
+		 &nbsp;Address 
+		 &nbsp;Map 
+		 &nbsp;Played 
+		 &nbsp;Players 
+		 &nbsp;Kills 
+		 &nbsp;Headshots 
+		 &nbsp;HS:K 
+       
+
+	 
+             
+ &nbsp; CS16 ORI CS1  
+             85.239.43.77:27015 ( Join ) 
+              
+             00:00:00 
+             0/10 
+             0 
+             0 
+             0.00 
+         
+		 
+			 
+				 
+					
+
+
+
+ 
+	 
+		 &nbsp;# 
+		 &nbsp;Player 
+		 &nbsp;Kills 
+		 &nbsp;Hs 
+		 &nbsp;HS:K 
+		 &nbsp;Acc 
+		 &nbsp;Lat 
+		 &nbsp;Time 
+		 &nbsp;+/- 
+		 &nbsp;Skill 
+	 
+
+	 
+		 &nbsp;		 
+		 No Players		 
+	 
+ 
+					 
+   &nbsp;24h View       	      &nbsp;Last Week       	      &nbsp;Last Month       	      &nbsp;Last Year       	   
+	 
+				 
+			 
+		 
+    	 
+             
+ &nbsp; Replay Server 37.230.137.48  
+             37.230.137.48:27015 ( Join ) 
+             de_rats_1337_32 
+             00:16:38 
+             0/10 
+             1,076 
+             481 
+             0.45 
+         
+		 
+			 
+				 
+					
+
+
+
+ 
+	 
+		 &nbsp;# 
+		 &nbsp;Player 
+		 &nbsp;Kills 
+		 &nbsp;Hs 
+		 &nbsp;HS:K 
+		 &nbsp;Acc 
+		 &nbsp;Lat 
+		 &nbsp;Time 
+		 &nbsp;+/- 
+		 &nbsp;Skill 
+	 
+
+	 
+		 &nbsp;		 
+		 No Players		 
+	 
+ 
+					 
+   &nbsp;24h View       	      &nbsp;Last Week       	      &nbsp;Last Month       	      &nbsp;Last Year       	   
+	 
+				 
+			 
+		 
+     	 
+ 		 
+			 
+				 
+			 
+		 
+   
+  
+ 
+ 
+	 
+			   
+	 
+ 
+ 
+You are currently viewing the basic version of this page, please enable JavaScript and reload the page to access full functionality. Generated in real-time by  HLstatsX Community Edition 1.11.4  
+All images are copyrighted by their respective owners.
+
+  [ Admin ]

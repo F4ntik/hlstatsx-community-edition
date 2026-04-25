@@ -37,11 +37,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+die(localized_direct_access_message());
     }
 
 	if ($auth->userdata["acclevel"] < 80) {
-        die ("Access denied!");
+        die(localized_access_denied_message());
 	}
 
     $container = require ROOT_PATH . '/bootstrap.php';
@@ -57,18 +57,18 @@ For support and installation notes visit http://www.hlxcommunity.com
 	
 	$edlist = new EditList("serverId", "hlstats_Servers", "server",true,true,"serversettings", 'delete_server');
 
-	$edlist->columns[] = new EditListColumn("address", "IP Address", 15, true, "ipaddress", "", 15);
-	$edlist->columns[] = new EditListColumn("port", "Port", 5, true, "text", "27015", 5);
-	$edlist->columns[] = new EditListColumn("name", "Server Name", 35, true, "text", "", 255);
-	$edlist->columns[] = new EditListColumn("rcon_password", "Rcon Password", 10, false, "password", "", 128);
-	$edlist->columns[] = new EditListColumn("publicaddress", "Public Address", 20, false, "text", "", 128);
-	$edlist->columns[] = new EditListColumn("game", "Game", 20, true, "select", "hlstats_Games.name/code/realgame='".$realgame."'");
-	$edlist->columns[] = new EditListColumn("sortorder", "Sort Order", 2, true, "text", "", 255);
+	$edlist->columns[] = new EditListColumn("address", t('literal.ip_address'), 15, true, "ipaddress", "", 15);
+	$edlist->columns[] = new EditListColumn("port", t('literal.port'), 5, true, "text", "27015", 5);
+	$edlist->columns[] = new EditListColumn("name", t('literal.server_name'), 35, true, "text", "", 255);
+	$edlist->columns[] = new EditListColumn("rcon_password", t('literal.rcon_password'), 10, false, "password", "", 128);
+	$edlist->columns[] = new EditListColumn("publicaddress", t('literal.public_address'), 20, false, "text", "", 128);
+	$edlist->columns[] = new EditListColumn("game", t('literal.game'), 20, true, "select", "hlstats_Games.name/code/realgame='".$realgame."'");
+	$edlist->columns[] = new EditListColumn("sortorder", t('literal.sort_order'), 2, true, "text", "", 255);
 	
 	if ($_POST)
 	{
 		if ($edlist->update())
-			message("success", "Operation successful.");
+			message("success", t('admin.operation_successful'));
 		else
 			message("warning", $edlist->error());
 	}
@@ -87,7 +87,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			sortorder,
 			publicaddress,
 			game,
-			IF(rcon_password='','','(encrypted)') AS rcon_password
+			IF(rcon_password='','', '" . $db->escape(t('admin.editlist.password_encrypted')) . "') AS rcon_password
 		FROM
 			hlstats_Servers
 		WHERE
@@ -103,7 +103,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 <table width="75%" border="0" cellspacing="0" cellpadding="0">
     <tr>
-        <td align="center"><input type="submit" value="  Apply  " class="submit"></td>
+        <td align="center"><input type="submit" value="  <?php echo eHtml(t('ui.apply')); ?>  " class="submit"></td>
     </tr>
 </table>
 

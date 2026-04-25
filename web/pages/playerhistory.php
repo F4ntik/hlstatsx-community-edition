@@ -41,7 +41,7 @@ For support and installation notes visit http://www.hlxcommunity.com
     }
 
     // Player History
-	$player = valid_request(intval($_GET['player']), true) or error('No player ID specified.');
+	$player = valid_request(intval($_GET['player']), true) or error(t('literal.no_player_id'));
 
 	$db->query("
 		SELECT
@@ -54,7 +54,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	");
 
 	if ($db->num_rows() != 1) {
-		error("No such player '$player'.");
+	error(localized_no_such_player_message($player));
 	}
 
 	$playerdata = $db->fetch_array();
@@ -87,13 +87,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 	pageHeader
 	(
-		array ($gamename, 'Event History', $pl_name),
+		array ($gamename, t('literal.event_history'), $pl_name),
 		array
 		(
 			$gamename=>$g_options['scripturl'] . "?game=$game",
-			'Player Rankings'=>$g_options['scripturl'] . "?mode=players&game=$game",
-			'Player Details'=>$g_options['scripturl'] . "?mode=playerinfo&player=$player",
-			'Event History'=>''
+			t('literal.player_rankings')=>$g_options['scripturl'] . "?mode=players&game=$game",
+			t('literal.player_details')=>$g_options['scripturl'] . "?mode=playerinfo&player=$player",
+			t('literal.event_history')=>''
 		),
 		$playername = ""
 	);
@@ -105,31 +105,31 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'eventTime',
-				'Date',
+				t('literal.date'),
 				'width=20'
 			),
 			new TableColumn
 			(
 				'eventType',
-				'Type',
+				t('literal.type'),
 				'width=10&align=center'
 			),
 			new TableColumn
 			(
 				'eventDesc',
-				'Description',
+				t('literal.description'),
 				'width=40&sort=no&append=.&embedlink=yes'
 			),
 			new TableColumn
 			(
 				'serverName',
-				'Server',
+				t('literal.server'),
 				'width=20'
 			),
 			new TableColumn
 			(
 				'map',
-				'Map',
+				t('literal.map'),
 				'width=10'
 			)
 		),
@@ -181,10 +181,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 	insertEvents
 	('TeamBonuses', "
 		SELECT
-			'Team Bonus',
+			'i18n:playerhistory.type.team_bonus',
 			<table>.eventTime,
-			CONCAT('My team received a points bonus of ', bonus, ' for triggering \"', IFNULL(hlstats_Actions.description,'Unknown'), '\"'),
-			IFNULL(hlstats_Servers.name, 'Unknown'),
+			CONCAT(
+				'i18n:playerhistory.desc.team_bonus|bonus=', bonus,
+				'|action=', IFNULL(hlstats_Actions.description, 'i18n:literal.unknown')
+			),
+			IFNULL(hlstats_Servers.name, 'i18n:literal.unknown'),
 			<table>.map
 		FROM
 			<table>
@@ -212,10 +215,10 @@ For support and installation notes visit http://www.hlxcommunity.com
 	insertEvents
 	('Connects', "
 		SELECT
-			'Connect',
+			'i18n:playerhistory.type.connect',
 			<table>.eventTime,
-			CONCAT('I connected to the server'),
-			IFNULL(hlstats_Servers.name, 'Unknown'),
+			'i18n:playerhistory.desc.connect',
+			IFNULL(hlstats_Servers.name, 'i18n:literal.unknown'),
 			<table>.map
 		FROM
 			<table>
@@ -229,10 +232,10 @@ For support and installation notes visit http://www.hlxcommunity.com
 	insertEvents
 	('Disconnects', "
 		SELECT
-			'Disconnect',
+			'i18n:playerhistory.type.disconnect',
 			<table>.eventTime,
-			'I left the game',
-			IFNULL(hlstats_Servers.name, 'Unknown'),
+			'i18n:playerhistory.desc.disconnect',
+			IFNULL(hlstats_Servers.name, 'i18n:literal.unknown'),
 			<table>.map
 		FROM
 			<table>
@@ -246,10 +249,10 @@ For support and installation notes visit http://www.hlxcommunity.com
 	insertEvents
 	('Entries', "
 		SELECT
-			'Entry',
+			'i18n:playerhistory.type.entry',
 			<table>.eventTime,
-			'I entered the game',
-			IFNULL(hlstats_Servers.name, 'Unknown'),
+			'i18n:playerhistory.desc.entry',
+			IFNULL(hlstats_Servers.name, 'i18n:literal.unknown'),
 			<table>.map
 		FROM
 			<table>
@@ -263,10 +266,14 @@ For support and installation notes visit http://www.hlxcommunity.com
 	insertEvents
 	('Frags', "
 		SELECT
-			'Kill',
+			'i18n:playerhistory.type.kill',
 			<table>.eventTime,
-			CONCAT('I killed %A%$surl?mode=playerinfo&player=', victimId, '%', IFNULL(hlstats_Players.lastName,'Unknown'), '%/A%', ' with ', weapon),
-			IFNULL(hlstats_Servers.name, 'Unknown'),
+			CONCAT(
+				'i18n:playerhistory.desc.kill|victim_url=', '$surl?mode=playerinfo&player=', victimId,
+				'|victim_name=', IFNULL(hlstats_Players.lastName, 'i18n:literal.unknown'),
+				'|weapon=', weapon
+			),
+			IFNULL(hlstats_Servers.name, 'i18n:literal.unknown'),
 			<table>.map
 		FROM
 			<table>
@@ -285,10 +292,14 @@ For support and installation notes visit http://www.hlxcommunity.com
 	insertEvents
 	('Frags', "
 		SELECT
-			'Kill',
+			'i18n:playerhistory.type.kill',
 			<table>.eventTime,
-			CONCAT('I killed %A%$surl?mode=playerinfo&player=', victimId, '%', IFNULL(hlstats_Players.lastName,'Unknown'), '%/A%', ' with a headshot from ', weapon),
-			IFNULL(hlstats_Servers.name, 'Unknown'),
+			CONCAT(
+				'i18n:playerhistory.desc.kill_headshot|victim_url=', '$surl?mode=playerinfo&player=', victimId,
+				'|victim_name=', IFNULL(hlstats_Players.lastName, 'i18n:literal.unknown'),
+				'|weapon=', weapon
+			),
+			IFNULL(hlstats_Servers.name, 'i18n:literal.unknown'),
 			<table>.map
 		FROM
 			<table>
@@ -307,10 +318,14 @@ For support and installation notes visit http://www.hlxcommunity.com
 	insertEvents
 	('Frags', "
 		SELECT
-			'Death',
+			'i18n:playerhistory.type.death',
 			<table>.eventTime,
-			CONCAT('%A%$surl?mode=playerinfo&player=', killerId, '%', IFNULL(hlstats_Players.lastName,'Unknown'), '%/A%', ' killed me with ', weapon),
-			IFNULL(hlstats_Servers.name, 'Unknown'),
+			CONCAT(
+				'i18n:playerhistory.desc.death|killer_url=', '$surl?mode=playerinfo&player=', killerId,
+				'|killer_name=', IFNULL(hlstats_Players.lastName, 'i18n:literal.unknown'),
+				'|weapon=', weapon
+			),
+			IFNULL(hlstats_Servers.name, 'i18n:literal.unknown'),
 			<table>.map
 		FROM
 			<table>
@@ -328,10 +343,14 @@ For support and installation notes visit http://www.hlxcommunity.com
 	insertEvents
 	('Teamkills', "
 		SELECT
-			'Team Kill',
+			'i18n:playerhistory.type.team_kill',
 			<table>.eventTime,
-			CONCAT('I killed teammate %A%$surl?mode=playerinfo&player=', victimId, '%', IFNULL(hlstats_Players.lastName,'Unknown'), '%/A%', ' with ', weapon),
-			IFNULL(hlstats_Servers.name, 'Unknown'),
+			CONCAT(
+				'i18n:playerhistory.desc.team_kill|victim_url=', '$surl?mode=playerinfo&player=', victimId,
+				'|victim_name=', IFNULL(hlstats_Players.lastName, 'i18n:literal.unknown'),
+				'|weapon=', weapon
+			),
+			IFNULL(hlstats_Servers.name, 'i18n:literal.unknown'),
 			<table>.map
 		FROM
 			<table>
@@ -349,10 +368,14 @@ For support and installation notes visit http://www.hlxcommunity.com
 	insertEvents
 	('Teamkills', "
 		SELECT
-			'Friendly Fire',
+			'i18n:playerhistory.type.friendly_fire',
 			<table>.eventTime,
-			CONCAT('My teammate %A%$surl?mode=playerinfo&player=', killerId, '%', IFNULL(hlstats_Players.lastName, 'Unknown'), '%/A%', ' killed me with ', weapon),
-			IFNULL(hlstats_Servers.name, 'Unknown'),
+			CONCAT(
+				'i18n:playerhistory.desc.friendly_fire|killer_url=', '$surl?mode=playerinfo&player=', killerId,
+				'|killer_name=', IFNULL(hlstats_Players.lastName, 'i18n:literal.unknown'),
+				'|weapon=', weapon
+			),
+			IFNULL(hlstats_Servers.name, 'i18n:literal.unknown'),
 			<table>.map
 		FROM
 			<table>
@@ -370,10 +393,10 @@ For support and installation notes visit http://www.hlxcommunity.com
 	insertEvents
 	('ChangeRole', "
 		SELECT
-			'Role',
+			'i18n:playerhistory.type.role',
 			<table>.eventTime,
-			CONCAT('I changed role to ', role),
-			IFNULL(hlstats_Servers.name, 'Unknown'),
+			CONCAT('i18n:playerhistory.desc.change_role|role=', role),
+			IFNULL(hlstats_Servers.name, 'i18n:literal.unknown'),
 			<table>.map
 		FROM
 			<table>
@@ -387,10 +410,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 	insertEvents
 	('ChangeName', "
 		SELECT
-			'Name',
+			'i18n:playerhistory.type.name',
 			<table>.eventTime,
-			CONCAT('I changed my name from \"', oldName, '\" to \"', newName, '\"'),
-			IFNULL(hlstats_Servers.name, 'Unknown'),
+			CONCAT(
+				'i18n:playerhistory.desc.change_name|old_name=', oldName,
+				'|new_name=', newName
+			),
+			IFNULL(hlstats_Servers.name, 'i18n:literal.unknown'),
 			<table>.map
 		FROM
 			<table>
@@ -406,8 +432,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 		SELECT
 			'Action',
 			<table>.eventTime,
-			CONCAT('I received a points bonus of ', bonus, ' for triggering \"', IFNULL(hlstats_Actions.description,'Unknown'), '\"'),
-			IFNULL(hlstats_Servers.name, 'Unknown'),
+			CONCAT(
+				'i18n:playerhistory.desc.player_action|bonus=', bonus,
+				'|action=', IFNULL(hlstats_Actions.description, 'i18n:literal.unknown')
+			),
+			IFNULL(hlstats_Servers.name, 'i18n:literal.unknown'),
 			<table>.map
 		FROM
 			<table>
@@ -429,8 +458,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 		SELECT
 			'Action',
 			<table>.eventTime,
-			CONCAT('I received a points bonus of ', bonus, ' for triggering \"', IFNULL(hlstats_Actions.description,'Unknown'), '\" against %A%$surl?mode=playerinfo&player=', victimId, '%', IFNULL(hlstats_Players.lastName,'Unknown'), '%/A%'),
-			IFNULL(hlstats_Servers.name, 'Unknown'),
+			CONCAT(
+				'i18n:playerhistory.desc.player_action_against|bonus=', bonus,
+				'|action=', IFNULL(hlstats_Actions.description, 'i18n:literal.unknown'),
+				'|victim_url=', '$surl?mode=playerinfo&player=', victimId,
+				'|victim_name=', IFNULL(hlstats_Players.lastName, 'i18n:literal.unknown')
+			),
+			IFNULL(hlstats_Servers.name, 'i18n:literal.unknown'),
 			<table>.map
 		FROM
 			<table>
@@ -454,8 +488,12 @@ For support and installation notes visit http://www.hlxcommunity.com
 		SELECT
 			'Action',
 			<table>.eventTime,
-			CONCAT('%A%$surl?mode=playerinfo&player=', <table>.playerId, '%', IFNULL(hlstats_Players.lastName,'Unknown'), '%/A% triggered \"', IFNULL(hlstats_Actions.description,'Unknown'), '\" against me'),
-			IFNULL(hlstats_Servers.name, 'Unknown'),
+			CONCAT(
+				'i18n:playerhistory.desc.player_action_against_me|player_url=', '$surl?mode=playerinfo&player=', <table>.playerId,
+				'|player_name=', IFNULL(hlstats_Players.lastName, 'i18n:literal.unknown'),
+				'|action=', IFNULL(hlstats_Actions.description, 'i18n:literal.unknown')
+			),
+			IFNULL(hlstats_Servers.name, 'i18n:literal.unknown'),
 			<table>.map
 		FROM
 			<table>
@@ -479,10 +517,10 @@ For support and installation notes visit http://www.hlxcommunity.com
 	insertEvents
 	('Suicides', "
 		SELECT
-			'Suicide',
+			'i18n:playerhistory.type.suicide',
 			<table>.eventTime,
-			CONCAT('I committed suicide with \"', weapon, '\"'),
-			IFNULL(hlstats_Servers.name, 'Unknown'),
+			CONCAT('i18n:playerhistory.desc.suicide|weapon=', weapon),
+			IFNULL(hlstats_Servers.name, 'i18n:literal.unknown'),
 			<table>.map
 		FROM
 			<table>
@@ -498,8 +536,12 @@ For support and installation notes visit http://www.hlxcommunity.com
 		SELECT
 			'Team',
 			<table>.eventTime,
-			IF(hlstats_Teams.name IS NULL, CONCAT('I joined team \"', team, '\"'), CONCAT('I joined team \"', team, '\" (', hlstats_Teams.name, ')')),
-			IFNULL(hlstats_Servers.name, 'Unknown'),
+			IF(
+				hlstats_Teams.name IS NULL,
+				CONCAT('i18n:playerhistory.desc.change_team|team=', team),
+				CONCAT('i18n:playerhistory.desc.change_team_named|team=', team, '|team_name=', hlstats_Teams.name)
+			),
+			IFNULL(hlstats_Servers.name, 'i18n:literal.unknown'),
 			<table>.map
 		FROM
 			<table>
@@ -545,7 +587,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 <div class="block">
 <?php
-	printSectionTitle('Player Event History (Last '.$g_options['DeleteDays'].' Days)');
+	printSectionTitle(t('literal.player_event_history', array('days' => $g_options['DeleteDays'])));
 	if ($numitems > 0)
 	{
 		$table->draw($result, $numitems, 95);
@@ -553,7 +595,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?><br /><br />
 	<div class="subblock">
 		<div style="float:right;">
-			Go to: <a href="<?php echo $g_options['scripturl'] . "?mode=playerinfo&amp;player=$player"; ?>"><?php echo $pl_name; ?>'s Statistics</a>
+			<?php echo eHtml(t('literal.go_to')); ?>: <a href="<?php echo $g_options['scripturl'] . "?mode=playerinfo&amp;player=$player"; ?>"><?php echo t('literal.player_statistics_link', array('player' => $pl_name)); ?></a>
 		</div>
 	</div>
 </div>

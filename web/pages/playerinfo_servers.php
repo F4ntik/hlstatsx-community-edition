@@ -48,13 +48,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'server',
-				'Server',
+				t('literal.server'),
 				'width=26&align=left'
 			),
 			new TableColumn
 			(
 				'kills',
-				'Kills',
+				t('literal.kills'),
 				'width=6&align=right'
 			),
 			new TableColumn
@@ -66,28 +66,28 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'kpercent',
-				'Ratio',
+				t('literal.ratio'),
 				'width=15&sort=no&type=bargraph'
 			),
 			new TableColumn
 			(
 				'deaths',
-				'Deaths',
+				t('literal.deaths'),
 				'width=6&align=right'
 			),
 			new TableColumn(
 				'kpd',
-				'K:D',
+				t('literal.kpd_cap'),
 				'width=5&align=right'
 			),
 			new TableColumn(
 				'headshots',
-				'Headshots',
+				t('literal.headshots'),
 				'width=6&align=right'
 			),
 			new TableColumn(
 				'hpercent',
-				'Percentage of Headshots',
+				t('literal.percentage_of_headshots'),
 				'width=16&sort=no&type=bargraph'
 			),
 			new TableColumn(
@@ -97,7 +97,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			),
 			new TableColumn(
 				'hpk',
-				'HS:K',
+				t('literal.hpk_cap'),
 				'width=5&align=right'
 			)
 			
@@ -146,7 +146,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	$numitems = $db->num_rows($result);
 	if ($numitems > 0)
 	{
-		printSectionTitle('Server Activity *');
+		printSectionTitle(t('literal.server_activity'));
 		$tblServers->draw($result, $numitems, 95);
 ?>
 	<br /><br />

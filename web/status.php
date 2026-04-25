@@ -40,9 +40,13 @@ define('IN_HLSTATS', true);
 
 foreach ($_SERVER as $key => $entry) {
 	if ($key !== 'HTTP_COOKIE') {
-		$search_pattern  = array('/<script>/', '/<\/script>/', '/[^A-Za-z0-9.\-\/=:;_?#&~]/');
-		$replace_pattern = array('', '', '');
-		$entry = preg_replace($search_pattern, $replace_pattern, $entry);
+		if (is_array($entry) || is_object($entry)) {
+			$_SERVER[$key] = '';
+			continue;
+		}
+
+		$entry = preg_replace('/<script\b[^>]*>.*?<\/script>/isu', '', (string) $entry);
+		$entry = preg_replace('/[^\p{L}\p{N}.\-\/=:;_?#&~]/u', '', $entry);
 
 		if ($key == 'PHP_SELF') {
 			if ((strrchr($entry, '/') !== '/hlstats.php') &&
@@ -64,13 +68,22 @@ foreach ($_SERVER as $key => $entry) {
 }
  
 require('config.php');
+require(INCLUDE_PATH . '/i18n.php');
+
+session_start();
+init_i18n();
+
 header('Content-Type: text/html; charset=utf-8');
+
+// Load database classes and shared helpers before any localized error handling.
+require(INCLUDE_PATH . "/class_db.php");
+require(INCLUDE_PATH . "/functions.php");
 
 // Check PHP configuration
 
 if (version_compare(phpversion(), "4.1.0", "<"))
 {
-	error("HLstats requires PHP version 4.1.0 or newer (you are running PHP version " . phpversion() . ").");
+	error(localized_text('error.php_version_too_old', null, array('version' => phpversion())));
 }
 
 // do not report NOTICE warnings
@@ -79,10 +92,6 @@ error_reporting(E_ALL ^ E_NOTICE);
 ///
 /// Classes
 ///
-
-// Load database classes
-require(INCLUDE_PATH . "/class_db.php");
-require(INCLUDE_PATH . "/functions.php");
 
 ////
 //// Initialisation
@@ -95,7 +104,7 @@ if ( class_exists($db_classname) )
 }
 else
 {
-	error('Database class does not exist.  Please check your config.php file for DB_TYPE');
+	error(localized_text('error.database_class_missing'));
 }
 
 $container = require ROOT_PATH . '/bootstrap.php';
@@ -103,7 +112,7 @@ $optionService = $container->get(\Service\OptionService::class);
 
 $g_options = $optionService->getAllOptions();
 if (empty($g_options)) {
-	error('Warning: Could not find any options in the database. Check HLStats configuration.');
+	error(localized_text('error.options_missing'));
 }
 
 
@@ -289,7 +298,7 @@ if ($server_data['addr'] != '')  {
 		}
 		else
 		{
-			echo '<a target="_blank" href="http://www.hlxcommunity.com" style="display:block;"><img src="'.IMAGE_PATH.'/icons/title-short.png" style="width:'.$width.'px;border:0px;" alt="Realtime player statistics for Halflife2 Source Engine" title="Realtime player statistics for Halflife2 Source Engine" /></a>';
+			echo '<a target="_blank" href="http://www.hlxcommunity.com" style="display:block;"><img src="'.IMAGE_PATH.'/icons/title-short.png" style="width:'.$width.'px;border:0px;" alt="' . eHtml(t('status.default_logo_title', array(), 'Realtime player statistics for Halflife2 Source Engine')) . '" title="' . eHtml(t('status.default_logo_title', array(), 'Realtime player statistics for Halflife2 Source Engine')) . '" /></a>';
 		}
 	echo '</td></tr>';
 	}
@@ -297,21 +306,21 @@ if ($server_data['addr'] != '')  {
 	if ($server_name == 1)
 	{
 		echo '<tr><td align="center" colspan="2" class="'.$fsize.'">';
-		echo '<a target="_blank" href="'.$g_options['scriptbase'].'" title="View statistics"><b>'.$server_data['name'].'</b></a>';
+		echo '<a target="_blank" href="'.$g_options['scriptbase'].'" title="' . eHtml(t('status.view_statistics')) . '"><b>'.$server_data['name'].'</b></a>';
 		echo '</td></tr>';
 	}
 
 	if ($server_url == 1)
 	{
 		echo '<tr><td align="center" colspan="2" class="'.$fsize.'">';
-		echo '<a href="steam://connect/'.$server_data['addr'].'" title="Connent to Server"><b>'.$server_data['addr'].'</b></a>';
+		echo '<a href="steam://connect/'.$server_data['addr'].'" title="' . eHtml(t('status.connect_to_server')) . '"><b>'.$server_data['addr'].'</b></a>';
 		echo '</td></tr>';
 	}
 
 	if ($show_password != '')
 	{
 		echo '<tr><td align="center" colspan="2" class="'.$fsize.'">';
-		echo '<b>Password:&nbsp;'.$show_password.'</b>';
+		echo '<b>' . eHtml(t('status.password')) . ':&nbsp;'.$show_password.'</b>';
 		echo '</td></tr>';
 	}    
 
@@ -333,13 +342,13 @@ if ($server_data['addr'] != '')  {
 	if ($show_summary == 1)
 	{
 		echo '<tr><td align="left" style="padding-left:2px" class="'.$fsize.'">';
-		echo 'Players:'; 
+		echo eHtml(t('status.players')) . ':';
 		echo '</td><td align="right" style="padding-right:2px;" class="'.$fsize.'">';
 		echo number_format($server_data['players']); 
 		echo '</td></tr>';
 
 		echo '<tr><td align="left" style="padding-left:2px" class="'.$fsize.'">';
-		echo 'Kills:'; 
+		echo eHtml(t('status.kills')) . ':';
 		echo '</td><td align="right" style="padding-right:2px;" class="'.$fsize.'">';
 		echo number_format($server_data['kills']); 
 		echo '</td></tr>';
@@ -347,7 +356,7 @@ if ($server_data['addr'] != '')  {
 		if ($server_data['headshots'] > 0)
 		{
 			echo '<tr><td align="left" style="padding-left:2px" class="'.$fsize.'">';
-			echo 'Headshots:'; 
+			echo eHtml(t('status.headshots')) . ':';
 			echo '</td><td align="right" style="padding-right:2px;" class="'.$fsize.'">';
 			echo number_format($server_data['headshots']); 
 			echo '</td></tr>';
@@ -356,7 +365,7 @@ if ($server_data['addr'] != '')  {
 
 	if ($map_name == 1) {
 		echo '<tr><td align="left" style="padding-left:2px" class="'.$fsize.'">';
-		echo 'Map:'; 
+		echo eHtml(t('literal.map')) . ':';
 		echo '</td><td align="right" style="padding-right:2px;" class="'.$fsize.'">';
 		echo $server_data['act_map']; 
 		echo '</td></tr>';
@@ -366,12 +375,12 @@ if ($server_data['addr'] != '')  {
 	$min   = sprintf("%02d", floor(($stamp % 3600) / 60));
 	$sec   = sprintf("%02d", floor($stamp % 60)); 
 	echo '<tr><td align="left" style="padding-left:2px" class="'.$fsize.'">';
-	echo 'Map Time:'; 
+	echo eHtml(t('status.map_time')) . ':';
 	echo '</td><td align="right" style="padding-right:2px;" class="'.$fsize.'">';
 	echo $hours.':'.$min.':'.$sec; 
 	echo '</td></tr>';
 	echo '<tr><td align="left" style="padding-left:2px;border-bottom:1px solid #000000;" class="'.$fsize.'">';
-	echo 'Online:'; 
+	echo eHtml(t('status.online')) . ':';
 	echo '</td><td align="right" style="padding-right:2px;border-bottom:1px solid #000000;" class="'.$fsize.'">';
 	echo $server_data['act_players'].'/'.$server_data['max_players']; 
 	echo '</td></tr>';
@@ -486,7 +495,7 @@ if ($server_data['addr'] != '')  {
 					{
 						$thisplayer['name'] = substr($thisplayer['name'], 0, 50);
 					}
-					echo '<a target="_blank" style="color:'.$thisteam['playerlist_color'].';" href="'.$g_options['scriptbase'].'/hlstats.php?mode=playerinfo&amp;player='.$thisplayer['player_id'].'" title="Player Details">';
+					echo '<a target="_blank" style="color:'.$thisteam['playerlist_color'].';" href="'.$g_options['scriptbase'].'/hlstats.php?mode=playerinfo&amp;player='.$thisplayer['player_id'].'" title="' . eHtml(t('literal.player_details')) . '">';
 					if ($show_flags == 1)
 					{
 					echo '<img src="'.getFlag($thisplayer['cli_flag']).'" alt="'.ucfirst(strtolower($thisplayer['cli_country'])).'" title="'.ucfirst(strtolower($thisplayer['cli_country'])).'">&nbsp;';
@@ -531,7 +540,7 @@ if ($server_data['addr'] != '')  {
 					if ($show_team_wins == 1) {
 						if (($map_teama_wins > 0) || ($map_teamb_wins > 0))
 						{
-							echo '&nbsp;('.$map_teama_wins.' wins)';
+							echo '&nbsp;' . eHtml(t('server.team_wins', array('wins' => $map_teama_wins)));
 						}
 					}
 					echo '</td>';
@@ -573,7 +582,7 @@ if ($server_data['addr'] != '')  {
 		if (count($teamdata) == 0)
 		{
 			echo '<tr><td colspan="2" align="left" style="background:#EFEFEF;color:black" class="'.$fsize.'">';
-			echo '&nbsp;No Players';
+			echo '&nbsp;' . eHtml(t('literal.no_players'));
 			echo '</td></tr>';
 		}
 	echo '</table></td></tr>';
@@ -602,7 +611,7 @@ if ($server_data['addr'] != '')  {
 		");
 		echo '<tr><td colspan="2"><table border="0" cellpadding="0" cellspacing="0" style="width:100%">';
 		echo '<tr><td align="center" colspan="2" style="border:1px solid #000000;" class="'.$fsize.'">';
-		echo '<b>TOP '.$top_players.' Players</b>';
+		echo '<b>' . eHtml(t('status.top_players', array('count' => $top_players), 'TOP :count Players')) . '</b>';
 		echo '</td></tr>';
 
 		while ($player = $db->fetch_array())
@@ -614,11 +623,11 @@ if ($server_data['addr'] != '')  {
 			$display_name = $player['lastName'];
 			if (strlen($player['lastName']) > $cut_pos)
 				$display_name = substr($player['lastName'], 0, $cut_pos);
-			echo '<a target="_blank" href="'.$g_options["scriptbase"].'/hlstats.php?mode=playerinfo&amp;player='.$player['playerId'].'" title="Player Details">';
+			echo '<a target="_blank" href="'.$g_options["scriptbase"].'/hlstats.php?mode=playerinfo&amp;player='.$player['playerId'].'" title="' . eHtml(t('literal.player_details')) . '">';
 			if ($show_flags == 1)
 			{
 				if ($player['country'] == '')
-					$player['country'] = 'Unknown Country';
+					$player['country'] = t('status.unknown_country', array(), 'Unknown Country');
 				echo '<img src="'.getFlag($player['flag']).'" alt="'.ucfirst($player['country']).'" title="'.ucfirst($player['country']).'">&nbsp;';
 			}
 			else

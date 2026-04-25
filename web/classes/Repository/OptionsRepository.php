@@ -20,7 +20,7 @@
         public function getOptionChoices(string $keyName): ?array
         {
             $sql = "
-                SELECT 
+                SELECT
                     `value`
                 FROM
                     `hlstats_Options_Choices`
@@ -42,11 +42,11 @@
         public function getAllOptions() : array
         {
             $sql = "
-                SELECT 
-                    `keyname`, `value` 
-                FROM 
-                    hlstats_Options 
-                WHERE 
+                SELECT
+                    `keyname`, `value`
+                FROM
+                    hlstats_Options
+                WHERE
                     opttype >= 1
             ";
 

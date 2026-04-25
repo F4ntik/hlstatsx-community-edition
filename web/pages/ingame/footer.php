@@ -37,7 +37,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+        die(localized_direct_access_message());
     }
 
 ?>
@@ -47,9 +47,9 @@ For support and installation notes visit http://www.hlxcommunity.com
 </div>
 <br />
 <div class="fSmall" style="text-align:center;">
-	Generated in real-time by <a href="http://www.hlxce.com" target="_blank">HLstatsX Community Edition <?php echo $g_options['version']; ?></a>
+	<?php echo eHtml(t('ingame.generated_in_real_time_by')); ?> <a href="http://www.hlxce.com" target="_blank">HLstatsX Community Edition <?php echo $g_options['version']; ?></a>
 	<br />
-	All images are copyrighted by their respective owners.
+	<?php echo eHtml(t('ingame.images_copyright_notice')); ?>
 	
 </div>
 </body>

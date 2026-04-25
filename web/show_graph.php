@@ -4,7 +4,7 @@ HLstatsX Community Edition - Real-time player and clan rankings and statistics
 Copyleft (L) 2008-20XX Nicholas Hastings (nshastings@gmail.com)
 http://www.hlxcommunity.com
 
-HLstatsX Community Edition is a continuation of 
+HLstatsX Community Edition is a continuation of
 ELstatsNEO - Real-time player and clan rankings and statistics
 Copyleft (L) 2008-20XX Malte Bayer (steam@neo-soft.org)
 http://ovrsized.neo-soft.org/
@@ -18,7 +18,7 @@ HLstatsX is an enhanced version of HLstats made by Simon Garner
 HLstats - Real-time player and clan rankings and statistics for Half-Life
 http://sourceforge.net/projects/hlstats/
 Copyright (C) 2001  Simon Garner
-            
+
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
 as published by the Free Software Foundation; either version 2
@@ -38,10 +38,14 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 	foreach ($_SERVER as $key => $entry) {
 		if ($key !== 'HTTP_COOKIE') {
-			$search_pattern  = array('/<script>/', '/<\/script>/', '/[^A-Za-z0-9.\-\/=:;_?#&~]/');
-			$replace_pattern = array('', '', '');
-			$entry = preg_replace($search_pattern, $replace_pattern, $entry);
-	  
+			if (is_array($entry) || is_object($entry)) {
+				$_SERVER[$key] = '';
+				continue;
+			}
+
+			$entry = preg_replace('/<script\b[^>]*>.*?<\/script>/isu', '', (string) $entry);
+			$entry = preg_replace('/[^\p{L}\p{N}.\-\/=:;_?#&~]/u', '', $entry);
+
 			if ($key == 'PHP_SELF') {
 				if ((strrchr($entry, '/') !== '/hlstats.php') &&
 					(strrchr($entry, '/') !== '/show_graph.php') &&
@@ -53,9 +57,9 @@ For support and installation notes visit http://www.hlxcommunity.com
 					(strrchr($entry, '/') !== '/config.php') &&
 					(strrchr($entry, '/') !== '/') &&
 					($entry !== '')) {
-					header('Location: http://'.$_SERVER['HTTP_HOST'].'/hlstats.php');    
+					header('Location: http://'.$_SERVER['HTTP_HOST'].'/hlstats.php');
 					exit;
-				}    
+				}
 			}
 			$_SERVER[$key] = $entry;
 		}
@@ -119,17 +123,17 @@ For support and installation notes visit http://www.hlxcommunity.com
 	if (isset($_GET['type']) && is_numeric($_GET['type'])) {
 		$bar_type = valid_request($_GET['type'], true);
 	}
-		
+
 	$selectedStyle = (isset($_COOKIE['style']) && $_COOKIE['style']) ? $_COOKIE['style'] : $g_options['style'];
 
-	
+
 	// Determine if we have custom nav images available
 	$selectedStyle = preg_replace('/\.css$/','',$selectedStyle);
-	
+
 	$iconpath = IMAGE_PATH . "/icons";
 	if (file_exists($iconpath . "/" . $selectedStyle)) {
 		$iconpath = $iconpath . "/" . $selectedStyle;
-	}		
+	}
 
 	$bg_color = array('red' => 171, 'green' => 204, 'blue' => 214);
 	if (isset($_GET['bgcolor']) && is_string($_GET['bgcolor'])) {
@@ -259,7 +263,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 		{
 			$i++;
 			$avg_values[] = array('timestamp' => $rowdata['timestamp'], 'act_players' => $rowdata['act_players'], 'min_players' => $rowdata['min_players'], 'max_players' => $rowdata['max_players'], 'uptime' => $rowdata['uptime'], 'fps' => $rowdata['fps'], 'map' => $rowdata['map']);
-			
+
 			if ($i == $avg_step)
 			{
 				$insert_values = array();
@@ -325,7 +329,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 				$rowdata = $db->fetch_array($result);
 				$players_last_day = sprintf("%.1f", $rowdata['players']);
 
-				$str = 'Average Players Last 24h: ' . $players_last_day . ' Last 1h: ' . $players_last_hour;
+				$str = t(
+					'show_graph.average_players_summary',
+					array(
+						'day' => $players_last_day,
+						'hour' => $players_last_hour,
+					)
+				);
 				$str_width = (imagefontwidth(1) * strlen($str)) + 2;
 				imagestring($image, 1, $width - $indent_x[1] - $str_width, $indent_y[0] - 11, $str, $font_color);
 			}
@@ -387,7 +397,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 		// PLAYER HISTORY GRAPH
 		$indent_x = array(35, 35);
 		$indent_y = array(15, 15);
-		
+
 		if (file_exists($iconpath . "/trendgraph.png")) {
 			$trendgraph_bg = $iconpath . "/trendgraph.png";
 		} else {

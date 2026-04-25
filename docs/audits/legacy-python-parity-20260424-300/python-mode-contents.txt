@@ -1,0 +1,206 @@
+HLstatsX Community Edition - Counter-Strike	 
+ 
+  
+
+			 
+			 
+			 
+			 
+			 
+			 
+			  
+	
+	 
+		 
+			   
+		 
+
+		 
+			 
+				     
+				     
+								
+				     
+			 
+
+		 
+	 
+	 
+		 
+  HLstatsX Community Edition   &raquo;    HLstatsX   &raquo;    Counter-Strike 			 
+		 
+
+		 
+			 
+									 
+								Language:
+				 
+											 English 
+											 Русский 
+									 
+			 
+		 
+	 
+	  
+ 
+
+ 
+      
+ 
+        
+
+    
+		 
+		 
+			  Servers  
+
+			  Chat  
+			  Players  
+			  Clans  
+
+			  Countries  
+			  Awards  
+ 
+			  Actions  
+			  Weapons  
+				  Maps  
+	  
+  
+
+
+
+ 
+
+ &nbsp; &nbsp;Participating Servers   		 
+     
+
+        Tracking  74  players ( +52  new players last 24h) with  1,235  kills ( +-52  last 24h) and  554  headshots ( 44.86% ) on  2  servers 
+       
+       
+		 &nbsp;Server 
+		 &nbsp;Address 
+		 &nbsp;Map 
+		 &nbsp;Played 
+		 &nbsp;Players 
+		 &nbsp;Kills 
+		 &nbsp;Headshots 
+		 &nbsp;Hpk 
+       
+
+	 
+             
+ &nbsp; CS16 ORI CS1  
+             85.239.43.77:27015 ( Join ) 
+              
+             00:00:00 
+             0/10 
+             0 
+             0 
+             0.00 
+         
+		 
+			 
+				 
+					
+
+
+
+ 
+	 
+		 &nbsp;# 
+		 &nbsp;Player 
+		 &nbsp;Kills 
+		 &nbsp;Hs 
+		 &nbsp;Hpk 
+		 &nbsp;Accuracy 
+		 &nbsp;Lat 
+		 &nbsp;Connection Time 
+		 &nbsp;+/- 
+		 &nbsp;Skill 
+	 
+
+	 
+		 &nbsp;		 
+		 No Players		 
+	 
+ 
+					 
+   &nbsp;24h View       	      &nbsp;Last Week       	      &nbsp;Last Month       	      &nbsp;Last Year       	   
+	 
+				 
+			 
+		 
+    	 
+             
+ &nbsp; Replay Server 37.230.137.48  
+             37.230.137.48:27015 ( Join ) 
+              
+             00:00:00 
+             4/10 
+             1,235 
+             554 
+             0.45 
+         
+		 
+			 
+				 
+					
+
+
+
+ 
+	 
+		 &nbsp;# 
+		 &nbsp;Player 
+		 &nbsp;Kills 
+		 &nbsp;Hs 
+		 &nbsp;Hpk 
+		 &nbsp;Accuracy 
+		 &nbsp;Lat 
+		 &nbsp;Connection Time 
+		 &nbsp;+/- 
+		 &nbsp;Skill 
+	 
+
+	 
+		 &nbsp;		 
+		 No Players		 
+	 
+ 
+					 
+   &nbsp;24h View       	      &nbsp;Last Week       	      &nbsp;Last Month       	      &nbsp;Last Year       	   
+	 
+				 
+			 
+		 
+     	 
+ 		 
+			 
+				 
+			 
+		 
+   
+
+ 
+	 
+		 
+		
+			  
+			  
+
+			 
+				 
+					 
+				 
+			 
+			 
+
+			 
+											You are currently viewing the basic version of this page, please enable JavaScript and reload the page to access full functionality.						 
+										
+					Generated in real-time by					 
+						HLstatsX Community Edition 1.11.4					 
+
+									 
+				All images are copyrighted by their respective owners.				  
+				[ Admin ]

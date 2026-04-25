@@ -61,16 +61,16 @@
 
 			$sql = "
 				SELECT DISTINCT
-					hlstats_PlayerNames.name 
-				FROM 
-					hlstats_PlayerNames 
-				INNER JOIN 
-					hlstats_Players 
-				ON 
-					hlstats_PlayerNames.playerId = hlstats_Players.playerId 
-				WHERE 
+					hlstats_PlayerNames.name
+				FROM
+					hlstats_PlayerNames
+				INNER JOIN
+					hlstats_Players
+				ON
+					hlstats_PlayerNames.playerId = hlstats_Players.playerId
+				WHERE
 					game = :game
-				AND 
+				AND
 					name LIKE :search
 				LIMIT :limit
 			";
@@ -111,9 +111,9 @@
                     hlstats_Players
                 WHERE
                     game = :game
-                AND 
+                AND
                     hideranking = 0
-                AND 
+                AND
                     kills >= 1
                 AND (
                     {$rankingType} > :points1

@@ -37,31 +37,31 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+die(localized_direct_access_message());
     }
 
 	if ($auth->userdata["acclevel"] < 80) {
-        die ("Access denied!");
+        die(localized_access_denied_message());
 	}
 
 	$edlist = new EditList("ribbonTriggerId", "hlstats_Ribbons_Trigger", "game");
-	$edlist->columns[] = new EditListColumn("game", "Game", 0, true, "hidden", $gamecode);
-	$edlist->columns[] = new EditListColumn("ribbonId", "Ribbon", 0, true, "select", "hlstats_Ribbons.ribbonName/ribbonId/game='$gamecode'");
-	$edlist->columns[] = new EditListColumn("awardCode", "Trigger Award", 0, false, "select", "hlstats_Awards.name/code/game='$gamecode'");
-	$edlist->columns[] = new EditListColumn("awardCount", "No. awards needed", 15, true, "text", "0", 64);
-	$edlist->columns[] = new EditListColumn("special", "Special logic", 15, false, "text", "0", 64);
+	$edlist->columns[] = new EditListColumn("game", t('literal.game'), 0, true, "hidden", $gamecode);
+	$edlist->columns[] = new EditListColumn("ribbonId", t('literal.ribbon'), 0, true, "select", "hlstats_Ribbons.ribbonName/ribbonId/game='$gamecode'");
+	$edlist->columns[] = new EditListColumn("awardCode", t('literal.trigger_award'), 0, false, "select", "hlstats_Awards.name/code/game='$gamecode'");
+	$edlist->columns[] = new EditListColumn("awardCount", t('literal.awards_needed'), 15, true, "text", "0", 64);
+	$edlist->columns[] = new EditListColumn("special", t('literal.special_logic'), 15, false, "text", "0", 64);
 
 	if ($_POST)
 	{
 		if ($edlist->update())
-			message("success", "Operation successful.");
+			message("success", t('admin.operation_successful'));
 		else
 			message("warning", $edlist->error());
 	}
 	
 ?>
 
-Always set special logic = 0 unless you know what you're doing!
+<?php echo eHtml(t('admin.task.ribbons_trigger.warning')); ?>
 
 <?php
 	
@@ -86,7 +86,7 @@ Always set special logic = 0 unless you know what you're doing!
 
 <table width="75%" border=0 cellspacing=0 cellpadding=0>
 <tr>
-	<td align="center"><input type="submit" value="  Apply  " class="submit"></td>
+	<td align="center"><input type="submit" value="  <?php echo eHtml(t('ui.apply')); ?>  " class="submit"></td>
 </tr>
 </table>
 

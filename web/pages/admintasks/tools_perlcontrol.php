@@ -37,11 +37,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
 	if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+        die(localized_direct_access_message());
     }
 
 	if ($auth->userdata["acclevel"] < 80) {
-        die ("Access denied!");
+        die(localized_access_denied_message());
 	}
 ?>
 
@@ -49,33 +49,52 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 <?php
 
-   $commands[0]["name"] = "Reload Configuration";
-   $commands[0]["cmd"] = "RELOAD";
-   $commands[1]["name"] = "Shut down the Daemon *";
-   $commands[1]["cmd"] = "KILL";
+    $commands = array(
+        array(
+            'name' => t('admin.task.tools_perlcontrol.command.reload_configuration'),
+            'cmd' => 'RELOAD',
+        ),
+        array(
+            'name' => t('admin.task.tools_perlcontrol.command.stop_runtime'),
+            'cmd' => 'KILL',
+        ),
+    );
 
     if (isset($_POST['confirm'])) {
-		$host = $_POST['masterserver'];
-		$port = $_POST["port"];
-		$command = $commands[$_POST["command"]]["cmd"];
-		if (!$command) die ('Invalid command!');
-		if ($port==0) $port = "27500";
+        $host = isset($_POST['masterserver']) ? trim((string) $_POST['masterserver']) : 'localhost';
+        $port = isset($_POST['port']) ? trim((string) $_POST['port']) : '';
+        $commandIndex = isset($_POST['command']) ? (int) $_POST['command'] : -1;
+        if (!isset($commands[$commandIndex])) {
+            die(eHtml(t('admin.task.tools_perlcontrol.error.invalid_command')));
+        }
+        $command = $commands[$commandIndex]['cmd'];
+        if ($port === '' || !ctype_digit($port) || (int) $port === 0) {
+            $port = '27500';
+        } else {
+            $port = (string) ((int) $port);
+        }
 
 		// Check if we're contacting a remote host -- if so, need proxy_key configured for this to work (die and throw an error if we're missing it)
 		if (($host != "127.0.0.1") && ($host != "localhost")) 
 		{
 			if ($g_options['Proxy_Key'] == "") 
 			{
-				echo "<p><strong>Warning:</strong> You are connecting to a remote daemon and do not have a Proxy Key configured.</p>";
-				
-				echo "<p>Please visit the <a href=\"{$g_options['scripturl']}?mode=admin&task=options#options\">HLstatsX:CE Settings page</a> and configure a Proxy Key.  Once configured, manually restart your daemon.</p>";
+                $settingsLink = '<a href="' . $g_options['scripturl'] . '?mode=admin&amp;task=options#options">' . eHtml(t('admin.task.tools_perlcontrol.proxy_key_settings_link')) . '</a>';
+                echo '<p><strong>' . eHtml(t('ui.warning')) . ':</strong> ' . eHtml(t('admin.task.tools_perlcontrol.proxy_key_warning')) . '</p>';
+                echo '<p>' . t('admin.task.tools_perlcontrol.proxy_key_notice', array('link' => $settingsLink)) . '</p>';
 				die();
 			}
 		}
 		
 		echo "<div style=\"margin-left: 50px;\"><ul>\n";      
-		echo "<li>Sending Command to HLstatsX: CE Daemon at $host:$port &mdash; ";
-		$host = gethostbyname($host);
+        echo '<li>' . t(
+            'admin.task.tools_perlcontrol.progress.send_command',
+            array(
+                'host' => eHtml($host),
+                'port' => eHtml($port),
+            )
+        ) . ' &mdash; ';
+		$resolvedHost = gethostbyname($host);
 		$socket = socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
 		$packet = "";
 		if ($g_options['Proxy_Key'])
@@ -86,10 +105,10 @@ For support and installation notes visit http://www.hlxcommunity.com
 		{
 			$packet = "C;".$command.";";
 		}
-		$bytes_sent = socket_sendto($socket, $packet, strlen($packet), 0, $host, $port);
-		echo "<strong>".$bytes_sent."</strong> bytes <strong>OK</strong></li>";
+		$bytes_sent = socket_sendto($socket, $packet, strlen($packet), 0, $resolvedHost, (int) $port);
+        echo '<strong>' . eHtml((string) $bytes_sent) . '</strong> ' . eHtml(t('admin.task.tools_synchronize.progress.bytes_suffix')) . ' <strong>' . eHtml(t('admin.tools_reset.status.ok')) . '</strong></li>';
 
-		echo "<li>Waiting for Backend Answer...";
+        echo '<li>' . eHtml(t('admin.task.tools_perlcontrol.progress.waiting_for_backend_answer'));
 		$recv_bytes = 0;
 		$buffer     = "";
 		$timeout    = 5;
@@ -97,7 +116,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 		$packets    = 0;
 		$read       = array($socket);
 		while (socket_select($read, $write = NULL, $except = NULL, $timeout) > 0) {
-			$recv_bytes += socket_recvfrom($socket, $buffer, 2000, 0, $host, $port);
+			$recv_bytes += socket_recvfrom($socket, $buffer, 2000, 0, $resolvedHost, $port);
 			$answer     .= $buffer;
 			$buffer     = "";
 			$timeout    = "1";
@@ -105,47 +124,59 @@ For support and installation notes visit http://www.hlxcommunity.com
 		}   
 
 
-		echo "recieving <strong>$recv_bytes</strong> bytes in <strong>$packets</strong> packets...<strong>OK</strong></li>";
+        echo ' ' . t(
+            'admin.task.tools_perlcontrol.progress.receiving_response',
+            array(
+                'bytes' => eHtml((string) $recv_bytes),
+                'packets' => eHtml((string) $packets),
+            )
+        ) . ' <strong>' . eHtml(t('admin.tools_reset.status.ok')) . '</strong></li>';
       
 		if ($packets>0) {
-			echo "<li>Backend Answer: ".$answer."</li>";
+            echo '<li>' . t('admin.task.tools_perlcontrol.progress.backend_answer', array('answer' => eHtml($answer))) . '</li>';
 		} 
 		else 
 		{
-			echo "<li><em>No packets received &mdash; check if backend dead or not listening on $host:$port</em></li>";
+            echo '<li><em>' . t(
+                'admin.task.tools_perlcontrol.progress.no_packets_received',
+                array(
+                    'host' => eHtml($host),
+                    'port' => eHtml($port),
+                )
+            ) . '</em></li>';
 		}
       
-		echo "<li>Closing connection to backend...";
+        echo '<li>' . eHtml(t('admin.task.tools_perlcontrol.progress.close_connection'));
 		socket_close($socket);
-		echo "<strong>OK</strong></li>";
+        echo '<strong>' . eHtml(t('admin.tools_reset.status.ok')) . '</strong></li>';
 		echo "</ul></div>\n";
 		
-		echo "<img src=\"".IMAGE_PATH."/rightarrow.gif\" /> <a href=\"{$g_options['scripturl']}?mode=admin\">Return to Administration Center</a>";
+        echo '<img src="' . IMAGE_PATH . '/rightarrow.gif" /> <a href="' . $g_options['scripturl'] . '?mode=admin">' . eHtml(t('admin.task.tools_perlcontrol.return_to_admin_center')) . '</a>';
 		}
 		else
 		{
         
 ?>        
 
-<p>After every configuration change made in the Administration Center, you should reload the daemon configuration.  To do so, enter the hostname or IP address of your HLXCE daemon and choose the reload option.  You can also shut down your daemon from this panel.  <strong>NOTE: The daemon can not be restarted through the web interface!</strong></p>
+<p><?php echo eHtml(t('admin.task.tools_perlcontrol.intro')); ?></p>
 
 <form method="POST">
 
 	<table class="data-table">
 		<tr class="bg1">
-			<td width="40%"><label for="masterserver">Daemon IP or Hostname:</label><p>Hostname or IP address of your HLX:CE Daemon<br />Normally the IP or Hostname listed in the "logaddress_add" line on your game server.<br />example: daemon1.hlxce.com <em>or</em> 1.2.3.4</p></td>
+            <td width="40%"><label for="masterserver"><?php echo eHtml(t('admin.task.tools_perlcontrol.field.runtime_host')); ?></label><p><?php echo eHtml(t('admin.task.tools_perlcontrol.help.runtime_host')); ?></p></td>
 			<td><input type="text" name="masterserver" value="localhost"></td>
 		</tr>
 		<tr class="bg2">
-			<td><label for="port">Daemon Port:</label><p>Port number the daemon (or proxy_daemon) is listening on.<br />Normally the port listed in the "logaddress_add" line on your game server configuration.<br />example: 27500</p></td>
+            <td><label for="port"><?php echo eHtml(t('admin.task.tools_perlcontrol.field.runtime_port')); ?></label><p><?php echo eHtml(t('admin.task.tools_perlcontrol.help.runtime_port')); ?></p></td>
 			<td><input type="text" name="port" value="27500" size="6"></td>
 		</tr>
 		<tr class="bg1">
-			<td><label for="command">Command:</label><p>Select the operation to perform on the daemon<br /><strong>* Note: If you shut the daemond down through this page it can not be restarted through this interface!</strong></p></td>
+            <td><label for="command"><?php echo eHtml(t('admin.task.tools_perlcontrol.field.command')); ?></label><p><?php echo eHtml(t('admin.task.tools_perlcontrol.help.command')); ?></p></td>
 			<td><SELECT NAME="command"><?php
   $i = 0;
   foreach ($commands as $cmd) {
-   echo "<OPTION VALUE=\"$i\">".$cmd["name"];
+   echo '<OPTION VALUE="' . $i . '">' . eHtml($cmd["name"]);
    $i++;
   } 
 ?>
@@ -154,7 +185,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	
 	<input type="hidden" name="confirm" value="1">
 	<div style="text-align: center; margin-top: 20px;">
-		<input type="submit" value="  EXECUTE  ">
+        <input type="submit" value="  <?php echo eHtml(t('admin.task.tools_perlcontrol.submit_button')); ?>  ">
 	</div>
 </form>
 

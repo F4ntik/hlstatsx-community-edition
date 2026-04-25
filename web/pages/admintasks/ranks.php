@@ -37,32 +37,32 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+        die(localized_direct_access_message());
     }
 	 
 	if ($auth->userdata["acclevel"] < 80) {
-        die ("Access denied!");
+        die(localized_access_denied_message());
 	}
 
 	$edlist = new EditList("rankId", "hlstats_Ranks", "", false);
-	$edlist->columns[] = new EditListColumn("game", "Game", 0, true, "hidden", $gamecode);
-	$edlist->columns[] = new EditListColumn("image", "Image file", 45, true, "text", "", 64);
-	$edlist->columns[] = new EditListColumn("minKills", "Minimum kills", 15, true, "text", "", 64);
-	$edlist->columns[] = new EditListColumn("maxKills", "Maximum kills", 15, true, "text", "", 64);
-	$edlist->columns[] = new EditListColumn("rankName", "Rank Name", 45, true, "text", "", 64);
+	$edlist->columns[] = new EditListColumn("game", t('literal.game'), 0, true, "hidden", $gamecode);
+	$edlist->columns[] = new EditListColumn("image", t('literal.image_file'), 45, true, "text", "", 64);
+	$edlist->columns[] = new EditListColumn("minKills", t('literal.minimum_kills'), 15, true, "text", "", 64);
+	$edlist->columns[] = new EditListColumn("maxKills", t('literal.maximum_kills'), 15, true, "text", "", 64);
+	$edlist->columns[] = new EditListColumn("rankName", t('literal.rank_name'), 45, true, "text", "", 64);
 	
 	if ($_POST)
 	{
 		if ($edlist->update())
-			message("success", "Operation successful.");
+			message("success", t('admin.operation_successful'));
 		else
 			message("warning", $edlist->error());
 	}
 	
 ?>
 
-Note: be sure to set the minKills/maxKills values correctly (no gap).<br>
-Images have to be given without ".gif" and "_small" extension!<p>
+<?php echo eHtml(t('admin.task.ranks.note')); ?><br>
+<?php echo eHtml(t('admin.task.ranks.images_note')); ?><p>
 
 <?php
 	
@@ -87,7 +87,7 @@ Images have to be given without ".gif" and "_small" extension!<p>
 
 <table width="75%" border=0 cellspacing=0 cellpadding=0>
 <tr>
-	<td align="center"><input type="submit" value="  Apply  " class="submit"></td>
+	<td align="center"><input type="submit" value="  <?php echo eHtml(t('ui.apply')); ?>  " class="submit"></td>
 </tr>
 </table>
 

@@ -25,11 +25,11 @@
             }
 
             $sql = "
-                SELECT 
-                    code 
-                FROM 
-                    hlstats_Games 
-                WHERE 
+                SELECT
+                    code
+                FROM
+                    hlstats_Games
+                WHERE
                     hidden = '0'
             ";
 

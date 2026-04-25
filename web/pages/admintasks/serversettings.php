@@ -37,11 +37,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+        die(localized_direct_access_message());
     }
 
 	if ($auth->userdata['acclevel'] < 80) {
-		die ('Access denied!');
+		die(localized_access_denied_message());
     }
 
     function setdefaults($key)
@@ -65,8 +65,9 @@ For support and installation notes visit http://www.hlxcommunity.com
 		}
 	}
 	
-	if ($key==0)
-		die('Server ID not set!');
+	if ($key == 0) {
+		die(t('admin.task.serversettings.server_id_not_set'));
+	}
 	
 	if (isset($_POST['sourceId'])) {
 		$sourceId = valid_request(intval($_POST['sourceId']),true);
@@ -83,7 +84,10 @@ For support and installation notes visit http://www.hlxcommunity.com
         
         <tr bgcolor="#FF0000">
             <td class="fNormal" style="color: #FFF; font-weight: bold; font-size: medium;" align="center">
-				Note: For changes on this page to take effect, you <strong>must</strong> <a href="<?php echo $g_options['scripturl'] . "?mode=admin&amp;task=tools_perlcontrol"; ?>">reload</a> or restart the HLX:CE daemon.
+				<?php
+				$reloadLink = '<a href="' . $g_options['scripturl'] . '?mode=admin&amp;task=tools_perlcontrol">' . eHtml(t('admin.task.serversettings.reload')) . '</a>';
+				echo t('admin.task.serversettings.runtime_notice', array('reload_link' => $reloadLink));
+				?>
 			</td>
         </tr>
         
@@ -95,16 +99,21 @@ For support and installation notes visit http://www.hlxcommunity.com
 	// get available help texts
 	$db->query("SELECT parameter,description FROM hlstats_Servers_Config_Default");
 	$helptexts = array();
-	while ($r = $db->fetch_array())
-		$helptexts[strtolower($r['parameter'])] = $r['description'];
+	while ($r = $db->fetch_array()) {
+		$helptexts[strtolower($r['parameter'])] = t(
+			'admin.task.serversettings.parameter_help',
+			array('parameter' => $r['parameter']),
+			'Runtime parameter: :parameter'
+		);
+	}
 	
 	$edlist = new EditList('serverConfigId', 'hlstats_Servers_Config','', false);
 	
 	$footerscript = $edlist->setHelp('helpdiv','parameter',$helptexts);
 
-	$edlist->columns[] = new EditListColumn('serverId', 'Server ID', 0, true, 'hidden', $key);
-	$edlist->columns[] = new EditListColumn('parameter', 'Server parameter name', 30, true, 'readonly', '', 50);
-	$edlist->columns[] = new EditListColumn('value', 'Parameter value', 60, false, 'text', '', 128);
+	$edlist->columns[] = new EditListColumn('serverId', t('literal.server_id'), 0, true, 'hidden', $key);
+	$edlist->columns[] = new EditListColumn('parameter', t('literal.server_parameter_name'), 30, true, 'readonly', '', 50);
+	$edlist->columns[] = new EditListColumn('value', t('literal.parameter_value'), 60, false, 'text', '', 128);
 	
 	if ($_POST)
 	if ($_POST['setdefaults']=='defaults') {
@@ -119,13 +128,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 			$r = $db->fetch_array();
 		} else {
 			if ($edlist->update())
-				message('success', 'Operation successful.');
+				message('success', t('admin.operation_successful'));
 			else
 				message('warning', $edlist->error());
 		}
 	
 ?>
-These are the actual server parameters used by the hlstats.pl script.<br>
+<?php echo eHtml(t('admin.task.serversettings.runtime_parameters_intro')); ?><br>
 
 <?php
 
@@ -168,14 +177,14 @@ These are the actual server parameters used by the hlstats.pl script.<br>
 <table width="75%" border=0 cellspacing=0 cellpadding=0>
 <tr>
 	<td align="center">
-	<INPUT TYPE="checkbox" NAME="setdefaults" VALUE="defaults"> Reset all settings to default!<br>
-	Set all options like existing server configuration: 
+	<INPUT TYPE="checkbox" NAME="setdefaults" VALUE="defaults"> <?php echo eHtml(t('admin.task.serversettings.reset_defaults')); ?><br>
+	<?php echo eHtml(t('admin.task.serversettings.copy_from_existing')); ?> 
   <SELECT NAME="sourceId">
-	 <OPTION VALUE="0">Select a server
+	 <OPTION VALUE="0"><?php echo eHtml(t('admin.task.serversettings.select_server')); ?>
 	 <?php echo $sourceIds; ?>
 	</SELECT><br> 
 	 
-  <input type="submit" value="  Apply  " class="submit"></td>
+  <input type="submit" value="  <?php echo eHtml(t('ui.apply')); ?>  " class="submit"></td>
 </tr>
 </table>
 

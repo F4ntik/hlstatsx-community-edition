@@ -1,0 +1,12 @@
+Strict parity replay on window-50/ (same flags as strict-300) should emit:
+
+  legacy-input-manifest-50.txt
+  python-input-manifest-50.txt
+  legacy-dropped-lines-50.txt
+  python-dropped-lines-50.txt
+  strict-input-parity-50.txt
+  legacy-sql-summary-50.txt
+  python-sql-summary-50.txt
+  runtime-db-diff-50.txt (optional; from compare_stats_dbs or local diff script)
+
+Source order matches docs/audits/legacy-python-parity-20260424-300-strict-fix-ignorebots/window-manifest-300.txt lines 1-50.

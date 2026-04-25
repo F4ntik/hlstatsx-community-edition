@@ -37,42 +37,42 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+die(localized_direct_access_message());
     }
 
 	if ($auth->userdata["acclevel"] < 80) {
-        die ("Access denied!");
+        die(localized_access_denied_message());
 	}
 ?>
 
-&nbsp;&nbsp;&nbsp;&nbsp;<img src="<?php echo IMAGE_PATH; ?>/downarrow.gif" width=9 height=6 class="imageformat"><b>&nbsp;<?php echo $task->title; ?></b> (Last <?php echo $g_options["DeleteDays"]; ?> Days)<p>
+&nbsp;&nbsp;&nbsp;&nbsp;<img src="<?php echo IMAGE_PATH; ?>/downarrow.gif" width=9 height=6 class="imageformat"><b>&nbsp;<?php echo $task->title; ?></b> <?php echo eHtml(t('admin.last_days', array('days' => $g_options["DeleteDays"]))); ?><p>
 
 <?php
 	$table = new Table(
 		array(
 			new TableColumn(
 				"eventTime",
-				"Date",
+				t('literal.date'),
 				"width=20"
 			),
 			new TableColumn(
 				"eventType",
-				"Type",
+				t('literal.type'),
 				"width=10&align=center"
 			),
 			new TableColumn(
 				"eventDesc",
-				"Description",
+				t('literal.description'),
 				"width=40&sort=no&append=.&embedlink=yes"
 			),
 			new TableColumn(
 				"serverName",
-				"Server",
+				t('literal.server'),
 				"width=20"
 			),
 			new TableColumn(
 				"map",
-				"Map",
+				t('literal.map'),
 				"width=10"
 			)
 		),
@@ -190,7 +190,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 <input type="hidden" name="sort" value="<?php echo $sort; ?>" />
 <input type="hidden" name="sortorder" value="<?php echo $sortorder; ?>" />
 
-<b style="padding-left:35px;">&#149;</b> Show only events of type: <?php
+<b style="padding-left:35px;">&#149;</b> <?php echo eHtml(t('admin.task.tools_adminevents.show_only_events_of_type')); ?> <?php
 	$resultTypes = $db->query("
 		SELECT
 			DISTINCT eventType
@@ -200,7 +200,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			eventType ASC
 	");
 	
-	$types[""] = "(All)";
+	$types[""] = t('search.all');
 	
 	while (list($k) = $db->fetch_row($resultTypes)) {
 		$types[$k] = $k;
@@ -208,7 +208,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	
 	echo getSelect("type", $types, $select_type);
 ?>
-<input type="submit" value="Filter" class="smallsubmit" /><br /><br />
+<input type="submit" value="<?php echo eHtml(t('ui.filter')); ?>" class="smallsubmit" /><br /><br />
 </form>
 <?php
 	$table->draw($result, $numitems, 95, "center");

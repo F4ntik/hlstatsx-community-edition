@@ -41,7 +41,7 @@ For support and installation notes visit http://www.hlxcommunity.com
     }
 
 	// Daily Award Statistics
-	$award = valid_request($_GET['award'], true) or error('No award ID specified.');
+	$award = valid_request($_GET['award'], true) or error(t('literal.no_award_id'));
 
 	$db->query("
 		SELECT
@@ -64,18 +64,18 @@ For support and installation notes visit http://www.hlxcommunity.com
 	
 	$db->query("SELECT name FROM hlstats_Games WHERE code='$game'");
 	if ($db->num_rows() < 1) {
-		error("No such game '$game'.");
+	error(localized_no_such_game_message($game));
 	}
 	
 	list($gamename) = $db->fetch_row();
 	$db->free_result();
 	
 	pageHeader(
-		array($gamename, 'Award Details', $awardname),
+		array($gamename, t('literal.daily_award_details'), $awardname),
 		array(
 			$gamename=>$g_options['scripturl'] . "?game=$game",
-			'Awards Statistics' => $g_options['scripturl'] . "?mode=awards&game=$game",
-			'Awards Details' => ''
+			t('literal.daily_awards') => $g_options['scripturl'] . "?mode=awards&game=$game",
+			t('literal.daily_award_details') => ''
 		),
 		$awardname
 	);
@@ -84,17 +84,17 @@ For support and installation notes visit http://www.hlxcommunity.com
 		array(
 			new TableColumn(
 				'awardTime',
-				'Day',
+				t('literal.day'),
 				'width=20&align=left'
 			),
 			new TableColumn(
 				'lastName',
-				'Player',
+				t('literal.player'),
 				'width=40&align=left&flag=1&link=' . urlencode('mode=playerinfo&amp;player=%k') 
 			),
 			new TableColumn(
 				'count',
-				'Count for the Day',
+				t('literal.count_for_day'),
 				'width=35&align=right&append=' . urlencode(" $awardverb")
 			)
 		),
@@ -142,10 +142,10 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 
 <div class="block">
-	<?php printSectionTitle('Daily Award Details'); ?>
+	<?php printSectionTitle(t('literal.daily_award_details')); ?>
 	<div class="subblock">
 		<div style="float:right;">
-			Back to <a href="<?php echo $g_options['scripturl'] . "?mode=awards&amp;game=$game"; ?>">Daily Awards</a>
+			<?php echo eHtml(t('literal.back_to')); ?> <a href="<?php echo $g_options['scripturl'] . "?mode=awards&amp;game=$game"; ?>"><?php echo eHtml(t('literal.daily_awards')); ?></a>
 		</div>
 		<div style="clear:both;"></div>
 	</div>

@@ -1,0 +1,8 @@
+﻿metric	value
+servers	2
+players	74
+frags	1235
+actions_events	1236
+awards	998
+maps_counts	18
+weapons	993

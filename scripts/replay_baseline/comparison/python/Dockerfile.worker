@@ -1,0 +1,21 @@
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app/scripts:/app/scripts/proxy_daemon_py
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential default-libmysqlclient-dev pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY scripts/proxy_daemon_py /app/scripts/proxy_daemon_py
+COPY scripts/hlstats_py /app/scripts/hlstats_py
+
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir /app/scripts/proxy_daemon_py \
+    && pip install --no-cache-dir geoip2
+
+COPY scripts/replay_baseline/comparison/python/hlstats.conf /app/hlstats.conf
+
+CMD ["python", "-m", "hlstats_py.runtime", "--configfile", "/app/hlstats.conf", "--port", "28000", "--foreground"]

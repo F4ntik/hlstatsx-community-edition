@@ -37,36 +37,95 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
 if (!defined('IN_HLSTATS')) {
-	die('Do not access this file directly.');
+	http_response_code(403);
+	exit;
+}
+
+function localized_interpolate($text, array $params = array())
+{
+	if (!$params) {
+		return $text;
+	}
+
+	$replacements = array();
+	foreach ($params as $key => $value) {
+		$replacements[':' . $key] = $value;
+		$replacements['{' . $key . '}'] = $value;
+	}
+
+	return strtr($text, $replacements);
+}
+
+function localized_text($key, $fallback = null, array $params = array())
+{
+	if (function_exists('t')) {
+		return t($key, $params, $fallback);
+	}
+
+	$text = ($fallback !== null) ? $fallback : $key;
+	return localized_interpolate($text, $params);
+}
+
+function localized_direct_access_message()
+{
+	return localized_text('admin.direct_access');
+}
+
+function localized_access_denied_message()
+{
+	return localized_text('admin.access_denied');
+}
+
+function localized_invalid_or_no_game_message()
+{
+	return localized_text('error.invalid_or_no_game_specified');
+}
+
+function localized_template_missing_message($template)
+{
+	return localized_text(
+		'error.template_missing',
+		null,
+		array('template' => $template)
+	);
+}
+
+function localized_required_php_function_unavailable_message($functionName)
+{
+	return localized_text(
+		'error.required_php_function_unavailable',
+		null,
+		array('function' => $functionName)
+	);
 }
 
 function checkValidGame(string $gameStr, array $allowedGames, ?string &$retError) : bool
 {
 	// Not object and array
 	if (!is_string($gameStr)) {
-		$retError = 'Invalid game parameter.';
+		$retError = localized_text('error.invalid_game_parameter');
 		return false;
 	}
 
 	$gameStr = trim($gameStr);
 	if ($gameStr === '') {
-		$retError = 'Game parameter missing.';
+		$retError = localized_text('error.game_parameter_missing');
 		return false;
 	}
 
 	// Path traversal and XSS fixes
 	if (!preg_match('/^[a-zA-Z0-9_]+$/', $gameStr)) {
-		$retError = 'Invalid game code.';
+		$retError = localized_text('error.invalid_game_code');
 		return false;
 	}
 
 	if (!is_array($allowedGames) || empty($allowedGames)) {
-		$retError = 'Failed to get list of allowed games.';
+		$retError = localized_text('error.allowed_games_unavailable');
 		return false;
 	}
 
 	if (!in_array($gameStr, $allowedGames, true)) {
-		$retError = 'This game is not allowed.';
+		$retError = localized_text('error.game_not_allowed');
 		return false;
 	}
 
@@ -125,6 +184,288 @@ function eHtml($str)
     return htmlspecialchars($str, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 }
 
+function translate_ui_literal_key($text)
+{
+	if (!is_string($text) || $text === '') {
+		return null;
+	}
+
+	if (strpos($text, '.') !== false) {
+		return $text;
+	}
+
+	static $map = array(
+		'Name' => 'literal.name',
+		'Username' => 'admin.username',
+		'Password' => 'admin.password',
+		'Players' => 'literal.players',
+		'Player' => 'literal.player',
+		'Clans' => 'literal.clans',
+		'Clan' => 'literal.clan',
+		'Servers' => 'literal.servers',
+		'Chat' => 'literal.chat',
+		'Countries' => 'literal.countries',
+		'Awards' => 'literal.awards',
+		'Actions' => 'literal.actions',
+		'Weapons' => 'literal.weapons',
+		'Maps' => 'literal.maps',
+		'Roles' => 'literal.roles',
+		'Ribbons' => 'literal.ribbons',
+		'Ranks' => 'literal.ranks',
+		'Player Action' => 'literal.player_action',
+		'PlyrPlyr Action' => 'literal.plyrplyr_action',
+		'Team Action' => 'literal.team_action',
+		'World Action' => 'literal.world_action',
+		'Action' => 'literal.action',
+		'Weapon' => 'literal.weapon',
+		'Team' => 'literal.team',
+		'Role' => 'literal.role',
+		'Server' => 'literal.server',
+		'Server ID' => 'literal.server_id',
+		'Server parameter name' => 'literal.server_parameter_name',
+		'Parameter value' => 'literal.parameter_value',
+		'Address' => 'literal.address',
+		'Connection Time' => 'literal.connection_time',
+		'Map Name' => 'literal.map_name',
+		'Map' => 'literal.map',
+		'Game Code' => 'literal.game_code',
+		'Display Name' => 'literal.display_name',
+		'Hide Game' => 'literal.hide_game',
+		'Played' => 'literal.played',
+		'Statistics Summary' => 'literal.statistics_summary',
+		'Clan Profile Stats Summary' => 'literal.clan_profile_stats_summary',
+		'Number Of Members' => 'literal.number_of_members',
+		'Avg. Member Points' => 'literal.avg_member_points',
+		'Top Player' => 'literal.top_player',
+		'Top Clan' => 'literal.top_clan',
+		'Rank' => 'literal.rank',
+		'Points' => 'literal.points',
+		'Activity' => 'literal.activity',
+		'Kills' => 'literal.kills',
+		'Deaths' => 'literal.deaths',
+		'Headshots' => 'literal.headshots',
+		'No Players' => 'literal.no_players',
+		'Unknown' => 'literal.unknown',
+		'Unknown team' => 'literal.unknown_team',
+		'Unknown Country' => 'status.unknown_country',
+		'Damage per Hit' => 'literal.damage_per_hit',
+		'Shots per Kill' => 'literal.shots_per_kill',
+		'Kills per Death' => 'literal.kills_per_death',
+		'Player Locations' => 'literal.player_locations',
+		'Clan Kills' => 'literal.clan_kills',
+		'Modifier' => 'literal.modifier',
+		'Shots' => 'literal.shots',
+		'Hits' => 'literal.hits',
+		'Damage' => 'literal.damage',
+		'Head' => 'literal.head',
+		'Chest' => 'literal.chest',
+		'Stomach' => 'literal.stomach',
+		'Left Arm' => 'literal.left_arm',
+		'Right Arm' => 'literal.right_arm',
+		'Left Leg' => 'literal.left_leg',
+		'Right Leg' => 'literal.right_leg',
+		'L. Arm' => 'literal.left_arm',
+		'R. Arm' => 'literal.right_arm',
+		'L. Leg' => 'literal.left_leg',
+		'R. Leg' => 'literal.right_leg',
+		'Left' => 'literal.left',
+		'Middle' => 'literal.middle',
+		'Right' => 'literal.right',
+		'HeatMap' => 'literal.heatmap',
+		'Earned' => 'literal.earned',
+		'Earned Against' => 'literal.earned_against',
+		'Achieved' => 'literal.achieved',
+		'Times Victimized' => 'literal.times_victimized',
+		'Reward' => 'literal.reward',
+		'Picked' => 'literal.picked',
+		'Joined' => 'literal.joined',
+		'Accuracy' => 'literal.accuracy',
+		'Weapon Accuracy' => 'literal.weapon_accuracy',
+		'Suicides' => 'literal.suicides',
+		'Victim' => 'literal.victim',
+		'Playername' => 'literal.player',
+		'Clanname' => 'admin.clan_name',
+		'Perc. Kills' => 'literal.percent_kills',
+		'Perc. Headshots' => 'literal.percent_headshots',
+		'Skill Bonus' => 'literal.skill_bonus',
+		'Skill Bonus Total' => 'literal.skill_bonus_total',
+		'Headshots per Kill' => 'literal.headshots_per_kill',
+		'Teammate Kills' => 'literal.teammate_kills',
+		'Longest Kill Streak' => 'literal.longest_kill_streak',
+		'Longest Death Streak' => 'literal.longest_death_streak',
+		'Total Kills' => 'literal.total_kills',
+		'Total Deaths' => 'literal.total_deaths',
+		'Home Page' => 'literal.home_page',
+		'Server offline' => 'literal.server_offline',
+		'Profile' => 'admin.profile',
+		'Real Name' => 'literal.real_name',
+		'E-mail Address' => 'literal.email_address',
+		'Homepage URL' => 'admin.homepage_url',
+		'Country Flag' => 'admin.country_flag',
+		'Hide Ranking' => 'admin.hide_ranking',
+		'Force Default Avatar Image (note that this overrides images in hlstatsimg/avatars)' => 'admin.force_default_avatar',
+		'Clan Name' => 'admin.clan_name',
+		'Map Region' => 'admin.map_region',
+		'1 = Hide from clan list' => 'admin.hide_from_clan_list',
+		'IP Address' => 'search.ip_address',
+		'Aliases' => 'literal.aliases',
+		'Last Use' => 'literal.last_use',
+		'Last Used' => 'literal.last_use',
+		'Total Connection Time' => 'literal.total_connection_time',
+		'Hidden' => 'literal.hidden',
+		'Banned' => 'literal.banned',
+		'In good standing' => 'literal.in_good_standing',
+		'Not active' => 'literal.not_active',
+		'Members' => 'literal.members',
+		'(None)' => 'literal.none',
+		'(Not specified.)' => 'literal.not_specified',
+		'Time' => 'literal.time_label',
+		'Skill' => 'literal.skill_label',
+		'Hpk' => 'literal.hpk_cap',
+		'Kpd' => 'literal.kpd_cap',
+		'K:D' => 'literal.kpd_cap',
+		'Game' => 'ui.game',
+		'Games' => 'ui.games',
+		'Yes' => 'literal.yes',
+		'No' => 'literal.no',
+		'Team Bonus' => 'playerhistory.type.team_bonus',
+		'Connect' => 'playerhistory.type.connect',
+		'Disconnect' => 'playerhistory.type.disconnect',
+		'Entry' => 'playerhistory.type.entry',
+		'Kill' => 'playerhistory.type.kill',
+		'Death' => 'playerhistory.type.death',
+		'Team Kill' => 'playerhistory.type.team_kill',
+		'Friendly Fire' => 'playerhistory.type.friendly_fire',
+		'Role' => 'playerhistory.type.role',
+		'Name' => 'playerhistory.type.name',
+		'Suicide' => 'playerhistory.type.suicide',
+		'Authorization Required' => 'admin.auth_required',
+		'Access denied!' => 'admin.access_denied',
+		'Operation successful.' => 'admin.operation_successful',
+		'Profile updated successfully.' => 'admin.profile_updated',
+		'No help text available' => 'admin.no_help_text',
+		'Server IP Address' => 'admin.server_ip_address',
+		'Server Port' => 'admin.server_port',
+		'Server Name' => 'literal.server_name',
+		'Rcon Password' => 'admin.rcon_password',
+		'Public Address' => 'admin.public_address',
+		'Admin Mod' => 'admin.admin_mod',
+		'PLEASE SELECT' => 'admin.please_select',
+	);
+
+	return $map[$text] ?? null;
+}
+
+function translate_ui_literal($text)
+{
+	if (!is_string($text) || $text === '') {
+		return $text;
+	}
+
+	$key = translate_ui_literal_key($text);
+	if ($key === null) {
+		return $text;
+	}
+
+	return t($key, array(), $text);
+}
+
+function localized_render_text($text)
+{
+	if (!is_string($text) || $text === '') {
+		return $text;
+	}
+
+	if (strpos($text, 'i18n:') !== 0) {
+		return translate_ui_literal($text);
+	}
+
+	$payload = substr($text, 5);
+	$parts = explode('|', $payload);
+	$key = array_shift($parts);
+	$params = array();
+
+	foreach ($parts as $part) {
+		$separator = strpos($part, '=');
+		if ($separator === false) {
+			continue;
+		}
+
+		$name = substr($part, 0, $separator);
+		$value = substr($part, $separator + 1);
+		$params[$name] = localized_render_text(rawurldecode($value));
+	}
+
+	return t($key, $params, $key);
+}
+
+function localized_no_such_game_message($game)
+{
+	return localized_text('literal.no_such_game_named', null, array('game' => $game));
+}
+
+function localized_no_such_player_message($player)
+{
+	return localized_text('literal.no_such_player', null, array('player' => $player));
+}
+
+function localized_no_such_country_message($country)
+{
+	return localized_text('literal.no_such_country', null, array('country' => $country));
+}
+
+function localized_no_such_clan_message($clan)
+{
+	return localized_text('literal.no_such_clan', null, array('clan' => $clan));
+}
+
+function localized_no_players_matching_uniqueid_message($uniqueid)
+{
+	return localized_text('literal.no_players_matching_uniqueid', null, array('uniqueid' => $uniqueid));
+}
+
+function format_compact_duration($seconds)
+{
+	$seconds = max(0, (int) round($seconds));
+
+	$days = intdiv($seconds, 86400);
+	$seconds %= 86400;
+	$hours = intdiv($seconds, 3600);
+	$seconds %= 3600;
+	$minutes = intdiv($seconds, 60);
+	$seconds %= 60;
+
+	return sprintf(
+		'%d%s&nbsp;%02d%s&nbsp;%02d%s&nbsp;%02d%s',
+		$days,
+		t('time.compact.d'),
+		$hours,
+		t('time.compact.h'),
+		$minutes,
+		t('time.compact.m'),
+		$seconds,
+		t('time.compact.s')
+	);
+}
+
+function format_short_duration($time)
+{
+	$time = max(0, (int) round($time));
+	$hours = intdiv($time, 3600);
+	$minutes = intdiv($time % 3600, 60);
+	$seconds = $time % 60;
+
+	if ($hours > 0) {
+		return $hours . t('time.compact.h') . ' ' . $minutes . t('time.compact.m') . ' ' . $seconds . t('time.compact.s');
+	}
+
+	if ($minutes > 0) {
+		return $minutes . t('time.compact.m') . ' ' . $seconds . t('time.compact.s');
+	}
+
+	return $seconds . t('time.compact.s');
+}
+
 // Test if flags exists
 /**
  * getFlag()
@@ -151,12 +492,21 @@ function getFlag($flag, $type='url')
  */
 function valid_request($str, $numeric = false)
 {
-	$search_pattern = array("/[^A-Za-z0-9\[\]*.,=()!\"$%&^`ґ':;ЯІі#+~_\-|<>\/\\\\@{}дцьДЦЬ ]/");
-	$replace_pattern = array('');
-	$str = preg_replace($search_pattern, $replace_pattern, $str);
+	if ($str === null) {
+		$str = '';
+	}
+
+	if (is_array($str) || is_object($str)) {
+		return $numeric ? -1 : '';
+	}
+
+	$str = (string) $str;
+	$str = preg_replace('/<script\b[^>]*>.*?<\/script>/isu', '', $str);
+	$str = preg_replace('/[\x00-\x1F\x7F]/u', '', $str);
+	$str = preg_replace('/[^\p{L}\p{N}\[\]*.,=()!"$%&^`?\'":;#+~_\-|<>\/\\\\@{}\s]/u', '', $str);
 
 	if (!$numeric) {
-		return htmlspecialchars($str, ENT_QUOTES);
+		return htmlspecialchars($str, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 	}
 
 	if (is_numeric($str)) {
@@ -176,22 +526,15 @@ function timestamp_to_str($seconds)
 {
     // We allow passing an empty parameter, for output in html
 	if (empty($seconds)) {
-		return '---';
+		return t('time.zero');
 	}
 
     // If something other than int or float is passed here, then return 'Undefined'
 	if (!is_numeric($seconds)) {
-		return "Undefined";
+		return t('ui.undefined');
 	}
 
-    // DateTime class doesn't work with float type,
-    // doesn't matter we don't need microsecond precision :D
-	$seconds = round($seconds);
-
-	$dtF = new \DateTime('@0');
-	$dtT = new \DateTime("@$seconds");
-
-	return $dtF->diff($dtT)->format('%ad&nbsp;%H:%I:%Sh');
+	return format_compact_duration($seconds);
 }
 
 /**
@@ -209,13 +552,13 @@ function error(string $message, bool $exit = true) : void
 
     $html .= '<thead style="text-align:center; color:#673636;">';
     $html .= '<tr>';
-    $html .= '<td class="errorhead">ERROR</td>';
+    $html .= '<td class="errorhead">' . eHtml(t('ui.error')) . '</td>';
     $html .= '</tr>';
     $html .= '</thead>';
 
     $html .= '<tbody>';
     $html .= '<tr>';
-    $html .= '<td class="errortext">' . eHtml($message) . '</td>';
+    $html .= '<td class="errortext">' . nl2br(eHtml($message), false) . '</td>';
     $html .= '</tr>';
     $html .= '</tbody>';
 
@@ -330,33 +673,34 @@ function getSortArrow($sort, $sortorder, $name, $longname, $var_sort = 'sort', $
 		$othersortorder = 'asc';
 	}
 	
-	$arrowstring = '<a href="' . $g_options['scripturl'] . '?' . makeQueryString($var_sort, $name,
-		array($var_sortorder));
+	$sortUrl = $g_options['scripturl'] . '?' . makeQueryString($var_sort, $name, array($var_sortorder));
 
 	if ($sort == $name)
 	{
-		$arrowstring .= "&amp;$var_sortorder=$othersortorder";
+		$sortUrl .= "&$var_sortorder=$othersortorder";
 		$jsarrow = "'" . $var_sortorder . "': '" . $othersortorder . "'";
 	}
 	else
 	{
-		$arrowstring .= "&amp;$var_sortorder=$sortorder";
+		$sortUrl .= "&$var_sortorder=$sortorder";
 		$jsarrow = "'" . $var_sortorder . "': '" . $sortorder . "'";
 	}
 
 	if ($sorthash)
 	{
-		$arrowstring .= "#$sorthash";
+		$sortUrl .= "#$sorthash";
 	}
 
-	$arrowstring .= '" class="head"';
+	$arrowstring = '<a href="' . eHtml($sortUrl) . '"';
+
+	$arrowstring .= ' class="head"';
 	
 	if ( $ajax )
 	{
 		$arrowstring .= " onclick=\"Tabs.refreshTab({'$var_sort': '$name', $jsarrow}); return false;\"";
 	}
 	
-	$arrowstring .= ' title="Change sorting order">' . "$longname</a>";
+	$arrowstring .= ' title="' . eHtml(t('ui.change_sort_order')) . '">' . eHtml(translate_ui_literal($longname)) . '</a>';
 
 	if ($sort == $name)
 	{
@@ -431,7 +775,7 @@ function getLink($url, $type = 'http://', $target = '_blank')
 
 	if($urld['scheme']!='http' && $urld['scheme']!='https')
 	{
-			return 'Invalid Url :(';
+			return localized_text('error.invalid_url');
 	}
 
 	if(!isset($urld['path']))

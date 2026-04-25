@@ -53,7 +53,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	");
 
 	if ($db->num_rows() < 1) {
-        error("No such game '$game'.");
+        error(localized_no_such_game_message($game));
 	}
 
 	list($gamename) = $db->fetch_row();
@@ -61,8 +61,8 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 	pageHeader
 	(
-		array ($gamename, 'Action Statistics'),
-		array ($gamename=>"%s?game=$game", 'Action Statistics'=>'')
+		array($gamename, t('literal.action_statistics')),
+		array($gamename => "%s?game=$game", t('literal.action_statistics') => '')
 	);
 
 	$tblPlayerActions = new Table
@@ -72,19 +72,19 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'description',
-				'Action',
+				t('literal.action'),
 				'width=45&link=' . urlencode('mode=actioninfo&amp;action=%k&amp;game='.$game)
 			),
 			new TableColumn
 			(
 				'obj_count',
-				'Earned',
+				t('literal.earned'),
 				'width=25&align=right&append=+times'
 			),
 			new TableColumn
 			(
 				'obj_bonus',
-				'Reward',
+				t('literal.reward'),
 				'width=25&align=right'
 			)
 		),
@@ -117,7 +117,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	");
 ?>
 <div class="block">
-	<?php printSectionTitle('Action Statistics'); ?>
+	<?php printSectionTitle(t('literal.action_statistics')); ?>
 	<div class="subblock">
 		<?php
 			$db->query
@@ -130,14 +130,14 @@ For support and installation notes visit http://www.hlxcommunity.com
 					hlstats_Actions.game = '$game'
 			");
 			list($totalactions) = $db->fetch_row();
-			?>From a total of <strong><?php echo number_format($totalactions); ?></strong> earned actions
+			?><?php echo t('literal.from_total_actions', array('total' => number_format($totalactions))); ?>
 	</div><br /><br />
 	<?php
 		$tblPlayerActions->draw($result, $db->num_rows($result), 95);
 	?><br /><br />
 	<div class="subblock">
 		<div style="float:right;">
-			Go to: <a href="<?php echo $g_options['scripturl'] . "?game=$game"; ?>"><?php echo $gamename; ?></a>
+			<?php echo eHtml(t('literal.go_to')); ?>: <a href="<?php echo $g_options['scripturl'] . "?game=$game"; ?>"><?php echo $gamename; ?></a>
 		</div>
 	</div>
 </div>

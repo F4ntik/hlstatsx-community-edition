@@ -50,13 +50,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 		WHERE
 			hlstats_Games.code = '$game'
 	");
-	if ($db->num_rows() < 1) error("No such game '$game'.");
+	if ($db->num_rows() < 1) error(localized_no_such_game_message($game));
 	list($gamename) = $db->fetch_row();
 	$db->free_result();
 	pageHeader
 	(
-		array ($gamename, 'Role Statistics'),
-		array ($gamename => "%s?game=$game", 'Role Statistics' => '')
+		array($gamename, t('literal.role_statistics')),
+		array($gamename => "%s?game=$game", t('literal.role_statistics') => '')
 	);
 	$result = $db->query
 	("
@@ -194,15 +194,15 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 
 <div class="block">
-	<?php printSectionTitle('Role Statistics'); ?>
+	<?php printSectionTitle(t('literal.role_statistics')); ?>
 	<div class="subblock">
-		From a total of <strong><?php echo number_format($realkills); ?></strong> kills with <strong><?php echo number_format($realdeaths); ?></strong> deaths
+		<?php echo t('literal.from_total_kills_deaths', array('kills' => number_format($realkills), 'deaths' => number_format($realdeaths))); ?>
 	</div>
 	<br /><br />
 	<?php $tblRoles->draw($result, $db->num_rows($result), 95); ?><br /><br />
 	<div class="subblock">
 		<div style="float:right;">
-			Go to: <a href="<?php echo $g_options['scripturl']."?game=$game"; ?>"><?php echo $gamename; ?></a>
+			<?php echo eHtml(t('literal.go_to')); ?>: <a href="<?php echo $g_options['scripturl']."?game=$game"; ?>"><?php echo $gamename; ?></a>
 		</div>
 	</div>
 </div>

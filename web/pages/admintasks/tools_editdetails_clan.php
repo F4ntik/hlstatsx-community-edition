@@ -37,11 +37,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
 	if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+        die(t('admin.direct_access'));
     }
 
 	if ($auth->userdata["acclevel"] < 80) {
-        die ("Access denied!");
+        die(t('admin.access_denied'));
 	}
 
     $id = -1;
@@ -57,25 +57,25 @@ For support and installation notes visit http://www.hlxcommunity.com
 	$mapselect.=";";   
 ?>
 
-&nbsp;&nbsp;&nbsp;&nbsp;<img src="<?php echo IMAGE_PATH; ?>/downarrow.gif" width="9" height="6" class="imageformat" alt="" /><b>&nbsp;<a href="<?php echo $g_options['scripturl']; ?>?mode=admin&amp;task=tools_editdetails">Edit Player or Clan Details</a></b><br />
+&nbsp;&nbsp;&nbsp;&nbsp;<img src="<?php echo IMAGE_PATH; ?>/downarrow.gif" width="9" height="6" class="imageformat" alt="" /><b>&nbsp;<a href="<?php echo $g_options['scripturl']; ?>?mode=admin&amp;task=tools_editdetails"><?php echo eHtml(t('admin.edit_player_or_clan_details')); ?></a></b><br />
 
 <img src="<?php echo IMAGE_PATH; ?>/spacer.gif" width="1" height="8" border="0"><br />
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<img src="<?php echo IMAGE_PATH; ?>/downarrow.gif" width="9" height="6" class="imageformat" alt="" /><b>&nbsp;<?php echo "Edit Clan #$id"; ?></b><br /><br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<img src="<?php echo IMAGE_PATH; ?>/downarrow.gif" width="9" height="6" class="imageformat" alt="" /><b>&nbsp;<?php echo eHtml(t('admin.edit_clan_number', array('id' => $id))); ?></b><br /><br />
 
 <form method="post" action="<?php echo $g_options['scripturl'] . "?mode=admin&amp;task=$selTask&amp;id=$id&" . strip_tags(SID); ?>">
 <?php
 	$proppage = new PropertyPage("hlstats_Clans", "clanId", $id, array(
-		new PropertyPage_Group("Profile", array(
-			new PropertyPage_Property("name", "Clan Name", "text"),
-			new PropertyPage_Property("homepage", "Homepage URL", "text"),
-			new PropertyPage_Property("mapregion", "Map Region", "select", $mapselect),
-			new PropertyPage_Property("hidden", "1 = Hide from clan list", "text")
+		new PropertyPage_Group(t('admin.profile'), array(
+			new PropertyPage_Property("name", t('admin.clan_name'), "text"),
+			new PropertyPage_Property("homepage", t('admin.homepage_url'), "text"),
+			new PropertyPage_Property("mapregion", t('admin.map_region'), "select", $mapselect),
+			new PropertyPage_Property("hidden", t('admin.hide_from_clan_list'), "text")
 		))
 	));
 
 	if (isset($_POST['name'])) {
 		$proppage->update();
-		message("success", "Profile updated successfully.");
+		message("success", t('admin.profile_updated'));
 	}
 
 	$result = $db->query("
@@ -88,7 +88,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	");
 
 	if ($db->num_rows() < 1) {
-        die("No clan exists with ID #$id");
+        die(t('admin.no_clan_exists', array('id' => $id)));
 	}
 	
 	$data = $db->fetch_array($result);
@@ -99,7 +99,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	
 	echo "<span class='fNormal'> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"
 		. "<a href=\"" . $g_options['scripturl'] . "?mode=claninfo&amp;clan=$id&amp;" . strip_tags(SID) . "\">"
-		. "(View Clan Details)</a></span>";
+		. "(" . eHtml(t('admin.view_clan_details')) . ")</a></span>";
 ?><br /><br />
 
 <table width="60%" align="center" border="0" cellspacing="0" cellpadding="0">
@@ -107,7 +107,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	<td class="fNormal"><?php
 		$proppage->draw($data);
 ?>
-	<center><input type="submit" value="  Apply  " class="submit"></center></td>
+	<center><input type="submit" value="  <?php echo eHtml(t('ui.apply')); ?>  " class="submit"></center></td>
 </tr>
 </table>
 </form>

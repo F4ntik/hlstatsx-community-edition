@@ -5,7 +5,7 @@
 	{
 		public function __construct()
 		{
-			
+
 		}
 
 		public function error(string $text) : void
