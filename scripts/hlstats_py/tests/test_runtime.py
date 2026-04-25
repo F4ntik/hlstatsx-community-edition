@@ -194,6 +194,37 @@ def test_runtime_started_map_with_crc_suffix_updates_storage() -> None:
     assert storage.recorded[0].current_map == "de_nuke"
 
 
+def test_runtime_started_map_switches_context_for_followup_events() -> None:
+    adapter = StubAdapter()
+    storage = StubStorage()
+    logger = ProxyLogger(LoggerConfig(stream=StringIO()))
+    server = ProxyUdpServer(logger)
+    runtime = HlstatsRuntime(adapter, server, logger, build_dispatcher(), storage)
+    adapter.connect()
+    runtime._reload_state()
+
+    runtime.process_stdin_line(
+        'L 01/01/2024 - 00:00:29: Loading map "de_nuke"',
+        "127.0.0.1:27015",
+    )
+    runtime.process_stdin_line(
+        'L 01/01/2024 - 00:00:31: Started map "de_nuke" (CRC "-1757378041")',
+        "127.0.0.1:27015",
+    )
+    runtime.process_stdin_line(
+        'L 01/01/2024 - 00:00:32: "Alice<2><STEAM_1:1:111><CT>" connected, address "1.2.3.4:27005"',
+        "127.0.0.1:27015",
+    )
+
+    assert storage.map_transitions == [
+        RecordedMapTransition(server_id=7, phase="loading", map_name="de_nuke"),
+        RecordedMapTransition(server_id=7, phase="started", map_name="de_nuke"),
+    ]
+    assert storage.recorded[0].current_map == "de_dust2"
+    assert storage.recorded[1].current_map == "de_nuke"
+    assert storage.recorded[2].current_map == "de_nuke"
+
+
 def test_runtime_stdin_quiet_by_default_without_per_event_notice() -> None:
     adapter = StubAdapter()
     storage = StubStorage()

@@ -67,6 +67,26 @@ class SupportsEventStorage(Protocol):
 
 
 @dataclass(slots=True)
+class RuntimeMapState:
+    """Projected map lifecycle state for a server."""
+
+    current_map: str
+    map_lifecycle: str = "active"
+    pending_map: str = ""
+
+    def apply_started(self, map_name: str) -> None:
+        self.current_map = map_name
+        self.pending_map = ""
+        self.map_lifecycle = "started"
+
+    def apply_loading(self, map_name: str) -> None:
+        self.pending_map = map_name
+        if not self.current_map:
+            self.current_map = map_name
+        self.map_lifecycle = "loading"
+
+
+@dataclass(slots=True)
 class TrackedServer:
     """Server metadata cached by the worker for fast event context lookup."""
 
@@ -75,13 +95,35 @@ class TrackedServer:
     port: int
     name: str
     game: str
-    current_map: str
-    map_lifecycle: str = "active"
-    pending_map: str = ""
+    state: RuntimeMapState
 
     @property
     def address_key(self) -> str:
         return f"{self.address}:{self.port}".strip().lower()
+
+    @property
+    def current_map(self) -> str:
+        return self.state.current_map
+
+    @current_map.setter
+    def current_map(self, value: str) -> None:
+        self.state.current_map = value
+
+    @property
+    def map_lifecycle(self) -> str:
+        return self.state.map_lifecycle
+
+    @map_lifecycle.setter
+    def map_lifecycle(self, value: str) -> None:
+        self.state.map_lifecycle = value
+
+    @property
+    def pending_map(self) -> str:
+        return self.state.pending_map
+
+    @pending_map.setter
+    def pending_map(self, value: str) -> None:
+        self.state.pending_map = value
 
 
 class ServerRegistry:
@@ -98,7 +140,7 @@ class ServerRegistry:
                 port=server.port,
                 name=server.name,
                 game=server.game,
-                current_map=server.current_map or "",
+                state=RuntimeMapState(current_map=server.current_map or ""),
             )
             for server in servers
         }
@@ -147,17 +189,12 @@ def apply_map_lifecycle_message(
     started = _last_regex_match(_STARTED_MAP_INLINE_RE, message)
     if started:
         name = started.group("map")
-        server.current_map = name
-        server.pending_map = ""
-        server.map_lifecycle = "started"
+        server.state.apply_started(name)
         return ("started", name)
     loading = _last_regex_match(_LOADING_MAP_INLINE_RE, message)
     if loading:
         name = loading.group("map")
-        server.pending_map = name
-        if not server.current_map:
-            server.current_map = name
-        server.map_lifecycle = "loading"
+        server.state.apply_loading(name)
         return ("loading", name)
     return None
 

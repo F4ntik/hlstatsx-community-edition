@@ -379,3 +379,42 @@ def test_replay_safe_geoip_warning_skips_failure(capsys: pytest.CaptureFixture[s
 
     calculator.run(settings)
     assert "warning:" in capsys.readouterr().out
+
+
+def test_strict_geoip_failure_bubbles_up_from_run() -> None:
+    responses = {
+        (normalize_sql(_SELECT_USE_GEOIP_BINARY_QUERY), None): [QueryResponse(fetchone=None)],
+        (normalize_sql(_SELECT_GEOIP_CANDIDATES_QUERY), None): [QueryResponse(fetchall=[])],
+        (normalize_sql(_SELECT_GEOLITE_BLOCKS_SMOKE_QUERY), None): [QueryResponse(fetchone=None)],
+    }
+    connection = FakeConnection(responses)
+    adapter = StubAdapter(connection)
+    calculator = AwardsCalculator(adapter)  # type: ignore[arg-type]
+    settings = cli.RuntimeSettings(
+        cli=cli.CliOptions(
+            configfile=None,
+            requested_actions=(cli.AwardsAction.GEOIP,),
+            numdays=1,
+            date=None,
+            db_host=None,
+            db_name=None,
+            db_username=None,
+            db_password=None,
+            verbose=False,
+            replay_mode=False,
+            version=False,
+        ),
+        actions=frozenset({cli.AwardsAction.GEOIP}),
+        database=cli.DatabaseConfig(
+            host="localhost",
+            name="hlstats",
+            username="hlx",
+            password="secret",
+            cpanel_hack=False,
+        ),
+        config_path=None,
+        policy=cli.RuntimePolicy.STRICT,
+    )
+
+    with pytest.raises(RuntimeError, match="geoLiteCity tables are empty"):
+        calculator.run(settings)

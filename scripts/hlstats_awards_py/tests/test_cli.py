@@ -49,6 +49,7 @@ def test_load_settings_uses_default_actions(tmp_path: Path) -> None:
     assert settings.database.name == "hlstats"
     assert settings.database.cpanel_hack is True
     assert settings.config_path == config_path.resolve()
+    assert settings.policy is cli.RuntimePolicy.STRICT
 
 
 def test_cli_flags_override_default_config(tmp_path: Path) -> None:

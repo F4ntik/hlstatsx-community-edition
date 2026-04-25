@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from hlstats_py.runtime import TrackedServer, apply_map_lifecycle_message
+from hlstats_py.runtime import RuntimeMapState, TrackedServer, apply_map_lifecycle_message
 
 
 def _server() -> TrackedServer:
@@ -10,7 +10,7 @@ def _server() -> TrackedServer:
         port=27015,
         name="Test",
         game="cstrike",
-        current_map="",
+        state=RuntimeMapState(current_map=""),
     )
 
 
