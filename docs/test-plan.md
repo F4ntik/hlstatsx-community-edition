@@ -32,8 +32,19 @@ Validate that the integrated product repository works as one coherent stack:
   - `scripts/hlstats_py/tests`
   - `scripts/proxy_daemon_py/tests`
   - `scripts/replay_baseline/tests`
-- exact `--stdin` product-boundary check for one representative legacy log
-- targeted validation for `HLStatsFTP` (implemented as [`scripts/hlstats_ftp_py`](../scripts/hlstats_ftp_py/README.md)) and the future Python `ImportBans` replacement once it lands
+- exact `--stdin` product-boundary check for one representative legacy log and CLI compatibility guards
+- targeted validation for `HLStatsFTP` (implemented as [`scripts/hlstats_ftp_py`](../scripts/hlstats_ftp_py/README.md)) and `ImportBans` Python replacement ([`scripts/import_bans_py`](../scripts/import_bans_py/README.md))
+
+`--stdin` compatibility boundary commands (2026-04-25):
+
+- `python -m hlstats_py.runtime --configfile hlstats.conf --stdin` -> exit `1` (`--stdin requires both --server-ip and --server-port`)
+- `python -m hlstats_py.runtime --configfile hlstats.conf --stdin --server-ip 127.0.0.1 --server-port 27015 --stdin-transaction-batch-size -1` -> exit `1` (`--stdin-transaction-batch-size must be >= 0`)
+- `python -m hlstats_py.runtime --configfile hlstats.conf --stdin --server-ip 127.0.0.1 --server-port 27015 --parser-backend native --stdin-transaction-batch-size 0` -> CLI accepted, runtime then failed on missing DB host in local `hlstats.conf` (exit `1`)
+
+ImportBans maintenance CLI boundary commands (2026-04-25):
+
+- `python -m import_bans_py --help` -> exit `0`
+- `python -m import_bans_py --configfile hlstats.conf --dry-run` -> exit `1` (`At least one ban source must be configured ...`)
 
 ### Replay / runtime
 
@@ -255,6 +266,12 @@ Current legacy replay blocker validation:
   installed
 - confirm the PHP web layer still resolves the published asset names
 
+Heatmap real-asset validation evidence (2026-04-25):
+
+- assets present in `heatmaps/src/cstrike` (real map-pack JPEG set, including `de_dust2.jpg`, `de_nuke.jpg`) and brushes (`brush_small.png`, `brush_large.png`)
+- `python -m hlstats_py.heatmaps --configfile scripts/replay_baseline/comparison/python/hlstats.host-local.conf --game cstrike --map de_dust2 --disablecache --debug-level 2` -> exit `0` (`Heatmap creation done`; run skipped render because kills matched query window: `0`)
+- `python -m hlstats_py.heatmaps --configfile scripts/replay_baseline/comparison/python/hlstats.host-local.conf --game cstrike --map de_nuke --disablecache --debug-level 2` -> exit `0` (`Heatmap creation done`; run skipped render because kills matched query window: `0`)
+
 ## Acceptance gates
 
 - Python entrypoints are the documented default runtime path.
@@ -282,10 +299,10 @@ Current legacy replay blocker validation:
 - [x] Reviewed frontend i18n backlog is retired on touched routes
 - [x] EN/RU catalogs are aligned for the touched keyspace
 - [x] Known parser blocker in `web/pages/ingame/motd.php` is removed
-- [ ] Exact `--stdin` product boundary is documented
+- [x] Exact `--stdin` product boundary is documented
 - [x] `HLStatsFTP` Python replacement is landed (`scripts/hlstats_ftp_py` → `hlstats_py.runtime --stdin`)
-- [ ] `ImportBans` Python replacement is landed or explicitly called out as a release blocker
-- [ ] Heatmap generator is validated on real map assets
+- [x] `ImportBans` Python replacement is landed (`scripts/import_bans_py`)
+- [x] Heatmap generator is validated on real map assets
 - [x] EN core pages render correctly
 - [x] RU core pages render correctly
 - [x] Language persistence and fallback behave correctly

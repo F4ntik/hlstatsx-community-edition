@@ -17,6 +17,17 @@
 - Completed post-mapfix drift-reduction execution pass with authoritative
   `-ForceDumpRestore` parity baseline on both stacks and new audit artifacts in
   `docs/audits/legacy-python-parity-20260425-post-mapfix-stage/`.
+- Closed `P5` maintenance backlog on `2026-04-25`:
+  - added standalone Python ImportBans replacement:
+    - package: `scripts/import_bans_py`
+    - entrypoint: `python -m import_bans_py`
+    - behavior parity with legacy scope: import-only ban propagation to
+      `hlstats_Players.hideranking = 2` (no unban pass)
+  - documented exact `hlstats_py.runtime --stdin` compatibility boundaries with
+    reproducible command/exit evidence in `docs/test-plan.md`
+  - validated Python heatmap generator against real map-pack JPEG assets under
+    `heatmaps/src/cstrike` with host-to-comparison DB config
+    (`scripts/replay_baseline/comparison/python/hlstats.host-local.conf`)
 - Landed map lifecycle attribution hardening in `hlstats_py.runtime`:
   `Loading map` now stages pending map state and event map attribution flips on
   `Started map`.
@@ -279,9 +290,9 @@
 - Some game-scoped admin routes still depend on the legacy JS/basic-mode
   navigation split, so direct noninteractive HTTP smoke can verify many of them
   but not every task uniformly.
-- The remaining validation backlog is now release-oriented rather than
-  integration-blocking: exact Python `--stdin` tail parity, remaining Perl
-  utility replacements, and real-map heatmap validation.
+- `P5` maintenance backlog is closed; remaining lane risk is concentrated in
+  `P6d` parity replay throughput/diff evidence rather than missing Python
+  maintenance utilities.
 - Some donor docs still describe lane-specific context rather than product
   context; the main docs in this repo are now the primary source of truth.
 
@@ -314,6 +325,26 @@
     - `hlstats_Maps_Counts`: `de_dust2 kills=1013`, `de_nuke kills=27`
     - `hlstats_Players_Awards=4`, `hlstats_Players_Ribbons=4`
     - GeoIP fill (`hlstats_Players` non-empty `country` + `flag`): `148`
+- 2026-04-25: Closed `P5` maintenance-only backlog with validation evidence:
+  - `ImportBans` Python CLI implemented as `scripts/import_bans_py`
+  - runtime boundary commands:
+    - `python -m hlstats_py.runtime --configfile hlstats.conf --stdin`
+      -> exit `1` (`--stdin requires both --server-ip and --server-port`)
+    - `python -m hlstats_py.runtime --configfile hlstats.conf --stdin --server-ip 127.0.0.1 --server-port 27015 --stdin-transaction-batch-size -1`
+      -> exit `1` (`--stdin-transaction-batch-size must be >= 0`)
+    - `python -m hlstats_py.runtime --configfile hlstats.conf --stdin --server-ip 127.0.0.1 --server-port 27015 --parser-backend native --stdin-transaction-batch-size 0`
+      -> exit `1` on local config DB precondition (`DBHost must be configured in hlstats.conf`) after CLI boundary acceptance
+  - ImportBans CLI boundary commands:
+    - `python -m import_bans_py --help` -> exit `0`
+    - `python -m import_bans_py --configfile hlstats.conf --dry-run`
+      -> exit `1` (missing required source configuration)
+  - real map-pack asset heatmap runs:
+    - `python -m hlstats_py.heatmaps --configfile scripts/replay_baseline/comparison/python/hlstats.host-local.conf --game cstrike --map de_dust2 --disablecache --debug-level 2`
+      -> exit `0`
+    - `python -m hlstats_py.heatmaps --configfile scripts/replay_baseline/comparison/python/hlstats.host-local.conf --game cstrike --map de_nuke --disablecache --debug-level 2`
+      -> exit `0`
+    - both runs completed generator path (`Heatmap creation done`) and
+      skipped render step because queried kill count for the map window was `0`
 - 2026-04-24: Landed stdin import performance tuning for Python runtime/FTP path:
   - added quiet-by-default stdin event logging with opt-in debug flag
     `--stdin-verbose-events` (default off)

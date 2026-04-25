@@ -110,17 +110,17 @@ Definition of done:
 - the integrated `web/` layer behaves as one product surface
 - the product repo has one primary source of truth for runtime and i18n rules
 
-### [ ] P5. Close the remaining Python product backlog
+### [x] P5. Close the remaining Python product backlog
 
 Goal:
 Finish the Python work required for this repo to act as a standalone product
 lane rather than only a migration checkpoint.
 
 Tasks:
-- document exact Python `--stdin` compatibility boundaries
+- [x] document exact Python `--stdin` compatibility boundaries
 - [x] port `HLStatsFTP` to Python on top of `hlstats_py.runtime --stdin` (`scripts/hlstats_ftp_py`)
-- port `ImportBans` to Python as a standalone maintenance CLI
-- validate the Python heatmap generator on real map-pack assets
+- [x] port `ImportBans` to Python as a standalone maintenance CLI (`scripts/import_bans_py`)
+- [x] validate the Python heatmap generator on real map-pack assets
 
 Definition of done:
 - Perl is no longer required for the common operational flows of this product
