@@ -10,6 +10,7 @@ from typing import Any, Callable, Optional, Protocol
 
 from proxy_daemon_py import db as proxy_db
 from .events import EventCategory, EventContext, EventUpdate
+from .event_buffer import BufferPolicy, EventBuffer
 from .protocol import PlayerDescriptor
 
 # Public re-exports from ``proxy_daemon_py`` are defined in ``__init__`` so we
@@ -149,6 +150,17 @@ _UPDATE_PLAYER_TEAMKILLS_QUERY = (
 _UPDATE_PLAYER_STREAKS_QUERY = (
     "UPDATE hlstats_Players "
     "SET `kill_streak` = IF(%s > `kill_streak`, %s, `kill_streak`), "
+    "`death_streak` = IF(%s > `death_streak`, %s, `death_streak`) "
+    "WHERE `playerId` = %s"
+)
+_UPDATE_PLAYER_FRAG_ROLLUP_QUERY = (
+    "UPDATE hlstats_Players SET "
+    "`kills` = `kills` + %s, "
+    "`headshots` = `headshots` + %s, "
+    "`deaths` = `deaths` + %s, "
+    "`suicides` = `suicides` + %s, "
+    "`skill` = `skill` + %s, "
+    "`kill_streak` = IF(%s > `kill_streak`, %s, `kill_streak`), "
     "`death_streak` = IF(%s > `death_streak`, %s, `death_streak`) "
     "WHERE `playerId` = %s"
 )
@@ -295,6 +307,22 @@ _UPSERT_MAP_COUNTS_QUERY = (
     "`kills` = `kills` + VALUES(`kills`), "
     "`headshots` = `headshots` + VALUES(`headshots`)"
 )
+_APPEND_ONLY_EVENT_INSERT_QUERIES = {
+    _INSERT_FRAG_QUERY,
+    _INSERT_SUICIDE_QUERY,
+    _INSERT_TEAMKILL_QUERY,
+    _INSERT_PLAYER_ACTION_QUERY,
+    _INSERT_TEAM_BONUS_QUERY,
+    _INSERT_PLAYER_PLAYER_ACTION_QUERY,
+    _INSERT_ENTRY_QUERY,
+    _INSERT_CHAT_QUERY,
+    _INSERT_STATSME_QUERY,
+    _INSERT_STATSME2_QUERY,
+    _INSERT_TEAM_CHANGE_QUERY,
+    _INSERT_CONNECT_QUERY,
+    _INSERT_DISCONNECT_QUERY,
+    _INSERT_ADMIN_EVENT_QUERY,
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -329,6 +357,7 @@ class EventStorage:
         self._player_teams: dict[int, str] = {}
         self._player_names: dict[int, str] = {}
         self._player_name_uses: set[tuple[int, str]] = set()
+        self._player_name_lastuse: dict[tuple[int, str], datetime] = {}
         self._server_players: dict[int, set[int]] = {}
         self._server_connected_players: dict[int, set[int]] = {}
         self._server_active_players: dict[int, set[int]] = {}
@@ -348,30 +377,53 @@ class EventStorage:
         self._player_skills: dict[int, int] = {}
         self._player_total_kills: dict[int, int] = {}
         self._seen_team_change_events: set[tuple[int, int, str, str, datetime]] = set()
+        self._server_totals_dirty: set[int] = set()
         self._transaction_batch_size = 0
         self._pending_writes = 0
         self._cached_cursor: proxy_db.SupportsCursor | None = None
         self._cached_cursor_connection: proxy_db.SupportsConnection | None = None
+        self._event_buffer: EventBuffer | None = None
+
+    def _set_skip_adapter_ping(self, enabled: bool) -> None:
+        setter = getattr(self._adapter, "set_skip_connection_ping", None)
+        if callable(setter):
+            setter(enabled)
 
     def begin_stdin_batch(self, *, transaction_batch_size: int) -> None:
         """Enable batched transaction mode for high-volume stdin imports."""
         if transaction_batch_size <= 0:
             self._transaction_batch_size = 0
             self._pending_writes = 0
+            self._event_buffer = None
+            self._set_skip_adapter_ping(False)
             return
         self._transaction_batch_size = transaction_batch_size
         self._pending_writes = 0
         self._set_autocommit(False)
+        self._set_skip_adapter_ping(True)
+        self._event_buffer = EventBuffer(policy=BufferPolicy(max_buffered_events=5000))
+
+    def configure_event_buffer(self, *, max_buffered_events: int) -> None:
+        if max_buffered_events <= 0:
+            self._event_buffer = None
+            return
+        self._event_buffer = EventBuffer(policy=BufferPolicy(max_buffered_events=max_buffered_events))
 
     def end_stdin_batch(self) -> None:
         """Flush pending writes and restore autocommit after stdin import."""
         if self._transaction_batch_size <= 0:
+            self._flush_event_buffer()
+            self._event_buffer = None
+            self._set_skip_adapter_ping(False)
             return
+        self._flush_event_buffer()
         self._commit_pending()
         self._transaction_batch_size = 0
         self._pending_writes = 0
         self._set_autocommit(True)
         self._close_cached_cursor()
+        self._event_buffer = None
+        self._set_skip_adapter_ping(False)
 
     def reset_runtime_state(self) -> None:
         """Drop replay/session-local caches after a runtime reload."""
@@ -380,6 +432,7 @@ class EventStorage:
         self._player_teams.clear()
         self._player_names.clear()
         self._player_name_uses.clear()
+        self._player_name_lastuse.clear()
         self._server_players.clear()
         self._server_connected_players.clear()
         self._server_active_players.clear()
@@ -399,13 +452,20 @@ class EventStorage:
         self._player_skills.clear()
         self._player_total_kills.clear()
         self._seen_team_change_events.clear()
+        self._server_totals_dirty.clear()
 
     def finalize_import(self) -> None:
         """Apply import-tail updates after a finite stdin replay."""
 
         connection = self._connection()
+        self._flush_event_buffer()
         self._execute(connection, _FINALIZE_PLAYER_LAST_EVENT_QUERY, None)
         self._maybe_commit_batch()
+
+    def flush_pending(self) -> None:
+        """Flush buffered inserts and commit pending batched writes."""
+        self._flush_event_buffer()
+        self._commit_pending()
 
     def apply_server_map_transition(
         self, server_id: int, phase: str, map_name: str, event_timestamp: datetime
@@ -579,18 +639,6 @@ class EventStorage:
         )
         self._execute(connection, _INSERT_FRAG_QUERY, params)
 
-        if killer_id:
-            self._execute(
-                connection,
-                _UPDATE_PLAYER_KILLS_QUERY,
-                (1, headshot, killer_id),
-            )
-        if victim_id:
-            if killer_id and killer_id == victim_id:
-                self._execute(connection, _UPDATE_PLAYER_SUICIDES_QUERY, (victim_id,))
-            else:
-                self._execute(connection, _UPDATE_PLAYER_DEATHS_QUERY, (victim_id,))
-
         weapon_name = update.attributes.get("weapon_name") or update.event_code
         self._execute(
             connection,
@@ -630,10 +678,19 @@ class EventStorage:
                 killer_id=killer_id,
                 victim_id=victim_id,
             )
-            if killer_skill_delta:
-                self._execute(connection, _UPDATE_PLAYER_SKILL_QUERY, (killer_skill_delta, killer_id))
-            if victim_skill_delta:
-                self._execute(connection, _UPDATE_PLAYER_SKILL_QUERY, (victim_skill_delta, victim_id))
+            self._apply_frag_player_rollup(
+                connection,
+                player_id=killer_id,
+                kills=1,
+                headshots=headshot,
+                skill_delta=killer_skill_delta,
+            )
+            self._apply_frag_player_rollup(
+                connection,
+                player_id=victim_id,
+                deaths=1,
+                skill_delta=victim_skill_delta,
+            )
 
             self._update_player_rollups(
                 connection,
@@ -678,6 +735,11 @@ class EventStorage:
                 player_id=victim_id,
             )
             victim_streak = self._set_player_streaks(connection, victim_id, death_delta=1, reset_kills=True)
+            self._apply_frag_player_rollup(
+                connection,
+                player_id=victim_id,
+                deaths=1,
+            )
             self._update_player_rollups(
                 connection,
                 context=context,
@@ -935,7 +997,9 @@ class EventStorage:
             ),
         )
         self._player_teams[actor_id] = team
-        self._update_player_presence(context.server_id, actor_id, team)
+        if self._update_player_presence(context.server_id, actor_id, team):
+            self._server_totals_dirty.add(context.server_id)
+            self._refresh_server_player_totals_if_dirty(connection, context.server_id)
 
     def _record_team_bonus(
         self,
@@ -1011,6 +1075,7 @@ class EventStorage:
                     _UPDATE_PLAYER_LAST_ADDRESS_QUERY,
                     (address, actor_id),
                 )
+            self._refresh_server_player_totals_if_dirty(connection, context.server_id)
         else:
             self._execute(
                 connection,
@@ -1027,6 +1092,7 @@ class EventStorage:
                 )
                 self._server_active_players.setdefault(context.server_id, set()).discard(actor_id)
                 self._server_connected_players.setdefault(context.server_id, set()).discard(actor_id)
+                self._server_totals_dirty.add(context.server_id)
                 self._refresh_server_player_totals(connection, context.server_id)
 
     def _record_entry(
@@ -1148,15 +1214,12 @@ class EventStorage:
             self._player_cache[cache_key] = player_id
             tracked_players = self._server_players.setdefault(context.server_id, set())
             connected_players = self._server_connected_players.setdefault(context.server_id, set())
-            needs_server_total_refresh = False
             if player_id not in tracked_players:
                 tracked_players.add(player_id)
-                needs_server_total_refresh = True
+                self._server_totals_dirty.add(context.server_id)
             if player_id not in connected_players:
                 connected_players.add(player_id)
-                needs_server_total_refresh = True
-            if needs_server_total_refresh:
-                self._refresh_server_player_totals(connection, context.server_id)
+                self._server_totals_dirty.add(context.server_id)
         self._player_is_bot[player_id] = self._player_is_bot.get(player_id, False) or self._is_bot_descriptor(
             descriptor
         )
@@ -1222,7 +1285,8 @@ class EventStorage:
         *,
         track_name_history: bool,
     ) -> None:
-        self._execute(connection, _UPDATE_PLAYER_NAME_QUERY, (descriptor.name, player_id))
+        if self._player_names.get(player_id) != descriptor.name:
+            self._execute(connection, _UPDATE_PLAYER_NAME_QUERY, (descriptor.name, player_id))
         self._player_names[player_id] = descriptor.name
         if player_id not in self._player_skills or player_id not in self._player_total_kills:
             row = self._fetchone(connection, _SELECT_PLAYER_STATE_QUERY, (player_id,))
@@ -1245,9 +1309,13 @@ class EventStorage:
         processed_at: datetime,
     ) -> None:
         key = (player_id, player_name)
+        last_use = self._player_name_lastuse.get(key)
+        if last_use is not None and (processed_at - last_use).total_seconds() < 1:
+            return
         if key not in self._player_name_uses:
             self._execute(connection, _UPSERT_PLAYER_NAME_QUERY, (player_id, player_name, processed_at))
             self._player_name_uses.add(key)
+            self._player_name_lastuse[key] = processed_at
             return
 
         self._execute(
@@ -1255,6 +1323,7 @@ class EventStorage:
             _UPDATE_PLAYERNAME_LASTUSE_QUERY,
             (processed_at, player_id, player_name),
         )
+        self._player_name_lastuse[key] = processed_at
 
     def _ensure_action_metadata(
         self,
@@ -1411,12 +1480,37 @@ class EventStorage:
         max_death_streak = max(death_streak, self._player_max_death_streaks.get(player_id, 0))
         self._player_max_kill_streaks[player_id] = max_kill_streak
         self._player_max_death_streaks[player_id] = max_death_streak
+        return kill_streak
+
+    def _apply_frag_player_rollup(
+        self,
+        connection: proxy_db.SupportsConnection,
+        *,
+        player_id: int,
+        kills: int = 0,
+        headshots: int = 0,
+        deaths: int = 0,
+        suicides: int = 0,
+        skill_delta: int = 0,
+    ) -> None:
+        kill_streak = self._player_max_kill_streaks.get(player_id, 0)
+        death_streak = self._player_max_death_streaks.get(player_id, 0)
         self._execute(
             connection,
-            _UPDATE_PLAYER_STREAKS_QUERY,
-            (max_kill_streak, max_kill_streak, max_death_streak, max_death_streak, player_id),
+            _UPDATE_PLAYER_FRAG_ROLLUP_QUERY,
+            (
+                kills,
+                headshots,
+                deaths,
+                suicides,
+                skill_delta,
+                kill_streak,
+                kill_streak,
+                death_streak,
+                death_streak,
+                player_id,
+            ),
         )
-        return kill_streak
 
     def _handle_world_state(
         self,
@@ -1470,6 +1564,15 @@ class EventStorage:
             _UPDATE_SERVER_PLAYER_TOTALS_QUERY,
             (total_players, active_players, server_id),
         )
+        self._server_totals_dirty.discard(server_id)
+
+    def _refresh_server_player_totals_if_dirty(
+        self,
+        connection: proxy_db.SupportsConnection,
+        server_id: int,
+    ) -> None:
+        if server_id in self._server_totals_dirty:
+            self._refresh_server_player_totals(connection, server_id)
 
     def _is_trackable_team(self, team: str) -> bool:
         normalized = team.strip().upper()
@@ -1668,7 +1771,8 @@ class EventStorage:
         current_skill = self._player_skills.setdefault(player_id, 1000) + skill_delta
         self._player_skills[player_id] = current_skill
         history_timestamp = self._history_timestamp(processed_at)
-        self._ensure_player_history_row(connection, context, player_id, timestamp)
+        if history_timestamp != self._history_timestamp(timestamp):
+            self._ensure_player_history_row(connection, context, player_id, timestamp)
 
         player_name = self._player_names.get(player_id)
         if player_name:
@@ -1930,12 +2034,28 @@ class EventStorage:
         query: str,
         params: tuple[Any, ...] | None,
     ) -> None:
+        if params is not None and query in _APPEND_ONLY_EVENT_INSERT_QUERIES:
+            buffer = self._event_buffer
+            if buffer is not None:
+                should_flush = buffer.add(query, params)
+                if should_flush:
+                    self._flush_event_buffer()
+                return
         cursor = self._cursor(connection)
         if params is None:
             cursor.execute(query)
         else:
             cursor.execute(query, params)
         self._pending_writes += 1
+
+    def _flush_event_buffer(self) -> None:
+        buffer = self._event_buffer
+        if buffer is None or buffer.buffered_rows <= 0:
+            return
+        connection = self._connection()
+        cursor = self._cursor(connection)
+        flushed = buffer.flush(cursor)
+        self._pending_writes += flushed
 
     def _fetchone(
         self,
@@ -1973,6 +2093,7 @@ class EventStorage:
     def _maybe_commit_batch(self) -> None:
         if self._transaction_batch_size <= 0:
             return
+        self._flush_event_buffer()
         if self._pending_writes >= self._transaction_batch_size:
             self._commit_pending()
 

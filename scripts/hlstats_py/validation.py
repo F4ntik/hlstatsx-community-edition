@@ -36,6 +36,7 @@ from .storage import (
     _SELECT_SERVER_CONFIG_QUERY,
     _SELECT_WEAPON_MODIFIER_QUERY,
     _UPDATE_PLAYER_DEATHS_QUERY,
+    _UPDATE_PLAYER_FRAG_ROLLUP_QUERY,
     _UPDATE_PLAYER_KILLS_QUERY,
     _UPDATE_PLAYER_NAME_QUERY,
     _UPDATE_PLAYER_STREAKS_QUERY,
@@ -568,6 +569,27 @@ class ReplayDatabase:
             return _ExecutionResult()
         if query == _UPDATE_PLAYER_STREAKS_QUERY:
             return _ExecutionResult()
+        if query == _UPDATE_PLAYER_FRAG_ROLLUP_QUERY:
+            assert normalized_params is not None
+            (
+                kills,
+                headshots,
+                deaths,
+                suicides,
+                skill_delta,
+                _kill_streak_cmp,
+                _kill_streak_val,
+                _death_streak_cmp,
+                _death_streak_val,
+                player_id,
+            ) = normalized_params
+            record = self._players[int(player_id)]
+            record.kills += int(kills)
+            record.headshots += int(headshots)
+            record.deaths += int(deaths)
+            record.suicides += int(suicides)
+            record.skill += int(skill_delta)
+            return _ExecutionResult()
         if query == _UPSERT_WEAPON_QUERY:
             assert normalized_params is not None
             game, code, name, _modifier, kills, headshots = normalized_params
@@ -794,6 +816,10 @@ class ReplayCursor:
 
     def execute(self, query: str, params: Optional[Iterable[object]] = None) -> None:
         self._result = self._database._handle_execute(query, params)
+
+    def executemany(self, query: str, params: Sequence[Iterable[object]]) -> None:
+        for row in params:
+            self.execute(query, row)
 
     def fetchone(self) -> Optional[Tuple[object, ...]]:
         return self._result.fetchone

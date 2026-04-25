@@ -108,8 +108,8 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--parser-backend",
         choices=("python", "native"),
-        default="python",
-        help="Parser backend for stdin import (default: python).",
+        default="native",
+        help="Parser backend for stdin import (default: native).",
     )
     p.add_argument(
         "--stdin-transaction-batch-size",
@@ -249,7 +249,11 @@ def _import_logs_batch(
     settings: RuntimeSettings,
     last_path: Path,
 ) -> int:
-    adapter = SyncDatabaseAdapter(database_config_from_proxy_config(settings.config))
+    adapter = SyncDatabaseAdapter(
+        database_config_from_proxy_config(settings.config),
+        import_mode=True,
+        enable_multi_statements=True,
+    )
     logger = ProxyLogger(LoggerConfig(level=settings.log_level))
     transport = ProxyUdpServer(logger)
     dispatcher = build_dispatcher()

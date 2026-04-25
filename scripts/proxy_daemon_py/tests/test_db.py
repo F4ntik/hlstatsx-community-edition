@@ -45,6 +45,10 @@ class FakeCursor(db.SupportsCursor):
         if self._key not in self._store.responses:
             raise AssertionError(f"Unexpected query {query!r} with params {params!r}")
 
+    def executemany(self, query: str, params: Sequence[Sequence[object]]) -> None:
+        for row in params:
+            self.execute(query, row)
+
     def fetchall(self) -> list[tuple[object, ...]]:
         assert self._key is not None
         response = self._store.responses[self._key]
@@ -116,7 +120,7 @@ def test_sync_connect_retries_until_success() -> None:
 
     assert len(attempts) == 3
     assert attempts[-1]["host"] == CONFIG.host
-    assert attempts[-1]["init_command"] == "SET NAMES 'utf8mb4'"
+    assert attempts[-1]["init_command"] == "SET NAMES 'utf8mb4', SESSION sql_mode = ''"
     assert connection.autocommit_value is True
     assert delays == [0.5, 1.0]
 
@@ -151,7 +155,7 @@ def test_sync_connect_normalizes_mysqlclient_timeout_parameters() -> None:
             "connect_timeout": 1,
             "read_timeout": 2,
             "write_timeout": 3,
-            "init_command": "SET NAMES 'utf8mb4'",
+            "init_command": "SET NAMES 'utf8mb4', SESSION sql_mode = ''",
         }
     ]
 

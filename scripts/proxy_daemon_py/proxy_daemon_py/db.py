@@ -25,6 +25,8 @@ class SupportsCursor(Protocol):
 
     def fetchall(self) -> Sequence[Any]: ...
 
+    def executemany(self, query: str, params: Sequence[Sequence[Any]]) -> Any: ...
+
     def close(self) -> None: ...
 
 
@@ -123,6 +125,9 @@ class SyncDatabaseAdapter:
         connect_timeout: float = 5.0,
         read_timeout: float = 5.0,
         write_timeout: float | None = None,
+        enable_multi_statements: bool = False,
+        executemany_chunk_size: int = 1000,
+        import_mode: bool = False,
         sleeper: Callable[[float], None] | None = None,
     ) -> None:
         if max_retries < 0:
@@ -133,6 +138,8 @@ class SyncDatabaseAdapter:
             raise ValueError("connect_timeout must be positive")
         if read_timeout <= 0:
             raise ValueError("read_timeout must be positive")
+        if executemany_chunk_size <= 0:
+            raise ValueError("executemany_chunk_size must be positive")
 
         self._config = config
         self._connector = connector
@@ -141,8 +148,17 @@ class SyncDatabaseAdapter:
         self._connect_timeout = connect_timeout
         self._read_timeout = read_timeout
         self._write_timeout = write_timeout
+        self._enable_multi_statements = enable_multi_statements
+        self._executemany_chunk_size = executemany_chunk_size
+        self._import_mode = import_mode
         self._sleeper = sleeper or time.sleep
         self._connection: SupportsConnection | None = None
+        self._skip_connection_ping: bool = False
+
+    def set_skip_connection_ping(self, enabled: bool) -> None:
+        """When True, reuse the pooled handle without ping checks (bulk import hot path)."""
+
+        self._skip_connection_ping = bool(enabled)
 
     def connect(self) -> None:
         """Establish a connection to MySQL, retrying with back-off on failures."""
@@ -152,6 +168,7 @@ class SyncDatabaseAdapter:
     def close(self) -> None:
         """Close the current database connection if one exists."""
 
+        self._skip_connection_ping = False
         if self._connection is None:
             return
         try:
@@ -302,10 +319,17 @@ class SyncDatabaseAdapter:
             "use_unicode": True,
             "connect_timeout": self._normalize_timeout(self._connect_timeout),
             "read_timeout": self._normalize_timeout(self._read_timeout),
-            "init_command": "SET NAMES 'utf8mb4'",
+            # Note: innodb_flush_log_at_trx_commit is GLOBAL-only on MariaDB/MySQL and
+            # cannot appear in SESSION init_command (connection would fail). Bulk-import
+            # tuning belongs in server config or a privileged bootstrap path, not here.
+            "init_command": "SET NAMES 'utf8mb4', SESSION sql_mode = ''",
         }
         if self._write_timeout is not None:
             params["write_timeout"] = self._normalize_timeout(self._write_timeout)
+        if self._enable_multi_statements:
+            client_flag = self._resolve_client_multi_statements_flag()
+            if client_flag is not None:
+                params["client_flag"] = client_flag
 
         last_error: Exception | None = None
         for attempt in range(self._max_retries + 1):
@@ -332,6 +356,9 @@ class SyncDatabaseAdapter:
         if connection is None:
             connection = self._connect_with_retries()
             self._connection = connection
+            return connection
+
+        if self._skip_connection_ping:
             return connection
 
         if not self._connection_alive(connection):
@@ -405,6 +432,20 @@ class SyncDatabaseAdapter:
         except ImportError as exc:  # pragma: no cover - requires runtime environment
             raise DatabaseError("mysqlclient (MySQLdb) is required for database access") from exc
         return cast(Callable[..., SupportsConnection], MySQLdb.connect)
+
+    def _resolve_client_multi_statements_flag(self) -> int | None:
+        try:
+            import MySQLdb
+        except ImportError:
+            return None
+        client = getattr(getattr(MySQLdb, "constants", None), "CLIENT", None)
+        if client is not None:
+            return getattr(client, "MULTI_STATEMENTS", None)
+        try:
+            from MySQLdb.constants import CLIENT
+        except Exception:
+            return None
+        return getattr(CLIENT, "MULTI_STATEMENTS", None)
 
     def _parse_daemon_list(self, raw: str) -> list[ProxyDaemonTarget]:
         entries: list[ProxyDaemonTarget] = []

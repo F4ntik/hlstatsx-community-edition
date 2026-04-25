@@ -46,6 +46,7 @@ from hlstats_py.storage import (
     _SELECT_WEAPON_MODIFIER_QUERY,
     _DELETE_PLAYER_HISTORY_QUERY,
     _UPDATE_PLAYER_DEATHS_QUERY,
+    _UPDATE_PLAYER_FRAG_ROLLUP_QUERY,
     _UPDATE_PLAYER_KILLS_QUERY,
     _UPDATE_PLAYER_SUICIDES_QUERY,
     _UPDATE_PLAYER_NAME_QUERY,
@@ -103,6 +104,10 @@ class FakeCursor:
         self._store.executed.append(key)
         self._key = key
         self._response = response
+
+    def executemany(self, query: str, params: Iterable[Iterable[object]]) -> None:
+        for row in params:
+            self.execute(query, row)
 
     def fetchone(self) -> Tuple[object, ...] | None:
         if self._response is None:
@@ -223,8 +228,11 @@ def test_record_frag_event_executes_expected_queries(dispatcher: EventDispatcher
     ) in connection.executed
     assert (_UPDATE_SERVER_FRAG_TOTALS_QUERY, (1, 1, 7)) in connection.executed
     assert (_UPSERT_MAP_COUNTS_QUERY, ("csgo", "de_dust2", 1, 1)) in connection.executed
-    assert (_UPDATE_PLAYER_SKILL_QUERY, (2, 101)) in connection.executed
-    assert (_UPDATE_PLAYER_SKILL_QUERY, (-2, 102)) in connection.executed
+    rollup_calls = [entry for entry in connection.executed if entry[0] == _UPDATE_PLAYER_FRAG_ROLLUP_QUERY]
+    assert len(rollup_calls) == 2
+    by_player = {entry[1][-1]: entry[1] for entry in rollup_calls}
+    assert by_player[101][:5] == (1, 1, 0, 0, 2)
+    assert by_player[102][:5] == (0, 0, 1, 0, -2)
     assert (_SELECT_ACTION_QUERY, ("csgo", "headshot")) in connection.executed
     assert (_INSERT_PLAYER_ACTION_QUERY, (timestamp, 7, "de_dust2", 101, 501, 0)) in connection.executed
     assert (_INCREMENT_ACTION_COUNT_QUERY, (501,)) in connection.executed
@@ -304,14 +312,12 @@ def test_record_chat_reuses_cached_player(event_context: EventContext) -> None:
         (_PLAYER_BY_UNIQUE_QUERY, ("STEAM_1:2", "csgo")),
         (_UPDATE_PLAYER_NAME_QUERY, ("Alice", 101)),
         (_SELECT_PLAYER_STATE_QUERY, (101,)),
-        (_UPDATE_SERVER_PLAYER_TOTALS_QUERY, (1, 1, 7)),
         (_UPSERT_PLAYER_NAME_QUERY, (101, "Alice", timestamp)),
         (_UPSERT_PLAYER_HISTORY_QUERY, (101, datetime(2024, 1, 2, 0, 0), "csgo", 1000)),
         (
             _INSERT_CHAT_QUERY,
             (timestamp, 7, "de_dust2", 101, 2, "Hold position"),
         ),
-        (_UPDATE_PLAYERNAME_LASTUSE_QUERY, (timestamp, 101, "Alice")),
         (_UPSERT_PLAYER_HISTORY_QUERY, (101, datetime(2024, 1, 2, 0, 0), "csgo", 1000)),
         (
             _INSERT_CHAT_QUERY,

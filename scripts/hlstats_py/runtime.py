@@ -65,6 +65,8 @@ class SupportsEventStorage(Protocol):
         self, server_id: int, phase: str, map_name: str, event_timestamp: datetime
     ) -> None: ...
 
+    def flush_pending(self) -> None: ...
+
 
 @dataclass(slots=True)
 class RuntimeMapState:
@@ -164,6 +166,7 @@ class ServerRegistry:
 _LOADING_MAP_INLINE_RE = re.compile(r'Loading map "(?P<map>[^"]+)"')
 _STARTED_MAP_INLINE_RE = re.compile(r'Started map "(?P<map>[^"]+)"')
 _STDIN_PROGRESS_EVERY = 10000
+_UDP_IDLE_FLUSH_SECONDS = 0.5
 
 MapLifecyclePhase = Literal["loading", "started"]
 
@@ -272,6 +275,8 @@ class HlstatsRuntime:
                 await self._consumer_task
             self._consumer_task = None
         await self._udp_server.stop()
+        with contextlib.suppress(Exception):
+            self._storage.flush_pending()
         self._adapter.close()
         self._logger.notice("HLstats worker stopped")
 
@@ -282,7 +287,15 @@ class HlstatsRuntime:
 
     async def _consume_datagrams(self) -> None:
         while True:
-            datagram = await self._udp_server.queue.get()
+            try:
+                datagram = await asyncio.wait_for(
+                    self._udp_server.queue.get(),
+                    timeout=_UDP_IDLE_FLUSH_SECONDS,
+                )
+            except asyncio.TimeoutError:
+                with contextlib.suppress(Exception):
+                    self._storage.flush_pending()
+                continue
             try:
                 await self._handle_datagram(datagram)
             except Exception as exc:  # pragma: no cover - defensive safety
@@ -406,7 +419,11 @@ async def _serve(argv: Sequence[str] | None = None) -> int:
         print(f"error: {exc}")
         return 1
 
-    database = SyncDatabaseAdapter(database_config_from_proxy_config(settings.config))
+    database = SyncDatabaseAdapter(
+        database_config_from_proxy_config(settings.config),
+        import_mode=settings.stdin,
+        enable_multi_statements=settings.stdin,
+    )
     logger = ProxyLogger(LoggerConfig(level=settings.log_level))
     transport = ProxyUdpServer(logger)
     dispatcher = build_dispatcher()

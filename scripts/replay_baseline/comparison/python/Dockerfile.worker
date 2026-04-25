@@ -11,11 +11,14 @@ WORKDIR /app
 
 COPY scripts/proxy_daemon_py /app/scripts/proxy_daemon_py
 COPY scripts/hlstats_py /app/scripts/hlstats_py
+COPY scripts/hlstats_ftp_py /app/scripts/hlstats_ftp_py
 
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir /app/scripts/proxy_daemon_py \
     && pip install --no-cache-dir geoip2
 
 COPY scripts/replay_baseline/comparison/python/hlstats.conf /app/hlstats.conf
+RUN mkdir -p /app/scripts/replay_baseline
+COPY scripts/replay_baseline/direct_import_artifacts.py /app/scripts/replay_baseline/direct_import_artifacts.py
 
 CMD ["python", "-m", "hlstats_py.runtime", "--configfile", "/app/hlstats.conf", "--port", "28000", "--foreground"]

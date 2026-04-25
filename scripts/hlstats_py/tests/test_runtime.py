@@ -35,6 +35,7 @@ class StubStorage:
         self.map_transitions: list[RecordedMapTransition] = []
         self.reset_calls = 0
         self.finalize_calls = 0
+        self.flush_pending_calls = 0
 
     def apply_server_map_transition(
         self, server_id: int, phase: str, map_name: str, event_timestamp: object
@@ -63,6 +64,9 @@ class StubStorage:
 
     def finalize_import(self) -> None:
         self.finalize_calls += 1
+
+    def flush_pending(self) -> None:
+        self.flush_pending_calls += 1
 
 
 class StubAdapter:
@@ -116,6 +120,21 @@ async def _wait_for(predicate, timeout: float = 1.0) -> None:
 
 def test_runtime_records_proxied_event() -> None:
     asyncio.run(_run_records_proxied_event())
+
+
+async def _run_stop_invokes_flush_pending() -> None:
+    adapter = StubAdapter()
+    storage = StubStorage()
+    logger = ProxyLogger(LoggerConfig(stream=StringIO()))
+    server = ProxyUdpServer(logger)
+    runtime = HlstatsRuntime(adapter, server, logger, build_dispatcher(), storage)
+    await runtime.start("127.0.0.1", 0)
+    await runtime.stop()
+    assert storage.flush_pending_calls >= 1
+
+
+def test_runtime_stop_calls_storage_flush_pending() -> None:
+    asyncio.run(_run_stop_invokes_flush_pending())
 
 
 def test_runtime_handles_control_commands_and_reload() -> None:
