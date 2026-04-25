@@ -269,12 +269,18 @@ def _import_logs_batch(
 
     server_address = f"{args.gs_ip}:{args.gs_port}".strip().lower()
     imported_records = 0
+    progress_every = 20000
     runtime._adapter.connect()
     try:
         runtime._reload_state()
         storage.begin_stdin_batch(transaction_batch_size=settings.stdin_transaction_batch_size)
-        for entry in todo:
+        for index, entry in enumerate(todo, start=1):
+            _log(
+                not args.quiet,
+                f'    - "{entry.name}" ({index}/{len(todo)}): batch parsing... ',
+            )
             local_file = tmp_dir / entry.name
+            file_records = 0
             with local_file.open("rb") as stdin_f:
                 for merged in iter_merged_goldsrc_physical_lines(stdin_f):
                     line = merged.decode("utf-8", errors="replace")
@@ -282,7 +288,14 @@ def _import_logs_batch(
                         continue
                     runtime.process_stdin_line(line, server_address)
                     imported_records += 1
+                    file_records += 1
+                    if not args.quiet and file_records % progress_every == 0:
+                        print(
+                            f"      progress: {entry.name} -> {file_records} records",
+                            flush=True,
+                        )
             write_last_mtime(last_path, entry.mtime)
+            _log(not args.quiet, f"done ({file_records} records).")
         runtime.finalize_stdin_import()
         storage.end_stdin_batch()
     finally:

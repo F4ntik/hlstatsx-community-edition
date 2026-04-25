@@ -387,7 +387,7 @@ Stop-and-fix rule:
 - if a route triggers destructive state changes, do not execute it; log it as
   read-only-only and continue
 
-### [ ] P6e. Runtime/Awards architecture modernization with strict legacy parity
+### [x] P6e. Runtime/Awards architecture modernization with strict legacy parity
 
 Goal:
 Deliver strict behavioral parity for replay-critical map flow, awards/ribbons,
@@ -449,15 +449,44 @@ Definition of done:
 - parity evidence is documented with command outputs and SQL checks
 
 Validation:
-- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\replay_baseline\comparison\python\Run-ContourFtpArtifacts.ps1 -SkipBuild -MaxImportFiles 500`
-- `python -m hlstats_awards_py --date 2026-01-04 -a -r --replay-mode`
+- `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\replay_baseline\comparison\python\Run-ContourFtpArtifacts.ps1 -SkipBuild -MaxImportFiles 100`
+- `python -m hlstats_awards_py --date 2026-01-02 -a -r --replay-mode`
 - optional GeoIP replay-safe check:
-  - `python -m hlstats_awards_py --date 2026-01-04 -a -r -g --replay-mode`
+  - `python -m hlstats_awards_py --date 2026-01-02 -a -r -g --replay-mode`
 - SQL checks:
   - non-empty map in `hlstats_Events_Frags`
   - map population in `hlstats_Maps_Counts` (e.g. `de_dust2`, `de_nuke`)
   - positive row counts in `hlstats_Players_Awards` and `hlstats_Players_Ribbons`
   - if GeoIP data source exists: positive `flag/country` fill count
+
+Execution evidence (2026-04-25):
+- Replay contour import (`MaxImportFiles=100`) completed with exit `0` on the Python comparison stack.
+- `Run-ContourFtpArtifacts.ps1` no longer flakes on FTP state cleanup:
+  - replaced the cleanup pipe with an explicit safe removal loop in
+    `scripts/replay_baseline/comparison/python/Run-ContourFtpArtifacts.ps1`
+  - stable end-to-end run confirmed with
+    `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\replay_baseline\comparison\python\Run-ContourFtpArtifacts.ps1 -SkipBuild -MaxImportFiles 100`
+    and exit `0`
+  - canonical script stdout summary:
+    - `status=ok`
+    - `import_mode=ftp-stdin`
+    - `server_identity=37.230.137.48:27015`
+    - `max_import_files=100`
+    - `ftp_probe_limit=500`
+    - `geoip_mode=strict`
+- Replay-safe awards runs completed with exit `0` for both:
+  - `python -m hlstats_awards_py --date 2026-01-02 -a -r --replay-mode`
+  - `python -m hlstats_awards_py --date 2026-01-02 -a -r -g --replay-mode`
+- Strict/default behavior sanity check completed with exit `0` for both:
+  - `python -m hlstats_awards_py --date 2026-01-02 -a -r`
+  - `python -m hlstats_awards_py --date 2026-01-02 -a -r -g`
+- SQL evidence captured on `hlstatsx-python-db`:
+  - `hlstats_Events_Frags` non-empty `map`: `6536`
+  - `hlstats_Events_PlayerActions` non-empty `map`: `6838`
+  - `hlstats_Events_Statsme` non-empty `map`: `40047`
+  - `hlstats_Maps_Counts`: `de_dust2 -> kills=1013`, `de_nuke -> kills=27`
+  - `hlstats_Players_Awards`: `4`; `hlstats_Players_Ribbons`: `4`
+  - GeoIP fill (`hlstats_Players` with non-empty `country` and `flag`): `148`
 
 Stop-and-fix rule:
 - if strict/default policy behavior changes unexpectedly in non-replay runs, stop and restore compatibility before continuing

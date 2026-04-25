@@ -23,6 +23,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$runStartedAt = Get-Date
+$runStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = (Resolve-Path (Join-Path $here "..\..\..\..")).Path
 $compose = Join-Path $here "docker-compose.yml"
@@ -91,7 +93,19 @@ if ($RecreateBaselineSnapshot) {
 powershell @restoreArgs
 
 Write-Host "==> clear FTP import state for replay server 37.230.137.48:27015"
-Get-ChildItem -Path $ftpWork -Filter "hlstats-ftp-37.230.137.48-27015.*" -ErrorAction SilentlyContinue | Remove-Item -Force
+$importStatePattern = "hlstats-ftp-37.230.137.48-27015.*"
+$importStateItems = @(Get-ChildItem -Path $ftpWork -Filter $importStatePattern -Force -ErrorAction SilentlyContinue)
+if ($importStateItems.Count -gt 0) {
+    foreach ($item in $importStateItems) {
+        if ($null -eq $item -or -not $item.PSObject.Properties.Match("FullName")) {
+            continue
+        }
+        Remove-Item -Path $item.FullName -Force -Recurse -ErrorAction Stop
+    }
+    Write-Host "==> Cleared $($importStateItems.Count) FTP state item(s)."
+} else {
+    Write-Host "==> No existing FTP state files to clear."
+}
 
 $identityParts = $ServerIdentity.Split(":", 2)
 if ($identityParts.Count -ne 2) {
@@ -147,5 +161,27 @@ if (-not $SkipGeoIp) {
 } else {
     Write-Host "==> GeoIP backfill skipped via -SkipGeoIp."
 }
+
+$runStopwatch.Stop()
+$importMode = if ($UseUdpReplay) { "udp-replay" } else { "ftp-stdin" }
+$maxFilesSummary = if ($NoCap) { "no-cap" } else { [string]$MaxImportFiles }
+$probeSummary = if ($UseUdpReplay -or $NoCap) { "n/a" } else { [string]$FtpProbeLimit }
+$geoipSummary = if ($SkipGeoIp) {
+    "skipped"
+} elseif ($GeoIpReplaySafe) {
+    "replay-safe"
+} else {
+    "strict"
+}
+
+Write-Host "==> Summary"
+Write-Host "    status: ok"
+Write-Host "    started_at: $($runStartedAt.ToString("s"))"
+Write-Host "    elapsed_seconds: $([Math]::Round($runStopwatch.Elapsed.TotalSeconds, 3))"
+Write-Host "    import_mode: $importMode"
+Write-Host "    server_identity: $ServerIdentity"
+Write-Host "    max_import_files: $maxFilesSummary"
+Write-Host "    ftp_probe_limit: $probeSummary"
+Write-Host "    geoip_mode: $geoipSummary"
 
 Write-Host "==> Done. Web: http://127.0.0.1:8281/hlstats.php - server 37.230.137.48:27015 (Replay)."

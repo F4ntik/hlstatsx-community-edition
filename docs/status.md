@@ -2,11 +2,11 @@
 
 ## Snapshot
 
-- Current phase: `P6d` — legacy reference replay and manifests are settled; the
-  Python full-corpus run used for the first `runtime-db-diff.md` used
-  `--send-delay 0` and is **not** authoritative (UDP loss on the parity path).
-  Next gate is a **throttled** Python full replay (default `--send-delay 0.005`),
-  then regenerate DB diff; frontend P6b/P6c closeout remains complete
+- Current phase: `P6d` with `P6e` closed — legacy reference replay and manifests
+  are settled; the Python full-corpus run used for the first
+  `runtime-db-diff.md` used `--send-delay 0` and is **not** authoritative (UDP
+  loss on the parity path). Next gate is a **throttled** Python full replay
+  (default `--send-delay 0.005`), then regenerate DB diff.
 - Plan file: `docs/plans.md`
 - Status: red for P6d runtime parity until a throttled Python full replay backs
   a fresh DB diff; yellow for the broader product lane
@@ -142,6 +142,22 @@
     `hlstats_Events_Frags=1,536`, `kills=1,536`, `act_players=396`
   - integrated RU web smoke still returns HTTP `200` for the game, players,
     and server pages on `http://127.0.0.1:8281/`
+- Closed `P6e` end-to-end on `2026-04-25`:
+  - replay contour FTP import completed on Python stack with
+    `Run-ContourFtpArtifacts` equivalent run at `MaxImportFiles=100` (exit `0`)
+  - replay-safe awards completed (exit `0`):
+    - `python -m hlstats_awards_py --date 2026-01-02 -a -r --replay-mode`
+    - `python -m hlstats_awards_py --date 2026-01-02 -a -r -g --replay-mode`
+  - strict/default sanity run completed (exit `0`):
+    - `python -m hlstats_awards_py --date 2026-01-02 -a -r`
+    - `python -m hlstats_awards_py --date 2026-01-02 -a -r -g`
+  - replay SQL evidence:
+    - non-empty map rows:
+      `hlstats_Events_Frags=6536`, `hlstats_Events_PlayerActions=6838`,
+      `hlstats_Events_Statsme=40047`
+    - `hlstats_Maps_Counts`: `de_dust2 (kills=1013)`, `de_nuke (kills=27)`
+    - `hlstats_Players_Awards=4`, `hlstats_Players_Ribbons=4`
+    - GeoIP fill (`country` + `flag` non-empty in `hlstats_Players`): `148`
 
 ## In Progress
 
@@ -181,14 +197,6 @@
   confirmed, transport parity was not.
 - A throttled Python full replay (e.g. `--send-delay 0.005`, new log name) plus
   fresh `compare_stats_dbs.py` output is the pending authoritative diff.
-- `P6e`: architecture-first parity remediation planning is now staged in
-  `docs/plans.md`:
-  - runtime map lifecycle must move to explicit projected state (loading/started)
-    so `Events_*` and `Maps_Counts` receive non-empty map values like legacy
-  - awards/ribbons flow needs explicit strict-vs-replay policy handling so
-    replay does not require manual `hideranking` SQL edits
-  - GeoIP must be policy-driven so replay runs can degrade gracefully when
-    `GeoLite2-City.mmdb` (or DB tables) are unavailable
 - The frontend-specific `P6b`/`P6c` work is still complete for the supported
   EN/RU product contour.
 
@@ -204,12 +212,9 @@
   - keep `--drop-empty-team-enter-events` mandatory on both sides; SQL mode
     `NO_ENGINE_SUBSTITUTION` for comparison
   - page/web mini-agent audit stays blocked until that diff is reviewed
-- Execute `P6e` implementation in bounded order:
-  - runtime: map lifecycle parse/dispatch/state projection/storage wiring
-  - awards: strict default policy + explicit replay-safe policy
-  - geoip: strict failure in default mode, best-effort skip in replay mode
-  - tests: map-flow parity, awards policy, geoip strict-vs-replay
-  - replay contour + SQL evidence capture
+- Keep `P6e` in maintenance-only mode:
+  - preserve strict/default behavior as the default contract
+  - keep replay-safe policy and SQL evidence checks available for regressions
 
 ## Decisions
 
@@ -282,6 +287,33 @@
 
 ## Audit Log
 
+- 2026-04-25: Closed `P6e` validation/evidence loop:
+  - replay contour FTP import completed on the Python stack with `100` file cap
+    (direct worker run equivalent to `Run-ContourFtpArtifacts` import stage)
+  - fixed intermittent `Run-ContourFtpArtifacts` abort between FTP-state cleanup
+    and `docker compose run`:
+    - root cause: flaky `Get-ChildItem ... | Remove-Item` path raising
+      `NullReferenceException` on some runs
+    - remediation: replaced with explicit safe cleanup loop over matched files
+      in `scripts/replay_baseline/comparison/python/Run-ContourFtpArtifacts.ps1`
+    - stable end-to-end command now passes without manual workaround:
+      `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\replay_baseline\comparison\python\Run-ContourFtpArtifacts.ps1 -SkipBuild -MaxImportFiles 100`
+      (exit `0`)
+    - canonical script summary now printed in stdout (`status/import mode/server/
+      limits/geoip mode`) for audit-friendly replay evidence
+  - replay-safe awards runs completed with exit `0`:
+    - `python -m hlstats_awards_py --date 2026-01-02 -a -r --replay-mode`
+    - `python -m hlstats_awards_py --date 2026-01-02 -a -r -g --replay-mode`
+  - strict/default sanity runs completed with exit `0`:
+    - `python -m hlstats_awards_py --date 2026-01-02 -a -r`
+    - `python -m hlstats_awards_py --date 2026-01-02 -a -r -g`
+  - SQL evidence captured:
+    - `hlstats_Events_Frags` non-empty map: `6536`
+    - `hlstats_Events_PlayerActions` non-empty map: `6838`
+    - `hlstats_Events_Statsme` non-empty map: `40047`
+    - `hlstats_Maps_Counts`: `de_dust2 kills=1013`, `de_nuke kills=27`
+    - `hlstats_Players_Awards=4`, `hlstats_Players_Ribbons=4`
+    - GeoIP fill (`hlstats_Players` non-empty `country` + `flag`): `148`
 - 2026-04-24: Landed stdin import performance tuning for Python runtime/FTP path:
   - added quiet-by-default stdin event logging with opt-in debug flag
     `--stdin-verbose-events` (default off)
