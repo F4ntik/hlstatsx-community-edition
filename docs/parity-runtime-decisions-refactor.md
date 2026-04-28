@@ -179,6 +179,36 @@ Expected TeamBonuses count for behavior-neutral work remains:
 If the count moves, stop and classify it as either an accidental behavior change
 or an explicitly approved parity fix.
 
+## Replay reuse optimization
+
+Do not rerun the legacy narrow-1000 contour by habit. Legacy Perl behavior is
+the stable reference for this branch, so a prepared legacy DB/container can be
+reused when all of these inputs match:
+
+- baseline restore source and snapshot/dump identity
+- retained corpus path and first `1000` sorted log filenames
+- server identity: `37.230.137.48:27015`
+- replay policy: `--drop-empty-team-enter-events`
+- comparison scope: narrow-1000 runtime diff
+
+Before skipping legacy replay, record or verify a fingerprint that includes the
+items above plus the SQL snapshot timestamp/counts. If any input changes, rerun
+legacy from dump. If only Python runtime/storage code changes, prefer restoring
+or reusing the already validated legacy narrow-1000 DB and rerun only the Python
+FTP/stdin contour plus `compare_stats_dbs.py`.
+
+Future tooling should make this explicit instead of relying on memory:
+
+- store contour state in `scripts/replay_baseline/comparison/.parity-state/`
+  with separate legacy and Python stage fingerprints
+- support a documented `SkipLegacyImport`/resume path for Python-only refactors
+- write inspectable container labels or a mounted metadata file showing contour
+  type, baseline source, corpus window, server identity, replay policy, import
+  completion time, and row-count anchors
+- expose the same metadata from inside containers, for example
+  `/app/CONTOUR_INFO.json` or `/contour-info.json`, so `docker exec` can answer
+  what DB/window is currently loaded
+
 ## Stop rules
 
 - Stop before implementation after this design doc is created.

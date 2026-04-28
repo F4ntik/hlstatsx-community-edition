@@ -51,6 +51,28 @@ $env:HLSTATS_TEAM_BONUS_TRACE_PATH = "scripts/replay_baseline/artifacts/team-bon
 Без этой переменной `hlstats_py.storage` только собирает счётчики в памяти во
 время процесса и не создаёт JSON на диске.
 
+## Переиспользование legacy narrow-1000
+
+Не переподнимать legacy-контур и не молотить те же `1000` логов по привычке.
+Legacy Perl в этом окне — стабильный эталон. Его можно переиспользовать, если
+не менялись:
+
+- baseline dump/snapshot;
+- путь к corpus и первые `1000` sorted `*.log`;
+- `server_identity=37.230.137.48:27015`;
+- replay policy `--drop-empty-team-enter-events`;
+- цель сравнения: narrow-1000 runtime diff.
+
+При Python-only refactor предпочтительный loop: проверить fingerprint/SQL
+snapshot legacy narrow-1000, не трогать legacy DB, переиграть только Python
+FTP/stdin и запустить `compare_stats_dbs.py`. Если хотя бы один input из списка
+выше изменился, legacy нужно переиграть от dump-baseline.
+
+Для инспекции контейнеров следующий tooling milestone должен добавить metadata
+в labels и/или mounted file вроде `/app/CONTOUR_INFO.json`: тип контура,
+baseline, corpus window, server identity, replay policy, время импорта,
+row-count anchors.
+
 ## Образ worker и свежий код
 
 Скрипты в контейнере **копируются в образ** при сборке. После правок в

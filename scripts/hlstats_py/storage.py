@@ -16,6 +16,7 @@ from .events import EventCategory, EventContext, EventUpdate
 from .event_buffer import BufferPolicy, EventBuffer
 from .frag_write_delta_buffer import FragWriteDeltaBuffer
 from .protocol import PlayerDescriptor
+from .runtime_decisions import should_ignore_bot, should_reward_team_player
 
 # Public re-exports from ``proxy_daemon_py`` are defined in ``__init__`` so we
 # import lazily and guard for type checkers. The runtime package layout keeps the
@@ -2086,12 +2087,14 @@ class EventStorage:
                 team=team,
                 server_id=context.server_id,
             )
-            # Legacy rewardTeam iterates the in-memory player roster. A player
-            # that joined a trackable team is eligible even when no separate
-            # "entered the game" row was emitted in the replay window.
-            if player_id not in reward_eligible_players and player_id not in active_players:
+            roster_decision = should_reward_team_player(
+                player_id=player_id,
+                active_players=active_players,
+                reward_eligible_players=reward_eligible_players,
+            )
+            if not roster_decision.allowed:
                 self._record_team_bonus_stage(
-                    "eligible_gate_reject",
+                    roster_decision.gate,
                     action_id=action.action_id,
                     map_name=map_name,
                     event_code=event_code,
@@ -2101,9 +2104,17 @@ class EventStorage:
                     server_id=context.server_id,
                 )
                 continue
-            if self._skip_team_reward_for_ignore_bots(connection, context.game, context.server_id, player_id):
+            bot_decision = should_ignore_bot(
+                ignored_by_policy=self._skip_team_reward_for_ignore_bots(
+                    connection,
+                    context.game,
+                    context.server_id,
+                    player_id,
+                )
+            )
+            if not bot_decision.allowed:
                 self._record_team_bonus_stage(
-                    "ignore_bots_gate_reject",
+                    bot_decision.gate,
                     action_id=action.action_id,
                     map_name=map_name,
                     event_code=event_code,
