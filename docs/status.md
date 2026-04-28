@@ -1146,3 +1146,14 @@
   environment teardown/setup failures from local pytest temp/cache directory
   permissions; Docker replay was not runnable in this session because Docker
   API access returned `permission denied`.
+- 2026-04-29: validated the current `refactor/parity-runtime-decisions` HEAD
+  after the TeamBonuses decision extraction and diagnostic trace commits.
+  `Run-DualContour-1000.ps1 -MaxImportFiles 1000 -UseDumpRestore
+  -ReuseValidLegacy` reused the valid legacy narrow-1000 contour and replayed
+  the Python contour successfully after adding a root `.dockerignore` for local
+  pytest/cache artifacts that must not enter Docker build context.
+  `compare_stats_dbs.py --max-examples 20` still reports the expected open
+  logical differences, with `hlstats_Events_TeamBonuses legacy=4765`,
+  `python=4773` (delta `+8`). Conclusion: the current refactor baseline is
+  behavior-neutral for the tracked TeamBonuses count, so the next safe slice is
+  parity decision JSONL tracing rather than another behavior fix.
