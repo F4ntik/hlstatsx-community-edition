@@ -2086,9 +2086,10 @@ class EventStorage:
                 team=team,
                 server_id=context.server_id,
             )
-            # Keep team reward eligibility strict: only players that entered the game
-            # in this server session can receive TeamBonuses.
-            if player_id not in reward_eligible_players:
+            # Legacy rewardTeam iterates the in-memory player roster. A player
+            # that joined a trackable team is eligible even when no separate
+            # "entered the game" row was emitted in the replay window.
+            if player_id not in reward_eligible_players and player_id not in active_players:
                 self._record_team_bonus_stage(
                     "eligible_gate_reject",
                     action_id=action.action_id,

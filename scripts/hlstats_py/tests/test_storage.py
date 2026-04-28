@@ -1172,6 +1172,36 @@ def test_team_bonus_awards_team_when_round_status_is_zero(event_context: EventCo
     assert len(insert_rows) == 2
 
 
+def test_team_bonus_awards_trackable_team_player_without_entry(event_context: EventContext) -> None:
+    dispatcher = EventDispatcher([TeamTriggerEventHandler()], fallback=GenericEventHandler())
+    event = parse_log_event('L 01/02/2024 - 03:04:05: Team "CT" triggered "SFUI_Notice_CTs_Win"')
+    update = dispatcher.dispatch(event, event_context)
+    assert update is not None
+    context = EventContext(
+        server_id=event_context.server_id,
+        game=event_context.game,
+        schema=event_context.schema,
+        localization=event_context.localization,
+        extras={"map": "de_dust2", "round_status": 0},
+    )
+    responses: Dict[QueryKey, List[QueryResponse]] = {
+        (_SELECT_SERVER_CONFIG_QUERY, (7, "MinPlayers")): [QueryResponse(fetchone=(0,))],
+        (_SELECT_ACTION_QUERY, ("csgo", "SFUI_Notice_CTs_Win")): [QueryResponse(fetchone=(755, 0, 2))],
+    }
+    connection = FakeConnection(responses)
+    storage = EventStorage(StubAdapter(connection), clock=lambda: update.timestamp)
+    storage._server_active_players[7] = {101}
+    storage._server_reward_eligible_players[7] = set()
+    storage._player_teams[101] = "CT"
+
+    storage.record(update, context)
+
+    assert (
+        _INSERT_TEAM_BONUS_QUERY,
+        (update.timestamp, 7, "de_dust2", 101, 755, 2),
+    ) in connection.executed
+
+
 def test_team_bonus_deduplicates_same_signature(event_context: EventContext) -> None:
     dispatcher = EventDispatcher([TeamTriggerEventHandler()], fallback=GenericEventHandler())
     event = parse_log_event('L 01/02/2024 - 03:04:05: Team "CT" triggered "SFUI_Notice_CTs_Win"')

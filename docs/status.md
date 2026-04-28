@@ -10,9 +10,10 @@
   артефактами без явного решения о промоции).
 - P0/M1 итог:
   - `TeamBonuses`: семантика `round_status`, bot/eligible gates, map-start
-    roster reset, same-second hostage multiplicity и candidate-set уточнения уже
-    приведены ближе к legacy. Актуальный narrow-1000 хвост всё ещё открыт:
-    `legacy=4765`, `python=4692` (дельта `-73`) — **первый незакрытый пункт
+    roster reset, same-second hostage multiplicity, candidate-set уточнения и
+    active-team reward eligibility уже приведены ближе к legacy. Актуальный
+    narrow-1000 хвост всё ещё открыт:
+    `legacy=4765`, `python=4773` (дельта `+8`) — **первый незакрытый пункт
     плана** (LP-P6D-001).
   - `Events_Entries`: принято с явной рационализацией (`legacy=0`,
     `python=1231` на 1000); строка сравнения **не** убирать (LP-P6D-002).
@@ -1106,3 +1107,28 @@
     точечно разбирать composition `eligible_gate_reject` (player lifecycle /
     reward eligibility transitions around earliest legacy-only windows:
     `2024-01-01 19:41:51` `de_mirage`, `2024-01-01 20:47:23` `cs_mansion`).
+- 2026-04-28: `LP-P6D-001` продолжен от актуального хвоста `4765` vs `4692`.
+  Root cause по `eligible_gate_reject`: legacy Perl `rewardTeam` проходит по
+  in-memory `%g_players`, а `doEvent_TeamSelection` делает игрока trackable без
+  обязательного `entered the game`; Python требовал `reward_eligible_players`
+  (Entry-only) и отбрасывал игроков с валидным team state. Минимальный патч:
+  `storage._reward_team_players` теперь допускает игрока, если он либо
+  `reward_eligible`, либо уже в `server_active_players`; connected-only без
+  trackable team по-прежнему отсекается. Regression test:
+  `test_team_bonus_awards_trackable_team_player_without_entry`.
+  Валидация:
+  - `PYTHONPATH=scripts;scripts/proxy_daemon_py python -m pytest scripts/hlstats_py/tests/test_storage.py`
+    -> `41 passed`;
+  - `PYTHONPATH=scripts;scripts/proxy_daemon_py python -m pytest scripts/hlstats_py/tests`
+    -> `107 passed`;
+  - Python narrow replay:
+    `Run-ContourFtpArtifacts.ps1 -SkipBuild -UseDumpRestore -SkipGeoIp -MaxImportFiles 1000`
+    -> `status=ok`, `elapsed_seconds=331.5`;
+  - legacy reference replay restored from dump and replayed the same first
+    `1000` logs -> `processed=1000`, `errors=0`;
+  - `compare_stats_dbs.py --max-examples 20` saved as
+    `runtime-db-diff-p6d-narrow-1000-20260428-175918.md`.
+  Новый срез `hlstats_Events_TeamBonuses`: `legacy=4765`, `python=4773`
+  (дельта `+8`, улучшение на `81` строк к предыдущему `-73`). `LP-P6D-001`
+  остаётся открыт; следующий минимальный разбор — residual `+8` по
+  grouped action/map/time и identity/name-only examples, не page audit.

@@ -397,3 +397,25 @@ Generated artifacts:
   - `hlstats_Players_History=675`
   - `hlstats_Events_Entries=1231`
   - `hlstats_Events_TeamBonuses=41686`
+
+### P6d-M1 TeamBonuses continuation (2026-04-28)
+
+- Root cause confirmed for part of `eligible_gate_reject`: Perl `rewardTeam`
+  rewards players in the in-memory roster after `doEvent_TeamSelection`
+  updates a trackable team; it does not require a separate `Entries` row.
+- Python patch: `storage._reward_team_players` now accepts players that are
+  either `reward_eligible` or already in `server_active_players`; connected-only
+  players without a trackable team remain rejected.
+- Validation:
+  - `PYTHONPATH=scripts;scripts/proxy_daemon_py python -m pytest scripts/hlstats_py/tests`
+    -> `107 passed`
+  - Python narrow replay:
+    `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\replay_baseline\comparison\python\Run-ContourFtpArtifacts.ps1 -SkipBuild -UseDumpRestore -SkipGeoIp -MaxImportFiles 1000`
+    -> `status=ok`, `elapsed_seconds=331.5`
+  - Legacy reference replay from dump, same first `1000` logs:
+    `processed=1000`, `errors=0`, `elapsed=156.512s`
+  - Compare artifact:
+    `runtime-db-diff-p6d-narrow-1000-20260428-175918.md`
+- Updated `hlstats_Events_TeamBonuses` count:
+  `legacy=4765`, `python=4773`, delta `+8` (previous current tail was
+  `legacy=4765`, `python=4692`, delta `-73`).
