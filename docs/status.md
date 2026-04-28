@@ -1132,3 +1132,17 @@
   (дельта `+8`, улучшение на `81` строк к предыдущему `-73`). `LP-P6D-001`
   остаётся открыт; следующий минимальный разбор — residual `+8` по
   grouped action/map/time и identity/name-only examples, не page audit.
+- 2026-04-28: added a narrow diagnostic extension for the remaining
+  `LP-P6D-001` `+8` TeamBonuses tail. The existing
+  `HLSTATS_TEAM_BONUS_TRACE_PATH` payload now includes
+  `stage_event_counts`, grouped by `event_time|actionId|map|team`, so the next
+  narrow replay can identify exact inserted/rejected event signatures instead
+  of relying only on action/map/player aggregates. Code changes:
+  `scripts/hlstats_py/storage.py` and regression
+  `test_team_bonus_trace_groups_by_event_signature` in
+  `scripts/hlstats_py/tests/test_storage.py`. Validation:
+  `PYTHONPATH=scripts;scripts/proxy_daemon_py python -m pytest -o cache_dir=.pytest-cache-local scripts/hlstats_py/tests/test_storage.py`
+  -> `42 passed`. Full `scripts/hlstats_py/tests` reached `107 passed` before
+  environment teardown/setup failures from local pytest temp/cache directory
+  permissions; Docker replay was not runnable in this session because Docker
+  API access returned `permission denied`.

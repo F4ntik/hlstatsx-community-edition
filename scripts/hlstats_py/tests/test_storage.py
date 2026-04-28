@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 from calendar import timegm
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Dict, Iterable, List, Tuple
 
 import pytest
@@ -1235,6 +1237,46 @@ def test_team_bonus_deduplicates_same_signature(event_context: EventContext) -> 
 
     insert_rows = [entry for entry in connection.executed if entry[0] == _INSERT_TEAM_BONUS_QUERY]
     assert len(insert_rows) == 2
+
+
+def test_team_bonus_trace_groups_by_event_signature(
+    event_context: EventContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    dispatcher = EventDispatcher([TeamTriggerEventHandler()], fallback=GenericEventHandler())
+    event = parse_log_event('L 01/02/2024 - 03:04:05: Team "CT" triggered "SFUI_Notice_CTs_Win"')
+    update = dispatcher.dispatch(event, event_context)
+    assert update is not None
+    context = EventContext(
+        server_id=event_context.server_id,
+        game=event_context.game,
+        schema=event_context.schema,
+        localization=event_context.localization,
+        extras={"map": "de_dust2", "round_status": 0},
+    )
+    responses: Dict[QueryKey, List[QueryResponse]] = {
+        (_SELECT_SERVER_CONFIG_QUERY, (7, "MinPlayers")): [QueryResponse(fetchone=(0,))],
+        (_SELECT_ACTION_QUERY, ("csgo", "SFUI_Notice_CTs_Win")): [QueryResponse(fetchone=(755, 0, 2))],
+    }
+    trace_path = Path(__file__).with_name(".tmp-team-bonus-trace.json")
+    trace_path.unlink(missing_ok=True)
+    monkeypatch.setenv("HLSTATS_TEAM_BONUS_TRACE_PATH", str(trace_path))
+    connection = FakeConnection(responses)
+    storage = EventStorage(StubAdapter(connection), clock=lambda: update.timestamp)
+    storage._server_active_players[7] = {101, 102}
+    storage._server_reward_eligible_players[7] = {101, 102}
+    storage._player_teams.update({101: "CT", 102: "TERRORIST"})
+
+    try:
+        storage.record(update, context)
+        storage.finalize_import()
+
+        payload = json.loads(trace_path.read_text(encoding="utf-8"))
+        event_key = "2024-01-02 03:04:05|755|de_dust2|CT"
+        assert payload["stage_event_counts"]["candidate_set"][event_key] == 2
+        assert payload["stage_event_counts"]["inserted"][event_key] == 1
+        assert payload["stage_event_counts"]["team_gate_reject"][event_key] == 1
+    finally:
+        trace_path.unlink(missing_ok=True)
 
 
 def test_team_bonus_rescued_hostage_allows_same_second_duplicates(event_context: EventContext) -> None:

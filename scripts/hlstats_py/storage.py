@@ -416,6 +416,7 @@ class EventStorage:
         self._team_bonus_stage_action_counts: dict[str, dict[int, int]] = {}
         self._team_bonus_stage_map_counts: dict[str, dict[str, int]] = {}
         self._team_bonus_stage_player_counts: dict[str, dict[int, int]] = {}
+        self._team_bonus_stage_event_counts: dict[str, dict[str, int]] = {}
         self._team_bonus_stage_samples: list[dict[str, Any]] = []
 
     def _set_skip_adapter_ping(self, enabled: bool) -> None:
@@ -2448,6 +2449,9 @@ class EventStorage:
         by_map[map_key] = by_map.get(map_key, 0) + 1
         by_player = self._team_bonus_stage_player_counts.setdefault(stage, {})
         by_player[player_id] = by_player.get(player_id, 0) + 1
+        event_key = f"{event_time.isoformat(sep=' ')}|{action_id}|{map_key}|{team}"
+        by_event = self._team_bonus_stage_event_counts.setdefault(stage, {})
+        by_event[event_key] = by_event.get(event_key, 0) + 1
         if len(self._team_bonus_stage_samples) < 200:
             self._team_bonus_stage_samples.append(
                 {
@@ -2475,6 +2479,7 @@ class EventStorage:
             "stage_action_counts": self._team_bonus_stage_action_counts,
             "stage_map_counts": self._team_bonus_stage_map_counts,
             "stage_player_counts": self._team_bonus_stage_player_counts,
+            "stage_event_counts": self._team_bonus_stage_event_counts,
             "samples": self._team_bonus_stage_samples,
         }
         trace_path.parent.mkdir(parents=True, exist_ok=True)
