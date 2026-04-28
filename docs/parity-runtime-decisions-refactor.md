@@ -201,13 +201,16 @@ Future tooling should make this explicit instead of relying on memory:
 
 - store contour state in `scripts/replay_baseline/comparison/.parity-state/`
   with separate legacy and Python stage fingerprints
-- support a documented `SkipLegacyImport`/resume path for Python-only refactors
-- write inspectable container labels or a mounted metadata file showing contour
-  type, baseline source, corpus window, server identity, replay policy, import
-  completion time, and row-count anchors
-- expose the same metadata from inside containers, for example
-  `/app/CONTOUR_INFO.json` or `/contour-info.json`, so `docker exec` can answer
-  what DB/window is currently loaded
+- use `Run-DualContour-1000.ps1 -ReuseValidLegacy` for Python-only refactors;
+  when the legacy metadata/fingerprint is valid, the script skips legacy
+  compose down/up, restore, import, and SQL snapshot
+- use `-AdoptCurrentLegacy` once after a known-good legacy narrow-1000 run if
+  the DB is already loaded but metadata was not created yet
+- write inspectable contour metadata to
+  `scripts/replay_baseline/comparison/.parity-state/contour-info/`
+- expose the same metadata from inside running containers as
+  `/CONTOUR_INFO.json`, so `docker exec` can answer what DB/window is currently
+  loaded
 
 ## Stop rules
 

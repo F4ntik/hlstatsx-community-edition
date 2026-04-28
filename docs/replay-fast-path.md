@@ -73,6 +73,30 @@ FTP/stdin и запустить `compare_stats_dbs.py`. Если хотя бы �
 baseline, corpus window, server identity, replay policy, время импорта,
 row-count anchors.
 
+Текущий флаг для этого loop:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\replay_baseline\comparison\Run-DualContour-1000.ps1 -MaxImportFiles 1000 -UseDumpRestore -ReuseValidLegacy
+```
+
+Если metadata/fingerprint для legacy не найден или anchors невалидны, скрипт
+сам откатывается к обычному full dual run. Если legacy валиден, скрипт не
+делает `docker compose down` для legacy, не вызывает restore/import legacy и не
+перезаписывает legacy SQL snapshot. Metadata пишется в
+`scripts/replay_baseline/comparison/.parity-state/contour-info/` и копируется
+в запущенные контейнеры как `/CONTOUR_INFO.json`.
+
+Если legacy narrow-1000 уже был успешно прогнан до появления metadata, можно
+один раз принять текущее состояние как эталон:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\replay_baseline\comparison\Run-DualContour-1000.ps1 -MaxImportFiles 1000 -UseDumpRestore -AdoptCurrentLegacy -ReuseValidLegacy -OnlyStage preflight
+```
+
+Использовать `-AdoptCurrentLegacy` только после известного успешного replay
+того же окна; этот флаг доверяет текущей legacy DB и записывает fingerprint +
+row-count anchors.
+
 ## Образ worker и свежий код
 
 Скрипты в контейнере **копируются в образ** при сборке. После правок в

@@ -8,6 +8,8 @@ param(
     [switch]$SkipBuild,
     [switch]$SkipLegacyImport,
     [switch]$SkipPythonImport,
+    [switch]$ReuseValidLegacy,
+    [switch]$AdoptCurrentLegacy,
     [switch]$UsePythonUdpReplay,
     [switch]$UseDumpRestore,
     [switch]$RecreateBaselineSnapshot,
@@ -33,6 +35,7 @@ $auditDir = Join-Path $repoRoot "docs\audits\legacy-python-parity-20260423"
 $snapshotScript = Join-Path $here "Snapshot-ContourSql.ps1"
 $pythonFtpWork = Join-Path $here "python\ftp_work"
 $stateRoot = Join-Path $here ".parity-state"
+$contourInfoDir = Join-Path $stateRoot "contour-info"
 
 if (-not (Test-Path $restoreScript)) {
     throw "restore-baseline.ps1 not found: $restoreScript"
@@ -54,6 +57,9 @@ if (-not (Test-Path $auditDir)) {
 }
 if (-not (Test-Path $stateRoot)) {
     New-Item -ItemType Directory -Path $stateRoot | Out-Null
+}
+if (-not (Test-Path $contourInfoDir)) {
+    New-Item -ItemType Directory -Path $contourInfoDir | Out-Null
 }
 
 if (-not $ArtifactsDir) {
@@ -85,6 +91,169 @@ function Invoke-ContainerMysqlScalar {
         throw "mysql query failed in $ContainerName"
     }
     return ($value | Out-String).Trim()
+}
+
+function Get-Sha256Text {
+    param([string]$Text)
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($Text)
+        $hash = $sha.ComputeHash($bytes)
+        return -join ($hash | ForEach-Object { $_.ToString("x2") })
+    } finally {
+        $sha.Dispose()
+    }
+}
+
+function Get-SelectedLogFingerprint {
+    param(
+        [string]$InputDirectory,
+        [int]$ImportLimit
+    )
+    $selected = @(Get-ChildItem -Path $InputDirectory -Filter "*.log" | Sort-Object Name | Select-Object -First $ImportLimit)
+    if ($selected.Count -eq 0) {
+        throw "no *.log files found for fingerprint in $InputDirectory"
+    }
+    $lines = @()
+    foreach ($log in $selected) {
+        $lines += "$($log.Name)|$($log.Length)"
+    }
+    return [pscustomobject]@{
+        count = $selected.Count
+        first = $selected[0].Name
+        last = $selected[$selected.Count - 1].Name
+        sha256 = Get-Sha256Text -Text ($lines -join "`n")
+    }
+}
+
+function Get-ContourFingerprint {
+    param(
+        [string]$StackName
+    )
+    $logFingerprint = Get-SelectedLogFingerprint -InputDirectory $artifactsPath -ImportLimit $MaxImportFiles
+    $payload = [ordered]@{
+        stack = $StackName
+        max_import_files = $MaxImportFiles
+        artifacts_path = $artifactsPath
+        logs_count = $logFingerprint.count
+        logs_first = $logFingerprint.first
+        logs_last = $logFingerprint.last
+        logs_sha256 = $logFingerprint.sha256
+        server_identity = $ServerIdentity
+        replay_policy = "drop-empty-team-enter-events"
+        baseline_mode = if ($UseDumpRestore) { "dump" } else { "snapshot" }
+        recreate_baseline_snapshot = [bool]$RecreateBaselineSnapshot
+    }
+    if ($StackName -eq "python") {
+        $payload.use_python_udp_replay = [bool]$UsePythonUdpReplay
+    }
+    $json = $payload | ConvertTo-Json -Compress
+    return [pscustomobject]@{
+        sha256 = Get-Sha256Text -Text $json
+        payload = $payload
+    }
+}
+
+function Test-ContainerRunning {
+    param([string]$ContainerName)
+    $status = docker inspect -f "{{.State.Running}}" $ContainerName 2>$null
+    return ($LASTEXITCODE -eq 0 -and (($status | Out-String).Trim()) -eq "true")
+}
+
+function Get-ContourAnchorCounts {
+    param(
+        [string]$ContainerName
+    )
+    return [ordered]@{
+        players = [int](Invoke-ContainerMysqlScalar -ContainerName $ContainerName -Sql "SELECT COUNT(*) FROM hlstats_Players;")
+        frags = [int](Invoke-ContainerMysqlScalar -ContainerName $ContainerName -Sql "SELECT COUNT(*) FROM hlstats_Events_Frags;")
+        team_bonuses = [int](Invoke-ContainerMysqlScalar -ContainerName $ContainerName -Sql "SELECT COUNT(*) FROM hlstats_Events_TeamBonuses;")
+        entries = [int](Invoke-ContainerMysqlScalar -ContainerName $ContainerName -Sql "SELECT COUNT(*) FROM hlstats_Events_Entries;")
+        server_rows = [int](Invoke-ContainerMysqlScalar -ContainerName $ContainerName -Sql "SELECT COUNT(*) FROM hlstats_Servers WHERE address='37.230.137.48' AND port=27015;")
+    }
+}
+
+function Write-ContourInfo {
+    param(
+        [string]$StackName,
+        [string]$Fingerprint,
+        [object]$FingerprintPayload,
+        [object]$AnchorCounts,
+        [string[]]$Containers,
+        [string]$Status = "loaded"
+    )
+    $infoPath = Join-Path $contourInfoDir "$StackName-narrow-$MaxImportFiles.json"
+    $info = [ordered]@{
+        contour = "narrow-$MaxImportFiles"
+        stack = $StackName
+        status = $Status
+        fingerprint = $Fingerprint
+        created_at = (Get-Date).ToString("o")
+        git_commit = (git -C $repoRoot rev-parse --short HEAD)
+        server_identity = $ServerIdentity
+        replay_policy = "drop-empty-team-enter-events"
+        baseline_mode = if ($UseDumpRestore) { "dump" } else { "snapshot" }
+        artifacts_path = $artifactsPath
+        inputs = $FingerprintPayload
+        anchors = $AnchorCounts
+    }
+    $info | ConvertTo-Json -Depth 8 | Set-Content -Path $infoPath -Encoding UTF8
+    foreach ($container in $Containers) {
+        if (Test-ContainerRunning -ContainerName $container) {
+            docker cp $infoPath "${container}:/CONTOUR_INFO.json" | Out-Null
+        }
+    }
+    return $infoPath
+}
+
+function Test-ReusableLegacyContour {
+    param(
+        [string]$ExpectedFingerprint
+    )
+    $infoPath = Join-Path $contourInfoDir "legacy-narrow-$MaxImportFiles.json"
+    if (-not (Test-Path $infoPath)) {
+        Write-Host "==> Legacy reuse unavailable: contour info file not found."
+        return $false
+    }
+    if (-not (Test-ContainerRunning -ContainerName "hlstatsx-legacy-db")) {
+        Write-Host "==> Legacy reuse unavailable: hlstatsx-legacy-db is not running."
+        return $false
+    }
+    $info = Get-Content -Path $infoPath -Raw | ConvertFrom-Json
+    if ($info.fingerprint -ne $ExpectedFingerprint) {
+        Write-Host "==> Legacy reuse unavailable: fingerprint mismatch."
+        return $false
+    }
+    $anchors = Get-ContourAnchorCounts -ContainerName "hlstatsx-legacy-db"
+    if ($anchors.players -le 0 -or $anchors.frags -le 0 -or $anchors.server_rows -ne 1) {
+        Write-Host "==> Legacy reuse unavailable: anchor counts are not loaded."
+        return $false
+    }
+    Write-ContourInfo `
+        -StackName "legacy" `
+        -Fingerprint $ExpectedFingerprint `
+        -FingerprintPayload $info.inputs `
+        -AnchorCounts $anchors `
+        -Containers @("hlstatsx-legacy-db", "hlstatsx-legacy-web", "hlstatsx-legacy-daemon") | Out-Null
+    Write-Host "==> Reusing valid legacy narrow-$MaxImportFiles contour."
+    return $true
+}
+
+function Adopt-CurrentLegacyContour {
+    if (-not (Test-ContainerRunning -ContainerName "hlstatsx-legacy-db")) {
+        throw "cannot adopt current legacy contour: hlstatsx-legacy-db is not running"
+    }
+    $anchors = Get-ContourAnchorCounts -ContainerName "hlstatsx-legacy-db"
+    if ($anchors.players -le 0 -or $anchors.frags -le 0 -or $anchors.server_rows -ne 1) {
+        throw "cannot adopt current legacy contour: anchor counts are not loaded"
+    }
+    $infoPath = Write-ContourInfo `
+        -StackName "legacy" `
+        -Fingerprint $script:LegacyContourFingerprint.sha256 `
+        -FingerprintPayload $script:LegacyContourFingerprint.payload `
+        -AnchorCounts $anchors `
+        -Containers @("hlstatsx-legacy-db", "hlstatsx-legacy-web", "hlstatsx-legacy-daemon")
+    Write-Host "==> Adopted current legacy narrow-$MaxImportFiles contour: $infoPath"
 }
 
 function Invoke-LegacyReplayImport {
@@ -324,14 +493,21 @@ function Invoke-Stage {
     param([string]$StageName)
     switch ($StageName) {
         "infra_updown" {
-            Write-Host "==> Bring both contours down"
-            docker compose -f $legacyCompose down | Out-Null
+            if (-not $script:ReuseLegacyForRun) {
+                Write-Host "==> Bring legacy contour down"
+                docker compose -f $legacyCompose down | Out-Null
+            } else {
+                Write-Host "==> Keep valid legacy contour running"
+            }
+            Write-Host "==> Bring Python contour down"
             docker compose -f $pythonCompose down | Out-Null
 
-            Write-Host "==> Bring both contours up"
+            Write-Host "==> Bring contours up"
             $env:HLSTATS_FTP_LOGS_HOST_PATH = $artifactsPath
             $env:HLSTATS_FTP_PASSWORD = "hlxftp123"
-            Invoke-ComposeUp -ComposePath $legacyCompose
+            if (-not $script:ReuseLegacyForRun) {
+                Invoke-ComposeUp -ComposePath $legacyCompose
+            }
             Invoke-ComposeUp -ComposePath $pythonCompose
         }
         "baseline_restore" {
@@ -343,11 +519,13 @@ function Invoke-Stage {
                 "-File",
                 $restoreScript
             )
-            if ($Stack -eq "both" -or $Stack -eq "legacy") {
+            if (($Stack -eq "both" -or $Stack -eq "legacy") -and -not $script:ReuseLegacyForRun) {
                 $legacyArgs = @($restoreArgsBase + @("-Stack", "legacy"))
                 if ($UseDumpRestore) { $legacyArgs += "-ForceDumpRestore" }
                 if ($RecreateBaselineSnapshot) { $legacyArgs += "-CreateSnapshot" }
                 powershell @legacyArgs
+            } elseif ($script:ReuseLegacyForRun) {
+                Write-Host "==> Legacy baseline restore skipped; valid contour is already loaded."
             }
             if ($Stack -eq "both" -or $Stack -eq "python") {
                 $pythonArgs = @($restoreArgsBase + @("-Stack", "python"))
@@ -375,8 +553,19 @@ function Invoke-Stage {
             if ($Stack -eq "python") {
                 throw "legacy_import requested with Stack=python"
             }
+            if ($script:ReuseLegacyForRun) {
+                Write-Host "==> Legacy import skipped; valid narrow-$MaxImportFiles contour is already loaded."
+                return
+            }
             Write-Host "==> Legacy import (1000 logs)"
             Invoke-LegacyReplayImport -InputDirectory $artifactsPath -ImportLimit $MaxImportFiles -Identity $ServerIdentity
+            $anchors = Get-ContourAnchorCounts -ContainerName "hlstatsx-legacy-db"
+            Write-ContourInfo `
+                -StackName "legacy" `
+                -Fingerprint $script:LegacyContourFingerprint.sha256 `
+                -FingerprintPayload $script:LegacyContourFingerprint.payload `
+                -AnchorCounts $anchors `
+                -Containers @("hlstatsx-legacy-db", "hlstatsx-legacy-web", "hlstatsx-legacy-daemon") | Out-Null
         }
         "python_import" {
             if ($Stack -eq "legacy") {
@@ -388,11 +577,20 @@ function Invoke-Stage {
                 Write-Host "==> Python import (stdin default, 1000 logs)"
             }
             Invoke-PythonFtpImport -ImportLimit $MaxImportFiles
+            $anchors = Get-ContourAnchorCounts -ContainerName "hlstatsx-python-db"
+            Write-ContourInfo `
+                -StackName "python" `
+                -Fingerprint $script:PythonContourFingerprint.sha256 `
+                -FingerprintPayload $script:PythonContourFingerprint.payload `
+                -AnchorCounts $anchors `
+                -Containers @("hlstatsx-python-db", "hlstatsx-python-web", "hlstatsx-python-worker", "hlstatsx-python-proxy", "hlstatsx-python-log-ftp") | Out-Null
         }
         "sql_snapshot" {
             Write-Host "==> SQL snapshots"
-            if ($Stack -eq "both" -or $Stack -eq "legacy") {
+            if (($Stack -eq "both" -or $Stack -eq "legacy") -and -not $script:ReuseLegacyForRun) {
                 powershell -NoProfile -ExecutionPolicy Bypass -File $snapshotScript -Stack legacy -OutputPath (Join-Path $auditDir "legacy-sql-snapshot-1000.txt")
+            } elseif ($script:ReuseLegacyForRun) {
+                Write-Host "==> Legacy SQL snapshot skipped; valid snapshot anchors are recorded in contour metadata."
             }
             if ($Stack -eq "both" -or $Stack -eq "python") {
                 powershell -NoProfile -ExecutionPolicy Bypass -File $snapshotScript -Stack python -OutputPath (Join-Path $auditDir "python-sql-snapshot-1000.txt")
@@ -416,6 +614,18 @@ if (-not $OnlyStage -and -not $FromStage -and -not $ToStage) {
 }
 
 $fingerprint = Get-ConfigFingerprint
+$script:LegacyContourFingerprint = Get-ContourFingerprint -StackName "legacy"
+$script:PythonContourFingerprint = Get-ContourFingerprint -StackName "python"
+$script:ReuseLegacyForRun = $false
+if ($AdoptCurrentLegacy -and ($Stack -eq "both" -or $Stack -eq "legacy")) {
+    Adopt-CurrentLegacyContour
+}
+if ($ReuseValidLegacy -and ($Stack -eq "both" -or $Stack -eq "legacy")) {
+    $script:ReuseLegacyForRun = Test-ReusableLegacyContour -ExpectedFingerprint $script:LegacyContourFingerprint.sha256
+    if (-not $script:ReuseLegacyForRun) {
+        Write-Host "==> Legacy reuse requested, but no valid reusable contour was found; running full legacy stages."
+    }
+}
 $stateFile = Resolve-StateFilePath
 $runState = Load-RunState -Path $stateFile -Fingerprint $fingerprint
 if (-not $runState.config_fingerprint) {
