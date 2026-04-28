@@ -16,16 +16,34 @@ surface. It is not the default runtime contract for this product lane.
 
 ## Repository role
 
+**Where we work:** day-to-day implementation, tests, and product documentation
+live **in this repository** (`hlstatsx-community-edition-python-i18n`). Treat
+sibling checkouts in the same workspace as **read-only reference** (parity,
+legacy semantics, donor web i18n) unless a task explicitly says to change them.
+
 This repo is intentionally separate from the two donor lanes used to assemble
 it:
 
-- `hlstatsx-community-edition/` provides the Python migration, replay-baseline,
-  proxy daemon, operational tooling, and heatmap generator work.
-- `hlstatsx-community-edition-web-ru-i18n/` provides the upstream-friendly RU
-  web i18n runtime cleanup and page coverage work.
+- `hlstatsx-community-edition/` — reference for migration, replay baseline, and
+  legacy behavior (do not use as the default target for new product commits).
+- `hlstatsx-community-edition-web-ru-i18n/` — reference for upstream-friendly RU
+  web i18n patterns.
 
 The product repo integrates those two lines without forcing either donor lane
 to become the final product branch.
+
+**Fast bulk log replay** (stdin batch / direct import, not slow UDP line relay):
+see [`docs/replay-fast-path.md`](docs/replay-fast-path.md).
+
+### Git: `hlstatsx-community-edition` fork used for Python migration
+
+On a fork of the Python migration repo (same tree as
+`hlstatsx-community-edition/`, remote often named `origin`), branch **`test`**
+is the **integration tip** for the Python stack, including stdin import
+performance work. The GitHub **default branch** may still be `main`; use
+**`test`** when you need that integration line. Ref
+`perf/hlstats-stdin-batch-speedup` may still exist at the same commit until
+removed for housekeeping.
 
 ## Product contracts
 

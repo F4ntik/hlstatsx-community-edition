@@ -30,14 +30,25 @@ class EventBuffer:
         self._buffered_rows += 1
         return self._buffered_rows >= self._policy.max_buffered_events
 
-    def flush(self, cursor: proxy_db.SupportsCursor) -> int:
+    def clear(self) -> None:
+        """Drop buffered rows without executing SQL (e.g. after transaction rollback)."""
+
+        self._rows_by_query.clear()
+        self._buffered_rows = 0
+
+    def flush(self, cursor: proxy_db.SupportsCursor, *, executemany_chunk_size: int | None = None) -> int:
         flushed = 0
         for query, rows in list(self._rows_by_query.items()):
             if not rows:
                 continue
             executemany = getattr(cursor, "executemany", None)
             if callable(executemany):
-                executemany(query, rows)
+                if executemany_chunk_size is not None and executemany_chunk_size > 0:
+                    for offset in range(0, len(rows), executemany_chunk_size):
+                        chunk = rows[offset : offset + executemany_chunk_size]
+                        executemany(query, chunk)
+                else:
+                    executemany(query, rows)
             else:
                 for row in rows:
                     cursor.execute(query, row)

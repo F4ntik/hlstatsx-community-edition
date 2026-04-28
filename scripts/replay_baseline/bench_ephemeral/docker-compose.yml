@@ -1,0 +1,36 @@
+# Ephemeral MariaDB for write-path benchmarks only.
+# Does NOT replace or reset the main comparison Python stack (hlstatsx-python-db / 3327).
+#
+# Usage (from repo root):
+#   docker compose -p hlstatsxwritebench -f scripts/replay_baseline/bench_ephemeral/docker-compose.yml up -d db
+# Tear down (removes this compose project’s DB volume only):
+#   docker compose -p hlstatsxwritebench -f scripts/replay_baseline/bench_ephemeral/docker-compose.yml down -v
+
+services:
+  db:
+    image: mariadb:10.11
+    container_name: hlstatsx-writebench-db
+    restart: "no"
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --max-allowed-packet=256M
+      - --sql-mode=NO_ENGINE_SUBSTITUTION
+    environment:
+      MARIADB_ROOT_PASSWORD: root123
+      MARIADB_DATABASE: hlstatsxce
+      MARIADB_USER: hlstatsxce
+      MARIADB_PASSWORD: hlx123
+    ports:
+      - "3328:3306"
+    volumes:
+      - hlstatsx_writebench_mysql:/var/lib/mysql
+    networks:
+      - hlstatsx_writebench_net
+
+networks:
+  hlstatsx_writebench_net:
+    driver: bridge
+
+volumes:
+  hlstatsx_writebench_mysql:

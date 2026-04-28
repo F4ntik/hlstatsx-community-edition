@@ -1,5 +1,9 @@
 # Test Plan: Standalone Python+i18n Product Lane
 
+**Replay speed / bulk import:** canonical cross-links and “do not reinvent”
+rules live in [`replay-fast-path.md`](replay-fast-path.md) (direct stdin and
+DB batching defaults; UDP only for transport checks).
+
 ## Objective
 
 Validate that the integrated product repository works as one coherent stack:
@@ -63,10 +67,19 @@ ImportBans maintenance CLI boundary commands (2026-04-25):
 - run legacy comparison smoke where needed for the parity reference
 - run Python replay against the integrated repo tooling:
   - single-file smoke for one retained `37.230.137.48:27015` log
-  - directory corpus replay through `scripts/replay_baseline/replay_python_log.py <dir> --server-identity 37.230.137.48:27015`
+  - **Narrow / parity test windows (узкие окна, сравнение с legacy):** по умолчанию
+    используй **прямой stdin-парсинг** в одном процессе (`hlstats_py.runtime --stdin`
+    через `scripts/replay_baseline/direct_import_artifacts.py` или тот же контур
+    внутри образа `hlstats-worker`), а не `replay_python_log.py` по UDP: задержка
+    `send-delay` на больших логах даёт **часы** wall time при том же DB-результате.
+    UDP-реплей оставь для проверок именно UDP/прокси-цепочки, не для регрессии
+    таблиц на сотнях файлов.
+  - directory corpus **UDP** (медленно): `scripts/replay_baseline/replay_python_log.py <dir> --server-identity 37.230.137.48:27015`
+  - **direct (быстро):** из корня репо, с тем же `--server-ip/--server-port`, пример:
+    `docker compose -f scripts/replay_baseline/comparison/python/docker-compose.yml run --rm -v "<abs-path-to-log-dir>:/window:ro" hlstats-worker python /app/scripts/replay_baseline/direct_import_artifacts.py --artifacts-dir /window --gs-ip 37.230.137.48 --gs-port 27015 --configfile /app/hlstats.conf --work-dir /tmp/hlstats_direct_parity`
   - for production-sized parity runs, prefer the FTP contour helper
     `scripts/replay_baseline/comparison/python/Run-ContourFtpArtifacts.ps1`
-    to avoid slow host-to-worker UDP replay; preserve the same corpus and
+    (stdin batch inside the worker) instead of UDP `replay_python_log.py`; preserve the same corpus and
     server identity
   - for dual-contour parity reruns, use staged orchestration from
     `scripts/replay_baseline/comparison/Run-DualContour-1000.ps1`:
@@ -75,6 +88,13 @@ ImportBans maintenance CLI boundary commands (2026-04-25):
     - `-OnlyStage baseline_restore` + `-OnlyStage preflight` + import stage for
       fast restore+replay in one chosen stack
 - run `compare_stats_dbs.py`
+- **P6d-M1 (TeamBonuses) gate:** после правки наград повторить узкое окно на
+  обоих контурах (`Run-DualContour-1000.ps1`, при необходимости
+  `-MaxImportFiles 300` или `1000`), затем
+  `python scripts\replay_baseline\compare_stats_dbs.py --max-examples 20`;
+  зафиксировать COUNT `hlstats_Events_TeamBonuses` в `performance.md`; pytest
+  `scripts/hlstats_py/tests` с
+  `PYTHONPATH=scripts;scripts/proxy_daemon_py`.
 - add parser/runtime parity fixtures beyond the compact replay diff:
   - Steam/auth normalization for `STEAM_1:*`, `STEAM_2:*`, and `[U:1:n]`
   - pending/unknown connect handling for `UNKNOWN`, `PENDING`, and

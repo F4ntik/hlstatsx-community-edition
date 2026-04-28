@@ -47,6 +47,10 @@ _TEAM_TRIGGER_RE = re.compile(
 )
 
 
+def _is_exact_entry_remainder(remainder: str) -> bool:
+    return remainder.strip() == "entered the game"
+
+
 class ControlCommandType(Enum):
     """Enumerates supported control commands sent via the proxy channel."""
 
@@ -238,7 +242,7 @@ def _parse_log_event_python(payload: str, *, server_address: str | None = None) 
         return _parse_name_change_event(body, actor, remainder[16:], timestamp, payload)
     if remainder.startswith("connected"):
         return _parse_connect_event(body, actor, remainder[9:], timestamp, payload)
-    if remainder.startswith("entered the game"):
+    if _is_exact_entry_remainder(remainder):
         return _parse_entry_event(body, actor, remainder[16:], timestamp, payload)
     if remainder.startswith("disconnected"):
         return _parse_disconnect_event(body, actor, remainder[12:], timestamp, payload)
@@ -296,7 +300,7 @@ def _parse_log_event_native(payload: str, *, server_address: str | None = None) 
         return _parse_name_change_event(body, actor, remainder[16:], timestamp, payload)
     if remainder.startswith("connected"):
         return _parse_connect_event(body, actor, remainder[9:], timestamp, payload)
-    if remainder.startswith("entered the game"):
+    if _is_exact_entry_remainder(remainder):
         return _parse_entry_event(body, actor, remainder[16:], timestamp, payload)
     if remainder.startswith("disconnected"):
         return _parse_disconnect_event(body, actor, remainder[12:], timestamp, payload)

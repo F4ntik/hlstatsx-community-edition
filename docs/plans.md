@@ -11,6 +11,11 @@ that combines:
 The product lane is intentionally not the same thing as either donor branch.
 Its job is to stabilize the combined stack as a releasable project.
 
+**Workspace:** implement and document here; use
+`hlstatsx-community-edition/` and `hlstatsx-community-edition-web-ru-i18n/` only
+as reference unless the task spans them. **Fast log replay index:**
+[`docs/replay-fast-path.md`](replay-fast-path.md).
+
 ### Execution update (2026-04-25)
 
 - Ran the post-mapfix drift-reduction stage against authoritative dump-restore
@@ -305,6 +310,19 @@ Goal:
 Run a distributed 1:1 audit against the original non-Python HLstatsX contour
 and the integrated Python+i18n contour, then convert the findings into a
 deduplicated bug plan.
+
+**Execution continuation (narrow replay / runtime slice, 2026-04-27):**
+
+- [x] P6d-P0: правки `round_status` для team-trigger наград + строгая классификация
+  ENTRY; узкие окна 50/300/1000 на обоих контурах; артефакты
+  `runtime-db-diff-p6d-narrow-*-20260427-*.md`; обновлены bug-plan / issues /
+  performance / status.
+- [~] P6d-M1 (LP-P6D-001): снять остаточный разрыв `hlstats_Events_TeamBonuses`
+  (профили action/map, гейты наград игрокам, MinPlayers) до сопоставимых COUNT
+  на том же narrow-окне или зафиксировать принятое отличие в issues.
+- [ ] P6d-M2 (RC-B): выровнять или явно принять политику объёмов
+  `ChangeTeam` / `Connects` / `Chat` / `PlayerActions`.
+- [ ] P6d-M3 (RC-C): повторная проверка идентичности игроков после M2.
 
 Tasks:
 - clear the current legacy full-corpus replay blocker before any DB/page

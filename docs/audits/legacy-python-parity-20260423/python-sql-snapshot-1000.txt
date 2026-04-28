@@ -1,58 +1,58 @@
 ﻿stack=python
 container=hlstatsx-python-db
-timestamp=2026-04-24T18:50:40
+timestamp=2026-04-27T09:25:10
 
 [counts]
-players=416
-frags=6634
+players=450
+frags=13041
 frags_empty_map=0
-maps_counts_rows=33
+maps_counts_rows=37
 awards_rows=0
 ribbons_rows=0
 
 [event_time_range]
-frags_minmax=2024-01-01 00:21:27|2026-01-01 23:18:09
+frags_minmax=2024-01-01 19:02:46|2026-01-28 22:19:07
 
 [top_frag_maps]
-$2000$	1274
-aim_map	826
-de_dust2	771
-cs_mansion	621
-fy_pool_day	422
-de_spay	372
-aim_ulbc_picolo	233
-de_mirage	213
-de_westwood_winter	210
-de_nuke_winter	196
-de_salt	182
-de_nuke	180
-de_inferno	165
-cs_office32	151
-de_dust	131
-cs_estate	117
-de_tuscan	115
-de_train	109
-cs_assault_1337	74
-de_aztec	69
+$2000$	2990
+de_dust2	1925
+fy_pool_day	1356
+aim_headshot	941
+aim_map	811
+cs_mansion	639
+awp_india	510
+awp_city	439
+aim_ulbc_picolo	411
+de_inferno	389
+de_spay	322
+de_mirage	297
+de_inferno_snow	266
+de_aztec_winter	214
+aim_ulbc_arena	213
+de_c4	177
+de_clan1_mill	174
+de_nuke_winter	137
+de_dust	119
+de_nuke	111
 
 [top_maps_counts]
-$2000$	1274
-aim_map	826
-de_dust2	771
-cs_mansion	621
-fy_pool_day	422
-de_spay	372
-aim_ulbc_picolo	233
-de_mirage	213
-de_westwood_winter	210
-de_nuke_winter	196
-de_salt	182
-de_nuke	180
-de_inferno	165
-cs_office32	151
-de_dust	131
-cs_estate	117
-de_tuscan	115
-de_train	109
-cs_assault_1337	74
-de_aztec	69
+$2000$	2990
+de_dust2	1925
+fy_pool_day	1356
+aim_headshot	941
+aim_map	811
+cs_mansion	639
+awp_india	510
+awp_city	439
+aim_ulbc_picolo	411
+de_inferno	389
+de_spay	322
+de_mirage	297
+de_inferno_snow	266
+de_aztec_winter	214
+aim_ulbc_arena	213
+de_c4	177
+de_clan1_mill	174
+de_nuke_winter	137
+de_dust	119
+de_nuke	111

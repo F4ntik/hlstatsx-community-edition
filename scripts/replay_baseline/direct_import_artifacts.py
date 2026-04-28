@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import cProfile
 import pstats
+import shutil
 import tempfile
 from argparse import Namespace
 from collections import Counter
@@ -57,6 +58,26 @@ def _build_entries(artifacts: Path, *, max_files: int | None = None) -> list[Log
     return entries
 
 
+def _stage_replicated_log_files(artifacts: Path, work: Path, file_count: int) -> tuple[list[LogFileEntry], Path]:
+    """Copy ``file_count`` ``*.log`` paths into *work*/bench_staged_logs for throughput tests."""
+
+    sources = sorted(p for p in artifacts.glob("*.log") if p.is_file())
+    if not sources:
+        raise SystemExit(f"No .log files under {artifacts}")
+    staged = work / "bench_staged_logs"
+    if staged.is_dir():
+        shutil.rmtree(staged)
+    staged.mkdir(parents=True)
+    entries: list[LogFileEntry] = []
+    for idx in range(file_count):
+        src = sources[idx % len(sources)]
+        name = f"_bench_{idx:05d}__{src.name}"
+        dst = staged / name
+        shutil.copy2(src, dst)
+        entries.append(LogFileEntry(name=name, mtime=dst.stat().st_mtime))
+    return entries, staged
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Direct local artifacts import helper for hlstats_py runtime."
@@ -97,6 +118,17 @@ def _parse_args() -> argparse.Namespace:
         help="Optional cap for number of input .log files (useful for quick profiling).",
     )
     parser.add_argument(
+        "--file-count",
+        type=int,
+        default=None,
+        metavar="N",
+        help=(
+            "Process exactly N .log files: if the artifacts directory has fewer than N files, "
+            "copy real logs round-robin into work/bench_staged_logs (for throughput benchmarks). "
+            "Ignores --max-files when set."
+        ),
+    )
+    parser.add_argument(
         "--parser-backend",
         choices=("python", "native"),
         default="native",
@@ -107,6 +139,17 @@ def _parse_args() -> argparse.Namespace:
         type=int,
         default=1000,
         help="Commit DB transaction every N stdin records (default: 1000).",
+    )
+    parser.add_argument(
+        "--gs-ip",
+        default="172.19.0.1",
+        help="Game server IP in hlstats_Servers for stdin routing (default matches baseline_reset dump).",
+    )
+    parser.add_argument(
+        "--gs-port",
+        type=int,
+        default=27015,
+        help="Game server port for stdin routing (default 27015).",
     )
     return parser.parse_args()
 
@@ -128,12 +171,17 @@ def main() -> int:
         else:
             work = Path(tempfile.gettempdir()) / "hlstats_direct_import_work"
     work.mkdir(parents=True, exist_ok=True)
-    last_path = work / "direct-artifacts-37.230.137.48-27015.last"
-    entries = _build_entries(artifacts, max_files=cli.max_files)
+    safe_ip = str(cli.gs_ip).replace(":", "_")
+    last_path = work / f"direct-artifacts-{safe_ip}-{cli.gs_port}.last"
+    if cli.file_count is not None and cli.file_count > 0:
+        entries, read_dir = _stage_replicated_log_files(artifacts, work, cli.file_count)
+    else:
+        read_dir = artifacts
+        entries = _build_entries(artifacts, max_files=cli.max_files)
 
     args = Namespace(
-        gs_ip="37.230.137.48",
-        gs_port=27015,
+        gs_ip=cli.gs_ip,
+        gs_port=cli.gs_port,
         ftp_ip="log-ftp",
         ftp_port=21,
         ftp_active=True,
@@ -173,7 +221,7 @@ def main() -> int:
         EventStorage._execute = _counting_execute
 
     try:
-        records = _import_logs_batch(entries, artifacts, args=args, settings=settings, last_path=last_path)
+        records = _import_logs_batch(entries, read_dir, args=args, settings=settings, last_path=last_path)
     finally:
         if cli.profile:
             EventStorage._execute = original_execute

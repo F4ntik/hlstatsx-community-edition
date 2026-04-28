@@ -36,6 +36,7 @@ from . import (
     parse_log_event,
     parse_proxy_envelope,
 )
+from .protocol import LogEvent, LogEventType
 from .cli import load_settings
 from .goldsrc_physical_lines import iter_merged_goldsrc_physical_lines
 
@@ -75,6 +76,7 @@ class RuntimeMapState:
     current_map: str
     map_lifecycle: str = "active"
     pending_map: str = ""
+    round_status: int = 0
 
     def apply_started(self, map_name: str) -> None:
         self.current_map = map_name
@@ -167,6 +169,12 @@ _LOADING_MAP_INLINE_RE = re.compile(r'Loading map "(?P<map>[^"]+)"')
 _STARTED_MAP_INLINE_RE = re.compile(r'Started map "(?P<map>[^"]+)"')
 _STDIN_PROGRESS_EVERY = 10000
 _UDP_IDLE_FLUSH_SECONDS = 0.5
+_ROUND_WIN_ACTIONS = {
+    "SFUI_Notice_CTs_Win",
+    "SFUI_Notice_Bomb_Defused",
+    "SFUI_Notice_Terrorists_Win",
+    "SFUI_Notice_Target_Bombed",
+}
 
 MapLifecyclePhase = Literal["loading", "started"]
 
@@ -394,6 +402,9 @@ class HlstatsRuntime:
             backend=self._parser_backend,
             server_address=source_label,
         )
+        if event.event_type is LogEventType.WORLD_TRIGGER:
+            self._project_round_status(event, server)
+        round_status_for_event = self._round_status_for_event(event, server)
         transition = apply_map_lifecycle_message(server, event.message)
         if transition is not None:
             phase, map_name = transition
@@ -403,14 +414,44 @@ class HlstatsRuntime:
         context = EventContext(
             server_id=server.server_id,
             game=server.game,
-            extras=MappingProxyType({"map": server.current_map or ""}),
+            extras=MappingProxyType(
+                {
+                    "map": server.current_map or "",
+                    "round_status": round_status_for_event,
+                }
+            ),
         )
         update = self._dispatcher.dispatch(event, context)
         self._storage.record(update, context)
+        self._finalize_round_status(event, server, round_status_for_event)
         if self._stdin_verbose_events:
             self._logger.notice(
                 f"Recorded {update.category.value} event '{update.event_code}' for {source_label}"
             )
+
+    @staticmethod
+    def _round_status_for_event(event: LogEvent, server: TrackedServer) -> int:
+        if event.event_type is LogEventType.TEAM_TRIGGER:
+            return server.state.round_status
+        return server.state.round_status
+
+    @staticmethod
+    def _finalize_round_status(event: LogEvent, server: TrackedServer, round_status_for_event: int) -> None:
+        if event.event_type is not LogEventType.TEAM_TRIGGER:
+            return
+        if round_status_for_event != 0:
+            return
+        action = event.action or ""
+        if action in _ROUND_WIN_ACTIONS:
+            server.state.round_status = 1
+
+    @staticmethod
+    def _project_round_status(event: LogEvent, server: TrackedServer) -> None:
+        if event.event_type is LogEventType.WORLD_TRIGGER:
+            action = event.action or ""
+            if action in {"Round_Start", "Mini_Round_Start", "Game_Commencing"}:
+                server.state.round_status = 0
+            return
 
 async def _serve(argv: Sequence[str] | None = None) -> int:
     try:
@@ -431,6 +472,8 @@ async def _serve(argv: Sequence[str] | None = None) -> int:
         database,
         use_event_timestamps_for_processing=settings.stdin,
     )
+    if not settings.stdin:
+        storage.configure_event_buffer(max_buffered_events=5000)
     runtime = HlstatsRuntime(
         database,
         transport,

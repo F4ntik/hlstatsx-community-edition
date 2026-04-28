@@ -3,6 +3,9 @@
 This directory holds the local baseline used to compare the legacy HLstatsX
 runtime against the Python migration on identical replayed production logs.
 
+**Fast multi-file Python import (stdin batch, not UDP):** canonical index and
+links — [`../../docs/replay-fast-path.md`](../../docs/replay-fast-path.md).
+
 ## Layout
 
 - `legacy_prod_like/docker-compose.yml`:
@@ -62,7 +65,10 @@ runtime against the Python migration on identical replayed production logs.
   helper for dedicated transport tests. It wraps each line into a proxied
   envelope, preserves the logical source server identity selected by
   `--server-identity`, paces UDP sends, and waits for the worker to drain the
-  tail.
+  tail. **Do not use it for multi-hundred-file table-diff gates:** throttled UDP
+  is wall-clock slow; use `direct_import_artifacts.py` (stdin batch in the
+  worker image) or `hlstats_ftp_py` instead — see `docs/test-plan.md` and
+  `docs/audits/legacy-python-parity-20260423/performance.md`.
 - `prune-small-logs.ps1` removed the empty undersized replay noise from the
   current production corpus:
   - before: `72,148` log files

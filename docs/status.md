@@ -2,18 +2,45 @@
 
 ## Snapshot
 
-- Current phase: `P6d` with `P6e` closed — legacy reference replay and manifests
-  are settled; the Python full-corpus run used for the first
-  `runtime-db-diff.md` used `--send-delay 0` and is **not** authoritative (UDP
-  loss on the parity path). Next gate is a **throttled** Python full replay
-  (default `--send-delay 0.005`), then regenerate DB diff.
-- Plan file: `docs/plans.md`
-- Status: red for P6d runtime parity until a throttled Python full replay backs
-  a fresh DB diff; yellow for the broader product lane
-- Last updated: 2026-04-25
+- Current phase: `P6d` post-P0 — срез P0 (код + тесты + узкое окно 50/300/1000)
+  закрыт 2026-04-27; диффы: `runtime-db-diff-p6d-narrow-50-20260427-050502.md`,
+  `runtime-db-diff-p6d-narrow-300-20260427-050912.md`,
+  `runtime-db-diff-p6d-narrow-1000-20260427-051926.md`. Полный корпус по-прежнему
+  описан в `runtime-db-diff-p6d-20260426-161410.md` (не заменять узкими
+  артефактами без явного решения о промоции).
+- P0/M1 итог:
+  - `TeamBonuses`: семантика `round_status`, bot/eligible gates, map-start
+    roster reset, same-second hostage multiplicity и candidate-set уточнения уже
+    приведены ближе к legacy. Актуальный narrow-1000 хвост всё ещё открыт:
+    `legacy=4765`, `python=4692` (дельта `-73`) — **первый незакрытый пункт
+    плана** (LP-P6D-001).
+  - `Events_Entries`: принято с явной рационализацией (`legacy=0`,
+    `python=1231` на 1000); строка сравнения **не** убирать (LP-P6D-002).
+- План: `docs/plans.md`, тест-план: `docs/test-plan.md`.
+- **Рабочий репозиторий:** правки кода и доков — в этом дереве
+  (`hlstatsx-community-edition-python-i18n`); соседние проекты в воркспейсе —
+  только для сверки с legacy/донором. **Быстрый массовый replay:** не
+  изобретать заново — `docs/replay-fast-path.md` (stdin / `direct_import_artifacts.py`,
+  тюнинг в `docs/hlstats_py_stdin_import_tuning.md`).
+- Статус ворот: **красный** для P6d до закрытия или явного принятия остатка
+  TeamBonuses + кластера RC-B. **Мини-агенты по страницам / маршрутам выключены**
+  до явного открытия ворот.
+- Last updated: 2026-04-27
 
 ## Done
 
+- Stdin batch write path (`scripts/hlstats_py/storage.py`): append-only
+  `EventBuffer` flushes when the buffer is full, before a periodic commit, or
+  at import boundaries (`end_stdin_batch`, `finalize_import`, `flush_pending`);
+  it is no longer flushed after every `record()`. Commits trigger when either
+  the number of completed records or buffered plus executed write volume reaches
+  `stdin_transaction_batch_size`. In batch mode, additive frag counters for
+  weapon upserts, server kill totals, and map counts are merged in memory
+  (`frag_write_delta_buffer.py`) and flushed with those queries. Rollback clears
+  in-memory buffers without executing them. UDP runtime enables
+  `configure_event_buffer(max_buffered_events=5000)` so idle `flush_pending`
+  can batch event inserts; `EventBuffer.flush` chunks `executemany` using the
+  adapter `executemany_chunk_size` when set.
 - Completed post-mapfix drift-reduction execution pass with authoritative
   `-ForceDumpRestore` parity baseline on both stacks and new audit artifacts in
   `docs/audits/legacy-python-parity-20260425-post-mapfix-stage/`.
@@ -42,7 +69,10 @@
 
 - Created a separate local repository for the standalone product lane.
 - Rebased the product lane on clean `upstream/master` history instead of using
-  the donor `test` branch as the final base directly.
+  the donor `test` branch as the final base directly (this standalone product
+  repo remains separate from that choice). On the **Python migration donor
+  fork**, branch `test` was later reset to the stdin performance integration
+  tip; see `README.md` and the audit log entry for 2026-04-26.
 - Imported the Python donor baseline from
   `D:\PyProjects\hlstatx-ce\hlstatsx-community-edition`.
 - Imported the RU i18n donor web/runtime layer from
@@ -172,18 +202,174 @@
 
 ## In Progress
 
-- `P6d`: **Python throttled full corpus replay running** (started 2026-04-23,
-  host `python`, `--send-delay 0.005`, `--drain-delay 10`, same filter and
-  server identity). Stdout/stderr:
-  `docs/audits/legacy-python-parity-20260423/python-full-corpus-replay-regex-filtered-throttled.log`
-  and `.err.log`; new manifests
-  `python-full-corpus-input-manifest-throttled.txt` /
-  `python-full-corpus-dropped-lines-throttled.txt` (verify SHA vs legacy when
-  finished). Wall clock is on the order of **tens of hours** (~32.6M lines ×
-  0.005 s sleep per datagram in-container, plus I/O). After `Replay summary`
-  appears: snapshot DB counts, start `hlstatsx-legacy-db` if the reference DB
-  is still populated, then `compare_stats_dbs.py` → refresh
-  `runtime-db-diff.md`.
+- [~] **P6d-M1 (LP-P6D-001):** в коде добавлено выравнивание с Perl
+  `rewardTeam`: при `IgnoreBots` не пишутся `TeamBonuses` / skill для ботов и
+  для `userid <= 0` (`storage._reward_team_players`,
+  `_skip_team_reward_for_ignore_bots`, учёт `user_id` в `_resolve_player_id`);
+  добавлен idle-prune активного состава перед `record(...)` (last_activity на
+  игрока, timeout `250s`) + unit test на исключение idle-игрока из
+  `TeamBonuses`. Прогон narrow-1000 после патча:
+  `runtime-db-diff-p6d-narrow-1000-20260427-091053.md`
+  (`hlstats_Events_TeamBonuses`: `legacy=12588`, `python=49033`) — остаток по
+  LP-P6D-001 пока не закрыт. Доп.проверка показала, что snapshot-restore для
+  python-контура уже содержал заполненные event-таблицы; валидный narrow-run
+  нужно считать только от dump-baseline (`Run-ContourFtpArtifacts.ps1` с
+  `-UseDumpRestore`). Runtime-блокер импорта снят минимальным патчем:
+  в bot-fallback SQL (`_SELECT_PLAYER_BOT_UNIQUE_QUERY`) экранированы `%` в
+  `LIKE` (`BOT:%%`, `00000000:%%:0`), из-за чего batch import больше не падает
+  на `not enough arguments for format string`. Повторный python-only narrow-1000
+  от dump-baseline: `hlstats_Events_TeamBonuses=4896`, bot/nonbot split:
+  `bot=0`, `nonbot=4896`; top actionId: `279=2085`, `278=2053`, `269=529`;
+  top map: `$2000$=1226`, `de_dust2=471`, `cs_mansion=314`; дубликаты по
+  `(eventTime,actionId,playerId)` до `dup_count=3`. Относительно последнего
+  валидного legacy narrow-1000 (`12588`) python теперь ниже на `7692`
+  (`~38.9%` от legacy), поэтому LP-P6D-001 остаётся открытым; следующий
+  минимальный шаг — точечный дедуп/гейт в `reward_team` без расширения scope.
+  Дополнительно переподнят и заново проигран legacy baseline на тех же
+  `1000` логах (без python replay): `processed=1000`, `errors=0`; повторный
+  `compare_stats_dbs.py` дал `hlstats_Events_TeamBonuses: legacy=4765,
+  python=4896` (дельта `+131`, python выше примерно на `2.75%`). Это
+  подтверждает, что предыдущая крупная дельта была следствием неконсистентного
+  legacy-среза, а текущий эталон для LP-P6D-001 — `4765 vs 4896`.
+  Доп.триаж после этого сравнения: найден баг в python storage — в action-пути
+  командных наград не учитывался `round_status` (добавлен гейт в
+  `_record_action`, покрыт тестом), и найден SQL-формат-баг bot-fallback
+  (`LIKE` с неэкранированным `%`, исправлен как `%%`). Для residual-дельты
+  добавлен узкий eligibility-gate в `reward_team` (награды только для игроков,
+  подтверждённых через `connect/entry` в рамках сессии); повторный python-only
+  narrow-1000 от dump-baseline дал `hlstats_Events_TeamBonuses: legacy=4765,
+  python=4813` (дельта `+48`, ~`+1.01%`), но LP-P6D-001 пока не закрыт.
+  Дополнительный точечный шаг по `(eventTime,actionId,playerId)`:
+  in-memory дедуп `TeamBonuses` по ключу `(server_id, player_id, action_id,
+  event_time)` в `storage._reward_team_players` (без изменения policy
+  `Events_Entries`); `PYTHONPATH=scripts;scripts/proxy_daemon_py python -m
+  pytest scripts/hlstats_py/tests` -> `103 passed`. Повторный python-only
+  narrow-1000 от dump-baseline + `python scripts/replay_baseline/compare_stats_dbs.py --max-examples 20`:
+  `hlstats_Events_TeamBonuses: legacy=4765, python=4801` (дельта `+36`,
+  ~`+0.76%`). Дополнительный минимальный шаг в `storage.py`: team reward теперь
+  берёт каноническую команду из `hlstats_Actions.team` (с fallback на payload),
+  что устраняет часть CT/T cross-team смещений в TeamBonuses. Полная валидация:
+  `PYTHONPATH=scripts;scripts/proxy_daemon_py python -m pytest scripts/hlstats_py/tests`
+  -> `103 passed`; затем
+  `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\replay_baseline\comparison\python\Run-ContourFtpArtifacts.ps1 -SkipBuild -UseDumpRestore -SkipGeoIp -MaxImportFiles 1000`
+  и `python scripts/replay_baseline/compare_stats_dbs.py --max-examples 20` дали
+  `hlstats_Events_TeamBonuses: legacy=4765, python=4800` (дельта `+35`,
+  ~`+0.73%`). Итог: LP-P6D-001 остаётся открытым (COUNT всё ещё выше legacy на
+  `35`; текущий минимальный патч уменьшил разрыв на `1`).
+  Следующий минимальный шаг: в `storage.apply_server_map_transition(..., phase="started")`
+  добавлен reset in-memory roster/team state (active/connected/eligible/last-activity)
+  для выравнивания с Perl `doEvent_ChangeMap` и отсечения stale team-состояний
+  перед TeamBonuses. Unit-валидация после патча: `103 passed` (включая новый
+  тест на reset). После восстановления Docker выполнена обязательная валидация:
+  `Run-ContourFtpArtifacts.ps1 -SkipBuild -UseDumpRestore -SkipGeoIp -MaxImportFiles 1000`
+  (summary `status=ok`, `elapsed_seconds=319.245`) и
+  `python scripts/replay_baseline/compare_stats_dbs.py --max-examples 20`.
+  Новый срез `hlstats_Events_TeamBonuses`: `legacy=4765`, `python=4669`
+  (дельта `-96`, python ниже на ~`2.01%`), поэтому LP-P6D-001 остаётся
+  **не закрыт** (расхождение COUNT всё ещё ненулевое, сменился знак дельты).
+  Точечный triage по ключу `(eventTime, actionId, playerId)` показывает:
+  - legacy>python пики: `(2024-01-05 18:01:39,272,145)` `3 vs 0`,
+    `(2024-01-05 18:01:39,272,133)` `3 vs 0`,
+    `(2024-01-05 18:08:53,272,290)` `2 vs 0`;
+  - зеркальные пары playerId-shift в тех же timestamp/action:
+    `(2026-01-05 22:25:24,278,317)` `1 vs 0` и
+    `(2026-01-05 22:25:24,278,321)` `0 vs 1` (аналогично по `279/269`).
+  Следующий минимальный шаг без расширения scope и без изменения policy
+  `Events_Entries`: в `reward_team` добавить узкий guard на смену канонического
+  `player_id` внутри одного `(server_id, event_time, action_id)` окна
+  (предпочитать первый стабильно разрешённый id в окне и не эмитить вторую
+  запись при позднем remap этого же игрока), затем повторить narrow-1000.
+  Выполнен следующий debug-цикл по первому расхождению:
+  - в `storage._resolve_player_id` добавлен guard для пустых дескрипторов
+    (нет `unique_id` и пустой `name`), чтобы не создавать phantom-player и не
+    сдвигать `playerId` в TeamBonuses;
+  - добавлен unit test:
+    `test_empty_descriptor_without_unique_id_does_not_create_player`;
+  - targeted pytest:
+    `PYTHONPATH=scripts;scripts/proxy_daemon_py python -m pytest scripts/hlstats_py/tests/test_storage.py -k "empty_descriptor_without_unique_id_does_not_create_player or team_bonus"` -> `9 passed`.
+  Полная обязательная валидация после фикса:
+  `Run-ContourFtpArtifacts.ps1 -SkipBuild -UseDumpRestore -SkipGeoIp -MaxImportFiles 1000`
+  (`status=ok`, `elapsed_seconds=271.062`) + `compare_stats_dbs.py --max-examples 20`
+  снова даёт `hlstats_Events_TeamBonuses: legacy=4765, python=4669` (дельта `-96`).
+  Локальная проверка окна первого расхождения (`L0101058`, `19:03:30..19:04:40`)
+  подтверждает, что playerId-shift исправлен (`...279,84...` теперь совпадает на
+  обеих сторонах). Residual остаётся в hostage-окне (`L0101061`, `20:33:47`,
+  action `272`): legacy сохраняет две строки на игрока в ту же секунду, Python
+  — одну из-за текущего in-memory dedupe по `(server_id, player_id, action_id,
+  event_time)`. Поэтому LP-P6D-001 всё ещё **не закрыт**: COUNT-дельта осталась
+  ненулевой, но источник смещён с identity-shift на multiplicity policy в
+  TeamBonuses (без изменений `Events_Entries` policy).
+  Дополнительный минимальный шаг по residual multiplicity выполнен:
+  - dedupe в `storage._reward_team_players` ослаблен только для
+    `event_code == "Rescued_A_Hostage"` (остальные team bonus события
+    по-прежнему дедупятся по `(server_id, player_id, action_id, event_time)`);
+  - добавлен тест
+    `test_team_bonus_rescued_hostage_allows_same_second_duplicates`;
+  - targeted pytest + полный пакет `scripts/hlstats_py/tests` -> `105 passed`.
+  Обязательный narrow-1000 replay+compare после шага:
+  `Run-ContourFtpArtifacts.ps1 -SkipBuild -UseDumpRestore -SkipGeoIp -MaxImportFiles 1000`
+  (`status=ok`, `elapsed_seconds=259.628`) и
+  `python scripts/replay_baseline/compare_stats_dbs.py --max-examples 20`
+  дали `hlstats_Events_TeamBonuses: legacy=4765, python=4681`
+  (дельта `-84`, улучшение на `+12` строк к предыдущему `-96`).
+  Санити по hostage-окну `L0101061` (`20:33:46..20:33:47`) теперь совпадает
+  1:1 с legacy, включая дубли на `20:33:47` для action `272`. LP-P6D-001 всё
+  ещё **не закрыт**: остаётся ненулевая COUNT-дельта `84`, но целевой локальный
+  класс расхождения (hostage same-second duplicates) снят.
+  Следующий точечный шаг по residual undercount выполнен в idle-prune path:
+  `_prune_idle_players` больше не исключает из active/reward-eligible игроков,
+  которые всё ещё присутствуют в `connected_players` (даже при старом
+  `last_activity`), чтобы не терять team rewards в длинных раундах.
+  Добавлен тест `test_team_bonus_keeps_connected_idle_players_for_reward`;
+  полный пакет `scripts/hlstats_py/tests` -> `106 passed`.
+  Обязательный narrow-1000 replay+compare после шага:
+  `Run-ContourFtpArtifacts.ps1 -SkipBuild -UseDumpRestore -SkipGeoIp -MaxImportFiles 1000`
+  (`status=ok`, `elapsed_seconds=347.481`) и
+  `python scripts/replay_baseline/compare_stats_dbs.py --max-examples 20`
+  дали `hlstats_Events_TeamBonuses: legacy=4765, python=4682`
+  (дельта `-83`, ещё `+1` к прошлому результату `-84`).
+  Локальная проверка de_mirage-окна `2024-01-01 19:41:51..19:51:56` показала,
+  что для игрока `playerId=79` (unique `0:1828776565`) часть пропусков остаётся,
+  поэтому LP-P6D-001 пока **не закрыт**.
+  Дополнительный узкий шаг выполнен в `reward_team`:
+  перебор кандидатов для TeamBonuses расширен до объединения
+  `active_players ∪ connected_players ∪ reward_eligible_players` при сохранении
+  strict-гейта на `reward_eligible_players` и всех действующих policy-гейтов
+  (`round_status`, `IgnoreBots`, dedupe).
+  Цель: не терять eligible-игроков, временно выпавших только из active-set.
+  Валидация:
+  - `PYTHONPATH=scripts;scripts/proxy_daemon_py python -m pytest scripts/hlstats_py/tests` -> `106 passed`;
+  - обязательный narrow-1000 replay+compare:
+    `Run-ContourFtpArtifacts.ps1 -SkipBuild -UseDumpRestore -SkipGeoIp -MaxImportFiles 1000`
+    (`status=ok`, `elapsed_seconds=282.009`) +
+    `python scripts/replay_baseline/compare_stats_dbs.py --max-examples 20`.
+  Новый срез `hlstats_Events_TeamBonuses`: `legacy=4765`, `python=4692`
+  (дельта `-73`, улучшение `+10` к предыдущему `-83`).
+  LP-P6D-001 всё ещё **не закрыт** (остаток `73`), но хвост продолжает
+  уменьшаться без расширения scope и без изменения policy `Events_Entries`.
+- [ ] **P6d-M2 (RC-B):** объёмные дельты `ChangeTeam` / `Connects` / `Chat` /
+  `PlayerActions` из того же narrow-diff — зафиксировать продуктовое решение и
+  выровнять политику.
+- `P6d`: full replay is now complete on both stacks for the same logical server
+  identity `37.230.137.48:27015`:
+  - legacy replay:
+    `docs/audits/legacy-python-parity-20260423/legacy-full-corpus-replay-p6d-20260426-034823.log`
+    (`processed=41513`, `errors=0`, `dropped_lines=169140`)
+  - python direct stdin replay (worker-local batch path, retry with parser backend
+    `python`):
+    `docs/audits/legacy-python-parity-20260423/python-direct-stdin-import-p6d-20260426-034823-retry1.log`
+    (`files=41513`, `records=30302028`, `mode=batch-stdin-local`)
+- Input parity for this run is confirmed:
+  - legacy input manifest:
+    `legacy-full-corpus-input-manifest-p6d-20260426-034823.txt`
+  - python processed-file manifest extracted from replay log:
+    `python-direct-input-manifest-p6d-20260426-034823-retry1.txt`
+  - line-by-line compare result: `diff_count=0` (same ordered filename set).
+- DB diff for this run (authoritative): `compare_stats_dbs.py` output is
+  `docs/audits/legacy-python-parity-20260423/runtime-db-diff-p6d-20260426-161410.md`
+  (`18` tables differ; triage: `bug-plan.md` in the same folder). The
+  `runtime-db-diff-p6d-20260426-034823-retry1.md` capture is a stub/obsolete
+  pointer, not a second source of truth.
 - The audit runbook is seeded at
   `docs/audits/legacy-python-parity-20260423/README.md`.
 - The legacy comparison contour now has the same second-server restore
@@ -213,19 +399,50 @@
 
 ## Next
 
-- Continue `P6d` after a **throttled** Python full replay:
-  - confirm manifest SHA parity with legacy (or document any drift)
-  - capture final DB counts aligned to legacy audit queries
-  - run `scripts/replay_baseline/compare_stats_dbs.py --max-examples 20` and
-    replace `runtime-db-diff.md` / `.err.txt` with UTF-8-safe capture
-  - only then classify any remaining table deltas (`parser/runtime`, DB
-    semantics, normalization)
-  - keep `--drop-empty-team-enter-events` mandatory on both sides; SQL mode
-    `NO_ENGINE_SUBSTITUTION` for comparison
-  - page/web mini-agent audit stays blocked until that diff is reviewed
-- Keep `P6e` in maintenance-only mode:
-  - preserve strict/default behavior as the default contract
-  - keep replay-safe policy and SQL evidence checks available for regressions
+1. Завершить **P6d-M1**: минимальный фикс + тесты (`test_storage.py` /
+   `test_runtime.py` по необходимости) → один прогон narrow 1000 (или 300 при
+   отладке) → `python scripts\replay_baseline\compare_stats_dbs.py --max-examples 20`
+   → при существенном изменении добавить `runtime-db-diff-p6d-narrow-*` →
+   обновить `bug-plan.md`, `issues.jsonl`, `performance.md`, этот `status.md`.
+2. **P6d-M2 (RC-B)** после или параллельно, если независимо от M1.
+3. **RC-C** (идентичность игроков / история) — после стабилизации RC-B.
+4. `Events_Entries` — не убирать из compare; пересмотр рационализации только
+   после RC-B/идентичности.
+5. HTTP / мини-агенты по маршрутам — только после зелёного или явно принятого
+   runtime-ворота.
+- `P6e`: режим обслуживания — строгий контракт по умолчанию, регрессионные
+  проверки replay/awards без расширения scope.
+
+## Handoff / старт следующего чата
+
+Скопируй в новый чат (репо `hlstatsx-community-edition-python-i18n`):
+
+> Продолжаем `P6d` по `docs/status.md` и `docs/plans.md`. Первый приоритет:
+> **LP-P6D-001** — на узком окне 1000 `TeamBonuses` всё ещё `4765` vs `4692`
+> после серии narrow-фиксов, последний подтверждённый хвост `delta=-73`. Прочитай
+> `docs/audits/legacy-python-parity-20260423/bug-plan.md` и последний артефакт
+> `runtime-db-diff-p6d-narrow-1000-20260427-092518.md`. Сверь read-only SQL на
+> legacy/python по `hlstats_Events_TeamBonuses` (COUNT, топ action/map) с Perl
+> и Python (см. In Progress). Минимальный патч + pytest с
+> `PYTHONPATH=scripts;scripts/proxy_daemon_py`. Не трогать строку compare для
+> `Events_Entries`. Не включать page-агентов. Перед коммитом проверь `git
+> status` на посторонние изменения вне этого среза.
+
+## Assumptions
+
+- Docker-контуры legacy/python подняты как в runbook аудита; SQL только
+  read-only для диагностики.
+- Канонический полнокорпусный diff остаётся
+  `runtime-db-diff-p6d-20260426-161410.md` до явной перезаписи.
+
+## Ready to execute
+
+- Старт: **P6d-M1** (TeamBonuses).
+- Цикл: правка → `pytest` (hlstats_py) → narrow replay + compare → правка
+  доказательств в `docs/audits/...` и `docs/status.md`.
+- Валидация: команды из раздела Next и `docs/test-plan.md` (replay / compare).
+- Стоп: блокер воспроизведения, необходимость ручного секрета/деструктива, или
+  явное продуктовое «принимаем как есть» с записью в `issues.jsonl`.
 
 ## Decisions
 
@@ -298,6 +515,13 @@
 
 ## Audit Log
 
+- 2026-04-26: On the Python migration donor fork (`hlstatsx-community-edition`,
+  e.g. `origin` for that clone), remote branch **`test`** was **force-updated**
+  to match the former `perf/hlstats-stdin-batch-speedup` tip (stdin import
+  batching / DB session reuse). Treat **`test`** as the fork’s integration line
+  for that stack; refresh local clones with `git fetch` and
+  `git reset --hard origin/test` if they still pointed at the pre-reset
+  history. Documented in `README.md` under Git / migration fork.
 - 2026-04-25: Closed `P6e` validation/evidence loop:
   - replay contour FTP import completed on the Python stack with `100` file cap
     (direct worker run equivalent to `Run-ContourFtpArtifacts` import stage)
@@ -854,3 +1078,31 @@
   - focused helper grep confirms no remaining fallback-only raw-English helper
     strings in `web/includes/functions.php` outside the shared legacy literal
     translation map
+- 2026-04-27: `LP-P6D-001` stage-level triage (narrow-1000) выполнен по плану
+  `team-bonuses-stage-trace`:
+  - baseline подтвержден: `hlstats_Events_TeamBonuses legacy=4765`,
+    `python=4692`, `delta=-73` (`legacy-only=904`, `python-only=831`).
+  - в `scripts/hlstats_py/storage.py` добавлена stage-level трассировка
+    pipeline TeamBonuses с артефактом
+    `scripts/replay_baseline/artifacts/team-bonus-stage-trace.json`
+    (stages: `candidate_set`, `eligible_gate_reject`, `team_gate_reject`,
+    `ignore_bots_gate_reject`, `dedupe_gate_reject`, `inserted` + агрегаты по
+    `actionId/map/playerId`).
+  - stage-агрегации на narrow-1000: `candidate_set=9667`,
+    `inserted=4692`, `team_gate_reject=4665`, `eligible_gate_reject=310`,
+    `ignore_bots_gate_reject=0`, `dedupe_gate_reject=0`.
+  - dominant gate для residual определен как `eligible_gate_reject`
+    (единственный «узкий» отсекающий gate со значимым вкладом при нулевых
+    `ignore_bots/dedupe`), top actions: `279=138`, `278=131`, `269=29`.
+  - внесен один минимальный фикс в dominant направлении: нормализация team alias
+    (`T/TS/TERRORISTS -> TERRORIST`, `COUNTER[- ]TERRORIST/CTS -> CT`) при
+    обновлении in-memory team state и team-based gate сравнениях.
+  - revalidate после фикса: unit
+    `PYTHONPATH=scripts;scripts/proxy_daemon_py python -m pytest scripts/hlstats_py/tests/test_storage.py`
+    -> `40 passed`; narrow-1000 + compare дали прежний результат
+    `legacy=4765`, `python=4692` (`delta=-73`), то есть гипотеза по alias
+    **не подтвердилась**.
+  - статус `LP-P6D-001`: **не закрыт**; подтвержден следующий минимальный шаг —
+    точечно разбирать composition `eligible_gate_reject` (player lifecycle /
+    reward eligibility transitions around earliest legacy-only windows:
+    `2024-01-01 19:41:51` `de_mirage`, `2024-01-01 20:47:23` `cs_mansion`).

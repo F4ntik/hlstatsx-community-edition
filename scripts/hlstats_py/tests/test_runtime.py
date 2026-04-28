@@ -20,6 +20,7 @@ class RecordedEvent:
     server_id: int
     game: str
     current_map: str
+    round_status: int
 
 
 @dataclass(slots=True)
@@ -49,6 +50,7 @@ class StubStorage:
         game = getattr(context, "game")
         extras = getattr(context, "extras")
         current_map = extras["map"]
+        round_status = int(extras.get("round_status", 0))
         self.recorded.append(
             RecordedEvent(
                 event_code=event_code,
@@ -56,6 +58,7 @@ class StubStorage:
                 server_id=server_id,
                 game=game,
                 current_map=current_map,
+                round_status=round_status,
             )
         )
 
@@ -167,6 +170,7 @@ def test_runtime_processes_stdin_line_for_known_server() -> None:
             server_id=7,
             game="csgo",
             current_map="de_dust2",
+            round_status=0,
         )
     ]
     assert storage.finalize_calls == 1
@@ -193,6 +197,8 @@ def test_runtime_projects_map_lifecycle_before_followup_events() -> None:
     assert storage.map_transitions[0] == RecordedMapTransition(server_id=7, phase="loading", map_name="de_nuke")
     assert storage.recorded[0].current_map == "de_dust2"
     assert storage.recorded[1].current_map == "de_dust2"
+    assert storage.recorded[0].round_status == 0
+    assert storage.recorded[1].round_status == 0
 
 
 def test_runtime_started_map_with_crc_suffix_updates_storage() -> None:
@@ -211,6 +217,7 @@ def test_runtime_started_map_with_crc_suffix_updates_storage() -> None:
 
     assert storage.map_transitions == [RecordedMapTransition(server_id=7, phase="started", map_name="de_nuke")]
     assert storage.recorded[0].current_map == "de_nuke"
+    assert storage.recorded[0].round_status == 0
 
 
 def test_runtime_started_map_switches_context_for_followup_events() -> None:
@@ -242,6 +249,36 @@ def test_runtime_started_map_switches_context_for_followup_events() -> None:
     assert storage.recorded[0].current_map == "de_dust2"
     assert storage.recorded[1].current_map == "de_nuke"
     assert storage.recorded[2].current_map == "de_nuke"
+    assert [event.round_status for event in storage.recorded] == [0, 0, 0]
+
+
+def test_runtime_projects_round_status_for_team_trigger_rewards() -> None:
+    adapter = StubAdapter()
+    storage = StubStorage()
+    logger = ProxyLogger(LoggerConfig(stream=StringIO()))
+    server = ProxyUdpServer(logger)
+    runtime = HlstatsRuntime(adapter, server, logger, build_dispatcher(), storage)
+    adapter.connect()
+    runtime._reload_state()
+
+    runtime.process_stdin_line(
+        'L 01/01/2024 - 00:00:30: Team "CT" triggered "SFUI_Notice_CTs_Win"',
+        "127.0.0.1:27015",
+    )
+    runtime.process_stdin_line(
+        'L 01/01/2024 - 00:00:31: Team "CT" triggered "SFUI_Notice_CTs_Win"',
+        "127.0.0.1:27015",
+    )
+    runtime.process_stdin_line(
+        'L 01/01/2024 - 00:00:32: World triggered "Round_Start"',
+        "127.0.0.1:27015",
+    )
+    runtime.process_stdin_line(
+        'L 01/01/2024 - 00:00:33: Team "CT" triggered "SFUI_Notice_CTs_Win"',
+        "127.0.0.1:27015",
+    )
+
+    assert [event.round_status for event in storage.recorded] == [0, 1, 0, 0]
 
 
 def test_runtime_stdin_quiet_by_default_without_per_event_notice() -> None:
@@ -384,6 +421,7 @@ async def _run_records_proxied_event() -> None:
                 server_id=7,
                 game="csgo",
                 current_map="de_dust2",
+            round_status=0,
             )
         ]
     finally:

@@ -20,7 +20,13 @@ __pycache__/
 *.out.txt
 /scripts/replay_baseline/artifacts/*.txt
 /scripts/replay_baseline/artifacts/*.log
+/scripts/replay_baseline/artifacts/*.json
 /scripts/replay_baseline/artifacts/snapshots/
+/scripts/replay_baseline/comparison/.parity-state/
+/docs/audits/**/.p6d_current_run_ts
+/docs/audits/**/perf-profile.txt
+/docs/audits/**/*-input-manifest*.txt
+/docs/audits/**/*-dropped-lines*.txt
 /docs/audits/**/window-*/
 /.codex_tmp/
 Thumbs.db

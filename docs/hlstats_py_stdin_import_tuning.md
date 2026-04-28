@@ -1,5 +1,10 @@
 # HLstats Python STDIN Import Tuning
 
+For **which entrypoints and orchestration** to use for fast multi-file parity
+(direct import, FTP contour, what to avoid), see the canonical index
+[`replay-fast-path.md`](replay-fast-path.md) — do not duplicate ad-hoc speed
+recipes outside that map.
+
 ## Scope
 
 This runbook documents performance-related runtime flags for high-volume stdin imports in:

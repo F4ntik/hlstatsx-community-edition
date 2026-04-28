@@ -160,6 +160,10 @@ class SyncDatabaseAdapter:
 
         self._skip_connection_ping = bool(enabled)
 
+    @property
+    def executemany_chunk_size(self) -> int:
+        return self._executemany_chunk_size
+
     def connect(self) -> None:
         """Establish a connection to MySQL, retrying with back-off on failures."""
 

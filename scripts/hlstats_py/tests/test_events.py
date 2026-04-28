@@ -190,6 +190,16 @@ def test_entry_event(dispatcher: EventDispatcher, event_context: EventContext) -
     assert update.actor.unique_id == "1:2"
 
 
+def test_entry_event_requires_exact_phrase(dispatcher: EventDispatcher, event_context: EventContext) -> None:
+    event = parse_log_event(
+        'L 01/02/2024 - 03:04:05: "Alice<2><STEAM_0:1:2><CT>" entered the game unexpectedly'
+    )
+
+    update = dispatcher.dispatch(event, event_context)
+
+    assert update.category is EventCategory.GENERIC
+
+
 def test_team_trigger_event(dispatcher: EventDispatcher, event_context: EventContext) -> None:
     event = parse_log_event('L 01/02/2024 - 03:04:05: Team "CT" triggered "CTs_Win" (CT "1") (T "0")')
 

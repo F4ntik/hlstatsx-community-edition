@@ -4,13 +4,17 @@ from __future__ import annotations
 from calendar import timegm
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+import json
+import os
+from pathlib import Path
 import re
 from typing import Any, Callable, Optional, Protocol
 
 from proxy_daemon_py import db as proxy_db
 from .events import EventCategory, EventContext, EventUpdate
 from .event_buffer import BufferPolicy, EventBuffer
+from .frag_write_delta_buffer import FragWriteDeltaBuffer
 from .protocol import PlayerDescriptor
 
 # Public re-exports from ``proxy_daemon_py`` are defined in ``__init__`` so we
@@ -41,6 +45,16 @@ _PLAYER_BY_NAME_QUERY = (
 )
 _STEAM_PREFIX_RE = re.compile(r"^STEAM_[01]:", re.IGNORECASE)
 _BOT_UNIQUE_RE = re.compile(r"^(?:BOT(?:[:\-].*)?|0|00000000:\d+:0)$", re.IGNORECASE)
+_ACTIVE_PLAYER_IDLE_TIMEOUT = timedelta(seconds=250)
+_TEAM_ALIASES = {
+    "T": "TERRORIST",
+    "TS": "TERRORIST",
+    "TERRORISTS": "TERRORIST",
+    "COUNTERTERRORIST": "CT",
+    "COUNTER-TERRORIST": "CT",
+    "COUNTER TERRORIST": "CT",
+    "CTS": "CT",
+}
 _SELECT_PLAYER_STATE_QUERY = (
     "SELECT `skill`, `kills`, `lastAddress`, `connection_time` "
     "FROM hlstats_Players WHERE `playerId` = %s LIMIT 1"
@@ -176,7 +190,7 @@ _SELECT_WEAPON_MODIFIER_QUERY = (
     "SELECT `modifier` FROM hlstats_Weapons WHERE `game` = %s AND `code` = %s LIMIT 1"
 )
 _SELECT_ACTION_QUERY = (
-    "SELECT `id`, `reward_player`, `reward_team` FROM hlstats_Actions "
+    "SELECT `id`, `reward_player`, `reward_team`, `team` FROM hlstats_Actions "
     "WHERE `game` = %s AND `code` = %s LIMIT 1"
 )
 _SELECT_OPTION_QUERY = "SELECT `value` FROM hlstats_Options WHERE `keyname` = %s LIMIT 1"
@@ -185,6 +199,12 @@ _SELECT_SERVER_CONFIG_QUERY = (
 )
 _SELECT_DEFAULT_SERVER_CONFIG_QUERY = (
     "SELECT `value` FROM hlstats_Servers_Config_Default WHERE `parameter` = %s LIMIT 1"
+)
+_SELECT_PLAYER_BOT_UNIQUE_QUERY = (
+    "SELECT 1 FROM hlstats_PlayerUniqueIds "
+    "WHERE `playerId` = %s "
+    "AND (`uniqueId` = 'BOT' OR `uniqueId` LIKE 'BOT:%%' OR `uniqueId` = '0' OR `uniqueId` LIKE '00000000:%%:0') "
+    "LIMIT 1"
 )
 _INSERT_ACTION_QUERY = (
     "INSERT INTO hlstats_Actions ("
@@ -337,6 +357,7 @@ class _ActionMetadata:
     action_id: int
     reward_player: int
     reward_team: int
+    team: str = ""
 
 
 class EventStorage:
@@ -361,12 +382,16 @@ class EventStorage:
         self._server_players: dict[int, set[int]] = {}
         self._server_connected_players: dict[int, set[int]] = {}
         self._server_active_players: dict[int, set[int]] = {}
+        self._server_reward_eligible_players: dict[int, set[int]] = {}
+        self._server_player_last_activity: dict[int, dict[int, datetime]] = {}
         self._server_skill_modes: dict[int, int] = {}
         self._server_min_players: dict[int, int] = {}
         self._server_ignore_bots: dict[int, int] = {}
         self._server_tk_penalties: dict[int, int] = {}
         self._option_cache: dict[str, int] = {}
         self._player_is_bot: dict[int, bool] = {}
+        self._player_is_bot_cache: dict[tuple[int, str], bool] = {}
+        self._player_last_user_id: dict[int, int] = {}
         self._weapon_modifiers: dict[tuple[str, str], float] = {}
         self._player_kill_streaks: dict[int, int] = {}
         self._player_death_streaks: dict[int, int] = {}
@@ -377,12 +402,20 @@ class EventStorage:
         self._player_skills: dict[int, int] = {}
         self._player_total_kills: dict[int, int] = {}
         self._seen_team_change_events: set[tuple[int, int, str, str, datetime]] = set()
+        self._seen_team_bonus_events: set[tuple[int, int, int, datetime]] = set()
         self._server_totals_dirty: set[int] = set()
         self._transaction_batch_size = 0
         self._pending_writes = 0
+        self._pending_records = 0
         self._cached_cursor: proxy_db.SupportsCursor | None = None
         self._cached_cursor_connection: proxy_db.SupportsConnection | None = None
         self._event_buffer: EventBuffer | None = None
+        self._frag_write_deltas: FragWriteDeltaBuffer | None = None
+        self._team_bonus_stage_counts: dict[str, int] = {}
+        self._team_bonus_stage_action_counts: dict[str, dict[int, int]] = {}
+        self._team_bonus_stage_map_counts: dict[str, dict[str, int]] = {}
+        self._team_bonus_stage_player_counts: dict[str, dict[int, int]] = {}
+        self._team_bonus_stage_samples: list[dict[str, Any]] = []
 
     def _set_skip_adapter_ping(self, enabled: bool) -> None:
         setter = getattr(self._adapter, "set_skip_connection_ping", None)
@@ -394,14 +427,18 @@ class EventStorage:
         if transaction_batch_size <= 0:
             self._transaction_batch_size = 0
             self._pending_writes = 0
+            self._pending_records = 0
             self._event_buffer = None
+            self._frag_write_deltas = None
             self._set_skip_adapter_ping(False)
             return
         self._transaction_batch_size = transaction_batch_size
         self._pending_writes = 0
+        self._pending_records = 0
         self._set_autocommit(False)
         self._set_skip_adapter_ping(True)
         self._event_buffer = EventBuffer(policy=BufferPolicy(max_buffered_events=5000))
+        self._frag_write_deltas = FragWriteDeltaBuffer()
 
     def configure_event_buffer(self, *, max_buffered_events: int) -> None:
         if max_buffered_events <= 0:
@@ -413,16 +450,20 @@ class EventStorage:
         """Flush pending writes and restore autocommit after stdin import."""
         if self._transaction_batch_size <= 0:
             self._flush_event_buffer()
+            self._flush_frag_counter_buffer()
             self._event_buffer = None
             self._set_skip_adapter_ping(False)
             return
         self._flush_event_buffer()
-        self._commit_pending()
+        self._flush_frag_counter_buffer()
+        self._commit_pending(force=True)
         self._transaction_batch_size = 0
         self._pending_writes = 0
+        self._pending_records = 0
         self._set_autocommit(True)
         self._close_cached_cursor()
         self._event_buffer = None
+        self._frag_write_deltas = None
         self._set_skip_adapter_ping(False)
 
     def reset_runtime_state(self) -> None:
@@ -436,12 +477,16 @@ class EventStorage:
         self._server_players.clear()
         self._server_connected_players.clear()
         self._server_active_players.clear()
+        self._server_reward_eligible_players.clear()
+        self._server_player_last_activity.clear()
         self._server_skill_modes.clear()
         self._server_min_players.clear()
         self._server_ignore_bots.clear()
         self._server_tk_penalties.clear()
         self._option_cache.clear()
         self._player_is_bot.clear()
+        self._player_is_bot_cache.clear()
+        self._player_last_user_id.clear()
         self._weapon_modifiers.clear()
         self._player_kill_streaks.clear()
         self._player_death_streaks.clear()
@@ -452,6 +497,7 @@ class EventStorage:
         self._player_skills.clear()
         self._player_total_kills.clear()
         self._seen_team_change_events.clear()
+        self._seen_team_bonus_events.clear()
         self._server_totals_dirty.clear()
 
     def finalize_import(self) -> None:
@@ -459,12 +505,15 @@ class EventStorage:
 
         connection = self._connection()
         self._flush_event_buffer()
+        self._flush_frag_counter_buffer()
         self._execute(connection, _FINALIZE_PLAYER_LAST_EVENT_QUERY, None)
         self._maybe_commit_batch()
+        self._write_team_bonus_stage_trace()
 
     def flush_pending(self) -> None:
         """Flush buffered inserts and commit pending batched writes."""
         self._flush_event_buffer()
+        self._flush_frag_counter_buffer()
         self._commit_pending()
 
     def apply_server_map_transition(
@@ -484,6 +533,18 @@ class EventStorage:
                 _UPDATE_SERVER_MAP_STARTED_QUERY,
                 (map_name, started_unix, server_id),
             )
+            # Align with legacy lifecycle semantics: a new started map resets
+            # in-memory active/trackable roster until fresh team/connect/entry data arrives.
+            stale_players = set(self._server_active_players.get(server_id, set()))
+            stale_players.update(self._server_connected_players.get(server_id, set()))
+            stale_players.update(self._server_reward_eligible_players.get(server_id, set()))
+            self._server_active_players[server_id] = set()
+            self._server_connected_players[server_id] = set()
+            self._server_reward_eligible_players[server_id] = set()
+            self._server_player_last_activity[server_id] = {}
+            for player_id in stale_players:
+                self._player_teams.pop(player_id, None)
+            self._server_totals_dirty.add(server_id)
             return
         raise ValueError(f"unsupported map lifecycle phase: {phase!r}")
 
@@ -494,6 +555,7 @@ class EventStorage:
         map_name = self._resolve_map(context)
         timestamp = self._normalize_timestamp(update.timestamp)
         processed_at = self._processing_timestamp(timestamp)
+        self._prune_idle_players(context.server_id, timestamp)
 
         try:
             if update.category is EventCategory.WORLD:
@@ -545,6 +607,8 @@ class EventStorage:
         except Exception as exc:  # pragma: no cover - safety net
             self._rollback_pending()
             raise StorageError(str(exc)) from exc
+        if self._transaction_batch_size > 0:
+            self._pending_records += 1
         self._maybe_commit_batch()
 
     # ------------------------------------------------------------------
@@ -839,17 +903,25 @@ class EventStorage:
                 delta=bonus,
             )
         if action.reward_team:
-            team = str(update.attributes.get("team") or self._effective_player_team(actor_id, update.actor))
-            self._reward_team_players(
-                connection,
-                context=context,
-                map_name=map_name,
-                timestamp=timestamp,
-                processed_at=processed_at,
-                team=team,
-                action=action,
-                bonus=action.reward_team,
-            )
+            # Keep team-reward gating aligned with legacy behavior:
+            # when round status is non-zero, rewardTeam should not emit rows.
+            round_status = int((context.extras or {}).get("round_status") or 0)
+            if round_status == 0:
+                team = action.team or str(
+                    update.attributes.get("team") or self._effective_player_team(actor_id, update.actor)
+                )
+                if team:
+                    self._reward_team_players(
+                        connection,
+                        context=context,
+                        map_name=map_name,
+                        timestamp=timestamp,
+                        processed_at=processed_at,
+                        team=team,
+                        action=action,
+                        bonus=action.reward_team,
+                        event_code=update.event_code,
+                    )
 
     def _record_chat(
         self,
@@ -980,7 +1052,7 @@ class EventStorage:
             return
         if self._player_is_bot.get(actor_id, False):
             return
-        team = str(update.attributes.get("team", update.event_code))
+        team = self._normalize_team_name(str(update.attributes.get("team", update.event_code)))
         dedupe_key = (context.server_id, actor_id, map_name, team, timestamp)
         if dedupe_key in self._seen_team_change_events:
             return
@@ -1010,7 +1082,6 @@ class EventStorage:
         timestamp: datetime,
         processed_at: datetime,
     ) -> None:
-        team = str(update.attributes.get("team") or "")
         row = self._fetchone(
             connection,
             _SELECT_ACTION_QUERY,
@@ -1021,15 +1092,20 @@ class EventStorage:
                 action_id=int(row[0]),
                 reward_player=int(row[1] or 0),
                 reward_team=int(row[2] or 0),
+                team=str(row[3] or "") if len(row) > 3 else "",
             )
             self._action_cache[(context.game, update.event_code)] = action
         else:
             if not update.attributes.get("team_award") and not int(update.attributes.get("points") or 0):
                 return
             action = self._ensure_action_metadata(connection, context.game, update)
+        team = self._normalize_team_name(action.team or str(update.attributes.get("team") or ""))
         bonus = int(update.attributes.get("points") or action.reward_team)
         self._execute(connection, _INCREMENT_ACTION_COUNT_QUERY, (action.action_id,))
 
+        round_status = int((context.extras or {}).get("round_status") or 0)
+        if round_status != 0:
+            return
         if not team or bonus == 0:
             return
 
@@ -1042,6 +1118,7 @@ class EventStorage:
             team=team,
             action=action,
             bonus=bonus,
+            event_code=update.event_code,
         )
 
     def _record_connection(
@@ -1092,6 +1169,8 @@ class EventStorage:
                 )
                 self._server_active_players.setdefault(context.server_id, set()).discard(actor_id)
                 self._server_connected_players.setdefault(context.server_id, set()).discard(actor_id)
+                self._server_reward_eligible_players.setdefault(context.server_id, set()).discard(actor_id)
+                self._server_player_last_activity.setdefault(context.server_id, {}).pop(actor_id, None)
                 self._server_totals_dirty.add(context.server_id)
                 self._refresh_server_player_totals(connection, context.server_id)
 
@@ -1105,11 +1184,14 @@ class EventStorage:
         processed_at: datetime,
     ) -> None:
         actor_id = self._resolve_player_id(connection, update.actor, context, timestamp, processed_at)
+        if actor_id is None or self._player_is_bot.get(actor_id, False):
+            return
         self._execute(
             connection,
             _INSERT_ENTRY_QUERY,
-            (timestamp, context.server_id, map_name, actor_id or 0),
+            (timestamp, context.server_id, map_name, actor_id),
         )
+        self._server_reward_eligible_players.setdefault(context.server_id, set()).add(actor_id)
 
     def _record_world_action(
         self,
@@ -1184,6 +1266,10 @@ class EventStorage:
     ) -> Optional[int]:
         if descriptor is None:
             return None
+        if not (descriptor.unique_id or descriptor.name.strip()):
+            # Ignore unresolved empty descriptors to avoid creating phantom
+            # players that later shift real player ids in TeamBonuses parity.
+            return None
 
         cache_key = self._cache_key_for_player(context.game, descriptor)
         player_id = self._player_cache.get(cache_key)
@@ -1223,10 +1309,14 @@ class EventStorage:
         self._player_is_bot[player_id] = self._player_is_bot.get(player_id, False) or self._is_bot_descriptor(
             descriptor
         )
+        if descriptor.user_id is not None:
+            self._player_last_user_id[player_id] = int(descriptor.user_id)
+        self._server_player_last_activity.setdefault(context.server_id, {})[player_id] = timestamp
 
-        if descriptor.team:
-            self._player_teams[player_id] = descriptor.team
-            self._update_player_presence(context.server_id, player_id, descriptor.team)
+        normalized_team = self._normalize_team_name(descriptor.team)
+        if normalized_team:
+            self._player_teams[player_id] = normalized_team
+            self._update_player_presence(context.server_id, player_id, normalized_team)
         if descriptor.name:
             self._player_names[player_id] = descriptor.name
             self._touch_player_name(connection, player_id, descriptor.name, processed_at)
@@ -1346,6 +1436,7 @@ class EventStorage:
                 action_id=int(row[0]),
                 reward_player=int(row[1] or 0),
                 reward_team=int(row[2] or 0),
+                team=str(row[3] or "") if len(row) > 3 else "",
             )
         else:
             description = update.attributes.get("description") or update.event_code
@@ -1364,6 +1455,7 @@ class EventStorage:
                 action_id=int(row[0]),
                 reward_player=reward_player,
                 reward_team=reward_team,
+                team=team,
             )
         self._action_cache[cache_key] = action
         return action
@@ -1531,6 +1623,26 @@ class EventStorage:
     def _active_trackable_players(self, server_id: int) -> int:
         return len(self._server_active_players.get(server_id, set()))
 
+    def _prune_idle_players(self, server_id: int, event_time: datetime) -> None:
+        last_activity = self._server_player_last_activity.get(server_id)
+        if not last_activity:
+            return
+        cutoff = event_time - _ACTIVE_PLAYER_IDLE_TIMEOUT
+        stale_players = [player_id for player_id, seen_at in last_activity.items() if seen_at < cutoff]
+        if not stale_players:
+            return
+        active_players = self._server_active_players.setdefault(server_id, set())
+        connected_players = self._server_connected_players.setdefault(server_id, set())
+        reward_eligible_players = self._server_reward_eligible_players.setdefault(server_id, set())
+        for player_id in stale_players:
+            if player_id in connected_players:
+                continue
+            active_players.discard(player_id)
+            connected_players.discard(player_id)
+            reward_eligible_players.discard(player_id)
+            del last_activity[player_id]
+        self._server_totals_dirty.add(server_id)
+
     def _active_trackable_players_for_gate(
         self,
         connection: proxy_db.SupportsConnection,
@@ -1575,8 +1687,16 @@ class EventStorage:
             self._refresh_server_player_totals(connection, server_id)
 
     def _is_trackable_team(self, team: str) -> bool:
-        normalized = team.strip().upper()
+        normalized = self._normalize_team_name(team)
         return normalized not in {"", "SPECTATOR", "SPECTATORS", "SPEC", "UNASSIGNED"}
+
+    def _normalize_team_name(self, team: str | None) -> str:
+        normalized = str(team or "").strip().upper()
+        compact = normalized.replace("_", " ")
+        alias_key = compact.replace(" ", "")
+        if alias_key in _TEAM_ALIASES:
+            return _TEAM_ALIASES[alias_key]
+        return normalized
 
     def _is_bot_descriptor(self, descriptor: PlayerDescriptor) -> bool:
         if descriptor.user_id is not None and descriptor.user_id <= 0:
@@ -1602,6 +1722,39 @@ class EventStorage:
             value = int(default_row[0]) if default_row and default_row[0] is not None else 0
         self._server_ignore_bots[server_id] = value
         return bool(value)
+
+    def _skip_team_reward_for_ignore_bots(
+        self,
+        connection: proxy_db.SupportsConnection,
+        game: str,
+        server_id: int,
+        player_id: int,
+    ) -> bool:
+        """Match Perl ``rewardTeam`` when ``IgnoreBots`` is set: no bonus rows for bots or userid <= 0."""
+
+        if not self._server_ignore_bots_enabled(connection, server_id):
+            return False
+        if self._is_bot_player(connection, player_id, game):
+            return True
+        uid = self._player_last_user_id.get(player_id)
+        return uid is not None and uid <= 0
+
+    def _is_bot_player(
+        self,
+        connection: proxy_db.SupportsConnection,
+        player_id: int,
+        game: str,
+    ) -> bool:
+        if self._player_is_bot.get(player_id, False):
+            return True
+        cache_key = (player_id, game)
+        cached = self._player_is_bot_cache.get(cache_key)
+        if cached is not None:
+            return cached
+        row = self._fetchone(connection, _SELECT_PLAYER_BOT_UNIQUE_QUERY, (player_id,))
+        is_bot = bool(row)
+        self._player_is_bot_cache[cache_key] = is_bot
+        return is_bot
 
     def _record_teamkill(
         self,
@@ -1914,11 +2067,88 @@ class EventStorage:
         team: str,
         action: _ActionMetadata,
         bonus: int,
+        event_code: str,
     ) -> None:
         active_players = self._server_active_players.get(context.server_id, set())
-        for player_id in sorted(active_players):
-            if self._player_teams.get(player_id) != team:
+        reward_eligible_players = self._server_reward_eligible_players.get(context.server_id, set())
+        connected_players = self._server_connected_players.get(context.server_id, set())
+        candidate_players = set(active_players)
+        candidate_players.update(connected_players)
+        candidate_players.update(reward_eligible_players)
+        for player_id in sorted(candidate_players):
+            self._record_team_bonus_stage(
+                "candidate_set",
+                action_id=action.action_id,
+                map_name=map_name,
+                event_code=event_code,
+                event_time=timestamp,
+                player_id=player_id,
+                team=team,
+                server_id=context.server_id,
+            )
+            # Keep team reward eligibility strict: only players that entered the game
+            # in this server session can receive TeamBonuses.
+            if player_id not in reward_eligible_players:
+                self._record_team_bonus_stage(
+                    "eligible_gate_reject",
+                    action_id=action.action_id,
+                    map_name=map_name,
+                    event_code=event_code,
+                    event_time=timestamp,
+                    player_id=player_id,
+                    team=team,
+                    server_id=context.server_id,
+                )
                 continue
+            if self._skip_team_reward_for_ignore_bots(connection, context.game, context.server_id, player_id):
+                self._record_team_bonus_stage(
+                    "ignore_bots_gate_reject",
+                    action_id=action.action_id,
+                    map_name=map_name,
+                    event_code=event_code,
+                    event_time=timestamp,
+                    player_id=player_id,
+                    team=team,
+                    server_id=context.server_id,
+                )
+                continue
+            if self._player_teams.get(player_id) != team:
+                self._record_team_bonus_stage(
+                    "team_gate_reject",
+                    action_id=action.action_id,
+                    map_name=map_name,
+                    event_code=event_code,
+                    event_time=timestamp,
+                    player_id=player_id,
+                    team=team,
+                    server_id=context.server_id,
+                )
+                continue
+            if event_code != "Rescued_A_Hostage":
+                dedupe_key = (context.server_id, player_id, action.action_id, timestamp)
+                if dedupe_key in self._seen_team_bonus_events:
+                    self._record_team_bonus_stage(
+                        "dedupe_gate_reject",
+                        action_id=action.action_id,
+                        map_name=map_name,
+                        event_code=event_code,
+                        event_time=timestamp,
+                        player_id=player_id,
+                        team=team,
+                        server_id=context.server_id,
+                    )
+                    continue
+                self._seen_team_bonus_events.add(dedupe_key)
+            self._record_team_bonus_stage(
+                "inserted",
+                action_id=action.action_id,
+                map_name=map_name,
+                event_code=event_code,
+                event_time=timestamp,
+                player_id=player_id,
+                team=team,
+                server_id=context.server_id,
+            )
             self._execute(
                 connection,
                 _INSERT_TEAM_BONUS_QUERY,
@@ -2041,6 +2271,34 @@ class EventStorage:
                 if should_flush:
                     self._flush_event_buffer()
                 return
+        if params is not None and self._buffer_frag_counter_write(query, params):
+            return
+        self._execute_direct(connection, query, params)
+
+    def _buffer_frag_counter_write(self, query: str, params: tuple[Any, ...]) -> bool:
+        buf = self._frag_write_deltas
+        if buf is None:
+            return False
+        if query == _UPSERT_WEAPON_QUERY:
+            game, code, name, modifier, kills, headshots = params
+            buf.add_weapon(str(game), str(code), str(name), float(modifier), int(kills), int(headshots))
+            return True
+        if query == _UPDATE_SERVER_FRAG_TOTALS_QUERY:
+            kills, headshots, server_id = params
+            buf.add_server_frag_totals(int(kills), int(headshots), int(server_id))
+            return True
+        if query == _UPSERT_MAP_COUNTS_QUERY:
+            game, map_name, kills, headshots = params
+            buf.add_map_counts(str(game), str(map_name), int(kills), int(headshots))
+            return True
+        return False
+
+    def _execute_direct(
+        self,
+        connection: proxy_db.SupportsConnection,
+        query: str,
+        params: tuple[Any, ...] | None,
+    ) -> None:
         cursor = self._cursor(connection)
         if params is None:
             cursor.execute(query)
@@ -2048,14 +2306,36 @@ class EventStorage:
             cursor.execute(query, params)
         self._pending_writes += 1
 
+    def _executemany_chunk_size(self) -> int | None:
+        size = getattr(self._adapter, "executemany_chunk_size", None)
+        if isinstance(size, int) and size > 0:
+            return size
+        return None
+
     def _flush_event_buffer(self) -> None:
         buffer = self._event_buffer
         if buffer is None or buffer.buffered_rows <= 0:
             return
         connection = self._connection()
         cursor = self._cursor(connection)
-        flushed = buffer.flush(cursor)
+        flushed = buffer.flush(cursor, executemany_chunk_size=self._executemany_chunk_size())
         self._pending_writes += flushed
+
+    def _flush_frag_counter_buffer(self) -> None:
+        buf = self._frag_write_deltas
+        if buf is None:
+            return
+        connection = self._connection()
+
+        def _emit(q: str, row: tuple[object, ...]) -> None:
+            self._execute_direct(connection, q, row)
+
+        buf.flush(
+            upsert_weapon_query=_UPSERT_WEAPON_QUERY,
+            update_server_frag_query=_UPDATE_SERVER_FRAG_TOTALS_QUERY,
+            upsert_map_counts_query=_UPSERT_MAP_COUNTS_QUERY,
+            execute=_emit,
+        )
 
     def _fetchone(
         self,
@@ -2093,20 +2373,34 @@ class EventStorage:
     def _maybe_commit_batch(self) -> None:
         if self._transaction_batch_size <= 0:
             return
-        self._flush_event_buffer()
-        if self._pending_writes >= self._transaction_batch_size:
-            self._commit_pending()
+        buffer = self._event_buffer
+        buffered_rows = buffer.buffered_rows if buffer is not None else 0
+        total_pending = self._pending_writes + buffered_rows
+        if (
+            self._pending_records >= self._transaction_batch_size
+            or total_pending >= self._transaction_batch_size
+        ):
+            self._flush_event_buffer()
+            self._flush_frag_counter_buffer()
+            self._commit_pending(force=True)
 
-    def _commit_pending(self) -> None:
-        if self._pending_writes <= 0:
+    def _commit_pending(self, *, force: bool = False) -> None:
+        if not force and self._pending_writes <= 0:
             return
         connection = self._connection()
         commit = getattr(connection, "commit", None)
         if callable(commit):
             commit()
         self._pending_writes = 0
+        if self._transaction_batch_size > 0:
+            self._pending_records = 0
 
     def _rollback_pending(self) -> None:
+        buffer = self._event_buffer
+        if buffer is not None:
+            buffer.clear()
+        if self._frag_write_deltas is not None:
+            self._frag_write_deltas.clear()
         if self._transaction_batch_size <= 0:
             return
         connection = self._connection()
@@ -2114,12 +2408,65 @@ class EventStorage:
         if callable(rollback):
             rollback()
         self._pending_writes = 0
+        self._pending_records = 0
 
     def _set_autocommit(self, enabled: bool) -> None:
         connection = self._connection()
         autocommit = getattr(connection, "autocommit", None)
         if callable(autocommit):
             autocommit(enabled)
+
+    def _record_team_bonus_stage(
+        self,
+        stage: str,
+        *,
+        action_id: int,
+        map_name: str,
+        event_code: str,
+        event_time: datetime,
+        player_id: int,
+        team: str,
+        server_id: int,
+    ) -> None:
+        self._team_bonus_stage_counts[stage] = self._team_bonus_stage_counts.get(stage, 0) + 1
+        by_action = self._team_bonus_stage_action_counts.setdefault(stage, {})
+        by_action[action_id] = by_action.get(action_id, 0) + 1
+        map_key = map_name or "<empty>"
+        by_map = self._team_bonus_stage_map_counts.setdefault(stage, {})
+        by_map[map_key] = by_map.get(map_key, 0) + 1
+        by_player = self._team_bonus_stage_player_counts.setdefault(stage, {})
+        by_player[player_id] = by_player.get(player_id, 0) + 1
+        if len(self._team_bonus_stage_samples) < 200:
+            self._team_bonus_stage_samples.append(
+                {
+                    "stage": stage,
+                    "event_time": event_time.isoformat(sep=" "),
+                    "action_id": action_id,
+                    "player_id": player_id,
+                    "team": team,
+                    "map": map_key,
+                    "event_code": event_code,
+                    "server_id": server_id,
+                }
+            )
+
+    def _write_team_bonus_stage_trace(self) -> None:
+        if not self._team_bonus_stage_counts:
+            return
+        trace_target = os.environ.get("HLSTATS_TEAM_BONUS_TRACE_PATH")
+        if not trace_target:
+            return
+        trace_path = Path(trace_target)
+        payload = {
+            "generated_at": datetime.now().isoformat(sep=" ", timespec="seconds"),
+            "stage_counts": self._team_bonus_stage_counts,
+            "stage_action_counts": self._team_bonus_stage_action_counts,
+            "stage_map_counts": self._team_bonus_stage_map_counts,
+            "stage_player_counts": self._team_bonus_stage_player_counts,
+            "samples": self._team_bonus_stage_samples,
+        }
+        trace_path.parent.mkdir(parents=True, exist_ok=True)
+        trace_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 __all__ = [

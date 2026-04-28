@@ -51,6 +51,9 @@ docs/audits/legacy-python-parity-20260423/
 
 ## Execution Notes
 
+- **Canonical fast Python log import (stdin / batch, links only):**
+  [`../../replay-fast-path.md`](../../replay-fast-path.md). Prefer that index
+  instead of inventing new “speedup” flows.
 - 2026-04-23: Legacy restore bootstrap now seeds
   `37.230.137.48:27015` for `game='cstrike'` and copies
   `hlstats_Servers_Config` from baseline server `172.19.0.1:27015` on
@@ -76,6 +79,11 @@ docs/audits/legacy-python-parity-20260423/
   still reports `errors=0`. Full-corpus DB diff vs legacy requires a **positive**
   send delay (default `0.005`); see `performance.md` and `replay_python_log`
   stderr warning when delay is zero.
+- 2026-04-27: **Практическое правило для тестовых окон:** для сравнения таблиц с
+  legacy на сотнях файлов используй **прямой stdin-импорт** (`direct_import_artifacts.py`
+  в контейнере `hlstats-worker` или локально с `hlstats.conf` на comparison DB),
+  а не UDP `replay_python_log.py` — иначе прогон растягивается на часы из‑за
+  `send-delay` на каждую строку. UDP оставляем для проверок транспорта/прокси.
 
 ## Current Blocker: Legacy Full-Corpus Replay
 

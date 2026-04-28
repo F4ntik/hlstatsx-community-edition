@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import re
 import subprocess
 import sys
@@ -210,6 +211,20 @@ def open_dropped_lines_manifest(path_text: str) -> TextIO | None:
     path = Path(path_text)
     path.parent.mkdir(parents=True, exist_ok=True)
     return path.open("w", encoding="utf-8")
+
+
+@contextlib.contextmanager
+def dropped_lines_manifest_cm(path_text: str):
+    """Yield an open dropped-lines manifest handle, or ``None`` when *path_text* is empty."""
+
+    handle = open_dropped_lines_manifest(path_text)
+    if handle is None:
+        yield None
+    else:
+        try:
+            yield handle
+        finally:
+            handle.close()
 
 
 def mysql_scalar(container: str, database: str, sql: str) -> str:
@@ -448,7 +463,7 @@ def run_replay(args: argparse.Namespace, log_paths: list[Path]) -> ReplaySummary
     dropped_lines = 0
     batches = batched_log_paths(log_paths, args.files_per_daemon)
 
-    with open_dropped_lines_manifest(args.dropped_lines_manifest) as dropped_lines_manifest:
+    with dropped_lines_manifest_cm(args.dropped_lines_manifest) as dropped_lines_manifest:
         for batch_index, batch_paths in enumerate(batches, start=1):
             if args.files_per_daemon > 0:
                 print(

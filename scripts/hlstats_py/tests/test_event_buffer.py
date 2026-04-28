@@ -35,3 +35,18 @@ def test_event_buffer_splits_by_query_template():
     flushed = buffer.flush(cursor)
     assert flushed == 3
     assert len(cursor.executemany_calls) == 2
+
+
+def test_event_buffer_executemany_chunking():
+    buffer = EventBuffer(policy=BufferPolicy(max_buffered_events=10))
+    for i in range(5):
+        buffer.add("INSERT INTO t VALUES (%s)", (i,))
+
+    cursor = _Cursor()
+    flushed = buffer.flush(cursor, executemany_chunk_size=2)
+    assert flushed == 5
+    assert cursor.executemany_calls == [
+        ("INSERT INTO t VALUES (%s)", [(0,), (1,)]),
+        ("INSERT INTO t VALUES (%s)", [(2,), (3,)]),
+        ("INSERT INTO t VALUES (%s)", [(4,)]),
+    ]

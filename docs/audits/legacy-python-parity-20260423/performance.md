@@ -2,9 +2,14 @@
 
 ## Python test contour default mode (2026-04-24)
 
+- Canonical index for fast replay (links, no duplicate recipes):
+  [`../../replay-fast-path.md`](../../replay-fast-path.md).
 - Python test contour default import path is now `hlstats_ftp_py -> hlstats_py.runtime --stdin`.
 - UDP replay path (`replay_python_log.py`) is preserved as an explicit opt-in mode
   for transport-focused tests.
+- **Narrow-window / table-diff runs:** prefer `direct_import_artifacts.py` (stdin
+  batch in-process) or `hlstats_ftp_py` over UDP `replay_python_log.py`; throttled
+  UDP remains correct but **very slow** on large line counts (delay per datagram).
 - `hlstats_ftp_py` now prints timing/throughput summary (`listing`, `download`,
   `parse`, `files/sec`, `lines/sec`) so before/after runs can be compared from CLI output.
 
@@ -306,3 +311,89 @@ Conclusion: the captured `runtime-db-diff.md` reflects the **throttled-off**
 Python contour (`--send-delay 0`) and must not be read as parser parity until a
 throttled full replay reproduces comparable DB scale to legacy. Page/web audit
 remains blocked until an authoritative throttled Python DB diff is reviewed.
+
+## P6d triage: anchor counts (2026-04-27)
+
+P0 triage is documented in `bug-plan.md` (canonical diff:
+`runtime-db-diff-p6d-20260426-161410.md`). The following are **headline table
+row totals from that diff** (not a second compare run). When the legacy and
+Python comparison MySQL instances are up, the runbook read-only queries in
+`README.md` should be re-run to log **live** `COUNT(*)` for `hlstats_Players`,
+`hlstats_Events_Frags`, `hlstats_Maps_Counts`, `hlstats_Events_Statsme*`,
+`hlstats_Players_History`, and the replay server row in `hlstats_Servers` for
+`37.230.137.48:27015` — append those numbers under this section for page agents.
+
+| Table / scope | legacy rows (161410) | python rows (161410) |
+| --- | ---:| ---:|
+| `hlstats_Events_TeamBonuses` | 929,699 | 22,381,762 |
+| `hlstats_Events_Entries` | 0 | 190,621 |
+| `hlstats_Events_Frags` | 1,078,740 | 1,028,032 |
+| `hlstats_Servers` (total rows) | 2 | 2 |
+
+## P0 closure execution pass (2026-04-27)
+
+### Baseline clean-state check
+
+Commands:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\replay_baseline\restore-baseline.ps1 -Stack legacy -ForceDumpRestore
+powershell -ExecutionPolicy Bypass -File scripts\replay_baseline\restore-baseline.ps1 -Stack python -ForceDumpRestore
+```
+
+Read-only anchor counts after restore (both contours):
+
+- `hlstats_Players=0`
+- `hlstats_Events_Frags=0`
+- `hlstats_Players_History=0`
+- `hlstats_Events_Entries=0`
+- `hlstats_Events_TeamBonuses=0`
+
+### Code/test pass
+
+- P0 code edits:
+  - `scripts/hlstats_py/runtime.py` (TeamBonuses round-status event-order semantics)
+  - `scripts/hlstats_py/protocol.py` (strict ENTRY classification)
+  - tests:
+    - `scripts/hlstats_py/tests/test_runtime.py`
+    - `scripts/hlstats_py/tests/test_storage.py`
+    - `scripts/hlstats_py/tests/test_events.py`
+- Test command:
+
+```powershell
+$env:PYTHONPATH='scripts;scripts/proxy_daemon_py'; python -m pytest scripts/hlstats_py/tests/test_runtime.py scripts/hlstats_py/tests/test_storage.py scripts/hlstats_py/tests/test_events.py
+```
+
+- Result: `56 passed`
+
+### Narrow windows + compare
+
+Replay commands:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\replay_baseline\comparison\Run-DualContour-1000.ps1 -MaxImportFiles 50
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\replay_baseline\comparison\Run-DualContour-1000.ps1 -MaxImportFiles 300
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\replay_baseline\comparison\Run-DualContour-1000.ps1 -MaxImportFiles 1000
+python scripts/replay_baseline/compare_stats_dbs.py --max-examples 20
+```
+
+Generated artifacts:
+
+- `docs/audits/legacy-python-parity-20260423/runtime-db-diff-p6d-narrow-50-20260427-050502.md`
+- `docs/audits/legacy-python-parity-20260423/runtime-db-diff-p6d-narrow-300-20260427-050912.md`
+- `docs/audits/legacy-python-parity-20260423/runtime-db-diff-p6d-narrow-1000-20260427-051926.md`
+
+### Anchor counts after 1000-window run
+
+- Legacy:
+  - `hlstats_Players=323`
+  - `hlstats_Events_Frags=6540`
+  - `hlstats_Players_History=659`
+  - `hlstats_Events_Entries=0`
+  - `hlstats_Events_TeamBonuses=5665`
+- Python:
+  - `hlstats_Players=326`
+  - `hlstats_Events_Frags=7828`
+  - `hlstats_Players_History=675`
+  - `hlstats_Events_Entries=1231`
+  - `hlstats_Events_TeamBonuses=41686`
