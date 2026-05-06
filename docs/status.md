@@ -2,6 +2,62 @@
 
 ## Snapshot
 
+- 2026-05-06 overlay: continued the derived combat/reward cluster with the
+  suicide kill-streak boundary identified from legacy
+  `HLstats_EventHandlers.plib`. Legacy `doEvent_Suicide()` calls
+  `endKillStreak()` before recording `Suicides`; Python now ends the active
+  kill streak before `_record_suicide()`, so a player who suicides after a
+  multi-kill life emits the same derived `kill_streak_N` PlayerAction path as
+  death/round-drain endings. Regression: `test_suicide_ends_active_kill_streak`.
+  Validation: focused RED first failed on missing `_INSERT_PLAYER_ACTION_QUERY`;
+  after the fix the focused test passed, and `test_storage.py -q` now reports
+  `67 passed`; targeted event/runtime/storage validation reports `86 passed`.
+  Replay/compare has not yet been rerun for this slice.
+
+- 2026-05-06 overlay: residual parity work moved from one-symbol anchors to
+  clustered triage and two dense behavior slices. Cluster breakdown used for
+  this pass:
+  identity/naming/encoding (`Players`, `PlayerUniqueIds`, `PlayerNames`,
+  `Players_History`); derived combat/reward counters (`Servers.act_players` /
+  `suicides`, `Actions.kill_streak_*`, kill-streak `PlayerActions`,
+  `TeamBonuses`); event-policy drift (`ChangeTeam`, `Chat`, non-derived
+  `PlayerActions`); accepted differences (`Entries 0/1017`, plus diagnostic
+  TeamBonuses/ChangeTeam/Chat/PlayerActions backlogs unless a narrower visible
+  impact is proven). Two dense fixes landed. First, ignored-bot name-change
+  events no longer mutate runtime/profile alias state, closing the bot encoding
+  split where `49.5 % karrigan` and `49.5 ％ karrigan` leaked into identity
+  comparison. Second, Statsme telemetry triggers `time` and `latency` are now
+  excluded before `Actions` / `PlayerActions` writes. Regressions:
+  `test_ignore_bots_skips_name_change_profile_update` and
+  `test_record_action_skips_status_noise_triggers`. Validation:
+  `test_storage.py -q` -> `64 passed`; targeted FTP/event/runtime/storage suite
+  -> `98 passed`; `docker compose build hlstats-worker` -> success; narrow-1000
+  dual contour with reused valid legacy -> success. Fresh compare still exits
+  `1`, now with `10` residual tables. Main movement: `Actions` row count
+  aligned `754/754` and telemetry action/player-action SQL counts are `0/0`;
+  `PlayerActions` improved from `4972/6019` to `4972/4977`;
+  `PlayerUniqueIds` dropped out of residual output; `PlayerNames` improved from
+  normalized `34/35` to `3/4`; `Players_History` from `195/195` to `106/106`;
+  `Players` from normalized `281/281` to `250/250`. Remaining open clusters:
+  `Servers.act_players/suicides`, kill-streak timing, broad
+  `ChangeTeam`/`Chat`, residual `PlayerActions`, `TeamBonuses +9`, and accepted
+  `Entries`.
+
+- 2026-05-06 overlay: continued the residual `fnat1k` alias-touch trace by
+  closing two more object-lifecycle boundaries instead of chasing a single
+  alias row. Python now marks player objects as closed after idle-prune cleanup
+  and after `Started map` roster reset, so the next same-name touch reopens the
+  alias like legacy `playerCleanup()` / reconnect flows. `Started map` does
+  **not** add a new profile flush; the change is limited to alias-use
+  semantics, keeping the already-aligned deferred `PlayerNames` stat rollup
+  contract intact. Regressions:
+  `test_reconnect_after_started_map_counts_alias_use_for_same_userid` and
+  `test_reconnect_after_idle_prune_counts_alias_use_for_same_userid`.
+  Validation at that point: `test_storage.py -q` -> `63 passed`; targeted
+  FTP/event/runtime/storage suite -> `95 passed`. The earlier replay-pending
+  note from this slice is superseded by the cluster pass above, which completed
+  narrow-1000 replay and fresh compare successfully.
+
 - 2026-05-06 overlay: advanced the broader human `PlayerNames` attribution
   cluster as `LP-P6D-004B` instead of chasing one-off anchors. Python now
   defers `hlstats_PlayerNames` stat rollups until player/profile flush

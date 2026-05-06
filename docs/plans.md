@@ -33,6 +33,30 @@ as reference unless the task spans them. **Fast log replay index:**
 
 ### Execution update (2026-05-06)
 
+- Continued the derived combat/reward follow-up with a narrow legacy parity
+  fix: suicides now end active kill streaks before recording the suicide,
+  matching `doEvent_Suicide() -> endKillStreak()` and targeting residual
+  `Actions.kill_streak_*` / kill-streak `PlayerActions` timing drift without
+  reopening broad event-policy differences.
+
+- Residual parity work is now organized by cluster instead of by single
+  identity anchors:
+  identity/naming/encoding; derived combat/reward counters; event-policy drift;
+  accepted differences.
+- Two dense slices were selected because each could move multiple tables:
+  ignored-bot name-change encoding/profile state and Statsme `time`/`latency`
+  telemetry action writes.
+- Result after successful narrow-1000 replay and fresh compare:
+  `Actions` aligned on row count (`754/754`), `PlayerActions` shrank from
+  `4972/6019` to `4972/4977`, `PlayerUniqueIds` disappeared from residual
+  output, `PlayerNames` normalized drift shrank to `3/4`, and
+  `Players_History` normalized drift shrank to `106/106`.
+- Remaining dense follow-ups are derived combat/reward timing
+  (`Servers.suicides`, `Actions.kill_streak_*`, kill-streak `PlayerActions`,
+  `TeamBonuses`) and event-policy drift (`ChangeTeam`, `Chat`, residual
+  non-derived `PlayerActions`). `Entries 0/1017` remains an accepted visible
+  compare row.
+
 - Advanced RC-C human `PlayerNames` attribution as one cluster instead of
   one-off alias fixes.
 - Deferred Python `PlayerNames` stat rollups to player/profile flush boundaries
@@ -41,6 +65,14 @@ as reference unless the task spans them. **Fast log replay index:**
   `64/65` to `34/35`; `X3` and `SayNor` anchors now align.
 - Remaining follow-up is limited to `fnat1k` alias-touch-only `numuses` misses
   (`106` vs `103`), not profile/history totals or broad event-policy drift.
+- Follow-up slice added two more lifecycle-close semantics for alias reuse only:
+  idle-prune cleanup and `Started map` roster reset now mark player objects as
+  closed before the next same-name touch. New regressions cover reconnect after
+  idle prune and reconnect after map start; targeted validation moved to
+  `95 passed`.
+- The earlier replay-pending note for this follow-up is superseded by the
+  cluster pass above: narrow-1000 replay and fresh compare completed
+  successfully after the bot-name and telemetry slices.
 
 ## Product contract
 

@@ -51,6 +51,7 @@ _PLAYER_BY_NAME_QUERY = (
     " ORDER BY `playerId` DESC LIMIT 1"
 )
 _BOT_UNIQUE_RE = re.compile(r"^(?:BOT(?:[:\-].*)?|0|00000000:\d+:0)$", re.IGNORECASE)
+_IGNORED_PLAYER_TRIGGER_ACTIONS = {"latency", "time"}
 _ACTIVE_PLAYER_IDLE_TIMEOUT = timedelta(seconds=250)
 _TEAM_ALIASES = {
     "T": "TERRORIST",
@@ -606,6 +607,7 @@ class EventStorage:
             self._server_player_last_activity[server_id] = {}
             for player_id in stale_players:
                 self._player_teams.pop(player_id, None)
+                self._closed_player_objects.add(player_id)
             self._server_totals_dirty.add(server_id)
             return
         raise ValueError(f"unsupported map lifecycle phase: {phase!r}")
@@ -623,6 +625,9 @@ class EventStorage:
             if update.category is EventCategory.WORLD:
                 self._handle_world_state(connection, update, context, map_name, timestamp, processed_at)
                 self._record_world_action(connection, update, context, map_name, timestamp)
+                return
+
+            if update.category is EventCategory.ACTION and update.event_code in _IGNORED_PLAYER_TRIGGER_ACTIONS:
                 return
 
             if update.category in {
@@ -685,6 +690,8 @@ class EventStorage:
         timestamp: datetime,
         processed_at: datetime,
     ) -> None:
+        if update.event_code in _IGNORED_PLAYER_TRIGGER_ACTIONS:
+            return
         if self._has_transient_identity(update.actor) or self._has_transient_identity(update.target):
             return
         killer_id = self._resolve_player_id(connection, update.actor, context, timestamp, processed_at)
@@ -708,6 +715,14 @@ class EventStorage:
             is_suicide = True
 
         if is_suicide and victim_id:
+            self._end_kill_streak(
+                connection,
+                context=context,
+                map_name=map_name,
+                timestamp=timestamp,
+                processed_at=processed_at,
+                player_id=victim_id,
+            )
             self._record_suicide(
                 connection,
                 context=context,
@@ -1256,8 +1271,7 @@ class EventStorage:
                     event_timestamp=timestamp,
                     processed_at=processed_at,
                 )
-                self._flush_player_profile_name(connection, actor_id)
-                self._closed_player_objects.add(actor_id)
+                self._close_player_object(connection, actor_id, flush_profile_name=True)
                 self._server_active_players.setdefault(context.server_id, set()).discard(actor_id)
                 self._server_connected_players.setdefault(context.server_id, set()).discard(actor_id)
                 self._server_reward_eligible_players.setdefault(context.server_id, set()).discard(actor_id)
@@ -1343,6 +1357,8 @@ class EventStorage:
             track_player_name=False,
         )
         if player_id is None:
+            return
+        if self._should_ignore_bot_event(connection, context, player_id):
             return
         new_name = str(update.attributes.get("new_name") or "")
         if not new_name:
@@ -1582,6 +1598,17 @@ class EventStorage:
         player_name = self._player_names.get(player_id)
         if player_name:
             self._execute(connection, _UPDATE_PLAYER_NAME_QUERY, (player_name, player_id))
+
+    def _close_player_object(
+        self,
+        connection: proxy_db.SupportsConnection,
+        player_id: int,
+        *,
+        flush_profile_name: bool,
+    ) -> None:
+        if flush_profile_name:
+            self._flush_player_profile_name(connection, player_id)
+        self._closed_player_objects.add(player_id)
 
     def _flush_all_player_profile_names(
         self,
@@ -1890,7 +1917,7 @@ class EventStorage:
         for player_id in stale_players:
             if player_id in connected_players:
                 continue
-            self._flush_player_profile_name(connection, player_id)
+            self._close_player_object(connection, player_id, flush_profile_name=True)
             active_players.discard(player_id)
             connected_players.discard(player_id)
             reward_eligible_players.discard(player_id)

@@ -8,6 +8,75 @@ Branch:
 
 Latest continuation (2026-05-06):
 
+- Continued the derived combat/reward cluster with a legacy-confirmed suicide
+  streak boundary. Legacy `doEvent_Suicide()` calls `endKillStreak()` before
+  recording the suicide; Python now mirrors that by ending the active
+  `kills_per_life` streak before `_record_suicide()`.
+- Regression added: `test_suicide_ends_active_kill_streak`.
+- Validation so far:
+  `PYTHONPATH=scripts;scripts\proxy_daemon_py python -m pytest -p no:cacheprovider --basetemp C:\tmp\hlstats-pytest-suicide-green scripts\hlstats_py\tests\test_storage.py -q -k suicide_ends_active_kill_streak`
+  -> `1 passed, 66 deselected`;
+  `PYTHONPATH=scripts;scripts\proxy_daemon_py python -m pytest -p no:cacheprovider --basetemp C:\tmp\hlstats-pytest-storage-suicide scripts\hlstats_py\tests\test_storage.py -q`
+  -> `67 passed`;
+  `PYTHONPATH=scripts;scripts\proxy_daemon_py python -m pytest -p no:cacheprovider --basetemp C:\tmp\hlstats-pytest-target-suicide scripts\hlstats_py\tests\test_events.py scripts\hlstats_py\tests\test_runtime_decisions.py scripts\hlstats_py\tests\test_storage.py -q`
+  -> `86 passed`.
+- Expected next replay impact: this should reduce residual kill-streak
+  `PlayerActions` / `Actions.kill_streak_*` timing drift where a player ends a
+  multi-kill life by suicide. It intentionally does not touch broad
+  `Chat`/`ChangeTeam`, accepted `Entries`, or TeamBonuses roster policy.
+
+- Current pass was cluster-first, not `fnat1k`-only. Residuals were split into:
+  identity/naming/encoding; derived combat/reward counters; event-policy drift;
+  accepted differences.
+- Dense cluster 1 closed: ignored-bot `"changed name to"` events no longer
+  mutate runtime/profile alias state. This closed the bot encoding spillover
+  around `49.5 % karrigan` vs `49.5 ％ karrigan`; `PlayerUniqueIds` no longer
+  appears in fresh residual compare output.
+- Dense cluster 2 closed: Statsme telemetry triggers `time` and `latency` are
+  now ignored before `Actions` / `PlayerActions` writes. They are legacy
+  telemetry inputs, not player-action awards.
+- Regressions added:
+  `test_ignore_bots_skips_name_change_profile_update` and
+  `test_record_action_skips_status_noise_triggers`.
+- Validation:
+  `PYTHONPATH=scripts;scripts/proxy_daemon_py python -m pytest -p no:cacheprovider --basetemp C:\tmp\hlstats-pytest-clusters scripts\hlstats_ftp_py\tests scripts\hlstats_py\tests\test_events.py scripts\hlstats_py\tests\test_runtime_decisions.py scripts\hlstats_py\tests\test_storage.py -q`
+  -> `98 passed`;
+  `docker compose build hlstats-worker` -> success;
+  `Run-DualContour-1000.ps1 -MaxImportFiles 1000 -UseDumpRestore -ReuseValidLegacy`
+  -> success, valid legacy contour reused.
+- Fresh compare headline: expected exit `1`, now `10` residual tables.
+  `Actions` row count aligned `754/754`; `PlayerActions` improved from
+  `4972/6019` to `4972/4977`; `PlayerUniqueIds` disappeared from residual
+  output; `PlayerNames` normalized drift improved to `3/4`;
+  `Players_History` normalized drift improved to `106/106`; `Players`
+  normalized drift improved to `250/250`.
+- Remaining open clusters:
+  `Servers.act_players/suicides`, `Actions.kill_streak_*`, kill-streak timing
+  in `PlayerActions`, `TeamBonuses +9`, broad `ChangeTeam`/`Chat`, and the
+  accepted visible `Entries 0/1017`.
+- The regenerated
+  `docs/audits/legacy-python-parity-20260423/python-sql-snapshot-1000.txt` is
+  a replay artifact and should stay out of the intended diff unless explicitly
+  requested.
+
+- Continued the remaining `fnat1k` alias-touch trace with two more
+  object-lifecycle boundaries instead of a one-row fix.
+- Python now marks player objects as closed after idle-prune cleanup and after
+  `Started map` roster reset, so the next same-name touch reopens alias use as
+  a legacy-style constructor/reconnect boundary.
+- Important constraint: `Started map` still does **not** flush deferred profile
+  names or `PlayerNames` stat rollups; this slice changes alias-use semantics
+  only.
+- Regressions added:
+  `test_reconnect_after_started_map_counts_alias_use_for_same_userid` and
+  `test_reconnect_after_idle_prune_counts_alias_use_for_same_userid`.
+- Validation:
+  `PYTHONPATH=scripts;scripts/proxy_daemon_py python -m pytest -p no:cacheprovider --basetemp C:\tmp\hlstats-pytest-fnat1k scripts\hlstats_py\tests\test_storage.py -q`
+  -> `63 passed`;
+  targeted FTP/event/runtime/storage suite with external basetemp -> `95 passed`.
+- Earlier replay-pending state from this lifecycle slice is superseded by the
+  cluster pass above: narrow-1000 replay and compare completed after the
+  bot-name and Statsme telemetry slices.
 - Broader human `PlayerNames` attribution was handled as cluster `LP-P6D-004B`,
   not as one-off `X3` / `fnat1k` / `SayNor` fixes.
 - Python now defers `hlstats_PlayerNames` stat rollups until player/profile
