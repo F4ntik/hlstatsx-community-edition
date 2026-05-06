@@ -101,6 +101,14 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Disable MLSD listing optimization and force NLST+MDTM probing.",
     )
     p.add_argument(
+        "--order-by-name",
+        action="store_true",
+        help=(
+            "Replay/parity mode: import eligible logs by filename "
+            "instead of FTP modification time. Requires a fresh .last state."
+        ),
+    )
+    p.add_argument(
         "--stdin-verbose-events",
         action="store_true",
         help="Enable per-event logs during Python stdin parsing (slower).",
@@ -344,6 +352,12 @@ def run(argv: list[str] | None = None) -> int:
     _log(not args.quiet, "OK.")
 
     last_mtime = read_last_mtime(last_path)
+    if args.order_by_name and last_mtime:
+        print(
+            f"error: --order-by-name requires a fresh FTP state; remove {last_path}",
+            file=sys.stderr,
+        )
+        return 1
     if last_mtime:
         _log(not args.quiet, f"\n - getting last mtime info... OK: last mtime {last_mtime}.\n")
     else:
@@ -366,7 +380,8 @@ def run(argv: list[str] | None = None) -> int:
         prefer_mlsd=not args.disable_mlsd,
     )
     stable = without_newest_log(entries)
-    todo = entries_to_download(stable, last_mtime)
+    order_by = "name" if args.order_by_name else "mtime"
+    todo = entries_to_download(stable, last_mtime, order_by=order_by)
     if args.max_import_files is not None and args.max_import_files > 0:
         cap = args.max_import_files
         if len(todo) > cap:

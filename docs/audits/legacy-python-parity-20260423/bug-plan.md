@@ -2,6 +2,27 @@
 
 ## Executive summary
 
+- **Policy update (2026-04-29):** use
+  `docs/parity-acceptance-policy.md` before changing runtime behavior. P6d is
+  now closed or advanced by impact classification, not by byte-for-byte Perl
+  quirk matching. Current narrow-1000 `TeamBonuses` residual after the
+  filename-order parity runner fix is legacy `4765` vs Python `4774` (delta
+  `+9`) and is diagnostic backlog unless RC-B/identity triage proves visible or
+  aggregate-critical damage. `Events_Entries`
+  `legacy=0` vs `python>0` remains accepted with explicit rationale and must
+  stay visible in compare output; current post-RC-C narrow-1000 is
+  `python=1017`. RC-C player-count drift is closed for the scoped invalid-id
+  subset (`Players 323/323`, visible `250/250`), and the `1:45686725`
+  current-name/GeoIP anchor is now aligned after Python GeoIP backfill. The
+  later `0:723234133` current-name anchor is also aligned once the Python FTP
+  parity contour imports by sorted filename instead of FTP modification time:
+  `lastName=Райымбек Гослинг`, kills/deaths `3/4`, `KZ/Kazakhstan`, aliases
+  `Player=2` and `Райымбек Гослинг=2`.
+  The ignored-bot history seed artifact is also closed: Python still persists
+  hidden bot profiles with `skill=0` / `hideranking=1`, but no longer seeds
+  bot `Players_History` rows from that reset value. Remaining RC-C work is
+  broader human `PlayerUniqueIds` / `PlayerNames` / `Players_History`
+  attribution drift.
 - **P0 code pass + narrow replay (2026-04-27) completed:** implemented
   runtime-side `round_status` event-order parity for team-trigger rewards and
   stricter ENTRY classification (`entered the game` exact phrase only), then
@@ -17,10 +38,11 @@
     candidate-set fixes.
   - `Events_Entries` = **accepted with explicit rationale** for this lane stage:
     Python remains non-zero while legacy remains zero on narrow windows
-    (`1000` window: legacy `0`, python `1231`), and compare row is kept to
+    (`1000` window: legacy `0`, python `1231`; current post-RC-C narrow-1000
+    is `python=1017`), and compare row is kept to
     prevent silent masking.
 - **Input parity:** confirmed — ordered manifests match 1:1; server identity `37.230.137.48:27015` for both contours.
-- **Authoritative DB diff:** `runtime-db-diff-p6d-20260426-161410.md` (from `compare_stats_dbs.py`). Do **not** use `runtime-db-diff-p6d-20260426-034823-retry1.md` (failed/empty; see file stub in repo).
+- **Authoritative full-corpus DB diff:** `runtime-db-diff-p6d-20260426-161410.md` (from `compare_stats_dbs.py`). Do **not** use `runtime-db-diff-p6d-20260426-034823-retry1.md` (failed/empty; see file stub in repo). Historical P0/P1 rows below describe the pre-policy triage baseline; current acceptance decisions are in `docs/parity-acceptance-policy.md` and the 2026-04-29 RC-B table.
 - **P0 triage (2026-04-27, code + diff; live SQL optional):** see **§ P0 triage conclusions** below. TeamBonuses gap is a **concrete bug hypothesis** (missing Perl `round_status` gate on the Python team-bonus path). Events_Entries is **not** “legacy never uses the table” — source writes Entries on `doEvent_EnterGame` for non-bots; `legacy rows: 0` vs `python rows: 190621` in the diff is a **join/enter path mismatch** to trace before changing `compare_stats_dbs` defaults.
 - **Confident (evidence in diff):**
   - **`hlstats_Events_TeamBonuses`:** order-of-magnitude inflation on Python vs legacy (≈22.3M vs ≈0.93M rows). This dominates noise and is **not** explainable as normal dictionary drift — treat as **highest-priority** runtime/ingest or semantic mismatch until proven otherwise.
@@ -81,9 +103,181 @@ Severity uses README semantics: **P0** = blocker / wrong data at scale; **P1** =
 - **Direction:** trace Python `EventCategory.ENTRY` (`protocol` / `events/handlers` “entry” event) vs Perl’s EnterGame routing on the same log snippets; **do not** exclude `Events_Entries` from `compare_stats_dbs` to hide a bug until this is decided (per runbook constraint).
 - **Classification:** **parity gap** — treat as **P0** until either legacy is shown to intentionally skip Entries for this mode or Python’s ENTRY emission is proven legacy-equivalent.
 
-### P1 policy cluster (RC-B) — next fix wave after P0
+### RC-B policy cluster — impact triage before fixes
 
-- **Scope:** `ChangeTeam` / `Connects` / `Chat` / `PlayerActions` volume deltas in `runtime-db-diff-p6d-20260426-161410.md` are tracked under **RC-B** (dedup, `ignore_bots`, `UNASSIGNED` / empty team, `--drop-empty-team-enter-events`, ChangeTeam filter already in Python storage). **Do not** tune this cluster to explain `TeamBonuses` until the `round_status` (or equivalent) hypothesis is fixed or disproved on a narrow replay.
+- **Scope:** `ChangeTeam` / `Connects` / `Chat` / `PlayerActions` volume deltas are tracked under **RC-B** (dedup, `ignore_bots`, `UNASSIGNED` / empty team, `--drop-empty-team-enter-events`, ChangeTeam filter already in Python storage). Classify by impact before changing behavior; do not tune this cluster to explain `TeamBonuses +8`.
+
+### RC-B impact triage (2026-04-29)
+
+Current artifact:
+`runtime-db-diff-p6d-narrow-1000-20260428-175918.md`.
+
+| Group | Current narrow-1000 evidence | Classification | Decision |
+| --- | --- | --- | --- |
+| `hlstats_Events_ChangeTeam` | `legacy=1345`, `python=1280`; examples include name-attribution pairs for the same unique id, legacy-only `UNASSIGNED` rows, HLTV/bot-like rows, and Python's existing unresolved/bot/dedupe filters in `storage._record_team_change`. | Diagnostic backlog | Keep visible. Add `HLSTATS_PARITY_DECISION_TRACE_PATH` only if a concrete player-history, active-roster, player-count, or identity question needs it. |
+| `hlstats_Events_Connects` | `legacy=992`, `python=1037` before RC-C invalid-id follow-up; the excess was the repeated `STEAM_ID_LAN` advertising identity. Current post-fix count is `992/992`. | Scoped must-fix closed | Do not change broad Connects policy from the old count. Promote only if connection history, last-address, or player-count semantics are proven wrong. |
+| `hlstats_Events_Chat` | `legacy=608`, `python=663` before RC-C invalid-id follow-up; the `STEAM_ID_LAN` advertising row was removed. Current post-fix count is `608/662`; remaining examples follow player-name attribution and extra command/help chat rows. | Diagnostic backlog | Do not tune broad chat policy yet. Revisit with identity trace if visible chat attribution remains wrong beyond known name/current-name drift. |
+| `hlstats_Events_PlayerActions` | `legacy=4972`, `python=6221`; python-only examples include `cstrike:amx_chat` action rows with `missing_player_id=0`, generated by server/plugin actor lines like `<><><> triggered "amx_chat"`. | Must-fix, scoped | Fix unresolved/server-origin action recording or action-counter increment first. Keep unrelated headshot/name-attribution deltas diagnostic until identity triage. |
+
+### RC-B scoped fix follow-up (2026-04-29)
+
+- Implemented the scoped `PlayerActions` fix in
+  `scripts/hlstats_py/storage.py::_record_action`: unresolved actors with no
+  victim now return before `hlstats_Events_PlayerActions` insert and
+  `hlstats_Actions.count` increment.
+- Regression:
+  `test_record_action_skips_unresolved_server_actor_without_victim` covers
+  `<><><> triggered "amx_chat"`.
+- Validation:
+  - `PYTHONPATH=scripts;scripts/proxy_daemon_py python -m pytest -o cache_dir=.pytest-cache-local scripts/hlstats_py/tests`
+    -> `113 passed`;
+  - `Run-DualContour-1000.ps1 -MaxImportFiles 1000 -UseDumpRestore -ReuseValidLegacy`
+    -> success with reused legacy contour;
+  - `compare_stats_dbs.py --max-examples 20` still reports residual documented
+    differences, but `hlstats_Events_PlayerActions` improves from `4972` vs
+    `6221` to `4972` vs `6020` before the RC-C bot slice, then to `4972` vs
+    `6019` after it; `amx_chat` is absent from Python
+    `hlstats_Actions` / `hlstats_Events_PlayerActions`.
+- Remaining `PlayerActions` drift is now diagnostic unless RC-C identity or
+  headshot/action attribution analysis promotes a narrower must-fix subset.
+
+### RC-C identity/player-count slice (2026-04-29)
+
+- Legacy reference checked before changing behavior:
+  `HLstats_EventHandlers.plib` resolves bot player objects, but with
+  `ignore_bots=1` it skips bot-owned `Frags`, `PlayerActions`, `Chat`,
+  `Statsme`, and `Statsme2`; `HLstats_Player.pm` flushes ignored bot profiles
+  with `skill=0` and `hideranking=1`.
+- Python now applies the same scoped policy in `storage.py`: resolved bot
+  profiles are hidden/reset when `IgnoreBots` is enabled, and bot-owned
+  frag/action/chat/statsme rows return before event/counter writes.
+- Validation:
+  - `PYTHONPATH=scripts;scripts/proxy_daemon_py python -m pytest -o cache_dir=.pytest-cache-local scripts/hlstats_py/tests/test_storage.py`
+    -> `45 passed`;
+  - `PYTHONPATH=scripts;scripts/proxy_daemon_py python -m pytest -o cache_dir=.pytest-cache-local scripts/hlstats_py/tests`
+    -> `115 passed`;
+  - `Run-DualContour-1000.ps1 -MaxImportFiles 1000 -UseDumpRestore -ReuseValidLegacy`
+    -> success;
+  - `compare_stats_dbs.py --max-examples 20` -> expected exit `1` with
+    documented residual diffs.
+- Current anchors after the fix:
+  - bot profiles aligned: `bots=73`, `visible_bots=0`, `skill1000_bots=0` on
+    both contours;
+  - raw `Frags`, `Statsme`, and `Statsme2` counts aligned:
+    `5464`, `32290`, `32290`;
+  - before the transient-id follow-up below, the remaining player-count drift
+    was one extra Python visible row plus human `PlayerUniqueIds` /
+    `PlayerNames` / `Players_History` name-attribution examples.
+- Decision at this stage: RC-C bot policy was fixed. The next narrow
+  must-review subset was the extra visible human identity and its history/stats
+  impact; that subset is closed in the follow-up below.
+
+### RC-C transient-id identity follow-up (2026-04-29)
+
+- Root cause: direct SQL identified the extra visible Python human as
+  `STEAM_ID_LAN` advertising connect/chat lines for
+  `en.prime-server.info BUY PLAYER` / `Boost en.Prime-server.info`
+  (`54.74.101.183`). Legacy Perl `getPlayerInfo` returns these normal-mode
+  invalid ids as transient info and does not create `HLstats_Player` /
+  `hlstats_PlayerUniqueIds` rows for them.
+- Fix: Python now skips transient `UNKNOWN`, `STEAM_ID_PENDING`,
+  `STEAM_ID_LAN`, `VALVE_ID_PENDING`, and `VALVE_ID_LAN` identities for
+  player-owned persistence, and stores `STEAM_[0-9]+:` unique ids in the
+  canonical legacy form.
+- Regression:
+  `test_transient_lan_unique_id_connect_does_not_create_visible_player`,
+  `test_transient_lan_unique_id_chat_does_not_create_player_or_chat`, and
+  `test_steam3_unique_id_is_stored_with_legacy_canonical_form`.
+- Validation:
+  - `PYTHONPATH=scripts;scripts/proxy_daemon_py python -m pytest -o cache_dir=.pytest-cache-local scripts/hlstats_py/tests/test_storage.py`
+    -> `48 passed`;
+  - `PYTHONPATH=scripts;scripts/proxy_daemon_py python -m pytest -o cache_dir=.pytest-cache-local scripts/hlstats_py/tests`
+    -> `118 passed`;
+  - `Run-DualContour-1000.ps1 -MaxImportFiles 1000 -UseDumpRestore -ReuseValidLegacy`
+    -> success;
+  - `compare_stats_dbs.py --max-examples 20` -> expected exit `1` with
+    documented residual diffs.
+- Current anchors after the fix:
+  - `Players 323/323`, visible players `250/250`;
+  - `Connects 992/992`;
+  - `STEAM_ID_LAN` unique rows `0/0`;
+  - canonical `0:247752695` unique rows `1/1`;
+  - `Chat 608/662`, `PlayerActions 4972/6019`;
+  - `Frags 5464/5464`, `Statsme 32290/32290`, `Statsme2 32290/32290`;
+  - `TeamBonuses 4765/4774`, `Entries 0/1017`.
+- Decision: the player-count blocker is closed. A 2026-04-30 GeoIP backfill
+  also aligned the previously noted `1:45686725` GeoIP gap (`RU/Russia` on both
+  contours). Remaining RC-C identity work is diagnostic unless a narrower trace
+  proves visible stats, awards, ranking, or player-history corruption.
+
+### RC-C ignored-bot history seed follow-up (2026-04-30)
+
+- Root cause: legacy Perl `check_history` can create ignored-bot
+  `hlstats_Players_History` rows with the default history skill before
+  `flushDB` reaches the ignored-bot profile branch. That branch resets
+  `hlstats_Players.skill=0` / `hideranking=1` but skips the normal
+  `hlstats_Players_History` update. Python was additionally mutating the
+  in-memory skill cache during `_apply_ignored_bot_profile`, so later history
+  row seeds used `0`.
+- Fix: `_apply_ignored_bot_profile` still persists the hidden/reset bot profile
+  but no longer changes the in-memory skill used for history seeds.
+- Regression: `test_ignore_bots_keeps_history_seed_skill_at_legacy_default`.
+- Validation: `test_storage.py -q` -> `52 passed`; full
+  `scripts/hlstats_py/tests` -> `122 passed`; narrow-1000 dual contour with
+  reused legacy -> success; host-side GeoIP backfill -> exit `0`;
+  `compare_stats_dbs.py --max-examples 5` still exits `1` for documented
+  residual diffs. Focused `Players_History` drift improved from `417/417` to
+  `111/111`, Python bot history rows with `skill=0` are `0`, and
+  `hlstats_Players_History` counts remain `659/659`.
+
+### RC-C PlayerNames alias/flush attribution cluster (2026-05-06)
+
+- Current task: `LP-P6D-004B`.
+- Scope is human `PlayerNames` / `Players_History` attribution only. This does
+  not reopen the closed player-count / `STEAM_ID_LAN` blocker, the closed
+  `1:45686725` and `0:723234133` current-name anchors, `TeamBonuses +9`,
+  `Connects`, `ChangeTeam`, broad `Chat`, or broad `PlayerActions`.
+- Initial read-only SQL on the running narrow contours showed the useful
+  pattern:
+  - `0:1838619084` was aligned at the profile/history level
+    (`lastName=X3`, kills/deaths `138/71`), but the `X3` alias row was still
+    `numuses legacy=3`, Python `2`.
+  - `0:36417680` (`fnat1k` family) and `0:2084898310` (`SayNor` family) had
+    matching summed `PlayerNames` kills/deaths/headshots/shots/hits, but Python
+    distributed those totals across alias rows differently from legacy.
+  - `1:55955613` (`Rakza`) read more like a `Players_History`
+    skill/current-name attribution anchor than a standalone `PlayerNames`
+    split unless a narrower row example proves otherwise.
+- Legacy behavior model:
+  `HLstats_Player->setName()` increments `hlstats_PlayerNames.numuses` on a
+  real constructor/name-change/reconnect name touch. `flushDB()` later applies
+  the pending player counters to the *current* in-memory alias row and updates
+  `hlstats_Players.lastName`. The stats are not attached to every event's
+  textual name immediately.
+- Implemented slice:
+  `_update_player_rollups()` now accumulates `PlayerNames` stat deltas until a
+  player/profile flush boundary instead of writing them immediately per event;
+  stdin transaction commits are not profile flushes. Alias-use suppression is
+  cleared on explicit name-change touches, stable-unique userid handoff, and
+  disconnect/reconnect lifecycle touches.
+- Validation:
+  `test_storage.py -q` -> `61 passed`; targeted FTP/event/runtime/storage suite
+  -> `93 passed`; narrow-1000 dual contour with reused legacy -> success;
+  `compare_stats_dbs.py --max-examples 1` still exits `1` for documented
+  residuals.
+- Result:
+  `hlstats_PlayerNames` normalized drift improved from `64/65` to `34/35`.
+  `0:1838619084` (`X3`) and `0:2084898310` (`SayNor`) now align. `0:36417680`
+  (`fnat1k`) now has matching per-alias stat totals, but `numuses` remains
+  `legacy=106`, Python `103` across three alias-touch rows. A candidate flush
+  before every explicit name change was replay-tested and rejected because it
+  regressed `PlayerNames` to `64/65`; do not restore it without a narrower
+  legacy object-lifecycle trace.
+- Next implementation target:
+  trace the remaining `fnat1k` alias-touch-only misses (`CS: zero condition`,
+  `fnat1k`, `mUrkovskii`) against legacy constructor/name-change/reconnect
+  object boundaries. Do not reopen profile/history totals or broad event-policy
+  backlogs for this cluster.
 
 ## Root-cause clusters (Step D → E)
 
@@ -198,14 +392,19 @@ Severity uses README semantics: **P0** = blocker / wrong data at scale; **P1** =
   - python: `Players=326`, `Frags=7828`, `Players_History=675`,
     `Events_Entries=1231`, `Events_TeamBonuses=41686`
 - Decision for P0 gate:
-  - `LP-P6D-001 TeamBonuses`: **fixed (code)**, keep open as parity follow-up
-    because row-scale drift persists after fix.
-  - `LP-P6D-002 Entries`: **accepted with explicit rationale (temporary)**;
-    keep included in `compare_stats_dbs` and revisit after RC-B policy alignment.
+  - `LP-P6D-001 TeamBonuses`: narrowed to `legacy=4765`, `python=4773`
+    (delta `+8`) and classified as diagnostic backlog under the acceptance
+    policy unless RC-B/identity proves visible or aggregate-critical impact.
+  - `LP-P6D-002 Entries`: accepted with explicit rationale; keep included in
+    `compare_stats_dbs` and revisit only if RC-B/identity proves visible stats
+    or awards damage.
 - Remaining short list (replaces blind 18-table triage):
-  1. close residual `TeamBonuses` drift with focused action/map-level comparison
-  2. align RC-B policy cluster (`ChangeTeam` / `Connects` / `Chat` / `PlayerActions`)
-  3. re-check RC-C identity fallout (`Players*` / naming) after RC-B
+  1. re-check RC-C identity fallout (`Players*` / naming) after the scoped
+     `PlayerActions` fix
+  2. inspect remaining `PlayerActions` drift only through identity/headshot
+     attribution evidence, not as a broad count chase
+  3. keep `TeamBonuses +8`, `ChangeTeam`, `Connects`, and `Chat` as diagnostic
+     backlog unless later evidence promotes them
 
 ## Obsolete
 

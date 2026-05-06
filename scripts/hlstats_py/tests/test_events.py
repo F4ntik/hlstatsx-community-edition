@@ -217,4 +217,6 @@ def test_generic_fallback(dispatcher: EventDispatcher, event_context: EventConte
     update = dispatcher.dispatch(event, event_context)
 
     assert update.category is EventCategory.GENERIC
+    assert update.event_code == "change_name"
     assert update.message == "Alicia"
+    assert update.attributes["new_name"] == "Alicia"

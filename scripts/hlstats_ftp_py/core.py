@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,12 +47,19 @@ def without_newest_log(entries: list[LogFileEntry]) -> list[LogFileEntry]:
 def entries_to_download(
     stable_entries: list[LogFileEntry],
     last_mtime: float,
+    *,
+    order_by: Literal["mtime", "name"] = "mtime",
 ) -> list[LogFileEntry]:
     """Return entries strictly newer than *last_mtime*, oldest first."""
 
+    sort_key = (
+        (lambda e: (e.name, e.mtime))
+        if order_by == "name"
+        else (lambda e: (e.mtime, e.name))
+    )
     return sorted(
         [e for e in stable_entries if e.mtime > last_mtime],
-        key=lambda e: (e.mtime, e.name),
+        key=sort_key,
     )
 
 

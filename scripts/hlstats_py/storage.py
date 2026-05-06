@@ -16,7 +16,13 @@ from .events import EventCategory, EventContext, EventUpdate
 from .event_buffer import BufferPolicy, EventBuffer
 from .frag_write_delta_buffer import FragWriteDeltaBuffer
 from .protocol import PlayerDescriptor
-from .runtime_decisions import should_ignore_bot, should_reward_team_player
+from .runtime_decisions import (
+    canonical_unique_id,
+    is_transient_unique_id,
+    should_ignore_bot,
+    should_persist_player_identity,
+    should_reward_team_player,
+)
 
 # Public re-exports from ``proxy_daemon_py`` are defined in ``__init__`` so we
 # import lazily and guard for type checkers. The runtime package layout keeps the
@@ -44,7 +50,6 @@ _PLAYER_BY_NAME_QUERY = (
     "SELECT `playerId` FROM hlstats_Players WHERE `lastName` = %s AND `game` = %s"
     " ORDER BY `playerId` DESC LIMIT 1"
 )
-_STEAM_PREFIX_RE = re.compile(r"^STEAM_[01]:", re.IGNORECASE)
 _BOT_UNIQUE_RE = re.compile(r"^(?:BOT(?:[:\-].*)?|0|00000000:\d+:0)$", re.IGNORECASE)
 _ACTIVE_PLAYER_IDLE_TIMEOUT = timedelta(seconds=250)
 _TEAM_ALIASES = {
@@ -238,6 +243,9 @@ _INSERT_ENTRY_QUERY = (
 _UPDATE_PLAYER_SKILL_QUERY = (
     "UPDATE hlstats_Players SET `skill` = `skill` + %s WHERE `playerId` = %s"
 )
+_UPDATE_IGNORED_BOT_PLAYER_QUERY = (
+    "UPDATE hlstats_Players SET `skill` = 0, `hideranking` = 1 WHERE `playerId` = %s"
+)
 _UPDATE_PLAYER_SHOTS_HITS_QUERY = (
     "UPDATE hlstats_Players SET `shots` = `shots` + %s, `hits` = `hits` + %s WHERE `playerId` = %s"
 )
@@ -361,6 +369,49 @@ class _ActionMetadata:
     team: str = ""
 
 
+@dataclass(slots=True)
+class _PlayerNameRollup:
+    connection_time: int = 0
+    kills: int = 0
+    deaths: int = 0
+    suicides: int = 0
+    headshots: int = 0
+    shots: int = 0
+    hits: int = 0
+
+    def add(
+        self,
+        *,
+        connection_time: int = 0,
+        kills: int = 0,
+        deaths: int = 0,
+        suicides: int = 0,
+        headshots: int = 0,
+        shots: int = 0,
+        hits: int = 0,
+    ) -> None:
+        self.connection_time += connection_time
+        self.kills += kills
+        self.deaths += deaths
+        self.suicides += suicides
+        self.headshots += headshots
+        self.shots += shots
+        self.hits += hits
+
+    def has_values(self) -> bool:
+        return any(
+            (
+                self.connection_time,
+                self.kills,
+                self.deaths,
+                self.suicides,
+                self.headshots,
+                self.shots,
+                self.hits,
+            )
+        )
+
+
 class EventStorage:
     """Translate :class:`EventUpdate` objects into SQL statements."""
 
@@ -380,6 +431,8 @@ class EventStorage:
         self._player_names: dict[int, str] = {}
         self._player_name_uses: set[tuple[int, str]] = set()
         self._player_name_lastuse: dict[tuple[int, str], datetime] = {}
+        self._player_name_rollups: dict[int, _PlayerNameRollup] = {}
+        self._closed_player_objects: set[int] = set()
         self._server_players: dict[int, set[int]] = {}
         self._server_connected_players: dict[int, set[int]] = {}
         self._server_active_players: dict[int, set[int]] = {}
@@ -392,6 +445,7 @@ class EventStorage:
         self._option_cache: dict[str, int] = {}
         self._player_is_bot: dict[int, bool] = {}
         self._player_is_bot_cache: dict[tuple[int, str], bool] = {}
+        self._ignored_bot_profiles_applied: set[tuple[int, int]] = set()
         self._player_last_user_id: dict[int, int] = {}
         self._weapon_modifiers: dict[tuple[str, str], float] = {}
         self._player_kill_streaks: dict[int, int] = {}
@@ -476,6 +530,8 @@ class EventStorage:
         self._player_names.clear()
         self._player_name_uses.clear()
         self._player_name_lastuse.clear()
+        self._player_name_rollups.clear()
+        self._closed_player_objects.clear()
         self._server_players.clear()
         self._server_connected_players.clear()
         self._server_active_players.clear()
@@ -488,6 +544,7 @@ class EventStorage:
         self._option_cache.clear()
         self._player_is_bot.clear()
         self._player_is_bot_cache.clear()
+        self._ignored_bot_profiles_applied.clear()
         self._player_last_user_id.clear()
         self._weapon_modifiers.clear()
         self._player_kill_streaks.clear()
@@ -508,14 +565,17 @@ class EventStorage:
         connection = self._connection()
         self._flush_event_buffer()
         self._flush_frag_counter_buffer()
+        self._flush_all_player_profile_names(connection)
         self._execute(connection, _FINALIZE_PLAYER_LAST_EVENT_QUERY, None)
         self._maybe_commit_batch()
         self._write_team_bonus_stage_trace()
 
     def flush_pending(self) -> None:
         """Flush buffered inserts and commit pending batched writes."""
+        connection = self._connection()
         self._flush_event_buffer()
         self._flush_frag_counter_buffer()
+        self._flush_all_player_profile_names(connection)
         self._commit_pending()
 
     def apply_server_map_transition(
@@ -557,7 +617,7 @@ class EventStorage:
         map_name = self._resolve_map(context)
         timestamp = self._normalize_timestamp(update.timestamp)
         processed_at = self._processing_timestamp(timestamp)
-        self._prune_idle_players(context.server_id, timestamp)
+        self._prune_idle_players(connection, context.server_id, timestamp)
 
         try:
             if update.category is EventCategory.WORLD:
@@ -605,7 +665,7 @@ class EventStorage:
             elif update.category is EventCategory.ENTRY:
                 self._record_entry(connection, update, context, map_name, timestamp, processed_at)
             else:
-                self._record_generic(connection, update, context, map_name, timestamp)
+                self._record_generic(connection, update, context, map_name, timestamp, processed_at)
         except Exception as exc:  # pragma: no cover - safety net
             self._rollback_pending()
             raise StorageError(str(exc)) from exc
@@ -625,9 +685,13 @@ class EventStorage:
         timestamp: datetime,
         processed_at: datetime,
     ) -> None:
+        if self._has_transient_identity(update.actor) or self._has_transient_identity(update.target):
+            return
         killer_id = self._resolve_player_id(connection, update.actor, context, timestamp, processed_at)
         victim_descriptor = update.target if update.target is not None else update.actor
         victim_id = self._resolve_player_id(connection, victim_descriptor, context, timestamp, processed_at)
+        if self._should_ignore_bot_event(connection, context, killer_id, victim_id):
+            return
 
         headshot = 1 if update.attributes.get("headshot") else 0
         killer_role = self._extract_role(update.actor)
@@ -861,8 +925,15 @@ class EventStorage:
         timestamp: datetime,
         processed_at: datetime,
     ) -> None:
+        if self._has_transient_identity(update.actor) or self._has_transient_identity(update.target):
+            return
         actor_id = self._resolve_player_id(connection, update.actor, context, timestamp, processed_at)
         victim_id = self._resolve_player_id(connection, update.target, context, timestamp, processed_at)
+        if actor_id is None and update.target is None:
+            return
+        if self._should_ignore_bot_event(connection, context, actor_id, victim_id):
+            return
+
         action = self._ensure_action_metadata(connection, context.game, update)
         bonus = int(update.attributes.get("points") or action.reward_player)
 
@@ -934,7 +1005,11 @@ class EventStorage:
         timestamp: datetime,
         processed_at: datetime,
     ) -> None:
+        if self._has_transient_identity(update.actor):
+            return
         actor_id = self._resolve_player_id(connection, update.actor, context, timestamp, processed_at)
+        if self._should_ignore_bot_event(connection, context, actor_id):
+            return
         team_only = 2 if update.attributes.get("team_only") else 1
         message = str(update.attributes.get("message", ""))
         self._execute(
@@ -959,8 +1034,12 @@ class EventStorage:
         timestamp: datetime,
         processed_at: datetime,
     ) -> None:
+        if self._has_transient_identity(update.actor):
+            return
         actor_id = self._resolve_player_id(connection, update.actor, context, timestamp, processed_at)
         if actor_id is None:
+            return
+        if self._should_ignore_bot_event(connection, context, actor_id):
             return
 
         shots = int(update.attributes.get("shots") or 0)
@@ -1016,8 +1095,12 @@ class EventStorage:
         timestamp: datetime,
         processed_at: datetime,
     ) -> None:
+        if self._has_transient_identity(update.actor):
+            return
         actor_id = self._resolve_player_id(connection, update.actor, context, timestamp, processed_at)
         if actor_id is None:
+            return
+        if self._should_ignore_bot_event(connection, context, actor_id):
             return
 
         weapon_code = str(update.attributes.get("weapon_code") or update.event_code)
@@ -1049,6 +1132,8 @@ class EventStorage:
         timestamp: datetime,
         processed_at: datetime,
     ) -> None:
+        if self._has_transient_identity(update.actor):
+            return
         actor_id = self._resolve_player_id(connection, update.actor, context, timestamp, processed_at)
         if actor_id is None:
             return
@@ -1132,6 +1217,8 @@ class EventStorage:
         timestamp: datetime,
         processed_at: datetime,
     ) -> None:
+        if self._has_transient_identity(update.actor):
+            return
         actor_id = self._resolve_player_id(connection, update.actor, context, timestamp, processed_at)
         if update.event_code == "connect":
             address = str(update.attributes.get("address") or "")
@@ -1169,6 +1256,8 @@ class EventStorage:
                     event_timestamp=timestamp,
                     processed_at=processed_at,
                 )
+                self._flush_player_profile_name(connection, actor_id)
+                self._closed_player_objects.add(actor_id)
                 self._server_active_players.setdefault(context.server_id, set()).discard(actor_id)
                 self._server_connected_players.setdefault(context.server_id, set()).discard(actor_id)
                 self._server_reward_eligible_players.setdefault(context.server_id, set()).discard(actor_id)
@@ -1185,6 +1274,8 @@ class EventStorage:
         timestamp: datetime,
         processed_at: datetime,
     ) -> None:
+        if self._has_transient_identity(update.actor):
+            return
         actor_id = self._resolve_player_id(connection, update.actor, context, timestamp, processed_at)
         if actor_id is None or self._player_is_bot.get(actor_id, False):
             return
@@ -1214,7 +1305,10 @@ class EventStorage:
         context: EventContext,
         map_name: str,
         timestamp: datetime,
+        processed_at: datetime,
     ) -> None:
+        if update.event_code == "change_name":
+            self._record_name_change(connection, update, context, timestamp, processed_at)
         message = str(update.attributes.get("message", update.message or ""))
         actor_name = update.actor.name if update.actor else ""
         self._execute(
@@ -1228,6 +1322,38 @@ class EventStorage:
                 message,
                 actor_name,
             ),
+        )
+
+    def _record_name_change(
+        self,
+        connection: proxy_db.SupportsConnection,
+        update: EventUpdate,
+        context: EventContext,
+        timestamp: datetime,
+        processed_at: datetime,
+    ) -> None:
+        if self._has_transient_identity(update.actor):
+            return
+        player_id = self._resolve_player_id(
+            connection,
+            update.actor,
+            context,
+            timestamp,
+            processed_at,
+            track_player_name=False,
+        )
+        if player_id is None:
+            return
+        new_name = str(update.attributes.get("new_name") or "")
+        if not new_name:
+            return
+        self._set_player_runtime_name(
+            connection,
+            player_id,
+            new_name,
+            processed_at,
+            track_player_name=True,
+            force_alias_use=True,
         )
 
     def _prime_player_state(
@@ -1256,7 +1382,7 @@ class EventStorage:
     # Resolution helpers
 
     def _canonical_unique_id(self, unique_id: str) -> str:
-        return _STEAM_PREFIX_RE.sub("", unique_id.strip())
+        return canonical_unique_id(unique_id)
 
     def _resolve_player_id(
         self,
@@ -1265,12 +1391,16 @@ class EventStorage:
         context: EventContext,
         timestamp: datetime,
         processed_at: datetime,
+        *,
+        track_player_name: bool = True,
     ) -> Optional[int]:
         if descriptor is None:
             return None
-        if not (descriptor.unique_id or descriptor.name.strip()):
-            # Ignore unresolved empty descriptors to avoid creating phantom
-            # players that later shift real player ids in TeamBonuses parity.
+        identity_decision = should_persist_player_identity(
+            unique_id=descriptor.unique_id,
+            name=descriptor.name,
+        )
+        if not identity_decision.allowed:
             return None
 
         cache_key = self._cache_key_for_player(context.game, descriptor)
@@ -1290,14 +1420,12 @@ class EventStorage:
                     connection,
                     player_id,
                     descriptor,
-                    track_name_history=True,
                 )
             else:
                 self._touch_player_profile(
                     connection,
                     player_id,
                     descriptor,
-                    track_name_history=False,
                 )
             self._player_cache[cache_key] = player_id
             tracked_players = self._server_players.setdefault(context.server_id, set())
@@ -1311,7 +1439,11 @@ class EventStorage:
         self._player_is_bot[player_id] = self._player_is_bot.get(player_id, False) or self._is_bot_descriptor(
             descriptor
         )
+        if self._player_is_bot.get(player_id, False):
+            self._apply_ignored_bot_profile(connection, context, player_id)
+        force_alias_use = False
         if descriptor.user_id is not None:
+            force_alias_use = self._handle_player_userid_rollover(connection, player_id, descriptor)
             self._player_last_user_id[player_id] = int(descriptor.user_id)
         self._server_player_last_activity.setdefault(context.server_id, {})[player_id] = timestamp
 
@@ -1319,9 +1451,14 @@ class EventStorage:
         if normalized_team:
             self._player_teams[player_id] = normalized_team
             self._update_player_presence(context.server_id, player_id, normalized_team)
-        if descriptor.name:
-            self._player_names[player_id] = descriptor.name
-            self._touch_player_name(connection, player_id, descriptor.name, processed_at)
+        self._set_player_runtime_name(
+            connection,
+            player_id,
+            descriptor.name,
+            processed_at,
+            track_player_name=track_player_name,
+            force_alias_use=force_alias_use,
+        )
         self._ensure_player_history_row(connection, context, player_id, timestamp)
         if self._history_timestamp(processed_at) != self._history_timestamp(timestamp):
             self._ensure_player_history_row(connection, context, player_id, processed_at)
@@ -1332,6 +1469,28 @@ class EventStorage:
             return _PlayerCacheKey("unique", descriptor.unique_id, None)
         key = f"{descriptor.name.lower()}::{descriptor.user_id}" if descriptor.user_id else descriptor.name.lower()
         return _PlayerCacheKey("name", f"{game}:{key}", descriptor.user_id)
+
+    def _handle_player_userid_rollover(
+        self,
+        connection: proxy_db.SupportsConnection,
+        player_id: int,
+        descriptor: PlayerDescriptor,
+    ) -> bool:
+        previous_user_id = self._player_last_user_id.get(player_id)
+        current_user_id = int(descriptor.user_id) if descriptor.user_id is not None else None
+        if previous_user_id is None or current_user_id is None or previous_user_id == current_user_id:
+            return False
+        self._flush_player_profile_name(connection, player_id)
+        if descriptor.name:
+            alias_key = (player_id, descriptor.name)
+            self._player_name_uses.discard(alias_key)
+            self._player_name_lastuse.pop(alias_key, None)
+        return True
+
+    def _has_transient_identity(self, descriptor: Optional[PlayerDescriptor]) -> bool:
+        if descriptor is None or not descriptor.unique_id:
+            return False
+        return is_transient_unique_id(descriptor.unique_id)
 
     def _lookup_player(
         self,
@@ -1374,12 +1533,7 @@ class EventStorage:
         connection: proxy_db.SupportsConnection,
         player_id: int,
         descriptor: PlayerDescriptor,
-        *,
-        track_name_history: bool,
     ) -> None:
-        if self._player_names.get(player_id) != descriptor.name:
-            self._execute(connection, _UPDATE_PLAYER_NAME_QUERY, (descriptor.name, player_id))
-        self._player_names[player_id] = descriptor.name
         if player_id not in self._player_skills or player_id not in self._player_total_kills:
             row = self._fetchone(connection, _SELECT_PLAYER_STATE_QUERY, (player_id,))
             if row:
@@ -1392,6 +1546,49 @@ class EventStorage:
         self._player_max_death_streaks.setdefault(player_id, 0)
         self._player_kills_per_life.setdefault(player_id, 0)
         self._player_deaths_in_a_row.setdefault(player_id, 0)
+
+    def _set_player_runtime_name(
+        self,
+        connection: proxy_db.SupportsConnection,
+        player_id: int,
+        player_name: str,
+        processed_at: datetime,
+        *,
+        track_player_name: bool,
+        force_alias_use: bool = False,
+    ) -> None:
+        if not player_name:
+            return
+        previous_name = self._player_names.get(player_id)
+        force_alias_use = force_alias_use or player_id in self._closed_player_objects
+        self._player_names[player_id] = player_name
+        if not track_player_name:
+            return
+        if previous_name == player_name and not force_alias_use:
+            return
+        if force_alias_use:
+            alias_key = (player_id, player_name)
+            self._player_name_uses.discard(alias_key)
+            self._player_name_lastuse.pop(alias_key, None)
+        self._touch_player_name(connection, player_id, player_name, processed_at)
+        self._closed_player_objects.discard(player_id)
+
+    def _flush_player_profile_name(
+        self,
+        connection: proxy_db.SupportsConnection,
+        player_id: int,
+    ) -> None:
+        self._flush_player_name_rollup(connection, player_id)
+        player_name = self._player_names.get(player_id)
+        if player_name:
+            self._execute(connection, _UPDATE_PLAYER_NAME_QUERY, (player_name, player_id))
+
+    def _flush_all_player_profile_names(
+        self,
+        connection: proxy_db.SupportsConnection,
+    ) -> None:
+        for player_id in sorted(self._player_names):
+            self._flush_player_profile_name(connection, player_id)
 
     def _touch_player_name(
         self,
@@ -1416,6 +1613,55 @@ class EventStorage:
             (processed_at, player_id, player_name),
         )
         self._player_name_lastuse[key] = processed_at
+
+    def _add_player_name_rollup(
+        self,
+        player_id: int,
+        *,
+        connection_time: int = 0,
+        kills: int = 0,
+        deaths: int = 0,
+        suicides: int = 0,
+        headshots: int = 0,
+        shots: int = 0,
+        hits: int = 0,
+    ) -> None:
+        rollup = self._player_name_rollups.setdefault(player_id, _PlayerNameRollup())
+        rollup.add(
+            connection_time=connection_time,
+            kills=kills,
+            deaths=deaths,
+            suicides=suicides,
+            headshots=headshots,
+            shots=shots,
+            hits=hits,
+        )
+
+    def _flush_player_name_rollup(
+        self,
+        connection: proxy_db.SupportsConnection,
+        player_id: int,
+    ) -> None:
+        rollup = self._player_name_rollups.get(player_id)
+        player_name = self._player_names.get(player_id)
+        if rollup is None or not rollup.has_values() or not player_name:
+            return
+        self._execute(
+            connection,
+            _UPDATE_PLAYERNAME_TOTALS_QUERY,
+            (
+                rollup.connection_time,
+                rollup.kills,
+                rollup.deaths,
+                rollup.suicides,
+                rollup.headshots,
+                rollup.shots,
+                rollup.hits,
+                player_id,
+                player_name,
+            ),
+        )
+        self._player_name_rollups.pop(player_id, None)
 
     def _ensure_action_metadata(
         self,
@@ -1625,7 +1871,12 @@ class EventStorage:
     def _active_trackable_players(self, server_id: int) -> int:
         return len(self._server_active_players.get(server_id, set()))
 
-    def _prune_idle_players(self, server_id: int, event_time: datetime) -> None:
+    def _prune_idle_players(
+        self,
+        connection: proxy_db.SupportsConnection,
+        server_id: int,
+        event_time: datetime,
+    ) -> None:
         last_activity = self._server_player_last_activity.get(server_id)
         if not last_activity:
             return
@@ -1639,6 +1890,7 @@ class EventStorage:
         for player_id in stale_players:
             if player_id in connected_players:
                 continue
+            self._flush_player_profile_name(connection, player_id)
             active_players.discard(player_id)
             connected_players.discard(player_id)
             reward_eligible_players.discard(player_id)
@@ -1724,6 +1976,37 @@ class EventStorage:
             value = int(default_row[0]) if default_row and default_row[0] is not None else 0
         self._server_ignore_bots[server_id] = value
         return bool(value)
+
+    def _apply_ignored_bot_profile(
+        self,
+        connection: proxy_db.SupportsConnection,
+        context: EventContext,
+        player_id: int,
+    ) -> None:
+        if not self._server_ignore_bots_enabled(connection, context.server_id):
+            return
+        key = (context.server_id, player_id)
+        if key in self._ignored_bot_profiles_applied:
+            return
+        self._execute(connection, _UPDATE_IGNORED_BOT_PLAYER_QUERY, (player_id,))
+        self._ignored_bot_profiles_applied.add(key)
+
+    def _should_ignore_bot_event(
+        self,
+        connection: proxy_db.SupportsConnection,
+        context: EventContext,
+        *player_ids: int | None,
+    ) -> bool:
+        candidate_ids = [
+            player_id
+            for player_id in player_ids
+            if player_id is not None and self._player_is_bot.get(player_id, False)
+        ]
+        if not candidate_ids:
+            return False
+        if not self._server_ignore_bots_enabled(connection, context.server_id):
+            return False
+        return any(self._is_bot_player(connection, player_id, context.game) for player_id in candidate_ids)
 
     def _skip_team_reward_for_ignore_bots(
         self,
@@ -1929,13 +2212,15 @@ class EventStorage:
         if history_timestamp != self._history_timestamp(timestamp):
             self._ensure_player_history_row(connection, context, player_id, timestamp)
 
-        player_name = self._player_names.get(player_id)
-        if player_name:
-            self._execute(
-                connection,
-                _UPDATE_PLAYERNAME_TOTALS_QUERY,
-                (0, kills, deaths, suicides, headshots, shots, hits, player_id, player_name),
-            )
+        self._add_player_name_rollup(
+            player_id,
+            kills=kills,
+            deaths=deaths,
+            suicides=suicides,
+            headshots=headshots,
+            shots=shots,
+            hits=hits,
+        )
 
         resolved_death_streak = death_streak or 0
         resolved_kill_streak = kill_streak or 0
@@ -2414,6 +2699,9 @@ class EventStorage:
             buffer.clear()
         if self._frag_write_deltas is not None:
             self._frag_write_deltas.clear()
+        self._player_name_rollups.clear()
+        self._ignored_bot_profiles_applied.clear()
+        self._closed_player_objects.clear()
         if self._transaction_batch_size <= 0:
             return
         connection = self._connection()

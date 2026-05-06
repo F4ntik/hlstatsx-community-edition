@@ -336,7 +336,8 @@ function Invoke-PythonFtpImport {
             "--configfile", "/app/hlstats.conf",
             "--cwd", "/tmp/ftp_work",
             "--max-import-files", "$ImportLimit",
-            "--ftp-probe-limit", "2000"
+            "--ftp-probe-limit", "2000",
+            "--order-by-name"
         )
     }
     docker @cmd | Out-Null

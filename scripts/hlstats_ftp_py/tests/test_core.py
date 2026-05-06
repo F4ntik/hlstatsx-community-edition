@@ -40,6 +40,20 @@ def test_entries_to_download_respects_last_mtime() -> None:
     assert entries_to_download(stable, 100) == []
 
 
+def test_entries_to_download_can_order_by_name_for_replay_parity() -> None:
+    stable = [
+        LogFileEntry("L0106059.log", 10.0),
+        LogFileEntry("L0106057.log", 20.0),
+        LogFileEntry("L0106058.log", 30.0),
+    ]
+
+    assert [e.name for e in entries_to_download(stable, 0, order_by="name")] == [
+        "L0106057.log",
+        "L0106058.log",
+        "L0106059.log",
+    ]
+
+
 def test_filter_log_names() -> None:
     assert filter_log_names(["x.LOG", "dir/game.log", "readme.txt"]) == ["game.log", "x.LOG"]
 

@@ -31,6 +31,17 @@ as reference unless the task spans them. **Fast log replay index:**
   - window-300: residual drift remains in `Maps_Counts`, `Actions` /
     `Events_PlayerActions`, and identity/history alignment.
 
+### Execution update (2026-05-06)
+
+- Advanced RC-C human `PlayerNames` attribution as one cluster instead of
+  one-off alias fixes.
+- Deferred Python `PlayerNames` stat rollups to player/profile flush boundaries
+  and kept stdin transaction commits from acting as profile flushes.
+- Narrow-1000 replay improved `hlstats_PlayerNames` normalized drift from
+  `64/65` to `34/35`; `X3` and `SayNor` anchors now align.
+- Remaining follow-up is limited to `fnat1k` alias-touch-only `numuses` misses
+  (`106` vs `103`), not profile/history totals or broad event-policy drift.
+
 ## Product contract
 
 - Default runtime path:
@@ -320,9 +331,166 @@ deduplicated bug plan.
 - [~] P6d-M1 (LP-P6D-001): снять остаточный разрыв `hlstats_Events_TeamBonuses`
   (профили action/map, гейты наград игрокам, MinPlayers) до сопоставимых COUNT
   на том же narrow-окне или зафиксировать принятое отличие в issues.
-- [ ] P6d-M2 (RC-B): выровнять или явно принять политику объёмов
+- [~] P6d-M2 (RC-B): выровнять или явно принять политику объёмов
   `ChangeTeam` / `Connects` / `Chat` / `PlayerActions`.
 - [ ] P6d-M3 (RC-C): повторная проверка идентичности игроков после M2.
+
+Policy checkpoint (2026-04-29):
+- `docs/parity-acceptance-policy.md` defines the P6d acceptance matrix:
+  must-fix, accepted legacy difference, and diagnostic backlog.
+- Current `hlstats_Events_TeamBonuses` narrow-1000 residual (`legacy=4765`,
+  `python=4774`, delta `+9`) is diagnostic backlog, not a standalone blocker.
+  The count reflects the corrected parity-runner Python input order
+  (`--order-by-name`) and does not reopen TeamBonuses code work by itself.
+- `Events_Entries legacy=0` vs `python>0` remains an accepted legacy
+  difference and must stay visible in compare output; current post-RC-C
+  narrow-1000 compare shows `python=1017`.
+- Next technical focus is RC-B impact triage for `ChangeTeam`, `Connects`,
+  `Chat`, and `PlayerActions`; identity/player count drift is must-review after
+  RC-B and must-fix only where it affects visible stats, awards, ranking,
+  history, or player-count semantics.
+
+RC-B impact triage, pre-RC-C follow-up (2026-04-29):
+- `ChangeTeam` (`1345` legacy vs `1280` Python): diagnostic backlog. Evidence
+  at this point mixes intentional filters/dedupe with identity/name attribution
+  and legacy-only `UNASSIGNED`/HLTV-style rows; no runtime change without
+  visible history/player-count impact evidence.
+- `Connects` (`992` legacy vs `1037` Python): diagnostic backlog. Evidence at
+  this point is mostly same timestamps/IPs with different current names for the
+  same unique ids plus repeated connect-line policy noise.
+- `Chat` (`608` legacy vs `663` Python): diagnostic backlog. Evidence at this
+  point shows visible chat attribution/name drift and extra command/help rows,
+  not a standalone parser-loss proof.
+- `PlayerActions` (`4972` legacy vs `6221` Python before the scoped fix):
+  scoped must-fix. Python-only
+  `amx_chat` rows from server/plugin actor `<><><>` are recorded with
+  `playerId=0` and increment action counters; fix this unresolved/server-action
+  subset before broad RC-B policy movement.
+
+RC-B scoped fix follow-up (2026-04-29):
+- Python now skips unresolved player-action rows without a victim before action
+  metadata/count updates. Narrow-1000 revalidation with
+  `Run-DualContour-1000.ps1 -MaxImportFiles 1000 -UseDumpRestore
+  -ReuseValidLegacy` shows `amx_chat` no longer exists in Python
+  `hlstats_Actions` and `hlstats_Events_PlayerActions`; `PlayerActions` moved
+  from `4972` vs `6221` to `4972` vs `6020`, then to `4972` vs `6019` after
+  the RC-C bot-policy slice.
+- `TeamBonuses` stayed `4765` vs `4773`; `ChangeTeam` and `Chat` counts stayed
+  diagnostic. `Connects` was later closed for the scoped player-count subset by
+  the RC-C transient-id follow-up (`992/992`). Next useful slice is RC-C
+  identity/player-count review, with remaining `PlayerActions` drift treated as
+  diagnostic unless identity/headshot evidence promotes a narrow subset.
+
+RC-C identity/player-count slice (2026-04-29):
+- Legacy Perl evidence: with `IgnoreBots=1`, bot profiles are kept but flushed
+  hidden/unranked (`skill=0`, `hideranking=1`), and bot-owned
+  `Frags` / `PlayerActions` / `Chat` / `Statsme` / `Statsme2` are not recorded.
+- Python now applies that same scoped bot policy in storage. Tests:
+  `test_ignore_bots_marks_bot_hidden_and_skips_chat`,
+  `test_ignore_bots_skips_frag_when_bot_participates`; full
+  `scripts/hlstats_py/tests` -> `115 passed`.
+- Replay/compare after the fix:
+  - bot profiles aligned: `bots=73`, `visible_bots=0`, `skill1000_bots=0` on
+    both legacy and Python;
+  - raw `Frags`, `Statsme`, and `Statsme2` row counts aligned
+    (`5464`, `32290`, `32290`);
+  - follow-up identified the extra visible Python human row as a repeated
+    legacy-invalid `STEAM_ID_LAN` advertising identity. Python now skips
+    transient `UNKNOWN` / pending / LAN unique ids for player-owned persistence
+    and canonicalizes `STEAM_[0-9]+:` unique ids to the legacy form.
+  - current post-follow-up anchors: `Players 323/323`, visible players
+    `250/250`, `Connects 992/992`, `Chat 608/662`, `PlayerActions 4972/6019`,
+    `Frags 5464/5464`, `Statsme 32290/32290`, `Statsme2 32290/32290`,
+    `TeamBonuses 4765/4773`, `Entries 0/1017`.
+- Next narrow must-review subset: remaining `PlayerUniqueIds` / `PlayerNames` /
+  `Players_History` name/current-name and GeoIP attribution drift. Do not touch
+  `TeamBonuses +8`, `ChangeTeam`, closed `Connects`, or broad `Chat` policy
+  without new visible-impact evidence.
+
+RC-C review follow-up (2026-04-29):
+- Closed two code-review issues in the bot-policy slice:
+  - action filtering now checks both actor and victim before
+    `PlayerPlayerActions` / action-counter writes on `IgnoreBots=1` servers;
+  - stdin rollback now clears the ignored-bot profile application cache so
+    rolled-back `skill=0` / `hideranking=1` updates can be reapplied.
+- Regression coverage:
+  `test_ignore_bots_skips_action_when_target_is_bot` and
+  `test_ignored_bot_profile_cache_is_cleared_on_rollback`.
+- Validation: `test_storage.py -q` -> `50 passed`; full
+  `scripts/hlstats_py/tests` -> `120 passed`; narrow-1000 dual contour with
+  reused legacy succeeded, and compare still exits `1` only for documented
+  residual diffs. Anchors stayed stable, including `Players 323/323`,
+  `PlayerActions 4972/6019`, `PlayerPlayerActions 0/0`, and
+  `TeamBonuses 4765/4773`.
+
+RC-C current-name follow-up (2026-04-29):
+- The next identity/name slice is scoped to `hlstats_Players.lastName`
+  attribution, starting from the `uniqueId=1:45686725` anchor where aggregate
+  kills/deaths match but legacy current name stays one profile flush behind
+  Python.
+- Python now mirrors the legacy shape more closely for profile names:
+  `hlstats_PlayerNames` remains immediate, while `hlstats_Players.lastName`
+  writes are deferred until disconnect/profile flush instead of every player
+  resolve. This is intended to reduce current-name drift without changing
+  player counts, event counts, or broad Chat/Connect policy.
+- Unit validation for the storage slice passed (`test_storage.py -q` ->
+  `51 passed`).
+- Follow-up validation on 2026-04-30 passed:
+  - full `scripts/hlstats_py/tests` with pytest cache disabled and basetemp
+    outside the locked repo temp dirs -> `121 passed`;
+  - narrow-1000 dual contour with `-UseDumpRestore -ReuseValidLegacy` ->
+    success;
+  - `compare_stats_dbs.py --max-examples 20` still exits `1` for documented
+    residual diffs.
+- Direct SQL confirms the `uniqueId=1:45686725` current-name anchor is now
+  aligned (`lastName=Mep3ocTb`, kills/deaths `198/179` in both contours, same
+  three aliases). A follow-up GeoIP backfill run on 2026-04-30 also aligned
+  that row's GeoIP (`RU/Russia`, `lastAddress=178.68.210.14`) on both contours,
+  so the next RC-C work should focus on broader remaining `PlayerUniqueIds` /
+  `PlayerNames` / `Players_History` attribution drift.
+- A 2026-04-30 ignored-bot history follow-up closed one broader
+  `Players_History` artifact without reopening player counts or bot visibility:
+  Python keeps the persisted ignored-bot profile reset (`skill=0`,
+  `hideranking=1`) but no longer seeds history rows from that reset value.
+  Narrow-1000 focused compare improved `hlstats_Players_History` normalized
+  drift from `417/417` to `111/111`; remaining history examples are human
+  skill/streak/name attribution drift, not bot hidden-profile rows.
+- A 2026-05-01 current-name flush follow-up closed another scoped attribution
+  gap in the deferred-name slice. Legacy periodic/shutdown `flushDB` pushes the
+  current profile name for live players even when no disconnect line appears;
+  Python now mirrors that import-tail behavior by flushing all cached profile
+  names from `finalize_import()` before the final `last_event` update. Targeted
+  validation for the storage/decision surface passed (`60 passed`), full
+  `scripts/hlstats_py/tests` passed (`126 passed`), and narrow-1000 replay with
+  reused legacy plus GeoIP backfill completed. Compare still exits `1` for
+  documented residual tables, with focused identity drift now at
+  `PlayerUniqueIds 1/1`, `PlayerNames 45/36`, and `Players_History 110/110`.
+  Remaining RC-C work is still broader human `PlayerNames` / `Players_History`
+  stat/name attribution, not player-count, transient-id, GeoIP, or ignored-bot
+  history policy.
+- A later 2026-05-01 local TDD follow-up closed a second current-name gap in
+  the same area: name-change log lines were parsed but handled as generic admin
+  events, so Python did not apply the `"changed name to"` target name to
+  `hlstats_PlayerNames` or the deferred `hlstats_Players.lastName` cache. The
+  storage path now applies `change_name` updates to the new alias/current-name
+  cache without incrementing the old alias for already-known live players,
+  matching the relevant Perl `doEvent_ChangeName` / `setName(newname)` shape.
+  This is expected to help anchors like `0:723234133` where alias counters were
+  aligned but current profile name still lagged. Replay validation is covered
+  by the 2026-05-05 follow-up below.
+- A 2026-05-05 replay follow-up closed that `0:723234133` anchor after
+  checking the legacy Perl event path again. The remaining replay mismatch was
+  parity-runner input order: Python FTP imported eligible logs by modification
+  time, while the validated legacy narrow window is the first `1000` sorted log
+  filenames. `hlstats_ftp_py` now has `--order-by-name`, and the dual-contour
+  parity runner passes it only for replay validation; production/default FTP
+  behavior remains mtime-ordered. Clean replay plus GeoIP backfill now shows
+  `lastName=Райымбек Гослинг`, kills/deaths `3/4`, `KZ/Kazakhstan`, and aliases
+  `Player=2`, `Райымбек Гослинг=2` on the Python contour. Current compare still
+  exits `1` for `11` documented residual tables: focused identity drift is now
+  `PlayerUniqueIds 31/31`, `PlayerNames 64/65`, `Players_History 195/195`, and
+  `TeamBonuses 4765/4774` remains diagnostic backlog under the acceptance
+  policy.
 
 Tasks:
 - clear the current legacy full-corpus replay blocker before any DB/page

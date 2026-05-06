@@ -449,21 +449,26 @@ class GenericEventHandler(_HandlerBase):
     )
 
     def handle(self, event: LogEvent, context: EventContext) -> Optional[EventUpdate]:
+        event_code = "change_name" if event.event_type is LogEventType.NAME_CHANGE else "generic"
         message_key, rendered_message = _build_message(
             context,
-            "generic",
+            event_code,
             actor=event.actor.name if event.actor else None,
             message=event.message or event.raw,
-            event_code="generic",
+            event_code=event_code,
         )
+        if event.event_type is LogEventType.NAME_CHANGE:
+            rendered_message = event.message or rendered_message
         attributes: dict[str, Any] = {
             "raw": event.raw,
             "message": event.message or event.raw,
             "properties": event.properties,
         }
+        if event.event_type is LogEventType.NAME_CHANGE:
+            attributes["new_name"] = event.message or ""
         return EventUpdate(
             category=EventCategory.GENERIC,
-            event_code="generic",
+            event_code=event_code,
             actor=event.actor,
             target=event.target,
             timestamp=event.timestamp,

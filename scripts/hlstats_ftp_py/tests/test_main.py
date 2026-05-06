@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import MagicMock
 
 from hlstats_ftp_py.main import (
@@ -14,6 +15,35 @@ from hlstats_ftp_py.main import (
 
 def test_run_version() -> None:
     assert run(["--version"]) == 0
+
+
+def test_order_by_name_requires_fresh_state(tmp_path: Path, capsys) -> None:
+    state = tmp_path / "hlstats-ftp-37.230.137.48-27015.last"
+    state.write_text("1700000000", encoding="ascii")
+
+    result = run(
+        [
+            "--gs-ip",
+            "37.230.137.48",
+            "--gs-port",
+            "27015",
+            "--ftp-usr",
+            "hlxslogs",
+            "--ftp-pwd",
+            "secret",
+            "--ftp-dir",
+            "/",
+            "--configfile",
+            "hlstats.conf",
+            "--cwd",
+            str(tmp_path),
+            "--order-by-name",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert result == 1
+    assert "--order-by-name requires a fresh FTP state" in captured.err
 
 
 def test_parse_mdtm_response() -> None:
