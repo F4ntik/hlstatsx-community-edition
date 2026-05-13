@@ -2,6 +2,145 @@
 
 ## Snapshot
 
+- 2026-05-13 overlay: traced the remaining `hlstats_Servers.act_players`
+  `4/0` residual back to legacy idle-cleanup cadence. Legacy Perl writes
+  `act_players` from `%srv_players` via `HLstats_Server::updatePlayerCount()`;
+  `Loading map` removes bots but keeps human player objects, `Started map`
+  resets team/trackable state without removing them, and idle cleanup only runs
+  when `next_timeout < ev_daemontime` before scheduling the next sweep 30-60s
+  later. Python had been pruning stale live-roster members before every event,
+  so silent map-tail humans could disappear before the equivalent legacy final
+  server flush. Added `_server_next_idle_prune_at` and a legacy-like
+  `record()` prune cadence, with RED-first regression
+  `test_record_prunes_idle_players_on_legacy_timeout_cadence`. Validation:
+  focused cadence tests passed, and targeted
+  storage/events/runtime-decisions suite reports `117 passed` with only local
+  pytest-cache permission warnings. Replay/compare is still pending for this
+  cadence slice; next run should verify whether `act_players` moves from
+  Python `0` back toward legacy `4`. A review subagent flagged the existing
+  `docs/audits/legacy-python-parity-20260423/python-sql-snapshot-1000.txt`
+  dirty change as questionable provenance for the old audit directory; do not
+  rely on or commit that artifact without regenerating/relocating evidence.
+
+- 2026-05-13 overlay: continued the narrow `hlstats_Servers.act_players`
+  source trace without moving on to Rakza. Focused regressions now cover three
+  live-roster edges: `Dropped_The_Bomb` does not create legacy live-roster
+  membership, `Loading map` removes bot live-roster members like legacy Perl,
+  and connect/userid-rollover live entries keep a fresh activity timestamp so
+  idle prune can later remove silent reconnects. The traced overcount source
+  for the prior Python `12` was all BOT roster members surviving `Loading map`;
+  after bot cleanup the full contour returned to Python `0` vs legacy `4`.
+  A deliberately narrow connect-source check showed raw connect membership can
+  overgrow to Python `14`, and the rollover/activity fix prunes that back to
+  Python `0`; therefore the remaining `4` legacy live members are not explained
+  by broad connect growth and still need a narrower legacy source/cadence trace
+  before touching combat or rewards. Validation: targeted
+  storage/events/runtime-decisions suite reports `116 passed`; `docker compose
+  build hlstats-worker` succeeded; narrow-1000 dual contour with
+  `-ReuseValidLegacy` succeeded; host-side GeoIP backfill exited `0`; fresh
+  compare still exits `1` with `9` residual tables. Current residual movement:
+  `hlstats_Servers.act_players` is legacy `4` vs Python `0`; `kill_streak_2`
+  remains legacy `1065` vs Python `1066` with the single Python-only Rakza
+  `hlstats_Events_PlayerActions` row at `2024-01-06 00:18:10` on `de_spay`;
+  `hlstats_Events_ChangeTeam` remains `1345/1343` with only the two
+  legacy-only `UNASSIGNED` rows (`Rakza`, `Baggio`);
+  `hlstats_Events_TeamBonuses` remains `4765/4763` with only the two
+  legacy-only rows (`Planted_The_Bomb` for `*психоделия*`, `CTs_Win` for
+  `Dance Bear`). `PlayerNames`, `Players`, `Players_History`, and accepted
+  `Entries 0/1017` remain intentionally deferred.
+
+- 2026-05-07 overlay: continued the clustered lifecycle parity fix instead of
+  chasing individual compare rows. Added a separate Python live-roster model
+  for `hlstats_Servers.act_players`, kept it across `Started map`, pruned stale
+  live roster members on idle cleanup, and limited live-roster growth to
+  explicit connect/team-selection sources instead of every chat/action
+  descriptor. Player object close now clears runtime team and per-life combat
+  state; disconnect ends an active kill streak at the disconnect timestamp
+  before later round drains can see stale `_player_kills_per_life`. Regression
+  coverage added/updated for legacy live roster semantics, cache-hit team
+  selection live restore, chat descriptors not inflating DB live roster,
+  map-start live roster preservation, stale live roster prune, kicked stale
+  `UNASSIGNED` suppression, and disconnect kill-streak drain. Validation:
+  targeted storage/events/runtime-decisions suite reports `111 passed`;
+  `docker compose build hlstats-worker` succeeded; narrow-1000 dual contour
+  with reused valid legacy succeeded; host-side GeoIP backfill completed with
+  exit `0`; fresh compare still exits `1` with `9` residual tables. Movement:
+  `hlstats_Servers.act_players` improved from Python `0` to Python `12`
+  against legacy `4` after intermediate over-broad live roster checks at `62`
+  and `30`, so it remains open and needs tracing of the final 12 live-roster
+  members. `hlstats_Events_ChangeTeam` improved from `1345/1357` with Python-only
+  `UNASSIGNED` rows to `1345/1343` with `2` legacy-only and `0` Python-only
+  examples (`Rakza`, `Baggio`). `hlstats_Events_TeamBonuses` moved from mixed
+  `2` legacy-only / `3` Python-only at `4765/4766` to `4765/4763` with only
+  the two legacy-only rows (`Planted_The_Bomb` for `*психоделия*` and
+  `CTs_Win` for `Dance Bear`); no direct reward-roster patch was made because
+  the stale Python-only rewards are gone. `kill_streak_2` improved from legacy
+  `1065` vs Python `1067` to `1065/1066`, leaving one Python-only
+  `hlstats_Events_PlayerActions` row for `Rakza` at `2024-01-06 00:18:10`
+  on `de_spay`. `PlayerNames`, `Players`, `Players_History`, and accepted
+  `Entries 0/1017` remain deferred residuals until the remaining
+  live-roster/combat roots settle.
+
+- 2026-05-07 overlay: continued narrow-1000 parity residual work with focused
+  RED-first regressions for the derived combat/team counter cluster. Python no
+  longer drains `kills_per_life` on `Restart_Round_(1_second)`; world-action
+  kill-streak drains now match the legacy `Round_End` / `Round_Win` /
+  `Mini_Round_Win` set, with death/suicide/disconnect remaining as life-end
+  boundaries. Implicit team sync now primes cached ignored status triggers far
+  enough to preserve a blank runtime team baseline and emit the subsequent
+  blank -> `UNASSIGNED` transition, while closed player objects and userid
+  rollovers do not seed that blank baseline. Server `act_players` refreshes now
+  use the trackable active set instead of connected count for ordinary presence
+  updates; a map-start pre-clear flush/dirty guard is covered locally, but the
+  final replay still shows the server counter residual open. New regressions:
+  `test_restart_round_does_not_end_kill_streak_before_actual_life_end`,
+  `test_implicit_team_change_emits_on_blank_to_unassigned_from_status_trigger`,
+  `test_closed_player_blank_status_does_not_seed_implicit_change_team`,
+  `test_server_act_players_uses_trackable_presence_not_connected_count`, and
+  `test_started_map_flushes_preclear_roster_count_to_server_act_players`.
+  Validation: targeted storage/events/runtime-decisions suite reports
+  `105 passed`; `docker compose build hlstats-worker` succeeded; narrow-1000
+  dual contour with reused valid legacy succeeded; host-side GeoIP backfill
+  completed with exit `0`; fresh compare still exits `1` with `9` residual
+  tables. Movement: `hlstats_Events_PlayerActions` improved from `4972/4976`
+  to `4972/4974`, now only two Python-only `kill_streak_2` rows; `hlstats_Actions`
+  row count remains `754/754` but `kill_streak_2` count is now legacy `1065`
+  vs Python `1067`; `hlstats_Events_ChangeTeam` moved past the missing-row
+  state to `1345/1357` with `1` legacy-only and `13` Python-only
+  `UNASSIGNED` examples, so this remains open and needs a narrower lifecycle
+  discriminator; `hlstats_Servers.act_players` remains open at legacy `4` vs
+  Python `0`; `hlstats_Events_TeamBonuses` remains `4765/4766` with `2`
+  legacy-only and `3` Python-only examples, so no direct reward-eligibility
+  change was made in this slice. `PlayerNames`, `Players`, `Players_History`,
+  and accepted `Entries 0/1017` remain residual follow-ups.
+
+- 2026-05-06 overlay: closed the next narrow-1000 parity residual slice across
+  suicide suppression/server counters, implicit team sync, chat policy, and
+  same-unique userid rollover cleanup. Python now mirrors the legacy
+  `last_team_change + 2 > event_time` suicide ignore window, increments the
+  DB-backed `hlstats_Servers.suicides` aggregate on accepted suicides, filters
+  legacy HLX command/buy-script chat before `hlstats_Events_Chat`, emits
+  implicit `hlstats_Events_ChangeTeam` rows for known descriptor team drift
+  while preserving bot/transient guards, and clears stale per-server live
+  roster state on same-unique/new-userid handoff before applying the new
+  descriptor. Note: Perl's `total_suicides` is a runtime field sourced from the
+  same `hlstats_Servers.suicides` DB column, not a schema column. Regressions
+  cover same-second and +2s suicide boundaries, server suicide aggregate,
+  command/buy/dead/ordinary chat, implicit ChangeTeam for ignored
+  `time`/`latency`, bot/transient guards, and rollover TeamBonuses cleanup.
+  Validation: targeted storage/events/runtime suite reports `100 passed`;
+  `docker compose build hlstats-worker` succeeded; narrow-1000 dual contour
+  with reused valid legacy succeeded; host-side GeoIP backfill completed with
+  exit `0`; fresh compare still exits `1`, now with `9` residual tables. Main
+  movement: `hlstats_Servers.suicides` aligned at `83/83` (remaining Servers
+  drift is `act_players 4/0`), `hlstats_Events_Chat` dropped out of residual
+  output, `hlstats_Events_TeamBonuses` improved to `4765/4766`, and GeoIP
+  backfill reduced `hlstats_Players` normalized drift to `50/50`. Remaining
+  residuals: `Servers.act_players`, kill-streak `Actions` /
+  `Events_PlayerActions`, `ChangeTeam 1345/1309`, `TeamBonuses +1`,
+  `PlayerNames` (`415/416`, Dim$on/Player21/XYU aliases), `Players` /
+  `Players_History` skill/streak attribution, and accepted `Entries 0/1017`.
+
 - 2026-05-06 overlay: continued the derived combat/reward cluster with the
   suicide kill-streak boundary identified from legacy
   `HLstats_EventHandlers.plib`. Legacy `doEvent_Suicide()` calls

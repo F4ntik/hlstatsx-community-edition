@@ -52,7 +52,9 @@ _PLAYER_BY_NAME_QUERY = (
 )
 _BOT_UNIQUE_RE = re.compile(r"^(?:BOT(?:[:\-].*)?|0|00000000:\d+:0)$", re.IGNORECASE)
 _IGNORED_PLAYER_TRIGGER_ACTIONS = {"latency", "time"}
+_NON_LIVE_ROSTER_ACTIONS = {"Dropped_The_Bomb"}
 _ACTIVE_PLAYER_IDLE_TIMEOUT = timedelta(seconds=250)
+_IDLE_PRUNE_INTERVAL = timedelta(seconds=30)
 _TEAM_ALIASES = {
     "T": "TERRORIST",
     "TS": "TERRORIST",
@@ -62,6 +64,91 @@ _TEAM_ALIASES = {
     "COUNTER TERRORIST": "CT",
     "CTS": "CT",
 }
+_CHAT_COMMANDS = {
+    "skill",
+    "rank",
+    "points",
+    "place",
+    "kdratio",
+    "kdeath",
+    "kpd",
+    "session",
+    "session_data",
+    "statsme",
+    "next",
+    "knife",
+    "usp",
+    "glock",
+    "deagle",
+    "p228",
+    "m3",
+    "xm1014",
+    "mp5navy",
+    "tmp",
+    "p90",
+    "m4a1",
+    "ak47",
+    "sg552",
+    "scout",
+    "awp",
+    "g3sg1",
+    "m249",
+    "hegrenade",
+    "flashbang",
+    "elite",
+    "aug",
+    "mac10",
+    "fiveseven",
+    "ump45",
+    "sg550",
+    "famas",
+    "galil",
+    "maps",
+    "map_stats",
+    "map",
+    "kill",
+    "kills",
+    "player_kills",
+    "weapon",
+    "weapons",
+    "weapon_usage",
+    "action",
+    "actions",
+    "hlx_menu",
+    "status",
+    "load",
+    "pro",
+    "servers",
+    "clans",
+    "cheaters",
+    "bans",
+    "help",
+    "timeleft",
+    "nextmap",
+    "thetime",
+}
+_CHAT_TOP_COMMAND_RE = re.compile(r"^/?top\d{1,2}$", re.IGNORECASE)
+_CHAT_HLX_PREFIXES = ("hlx_",)
+_CHAT_BUY_TERMS = (
+    "ak47",
+    "ak",
+    "m4",
+    "m4a1",
+    "deagle",
+    "famas",
+    "galil",
+    "scout",
+    "awp",
+    "awm",
+    "aug",
+    "m249",
+    "para",
+    "sig",
+    "tmp",
+    "grenade",
+    "usp",
+    "glock",
+)
 _SELECT_PLAYER_STATE_QUERY = (
     "SELECT `skill`, `kills`, `lastAddress`, `connection_time` "
     "FROM hlstats_Players WHERE `playerId` = %s LIMIT 1"
@@ -303,6 +390,9 @@ _UPDATE_SERVER_FRAG_TOTALS_QUERY = (
     "SET `kills` = `kills` + %s, `headshots` = `headshots` + %s "
     "WHERE `serverId` = %s"
 )
+_UPDATE_SERVER_SUICIDE_TOTALS_QUERY = (
+    "UPDATE hlstats_Servers SET `suicides` = `suicides` + 1 WHERE `serverId` = %s"
+)
 _UPDATE_SERVER_CT_SHOTS_HITS_QUERY = (
     "UPDATE hlstats_Servers "
     "SET `ct_shots` = `ct_shots` + %s, `ct_hits` = `ct_hits` + %s, "
@@ -435,10 +525,12 @@ class EventStorage:
         self._player_name_rollups: dict[int, _PlayerNameRollup] = {}
         self._closed_player_objects: set[int] = set()
         self._server_players: dict[int, set[int]] = {}
+        self._server_live_players: dict[int, set[int]] = {}
         self._server_connected_players: dict[int, set[int]] = {}
         self._server_active_players: dict[int, set[int]] = {}
         self._server_reward_eligible_players: dict[int, set[int]] = {}
         self._server_player_last_activity: dict[int, dict[int, datetime]] = {}
+        self._server_next_idle_prune_at: dict[int, datetime] = {}
         self._server_skill_modes: dict[int, int] = {}
         self._server_min_players: dict[int, int] = {}
         self._server_ignore_bots: dict[int, int] = {}
@@ -458,6 +550,7 @@ class EventStorage:
         self._player_skills: dict[int, int] = {}
         self._player_total_kills: dict[int, int] = {}
         self._seen_team_change_events: set[tuple[int, int, str, str, datetime]] = set()
+        self._player_last_team_change: dict[int, datetime] = {}
         self._seen_team_bonus_events: set[tuple[int, int, int, datetime]] = set()
         self._server_totals_dirty: set[int] = set()
         self._transaction_batch_size = 0
@@ -534,10 +627,12 @@ class EventStorage:
         self._player_name_rollups.clear()
         self._closed_player_objects.clear()
         self._server_players.clear()
+        self._server_live_players.clear()
         self._server_connected_players.clear()
         self._server_active_players.clear()
         self._server_reward_eligible_players.clear()
         self._server_player_last_activity.clear()
+        self._server_next_idle_prune_at.clear()
         self._server_skill_modes.clear()
         self._server_min_players.clear()
         self._server_ignore_bots.clear()
@@ -557,6 +652,7 @@ class EventStorage:
         self._player_skills.clear()
         self._player_total_kills.clear()
         self._seen_team_change_events.clear()
+        self._player_last_team_change.clear()
         self._seen_team_bonus_events.clear()
         self._server_totals_dirty.clear()
 
@@ -587,6 +683,19 @@ class EventStorage:
         connection = self._connection()
         if phase == "loading":
             self._execute(connection, _UPDATE_SERVER_MAP_LOADING_QUERY, (map_name, server_id))
+            bot_players = {
+                player_id
+                for player_id in (
+                    set(self._server_live_players.get(server_id, set()))
+                    | set(self._server_active_players.get(server_id, set()))
+                    | set(self._server_connected_players.get(server_id, set()))
+                )
+                if self._player_is_bot.get(player_id, False)
+            }
+            for player_id in bot_players:
+                self._clear_player_live_state_for_server(server_id, player_id)
+            if bot_players:
+                self._refresh_server_player_totals(connection, server_id)
             return
         if phase == "started":
             normalized = self._normalize_timestamp(event_timestamp)
@@ -601,14 +710,33 @@ class EventStorage:
             stale_players = set(self._server_active_players.get(server_id, set()))
             stale_players.update(self._server_connected_players.get(server_id, set()))
             stale_players.update(self._server_reward_eligible_players.get(server_id, set()))
+            flushed_player_totals = False
+            if server_id in self._server_live_players:
+                self._execute(
+                    connection,
+                    _UPDATE_SERVER_PLAYER_TOTALS_QUERY,
+                    (
+                        len(self._server_players.get(server_id, set())),
+                        len(self._server_live_players.get(server_id, set())),
+                        server_id,
+                    ),
+                )
+                self._server_totals_dirty.discard(server_id)
+                flushed_player_totals = True
             self._server_active_players[server_id] = set()
             self._server_connected_players[server_id] = set()
             self._server_reward_eligible_players[server_id] = set()
-            self._server_player_last_activity[server_id] = {}
+            live_players = self._server_live_players.get(server_id, set())
+            last_activity = self._server_player_last_activity.get(server_id, {})
+            self._server_player_last_activity[server_id] = {
+                player_id: seen_at
+                for player_id, seen_at in last_activity.items()
+                if player_id in live_players
+            }
             for player_id in stale_players:
-                self._player_teams.pop(player_id, None)
-                self._closed_player_objects.add(player_id)
-            self._server_totals_dirty.add(server_id)
+                self._close_player_object(connection, player_id, flush_profile_name=False)
+            if not flushed_player_totals:
+                self._server_totals_dirty.add(server_id)
             return
         raise ValueError(f"unsupported map lifecycle phase: {phase!r}")
 
@@ -619,7 +747,7 @@ class EventStorage:
         map_name = self._resolve_map(context)
         timestamp = self._normalize_timestamp(update.timestamp)
         processed_at = self._processing_timestamp(timestamp)
-        self._prune_idle_players(connection, context.server_id, timestamp)
+        self._prune_idle_players_if_due(connection, context.server_id, timestamp)
 
         try:
             if update.category is EventCategory.WORLD:
@@ -628,6 +756,15 @@ class EventStorage:
                 return
 
             if update.category is EventCategory.ACTION and update.event_code in _IGNORED_PLAYER_TRIGGER_ACTIONS:
+                if self._should_prime_ignored_action_for_team_sync(update, context):
+                    self._prime_player_state(
+                        connection,
+                        update,
+                        context,
+                        timestamp,
+                        processed_at,
+                        allow_create_player=False,
+                    )
                 return
 
             if update.category in {
@@ -715,6 +852,9 @@ class EventStorage:
             is_suicide = True
 
         if is_suicide and victim_id:
+            last_team_change = self._player_last_team_change.get(victim_id)
+            if last_team_change is not None and last_team_change + timedelta(seconds=2) > timestamp:
+                return
             self._end_kill_streak(
                 connection,
                 context=context,
@@ -922,6 +1062,7 @@ class EventStorage:
             ),
         )
         self._execute(connection, _UPDATE_PLAYER_SUICIDES_QUERY, (player_id,))
+        self._execute(connection, _UPDATE_SERVER_SUICIDE_TOTALS_QUERY, (context.server_id,))
         self._update_player_rollups(
             connection,
             context=context,
@@ -942,7 +1083,14 @@ class EventStorage:
     ) -> None:
         if self._has_transient_identity(update.actor) or self._has_transient_identity(update.target):
             return
-        actor_id = self._resolve_player_id(connection, update.actor, context, timestamp, processed_at)
+        actor_id = self._resolve_player_id(
+            connection,
+            update.actor,
+            context,
+            timestamp,
+            processed_at,
+            update_live_roster=update.event_code not in _NON_LIVE_ROSTER_ACTIONS,
+        )
         victim_id = self._resolve_player_id(connection, update.target, context, timestamp, processed_at)
         if actor_id is None and update.target is None:
             return
@@ -1022,11 +1170,19 @@ class EventStorage:
     ) -> None:
         if self._has_transient_identity(update.actor):
             return
-        actor_id = self._resolve_player_id(connection, update.actor, context, timestamp, processed_at)
+        actor_id = self._resolve_player_id(
+            connection,
+            update.actor,
+            context,
+            timestamp,
+            processed_at,
+        )
         if self._should_ignore_bot_event(connection, context, actor_id):
             return
         team_only = 2 if update.attributes.get("team_only") else 1
         message = str(update.attributes.get("message", ""))
+        if self._is_legacy_filtered_chat_message(message):
+            return
         self._execute(
             connection,
             _INSERT_CHAT_QUERY,
@@ -1149,7 +1305,15 @@ class EventStorage:
     ) -> None:
         if self._has_transient_identity(update.actor):
             return
-        actor_id = self._resolve_player_id(connection, update.actor, context, timestamp, processed_at)
+        actor_id = self._resolve_player_id(
+            connection,
+            update.actor,
+            context,
+            timestamp,
+            processed_at,
+            emit_implicit_team_change=False,
+            update_live_roster=True,
+        )
         if actor_id is None:
             return
         if self._player_is_bot.get(actor_id, False):
@@ -1170,10 +1334,38 @@ class EventStorage:
                 team,
             ),
         )
+        self._player_last_team_change[actor_id] = timestamp
         self._player_teams[actor_id] = team
         if self._update_player_presence(context.server_id, actor_id, team):
             self._server_totals_dirty.add(context.server_id)
             self._refresh_server_player_totals_if_dirty(connection, context.server_id)
+
+    def _record_implicit_team_change(
+        self,
+        connection: proxy_db.SupportsConnection,
+        *,
+        context: EventContext,
+        timestamp: datetime,
+        player_id: int,
+        team: str,
+    ) -> None:
+        map_name = self._resolve_map(context)
+        dedupe_key = (context.server_id, player_id, map_name, team, timestamp)
+        if dedupe_key in self._seen_team_change_events:
+            return
+        self._seen_team_change_events.add(dedupe_key)
+        self._execute(
+            connection,
+            _INSERT_TEAM_CHANGE_QUERY,
+            (
+                timestamp,
+                context.server_id,
+                map_name,
+                player_id,
+                team,
+            ),
+        )
+        self._player_last_team_change[player_id] = timestamp
 
     def _record_team_bonus(
         self,
@@ -1234,7 +1426,14 @@ class EventStorage:
     ) -> None:
         if self._has_transient_identity(update.actor):
             return
-        actor_id = self._resolve_player_id(connection, update.actor, context, timestamp, processed_at)
+        actor_id = self._resolve_player_id(
+            connection,
+            update.actor,
+            context,
+            timestamp,
+            processed_at,
+            update_live_roster=update.event_code == "connect",
+        )
         if update.event_code == "connect":
             address = str(update.attributes.get("address") or "")
             self._execute(
@@ -1258,6 +1457,15 @@ class EventStorage:
                 )
             self._refresh_server_player_totals_if_dirty(connection, context.server_id)
         else:
+            if actor_id:
+                self._end_kill_streak(
+                    connection,
+                    context=context,
+                    map_name=map_name,
+                    timestamp=timestamp,
+                    processed_at=processed_at,
+                    player_id=actor_id,
+                )
             self._execute(
                 connection,
                 _INSERT_DISCONNECT_QUERY,
@@ -1272,6 +1480,7 @@ class EventStorage:
                     processed_at=processed_at,
                 )
                 self._close_player_object(connection, actor_id, flush_profile_name=True)
+                self._server_live_players.setdefault(context.server_id, set()).discard(actor_id)
                 self._server_active_players.setdefault(context.server_id, set()).discard(actor_id)
                 self._server_connected_players.setdefault(context.server_id, set()).discard(actor_id)
                 self._server_reward_eligible_players.setdefault(context.server_id, set()).discard(actor_id)
@@ -1379,6 +1588,8 @@ class EventStorage:
         context: EventContext,
         timestamp: datetime,
         processed_at: datetime,
+        *,
+        allow_create_player: bool = True,
     ) -> None:
         descriptors: list[PlayerDescriptor] = []
         if update.actor is not None:
@@ -1392,7 +1603,14 @@ class EventStorage:
             if cache_key in seen:
                 continue
             seen.add(cache_key)
-            self._resolve_player_id(connection, descriptor, context, timestamp, processed_at)
+            self._resolve_player_id(
+                connection,
+                descriptor,
+                context,
+                timestamp,
+                processed_at,
+                allow_create_player=allow_create_player,
+            )
 
     # ------------------------------------------------------------------
     # Resolution helpers
@@ -1409,6 +1627,9 @@ class EventStorage:
         processed_at: datetime,
         *,
         track_player_name: bool = True,
+        emit_implicit_team_change: bool = True,
+        allow_create_player: bool = True,
+        update_live_roster: bool = False,
     ) -> Optional[int]:
         if descriptor is None:
             return None
@@ -1424,6 +1645,8 @@ class EventStorage:
         if player_id is None:
             player_id = self._lookup_player(connection, descriptor, context.game)
             if player_id is None:
+                if not allow_create_player:
+                    return None
                 player_id = self._create_player(connection, descriptor, context.game)
                 if descriptor.unique_id:
                     normalized_unique = self._canonical_unique_id(descriptor.unique_id)
@@ -1444,29 +1667,51 @@ class EventStorage:
                     descriptor,
                 )
             self._player_cache[cache_key] = player_id
-            tracked_players = self._server_players.setdefault(context.server_id, set())
-            connected_players = self._server_connected_players.setdefault(context.server_id, set())
-            if player_id not in tracked_players:
-                tracked_players.add(player_id)
-                self._server_totals_dirty.add(context.server_id)
-            if player_id not in connected_players:
-                connected_players.add(player_id)
-                self._server_totals_dirty.add(context.server_id)
+            if allow_create_player:
+                connected_players = self._server_connected_players.setdefault(context.server_id, set())
+                if player_id not in connected_players:
+                    connected_players.add(player_id)
+                    self._server_totals_dirty.add(context.server_id)
         self._player_is_bot[player_id] = self._player_is_bot.get(player_id, False) or self._is_bot_descriptor(
             descriptor
         )
         if self._player_is_bot.get(player_id, False):
             self._apply_ignored_bot_profile(connection, context, player_id)
         force_alias_use = False
+        userid_rollover = False
         if descriptor.user_id is not None:
-            force_alias_use = self._handle_player_userid_rollover(connection, player_id, descriptor)
+            force_alias_use = self._handle_player_userid_rollover(
+                connection,
+                player_id,
+                descriptor,
+                server_id=context.server_id,
+            )
+            userid_rollover = force_alias_use
             self._player_last_user_id[player_id] = int(descriptor.user_id)
-        self._server_player_last_activity.setdefault(context.server_id, {})[player_id] = timestamp
 
+        self._mark_player_seen_on_server(context.server_id, player_id, update_live_roster=update_live_roster)
         normalized_team = self._normalize_team_name(descriptor.team)
+        if not (userid_rollover and not normalized_team and not update_live_roster):
+            self._server_player_last_activity.setdefault(context.server_id, {})[player_id] = timestamp
         if normalized_team:
+            previous_team = self._player_teams.get(player_id)
+            if (
+                emit_implicit_team_change
+                and previous_team is not None
+                and previous_team != normalized_team
+                and not self._player_is_bot.get(player_id, False)
+            ):
+                self._record_implicit_team_change(
+                    connection,
+                    context=context,
+                    timestamp=timestamp,
+                    player_id=player_id,
+                    team=normalized_team,
+                )
             self._player_teams[player_id] = normalized_team
             self._update_player_presence(context.server_id, player_id, normalized_team)
+        elif not userid_rollover and player_id not in self._closed_player_objects:
+            self._player_teams.setdefault(player_id, "")
         self._set_player_runtime_name(
             connection,
             player_id,
@@ -1491,17 +1736,48 @@ class EventStorage:
         connection: proxy_db.SupportsConnection,
         player_id: int,
         descriptor: PlayerDescriptor,
+        *,
+        server_id: int,
     ) -> bool:
         previous_user_id = self._player_last_user_id.get(player_id)
         current_user_id = int(descriptor.user_id) if descriptor.user_id is not None else None
         if previous_user_id is None or current_user_id is None or previous_user_id == current_user_id:
             return False
         self._flush_player_profile_name(connection, player_id)
+        self._clear_player_live_state_for_server(server_id, player_id)
         if descriptor.name:
             alias_key = (player_id, descriptor.name)
             self._player_name_uses.discard(alias_key)
             self._player_name_lastuse.pop(alias_key, None)
         return True
+
+    def _clear_player_live_state_for_server(self, server_id: int, player_id: int) -> None:
+        self._server_live_players.setdefault(server_id, set()).discard(player_id)
+        self._server_active_players.setdefault(server_id, set()).discard(player_id)
+        self._server_connected_players.setdefault(server_id, set()).discard(player_id)
+        self._server_reward_eligible_players.setdefault(server_id, set()).discard(player_id)
+        self._server_player_last_activity.setdefault(server_id, {}).pop(player_id, None)
+        self._player_teams.pop(player_id, None)
+        self._closed_player_objects.discard(player_id)
+        self._server_totals_dirty.add(server_id)
+
+    def _mark_player_seen_on_server(
+        self,
+        server_id: int,
+        player_id: int,
+        *,
+        update_live_roster: bool,
+    ) -> None:
+        tracked_players = self._server_players.setdefault(server_id, set())
+        if player_id not in tracked_players:
+            tracked_players.add(player_id)
+            self._server_totals_dirty.add(server_id)
+        if not update_live_roster:
+            return
+        live_players = self._server_live_players.setdefault(server_id, set())
+        if player_id not in live_players:
+            live_players.add(player_id)
+            self._server_totals_dirty.add(server_id)
 
     def _has_transient_identity(self, descriptor: Optional[PlayerDescriptor]) -> bool:
         if descriptor is None or not descriptor.unique_id:
@@ -1608,7 +1884,14 @@ class EventStorage:
     ) -> None:
         if flush_profile_name:
             self._flush_player_profile_name(connection, player_id)
+        self._player_teams.pop(player_id, None)
+        self._clear_player_combat_life_state(player_id)
         self._closed_player_objects.add(player_id)
+
+    def _clear_player_combat_life_state(self, player_id: int) -> None:
+        self._player_kills_per_life.pop(player_id, None)
+        self._player_kill_streaks.pop(player_id, None)
+        self._player_death_streaks.pop(player_id, None)
 
     def _flush_all_player_profile_names(
         self,
@@ -1888,7 +2171,7 @@ class EventStorage:
         timestamp: datetime,
         processed_at: datetime,
     ) -> None:
-        if update.event_code in {"Restart_Round_(1_second)", "Round_End"}:
+        if update.event_code in {"Round_End", "Round_Win", "Mini_Round_Win"}:
             self._drain_kill_streaks(connection, context, map_name, timestamp, processed_at)
             self._reset_round_streaks()
 
@@ -1914,7 +2197,11 @@ class EventStorage:
         active_players = self._server_active_players.setdefault(server_id, set())
         connected_players = self._server_connected_players.setdefault(server_id, set())
         reward_eligible_players = self._server_reward_eligible_players.setdefault(server_id, set())
+        live_players = self._server_live_players.setdefault(server_id, set())
         for player_id in stale_players:
+            if player_id in live_players:
+                live_players.discard(player_id)
+                self._server_totals_dirty.add(server_id)
             if player_id in connected_players:
                 continue
             self._close_player_object(connection, player_id, flush_profile_name=True)
@@ -1923,6 +2210,18 @@ class EventStorage:
             reward_eligible_players.discard(player_id)
             del last_activity[player_id]
         self._server_totals_dirty.add(server_id)
+
+    def _prune_idle_players_if_due(
+        self,
+        connection: proxy_db.SupportsConnection,
+        server_id: int,
+        event_time: datetime,
+    ) -> None:
+        next_prune_at = self._server_next_idle_prune_at.get(server_id)
+        if next_prune_at is not None and event_time < next_prune_at:
+            return
+        self._prune_idle_players(connection, server_id, event_time)
+        self._server_next_idle_prune_at[server_id] = event_time + _IDLE_PRUNE_INTERVAL
 
     def _active_trackable_players_for_gate(
         self,
@@ -1951,7 +2250,7 @@ class EventStorage:
         server_id: int,
     ) -> None:
         total_players = len(self._server_players.get(server_id, set()))
-        active_players = len(self._server_connected_players.get(server_id, set()))
+        active_players = len(self._server_live_players.get(server_id, set()))
         self._execute(
             connection,
             _UPDATE_SERVER_PLAYER_TOTALS_QUERY,
@@ -1978,6 +2277,38 @@ class EventStorage:
         if alias_key in _TEAM_ALIASES:
             return _TEAM_ALIASES[alias_key]
         return normalized
+
+    def _should_prime_ignored_action_for_team_sync(self, update: EventUpdate, context: EventContext) -> bool:
+        for descriptor in (update.actor, update.target):
+            if descriptor is None:
+                continue
+            cache_key = self._cache_key_for_player(context.game, descriptor)
+            if cache_key in self._player_cache:
+                return True
+            normalized_team = self._normalize_team_name(descriptor.team)
+            if not normalized_team:
+                continue
+            if normalized_team in {"UNASSIGNED", "SPECTATOR", "SPECTATORS", "SPEC"}:
+                return True
+        return False
+
+    def _is_legacy_filtered_chat_message(self, message: str) -> bool:
+        command = message.strip()
+        if not command:
+            return False
+        command_key = command[1:] if command.startswith("/") else command
+        command_key = command_key.strip().lower()
+        if command_key in _CHAT_COMMANDS:
+            return True
+        if _CHAT_TOP_COMMAND_RE.match(command):
+            return True
+        if any(command_key.startswith(prefix) for prefix in _CHAT_HLX_PREFIXES):
+            return True
+        if 3 < len(command) < 15:
+            lowered = command.lower()
+            if any(term in lowered for term in _CHAT_BUY_TERMS):
+                return True
+        return False
 
     def _is_bot_descriptor(self, descriptor: PlayerDescriptor) -> bool:
         if descriptor.user_id is not None and descriptor.user_id <= 0:
