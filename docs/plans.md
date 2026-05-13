@@ -365,6 +365,11 @@ deduplicated bug plan.
   на том же narrow-окне или зафиксировать принятое отличие в issues.
 - [~] P6d-M2 (RC-B): выровнять или явно принять политику объёмов
   `ChangeTeam` / `Connects` / `Chat` / `PlayerActions`.
+  Current runtime sub-focus: `hlstats_Servers.act_players` legacy live-roster
+  cadence remains open after the bot-cleanup pass; keep `Loading map` bot
+  removal, preserve human live-roster members across `Started map`, and verify
+  legacy-style idle-prune timing by replay/compare before reclassifying the
+  remaining RC-B residuals.
 - [ ] P6d-M3 (RC-C): повторная проверка идентичности игроков после M2.
 
 Policy checkpoint (2026-04-29):
