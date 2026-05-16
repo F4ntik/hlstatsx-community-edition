@@ -74,6 +74,67 @@ as reference unless the task spans them. **Fast log replay index:**
   cluster pass above: narrow-1000 replay and fresh compare completed
   successfully after the bot-name and telemetry slices.
 
+### Execution update (2026-05-15)
+
+- Continued the remaining visible `skill` drift as a reward-path slice after
+  subagent tracing against legacy Perl and Python storage. Legacy
+  `PlayerPlayerActions` applies `reward_player` to the actor and the symmetric
+  negative delta to the victim; Python had only applied the actor reward. Added
+  RED-first coverage for this parity rule and updated `_record_action()` to
+  apply the victim penalty through the same player/history rollup path. Local
+  storage/runtime validation now reports `113 passed`. This slice is
+  replay-pending because Docker buildx lock access was denied in the sandbox;
+  replay should measure movement in the visible skill sum (`+415` before this
+  change) before promoting broader team-bonus or flush-cadence changes.
+
+- Rebuilt `hlstats-worker`, reran the Python narrow-1000 contour with reused
+  valid legacy, and then ran the required host-side GeoIP backfill. The
+  2026-05-14 idle-prune equality fix is now replay-verified: the
+  `hlstats_Servers.act_players` residual is closed and `hlstats_Servers`
+  dropped out of fresh `compare_stats_dbs.py` output.
+- Fresh post-backfill compare now exits `1` for `8` residual tables. The
+  remaining narrow rows in `TeamBonuses`, `ChangeTeam`, and `PlayerActions`
+  are down to single-row examples, while the accepted `Entries 0/1017` line
+  remains visible by policy.
+- The highest-priority open slice changed: player-facing
+  `connection_time`/`skill` drift is now proven by direct SQL and page checks,
+  not inferred from normalized compare counts. Example anchor:
+  `Alex` (`playerId=162`, `uniqueId=1:507890084`) is
+  `legacy skill=1679, connection_time=1958, PlayerNames.numuses=37` vs
+  `python skill=1713, connection_time=0, PlayerNames.numuses=29`.
+- The `connection_time` failure is systemic after replay plus GeoIP backfill:
+  Python currently has `0` rows with non-zero `connection_time` in
+  `hlstats_Players`, `hlstats_PlayerNames`, and `hlstats_Players_History`,
+  whereas legacy has `298`, `336`, and `311`. This reclassifies the broader
+  `Players` / `PlayerNames` / `Players_History` cluster from diagnostic
+  backlog to active must-fix work for the next parity slice.
+- First narrow implementation slice is now replay-checked after unit validation:
+  Python tracks per-player connection-time flush timestamps, writes elapsed
+  session deltas to `hlstats_Players`, `hlstats_PlayerNames`, and
+  `hlstats_Players_History`, clamps gaps over `600` seconds to `0`, and resets
+  the session baseline on true close/reconnect boundaries. RED-first coverage
+  now includes disconnect, open-player finalize, clamp, and reconnect/offline
+  gap cases. Targeted storage/runtime validation passes (`4 passed` for the
+  connection-time slice and `110 passed` for
+  `test_runtime_decisions.py test_storage.py`). The reused-legacy narrow-1000
+  replay plus GeoIP backfill succeeded. The missing persistence root cause is
+  closed, but exact attribution remains open: Python now has non-zero
+  `connection_time` rows (`285/325/438`) instead of `0/0/0`, compared to
+  legacy `298/336/311`; `Alex` moved to Python `1976` vs legacy `1958`;
+  compare still reports `8` residual tables with `Players 38/38`,
+  `PlayerNames 2/3`, and `Players_History 90/90`.
+  `Players_History.connection_time` is over-attributed in aggregate
+  (`157145` vs legacy `108852`). A follow-up ignored-bot policy slice now
+  suppresses only the history `connection_time` delta for ignored bots while
+  preserving bot `Players` and `PlayerNames` totals. Targeted validation passes
+  (`5 passed` for connection-time/bot tests and `111 passed` for
+  `test_runtime_decisions.py test_storage.py`), and the second replay/GeoIP
+  gate succeeded. Python bot connection-time sums are now
+  `Players=43006`, `PlayerNames=43006`, `Players_History=0`; overall history
+  sum dropped to `114139` vs legacy `108852`. The next milestone is calibration
+  of remaining human history/session flush semantics, skill attribution, and
+  alias-use boundaries, not another broad event-policy change.
+
 ## Product contract
 
 - Default runtime path:

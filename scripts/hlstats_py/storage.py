@@ -55,6 +55,7 @@ _IGNORED_PLAYER_TRIGGER_ACTIONS = {"latency", "time"}
 _NON_LIVE_ROSTER_ACTIONS = {"Dropped_The_Bomb"}
 _ACTIVE_PLAYER_IDLE_TIMEOUT = timedelta(seconds=250)
 _IDLE_PRUNE_INTERVAL = timedelta(seconds=30)
+_MAX_CONNECTION_TIME_GAP_SECONDS = 600
 _TEAM_ALIASES = {
     "T": "TERRORIST",
     "TS": "TERRORIST",
@@ -157,6 +158,9 @@ _INSERT_PLAYER_QUERY = "INSERT INTO hlstats_Players (`game`, `lastName`) VALUES 
 _LAST_INSERT_ID_QUERY = "SELECT LAST_INSERT_ID()"
 _UPDATE_PLAYER_NAME_QUERY = "UPDATE hlstats_Players SET `lastName` = %s WHERE `playerId` = %s"
 _UPDATE_PLAYER_LAST_ADDRESS_QUERY = "UPDATE hlstats_Players SET `lastAddress` = %s WHERE `playerId` = %s"
+_UPDATE_PLAYER_CONNECTION_TIME_QUERY = (
+    "UPDATE hlstats_Players SET `connection_time` = `connection_time` + %s WHERE `playerId` = %s"
+)
 _UPSERT_PLAYER_NAME_QUERY = (
     "INSERT INTO hlstats_PlayerNames (`playerId`, `name`, `lastuse`, `numuses`) VALUES (%s, %s, %s, 1) "
     "ON DUPLICATE KEY UPDATE `lastuse` = VALUES(`lastuse`), `numuses` = `numuses` + 1"
@@ -535,6 +539,7 @@ class EventStorage:
         self._server_min_players: dict[int, int] = {}
         self._server_ignore_bots: dict[int, int] = {}
         self._server_tk_penalties: dict[int, int] = {}
+        self._server_suicide_penalties: dict[int, int] = {}
         self._option_cache: dict[str, int] = {}
         self._player_is_bot: dict[int, bool] = {}
         self._player_is_bot_cache: dict[tuple[int, str], bool] = {}
@@ -549,6 +554,8 @@ class EventStorage:
         self._player_deaths_in_a_row: dict[int, int] = {}
         self._player_skills: dict[int, int] = {}
         self._player_total_kills: dict[int, int] = {}
+        self._player_connection_time_flush_at: dict[int, datetime] = {}
+        self._player_connection_time_context: dict[int, tuple[int, str]] = {}
         self._seen_team_change_events: set[tuple[int, int, str, str, datetime]] = set()
         self._player_last_team_change: dict[int, datetime] = {}
         self._seen_team_bonus_events: set[tuple[int, int, int, datetime]] = set()
@@ -637,6 +644,7 @@ class EventStorage:
         self._server_min_players.clear()
         self._server_ignore_bots.clear()
         self._server_tk_penalties.clear()
+        self._server_suicide_penalties.clear()
         self._option_cache.clear()
         self._player_is_bot.clear()
         self._player_is_bot_cache.clear()
@@ -651,6 +659,8 @@ class EventStorage:
         self._player_deaths_in_a_row.clear()
         self._player_skills.clear()
         self._player_total_kills.clear()
+        self._player_connection_time_flush_at.clear()
+        self._player_connection_time_context.clear()
         self._seen_team_change_events.clear()
         self._player_last_team_change.clear()
         self._seen_team_bonus_events.clear()
@@ -662,6 +672,7 @@ class EventStorage:
         connection = self._connection()
         self._flush_event_buffer()
         self._flush_frag_counter_buffer()
+        self._flush_all_open_player_connection_times(connection)
         self._flush_all_player_profile_names(connection)
         self._execute(connection, _FINALIZE_PLAYER_LAST_EVENT_QUERY, None)
         self._maybe_commit_batch()
@@ -672,6 +683,7 @@ class EventStorage:
         connection = self._connection()
         self._flush_event_buffer()
         self._flush_frag_counter_buffer()
+        self._flush_all_open_player_connection_times(connection)
         self._flush_all_player_profile_names(connection)
         self._commit_pending()
 
@@ -734,7 +746,12 @@ class EventStorage:
                 if player_id in live_players
             }
             for player_id in stale_players:
-                self._close_player_object(connection, player_id, flush_profile_name=False)
+                self._close_player_object(
+                    connection,
+                    player_id,
+                    flush_profile_name=False,
+                    flush_connection_time_at=event_timestamp,
+                )
             if not flushed_player_totals:
                 self._server_totals_dirty.add(server_id)
             return
@@ -1063,6 +1080,9 @@ class EventStorage:
         )
         self._execute(connection, _UPDATE_PLAYER_SUICIDES_QUERY, (player_id,))
         self._execute(connection, _UPDATE_SERVER_SUICIDE_TOTALS_QUERY, (context.server_id,))
+        penalty = (-1) * self._server_suicide_penalty(connection, context.server_id)
+        if penalty:
+            self._execute(connection, _UPDATE_PLAYER_SKILL_QUERY, (penalty, player_id))
         self._update_player_rollups(
             connection,
             context=context,
@@ -1070,6 +1090,7 @@ class EventStorage:
             processed_at=processed_at,
             player_id=player_id,
             suicides=1,
+            skill_delta=penalty,
         )
 
     def _record_action(
@@ -1138,6 +1159,15 @@ class EventStorage:
                 player_id=actor_id,
                 delta=bonus,
             )
+            if victim_id:
+                self._apply_player_skill_delta(
+                    connection,
+                    context=context,
+                    timestamp=timestamp,
+                    processed_at=processed_at,
+                    player_id=victim_id,
+                    delta=(-1) * bonus,
+                )
         if action.reward_team:
             # Keep team-reward gating aligned with legacy behavior:
             # when round status is non-zero, rewardTeam should not emit rows.
@@ -1479,7 +1509,12 @@ class EventStorage:
                     event_timestamp=timestamp,
                     processed_at=processed_at,
                 )
-                self._close_player_object(connection, actor_id, flush_profile_name=True)
+                self._close_player_object(
+                    connection,
+                    actor_id,
+                    flush_profile_name=True,
+                    flush_connection_time_at=timestamp,
+                )
                 self._server_live_players.setdefault(context.server_id, set()).discard(actor_id)
                 self._server_active_players.setdefault(context.server_id, set()).discard(actor_id)
                 self._server_connected_players.setdefault(context.server_id, set()).discard(actor_id)
@@ -1685,11 +1720,14 @@ class EventStorage:
                 player_id,
                 descriptor,
                 server_id=context.server_id,
+                timestamp=timestamp,
             )
             userid_rollover = force_alias_use
             self._player_last_user_id[player_id] = int(descriptor.user_id)
 
         self._mark_player_seen_on_server(context.server_id, player_id, update_live_roster=update_live_roster)
+        self._player_connection_time_flush_at.setdefault(player_id, timestamp)
+        self._player_connection_time_context[player_id] = (context.server_id, context.game)
         normalized_team = self._normalize_team_name(descriptor.team)
         if not (userid_rollover and not normalized_team and not update_live_roster):
             self._server_player_last_activity.setdefault(context.server_id, {})[player_id] = timestamp
@@ -1738,11 +1776,14 @@ class EventStorage:
         descriptor: PlayerDescriptor,
         *,
         server_id: int,
+        timestamp: datetime,
     ) -> bool:
         previous_user_id = self._player_last_user_id.get(player_id)
         current_user_id = int(descriptor.user_id) if descriptor.user_id is not None else None
         if previous_user_id is None or current_user_id is None or previous_user_id == current_user_id:
             return False
+        self._flush_player_connection_time(connection, player_id, timestamp)
+        self._reset_player_connection_time_session(player_id)
         self._flush_player_profile_name(connection, player_id)
         self._clear_player_live_state_for_server(server_id, player_id)
         if descriptor.name:
@@ -1881,7 +1922,11 @@ class EventStorage:
         player_id: int,
         *,
         flush_profile_name: bool,
+        flush_connection_time_at: datetime | None = None,
     ) -> None:
+        if flush_connection_time_at is not None:
+            self._flush_player_connection_time(connection, player_id, flush_connection_time_at)
+        self._reset_player_connection_time_session(player_id)
         if flush_profile_name:
             self._flush_player_profile_name(connection, player_id)
         self._player_teams.pop(player_id, None)
@@ -1899,6 +1944,78 @@ class EventStorage:
     ) -> None:
         for player_id in sorted(self._player_names):
             self._flush_player_profile_name(connection, player_id)
+
+    def _flush_all_open_player_connection_times(
+        self,
+        connection: proxy_db.SupportsConnection,
+    ) -> None:
+        for server_id in sorted(self._server_player_last_activity):
+            last_activity = self._server_player_last_activity.get(server_id, {})
+            for player_id in sorted(last_activity):
+                self._flush_player_connection_time(connection, player_id, last_activity[player_id])
+
+    def _flush_player_connection_time(
+        self,
+        connection: proxy_db.SupportsConnection,
+        player_id: int,
+        flush_timestamp: datetime,
+    ) -> None:
+        last_flush_at = self._player_connection_time_flush_at.get(player_id)
+        if last_flush_at is None:
+            self._player_connection_time_flush_at[player_id] = flush_timestamp
+            return
+        delta = int((flush_timestamp - last_flush_at).total_seconds())
+        if delta <= 0:
+            return
+        self._player_connection_time_flush_at[player_id] = flush_timestamp
+        if delta > _MAX_CONNECTION_TIME_GAP_SECONDS:
+            return
+
+        player_context = self._player_connection_time_context.get(player_id)
+        if player_context is None:
+            return
+        _server_id, game = player_context
+        current_skill = self._player_skills.setdefault(player_id, 1000)
+        ignore_bots_enabled = self._player_is_bot.get(player_id, False) and self._server_ignore_bots_enabled(
+            connection,
+            _server_id,
+        )
+        history_timestamp = self._history_timestamp(flush_timestamp)
+        self._execute(
+            connection,
+            _UPSERT_PLAYER_HISTORY_QUERY,
+            (player_id, history_timestamp, game, current_skill),
+        )
+        self._execute(connection, _UPDATE_PLAYER_CONNECTION_TIME_QUERY, (delta, player_id))
+        self._add_player_name_rollup(player_id, connection_time=delta)
+        if not ignore_bots_enabled:
+            self._execute(
+                connection,
+                _UPDATE_PLAYER_HISTORY_QUERY,
+                (
+                    delta,
+                    0,
+                    0,
+                    0,
+                    current_skill,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    player_id,
+                    history_timestamp,
+                    game,
+                ),
+            )
+
+    def _reset_player_connection_time_session(self, player_id: int) -> None:
+        self._player_connection_time_flush_at.pop(player_id, None)
+        self._player_connection_time_context.pop(player_id, None)
 
     def _touch_player_name(
         self,
@@ -2095,6 +2212,23 @@ class EventStorage:
         self._server_tk_penalties[server_id] = value
         return value
 
+    def _server_suicide_penalty(
+        self,
+        connection: proxy_db.SupportsConnection,
+        server_id: int,
+    ) -> int:
+        cached = self._server_suicide_penalties.get(server_id)
+        if cached is not None:
+            return cached
+        row = self._fetchone(connection, _SELECT_SERVER_CONFIG_QUERY, (server_id, "SuicidePenalty"))
+        if row and row[0] is not None:
+            value = int(row[0])
+        else:
+            default_row = self._fetchone(connection, _SELECT_DEFAULT_SERVER_CONFIG_QUERY, ("SuicidePenalty",))
+            value = int(default_row[0]) if default_row and default_row[0] is not None else 5
+        self._server_suicide_penalties[server_id] = value
+        return value
+
     def _weapon_modifier(
         self,
         connection: proxy_db.SupportsConnection,
@@ -2204,7 +2338,12 @@ class EventStorage:
                 self._server_totals_dirty.add(server_id)
             if player_id in connected_players:
                 continue
-            self._close_player_object(connection, player_id, flush_profile_name=True)
+            self._close_player_object(
+                connection,
+                player_id,
+                flush_profile_name=True,
+                flush_connection_time_at=event_time,
+            )
             active_players.discard(player_id)
             connected_players.discard(player_id)
             reward_eligible_players.discard(player_id)
@@ -2218,7 +2357,7 @@ class EventStorage:
         event_time: datetime,
     ) -> None:
         next_prune_at = self._server_next_idle_prune_at.get(server_id)
-        if next_prune_at is not None and event_time < next_prune_at:
+        if next_prune_at is not None and event_time <= next_prune_at:
             return
         self._prune_idle_players(connection, server_id, event_time)
         self._server_next_idle_prune_at[server_id] = event_time + _IDLE_PRUNE_INTERVAL

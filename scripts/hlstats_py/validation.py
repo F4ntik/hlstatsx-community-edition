@@ -50,6 +50,7 @@ from .storage import (
     _UPDATE_SERVER_MAP_LOADING_QUERY,
     _UPDATE_SERVER_MAP_STARTED_QUERY,
     _UPDATE_SERVER_PLAYER_TOTALS_QUERY,
+    _UPDATE_SERVER_SUICIDE_TOTALS_QUERY,
     _UPSERT_MAP_COUNTS_QUERY,
     _UPSERT_PLAYER_HISTORY_QUERY,
     _UPSERT_PLAYER_NAME_QUERY,
@@ -680,6 +681,8 @@ class ReplayDatabase:
         if query == _UPDATE_SERVER_PLAYER_TOTALS_QUERY:
             return _ExecutionResult()
         if query == _UPDATE_SERVER_FRAG_TOTALS_QUERY:
+            return _ExecutionResult()
+        if query == _UPDATE_SERVER_SUICIDE_TOTALS_QUERY:
             return _ExecutionResult()
         if query == _UPSERT_MAP_COUNTS_QUERY:
             return _ExecutionResult()

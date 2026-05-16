@@ -2,6 +2,139 @@
 
 ## Snapshot
 
+- 2026-05-15 automation continuation: traced the remaining visible positive
+  `skill` drift with two subagents against legacy Perl and Python storage.
+  Both traces converged on reward-path behavior rather than combat counters:
+  legacy `PlayerPlayerActions` applies `reward_player` to the actor and the
+  symmetric negative delta to the victim, while Python only rewarded the actor.
+  This matches the symptom from the previous replay: kills/deaths/headshots/
+  suicides/teamkills match for all common players, but Python visible skill is
+  `+415`. Added RED-first regression
+  `test_player_player_action_penalizes_victim_skill_like_legacy` and updated
+  `_record_action()` so victim-targeted player-player action bonuses now write
+  `hlstats_Players.skill -= reward_player` and the matching
+  `hlstats_Players_History.skill_change` delta through the existing rollup
+  path. Local validation:
+  targeted RED/green test passed, and
+  `test_runtime_decisions.py test_storage.py -q` reports `113 passed`.
+  Replay is still pending for this slice because `docker compose build
+  hlstats-worker` could not acquire `C:\Users\semer\.docker\buildx\.lock`
+  (`Access is denied`) in this sandbox. Next run should rebuild
+  `hlstats-worker`, rerun narrow-1000 with `-ReuseValidLegacy`, run GeoIP
+  backfill, and compare whether the visible skill sum drops toward legacy
+  before chasing team bonus or history flush cadence.
+
+- 2026-05-15 implementation continuation: completed the first narrow
+  `connection_time` parity slice in `scripts/hlstats_py/storage.py`.
+  Root-cause review against legacy Perl confirmed that `HLstats_Player::updateDB`
+  computes elapsed session time from the last player flush timestamp, clamps
+  gaps over `600` seconds to `0`, and writes the same delta into
+  `hlstats_Players`, `hlstats_PlayerNames`, and `hlstats_Players_History`.
+  Python already had partial PlayerNames/history SQL support, but no elapsed
+  session clock, no `hlstats_Players.connection_time` update path, and a
+  literal `0` history rollup. Python now tracks a per-player connection-time
+  flush timestamp/context, writes `hlstats_Players.connection_time += delta`,
+  forwards the same delta through PlayerNames rollups and same-day history
+  updates, flushes open sessions from `finalize_import()` / `flush_pending()`,
+  and flushes/reset sessions on close boundaries such as disconnect, idle
+  close, map-start stale close, and userid rollover. A review-found reconnect
+  bug was fixed before handoff: true session close now clears the time baseline
+  so offline gaps are not counted after reconnect. RED-first regressions added:
+  `test_disconnect_flushes_player_connection_time_rollups`,
+  `test_finalize_import_flushes_open_player_connection_time`,
+  `test_flush_pending_clamps_connection_time_gap_above_600_seconds`, and
+  `test_reconnect_does_not_count_offline_gap_into_connection_time`. Local
+  validation: targeted connection-time pytest reports `4 passed, 99 deselected`;
+  `test_runtime_decisions.py test_storage.py -q` reports `110 passed`. Replay is
+  now complete for this slice: `docker compose build hlstats-worker` succeeded,
+  `Run-DualContour-1000.ps1 -MaxImportFiles 1000 -UseDumpRestore
+  -ReuseValidLegacy` succeeded, host-side GeoIP backfill exited `0`, and
+  `compare_stats_dbs.py --max-examples 5` still exits `1` for `8` residual
+  tables. The systemic zero is closed but exact parity is not:
+  `connection_time` counts moved from Python `0/0/0` to `285/325/438` for
+  `Players` / `PlayerNames` / `Players_History`, versus legacy `298/336/311`.
+  The `Alex` anchor moved from Python `connection_time=0` to `1976` versus
+  legacy `1958`; `PlayerNames(Alex)` is also `1976` vs `1958`, while
+  `numuses` remains `29` vs legacy `37` and skill remains `1713` vs `1679`.
+  Aggregate sums show the next bug is flush/history attribution, not missing
+  persistence: Python `Players` sum is `157145` vs legacy `155642`,
+  `PlayerNames` sum is `157145` vs `155446`, and `Players_History` sum is
+  `157145` vs legacy `108852`. Follow-up root-cause tracing isolated the
+  largest history overcount to ignored bots: legacy writes bot
+  `connection_time` into `Players` and `PlayerNames`, but leaves ignored-bot
+  history `connection_time=0`. Python now mirrors that policy while preserving
+  bot player/name totals. Added
+  `test_ignore_bots_flushes_connection_time_without_history_delta`; targeted
+  connection-time tests report `5 passed, 99 deselected`, and
+  `test_runtime_decisions.py test_storage.py -q` reports `111 passed`. A second
+  rebuild/replay/GeoIP/compare completed successfully. Post-fix SQL anchors:
+  Python non-zero `connection_time` counts are `285/325/314`; sums are
+  `Players=157145`, `PlayerNames=157145`, `Players_History=114139`; bot sums
+  are `43006/43006/0`, matching the legacy ignored-bot history shape. Compare
+  still exits `1` for the same `8` residual tables, with `Players 38/38`,
+  `PlayerNames 2/3`, and `Players_History 90/90`. Next slice should continue
+  human skill/session/alias attribution rather than reopening GeoIP,
+  `act_players`, or one-row TeamBonuses/ChangeTeam drift.
+
+- 2026-05-15 continuation: rebuilt `hlstats-worker`, reran the Python
+  narrow-1000 contour with reused valid legacy
+  (`Run-DualContour-1000.ps1 -MaxImportFiles 1000 -UseDumpRestore
+  -ReuseValidLegacy`), then ran the required host-side GeoIP backfill
+  (`python -m hlstats_awards_py --configfile /app/hlstats.conf --geoip`
+  through the comparison worker compose file). The 2026-05-14
+  `_prune_idle_players_if_due()` equality fix is now replay-verified:
+  `hlstats_Servers.act_players` closed and `hlstats_Servers` disappeared from
+  fresh `compare_stats_dbs.py --max-examples 5` output. Current compare now
+  exits `1` for `8` residual tables: `hlstats_Actions`
+  `kill_streak_2 1065/1066`; `hlstats_Events_PlayerActions 4972/4973` with the
+  single Python-only `Rakza` row at `2024-01-06 00:18:10` on `de_spay`;
+  `hlstats_Events_ChangeTeam 1345/1344` with the single legacy-only
+  `UNASSIGNED` row for `Rakza`; `hlstats_Events_TeamBonuses 4765/4764` with the
+  single legacy-only `CTs_Win` row for `Dance Bear`; accepted
+  `hlstats_Events_Entries 0/1017`; plus the broader identity/history cluster
+  in `hlstats_Players`, `hlstats_PlayerNames`, and
+  `hlstats_Players_History`. The new must-fix evidence is no longer abstract:
+  direct SQL confirms player-facing `skill` and session drift for
+  `playerId=162` / `uniqueId=1:507890084` (`Alex`) with
+  `legacy skill=1679, connection_time=1958, PlayerNames.numuses=37` vs
+  `python skill=1713, connection_time=0, PlayerNames.numuses=29`, while
+  kills/deaths remain `141/159`. The `connection_time` gap is systemic, not a
+  one-off page quirk: after fresh replay plus GeoIP backfill, legacy still has
+  `hlstats_Players.connection_time > 0` for `298` players,
+  `hlstats_PlayerNames.connection_time > 0` for `336` alias rows, and
+  `hlstats_Players_History.connection_time > 0` for `311` history rows,
+  whereas Python is `0/0/0`. GeoIP is back in the expected post-replay state
+  (`lastAddress <> ''` with empty `flag`/`country` is `0`), so the remaining
+  `Players` drift is no longer a missing-backfill artifact. Next task should
+  treat `connection_time` persistence plus the linked `skill` / alias-use /
+  history attribution drift as the new primary must-fix slice; do not reopen
+  the now-closed `act_players` work.
+
+- 2026-05-14 automation continuation: continued the
+  `hlstats_Servers.act_players` residual instead of moving to a new parity
+  cluster. Legacy tracing confirmed that Perl's `Started map` clears player
+  `team` / `trackable` state but does not remove human `srv_players`, and that
+  idle cleanup only runs when `next_timeout < ev_daemontime`. Python's
+  live-roster model was already the correct `srv_players` analogue, so the
+  fix stayed on the exact timeout gate: `_prune_idle_players_if_due()` now
+  waits until the event timestamp is strictly after the scheduled legacy sweep
+  boundary instead of pruning at equality. Added
+  `test_record_does_not_prune_idle_players_at_exact_legacy_timeout_boundary`
+  to cover the equality edge and keep the existing before/after cadence
+  regression intact. Also updated the in-memory replay validation database to
+  accept the server suicide aggregate query emitted by the suicide parity path.
+  Validation: focused act-player tests passed; targeted
+  storage/events/runtime-decisions suite reports `118 passed`; broad
+  `scripts/hlstats_py/tests -k "not heatmap and not load_settings"` reports
+  `164 passed, 8 deselected`. Full unfiltered `scripts/hlstats_py/tests`
+  remains blocked in this Windows session by `tmp_path` permission errors for
+  heatmap/load-settings tests, but the unrelated replay validation failure was
+  fixed. Docker replay/build was not run because Docker API access returned
+  `permission denied` on `npipe:////./pipe/dockerDesktopLinuxEngine`. Next run
+  should rebuild `hlstats-worker`, rerun the narrow-1000 Python contour with
+  `-ReuseValidLegacy`, then confirm whether `act_players` moves from Python
+  `0` back to legacy `4`.
+
 - 2026-05-13 overlay: traced the remaining `hlstats_Servers.act_players`
   `4/0` residual back to legacy idle-cleanup cadence. Legacy Perl writes
   `act_players` from `%srv_players` via `HLstats_Server::updatePlayerCount()`;
