@@ -36,6 +36,7 @@ from .storage import (
     _SELECT_SERVER_CONFIG_QUERY,
     _SELECT_WEAPON_MODIFIER_QUERY,
     _UPDATE_PLAYER_DEATHS_QUERY,
+    _UPDATE_PLAYER_CONNECTION_TIME_QUERY,
     _UPDATE_PLAYER_FRAG_ROLLUP_QUERY,
     _UPDATE_PLAYER_KILLS_QUERY,
     _UPDATE_PLAYER_NAME_QUERY,
@@ -214,6 +215,7 @@ class _PlayerRecord:
     game: str
     name: str
     unique_ids: List[str] = field(default_factory=list)
+    connection_time: int = 0
     kills: int = 0
     headshots: int = 0
     deaths: int = 0
@@ -677,6 +679,12 @@ class ReplayDatabase:
             delta, player_id = normalized_params
             record = self._players[int(player_id)]
             record.skill += int(delta)
+            return _ExecutionResult()
+        if query == _UPDATE_PLAYER_CONNECTION_TIME_QUERY:
+            assert normalized_params is not None
+            delta, player_id = normalized_params
+            record = self._players[int(player_id)]
+            record.connection_time += int(delta)
             return _ExecutionResult()
         if query == _UPDATE_SERVER_PLAYER_TOTALS_QUERY:
             return _ExecutionResult()

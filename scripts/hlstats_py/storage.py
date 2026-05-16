@@ -670,9 +670,10 @@ class EventStorage:
         """Apply import-tail updates after a finite stdin replay."""
 
         connection = self._connection()
+        flush_timestamp = self._clock()
         self._flush_event_buffer()
         self._flush_frag_counter_buffer()
-        self._flush_all_open_player_connection_times(connection)
+        self._flush_all_open_player_connection_times(connection, flush_timestamp)
         self._flush_all_player_profile_names(connection)
         self._execute(connection, _FINALIZE_PLAYER_LAST_EVENT_QUERY, None)
         self._maybe_commit_batch()
@@ -681,9 +682,10 @@ class EventStorage:
     def flush_pending(self) -> None:
         """Flush buffered inserts and commit pending batched writes."""
         connection = self._connection()
+        flush_timestamp = self._clock()
         self._flush_event_buffer()
         self._flush_frag_counter_buffer()
-        self._flush_all_open_player_connection_times(connection)
+        self._flush_all_open_player_connection_times(connection, flush_timestamp)
         self._flush_all_player_profile_names(connection)
         self._commit_pending()
 
@@ -1948,11 +1950,10 @@ class EventStorage:
     def _flush_all_open_player_connection_times(
         self,
         connection: proxy_db.SupportsConnection,
+        flush_timestamp: datetime,
     ) -> None:
-        for server_id in sorted(self._server_player_last_activity):
-            last_activity = self._server_player_last_activity.get(server_id, {})
-            for player_id in sorted(last_activity):
-                self._flush_player_connection_time(connection, player_id, last_activity[player_id])
+        for player_id in sorted(self._player_connection_time_flush_at):
+            self._flush_player_connection_time(connection, player_id, flush_timestamp)
 
     def _flush_player_connection_time(
         self,

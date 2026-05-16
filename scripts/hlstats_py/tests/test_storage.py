@@ -9,7 +9,7 @@ from typing import Dict, Iterable, List, Tuple
 
 import pytest
 
-from hlstats_py import EventContext, LocalizationCatalog
+from hlstats_py import EventContext, LocalizationCatalog, ReplayRunner
 from hlstats_py.events import (
     ActionDefinition,
     ConnectEventHandler,
@@ -848,7 +848,7 @@ def test_player_name_totals_flush_to_current_alias_after_name_change(
         (_SELECT_ACTION_QUERY, ("csgo", "headshot")): [QueryResponse(fetchone=(501, 0, 0))],
     }
     connection = FakeConnection(responses)
-    storage = EventStorage(StubAdapter(connection), clock=lambda: frag_update.timestamp)
+    storage = EventStorage(StubAdapter(connection), clock=lambda: name_update.timestamp)
 
     storage.record(frag_update, event_context)
     assert all(query != _UPDATE_PLAYERNAME_TOTALS_QUERY for query, _params in connection.executed)
@@ -1756,6 +1756,47 @@ def test_finalize_import_flushes_open_player_connection_time(event_context: Even
     ) in connection.executed
 
 
+def test_finalize_import_flushes_rollover_session_without_live_activity_entry(
+    event_context: EventContext,
+) -> None:
+    dispatcher = EventDispatcher([ChatEventHandler()])
+    first_update = dispatcher.dispatch(
+        parse_log_event('L 01/02/2024 - 03:04:05: "Alice<2><STEAM_1:2><CT>" say "ready"'),
+        event_context,
+    )
+    rollover_update = dispatcher.dispatch(
+        parse_log_event('L 01/02/2024 - 03:04:35: "Alice<3><STEAM_1:2><>" say "back"'),
+        event_context,
+    )
+    import_end = datetime(2024, 1, 2, 3, 4, 50)
+    history_timestamp = datetime(2024, 1, 2)
+
+    responses: Dict[QueryKey, List[QueryResponse]] = {
+        (_PLAYER_BY_UNIQUE_QUERY, ("STEAM_1:2", "csgo")): [QueryResponse(fetchone=(101,))],
+        (_SELECT_PLAYER_STATE_QUERY, (101,)): [QueryResponse(fetchone=(1000, 0, "", 0))],
+    }
+    connection = FakeConnection(responses)
+    storage = EventStorage(StubAdapter(connection), clock=lambda: import_end)
+
+    storage.record(first_update, event_context)
+    storage.record(rollover_update, event_context)
+
+    assert 101 not in storage._server_player_last_activity[event_context.server_id]
+
+    storage.finalize_import()
+
+    assert (_UPDATE_PLAYER_CONNECTION_TIME_QUERY, (30, 101)) in connection.executed
+    assert (_UPDATE_PLAYER_CONNECTION_TIME_QUERY, (15, 101)) in connection.executed
+    assert (
+        _UPDATE_PLAYERNAME_TOTALS_QUERY,
+        (15, 0, 0, 0, 0, 0, 0, 101, "Alice"),
+    ) in connection.executed
+    assert (
+        _UPDATE_PLAYER_HISTORY_QUERY,
+        (15, 0, 0, 0, 1000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 101, history_timestamp, "csgo"),
+    ) in connection.executed
+
+
 def test_flush_pending_clamps_connection_time_gap_above_600_seconds(event_context: EventContext) -> None:
     dispatcher = EventDispatcher([ConnectEventHandler(), ChatEventHandler()])
     connect_update = dispatcher.dispatch(
@@ -1805,15 +1846,17 @@ def test_flush_pending_clamps_connection_time_gap_above_600_seconds(event_contex
     storage.record(fresh_chat_update, event_context)
     storage.finalize_import()
 
-    assert (_UPDATE_PLAYER_CONNECTION_TIME_QUERY, (5, 101)) in connection.executed
-    assert (
-        _UPDATE_PLAYERNAME_TOTALS_QUERY,
-        (5, 0, 0, 0, 0, 0, 0, 101, "Alice"),
-    ) in connection.executed
-    assert (
-        _UPDATE_PLAYER_HISTORY_QUERY,
-        (5, 0, 0, 0, 1000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 101, history_timestamp, "csgo"),
-    ) in connection.executed
+    assert all(
+        entry not in connection.executed
+        for entry in [
+            (_UPDATE_PLAYER_CONNECTION_TIME_QUERY, (5, 101)),
+            (_UPDATE_PLAYERNAME_TOTALS_QUERY, (5, 0, 0, 0, 0, 0, 0, 101, "Alice")),
+            (
+                _UPDATE_PLAYER_HISTORY_QUERY,
+                (5, 0, 0, 0, 1000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 101, history_timestamp, "csgo"),
+            ),
+        ]
+    )
 
 
 def test_reconnect_does_not_count_offline_gap_into_connection_time(event_context: EventContext) -> None:
@@ -1865,6 +1908,27 @@ def test_reconnect_does_not_count_offline_gap_into_connection_time(event_context
     assert player_connection_updates == [(10, 101), (5, 101)]
     assert (15, 101) not in player_connection_updates
     assert (20, 101) not in player_connection_updates
+
+
+def test_replay_runner_handles_connection_time_player_update(event_context: EventContext) -> None:
+    generic = GenericEventHandler()
+    dispatcher = EventDispatcher(
+        [ConnectEventHandler(), DisconnectEventHandler(), generic],
+        fallback=generic,
+    )
+    runner = ReplayRunner(dispatcher, event_context)
+
+    result = runner.run(
+        [
+            'PROXY Key=proxy 127.0.0.1:27015 PROXY '
+            'L 01/02/2024 - 03:04:05: "Alice<2><STEAM_1:2><>" connected, address "1.2.3.4:27005"',
+            'PROXY Key=proxy 127.0.0.1:27015 PROXY '
+            'L 01/02/2024 - 03:04:12: "Alice<2><STEAM_1:2><CT>" disconnected',
+        ]
+    )
+
+    assert (_UPDATE_PLAYER_CONNECTION_TIME_QUERY, (7, 1)) in result.executed_queries
+    assert result.snapshot.players[1].disconnects == 1
 
 
 def test_flush_pending_flushes_deferred_player_profile_names(event_context: EventContext) -> None:
