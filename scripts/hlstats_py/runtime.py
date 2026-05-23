@@ -170,6 +170,10 @@ _STARTED_MAP_INLINE_RE = re.compile(r'Started map "(?P<map>[^"]+)"')
 _STDIN_PROGRESS_EVERY = 10000
 _UDP_IDLE_FLUSH_SECONDS = 0.5
 _ROUND_WIN_ACTIONS = {
+    "CTs_Win",
+    "Bomb_Defused",
+    "Terrorists_Win",
+    "Target_Bombed",
     "SFUI_Notice_CTs_Win",
     "SFUI_Notice_Bomb_Defused",
     "SFUI_Notice_Terrorists_Win",

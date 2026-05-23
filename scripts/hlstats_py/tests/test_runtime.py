@@ -281,6 +281,27 @@ def test_runtime_projects_round_status_for_team_trigger_rewards() -> None:
     assert [event.round_status for event in storage.recorded] == [0, 1, 0, 0]
 
 
+def test_runtime_projects_round_status_for_goldsrc_bomb_defused() -> None:
+    adapter = StubAdapter()
+    storage = StubStorage()
+    logger = ProxyLogger(LoggerConfig(stream=StringIO()))
+    server = ProxyUdpServer(logger)
+    runtime = HlstatsRuntime(adapter, server, logger, build_dispatcher(), storage)
+    adapter.connect()
+    runtime._reload_state()
+
+    runtime.process_stdin_line(
+        'L 01/06/2024 - 00:18:10: Team "CT" triggered "Bomb_Defused" (CT "6") (T "17")',
+        "127.0.0.1:27015",
+    )
+    runtime.process_stdin_line(
+        'L 01/06/2024 - 00:18:10: World triggered "Round_End"',
+        "127.0.0.1:27015",
+    )
+
+    assert [event.round_status for event in storage.recorded] == [0, 1]
+
+
 def test_runtime_stdin_quiet_by_default_without_per_event_notice() -> None:
     adapter = StubAdapter()
     storage = StubStorage()

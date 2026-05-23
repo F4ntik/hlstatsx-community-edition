@@ -9,7 +9,7 @@ import json
 import os
 from pathlib import Path
 import re
-from typing import Any, Callable, Optional, Protocol
+from typing import Any, Callable, Optional, Protocol, TextIO
 
 from proxy_daemon_py import db as proxy_db
 from .events import EventCategory, EventContext, EventUpdate
@@ -53,8 +53,15 @@ _PLAYER_BY_NAME_QUERY = (
 _BOT_UNIQUE_RE = re.compile(r"^(?:BOT(?:[:\-].*)?|0|00000000:\d+:0)$", re.IGNORECASE)
 _IGNORED_PLAYER_TRIGGER_ACTIONS = {"latency", "time"}
 _NON_LIVE_ROSTER_ACTIONS = {"Dropped_The_Bomb"}
+_ROUND_END_KILL_STREAK_SUPPRESS_ACTIONS = {
+    "Defused_The_Bomb",
+    "Bomb_Defused",
+    "SFUI_Notice_Bomb_Defused",
+}
+_POST_ROUND_TEAM_REWARD_EVENTS = {"Rescued_A_Hostage"}
+_POST_ROUND_TEAM_REWARD_GAME_EVENTS = {("cstrike", "Planted_The_Bomb")}
 _ACTIVE_PLAYER_IDLE_TIMEOUT = timedelta(seconds=250)
-_IDLE_PRUNE_INTERVAL = timedelta(seconds=30)
+_IDLE_PRUNE_INTERVAL = timedelta(seconds=60)
 _MAX_CONNECTION_TIME_GAP_SECONDS = 600
 _TEAM_ALIASES = {
     "T": "TERRORIST",
@@ -449,6 +456,14 @@ _APPEND_ONLY_EVENT_INSERT_QUERIES = {
 }
 
 
+def _allows_post_round_team_reward(game: str, event_code: str) -> bool:
+    normalized_game = (game or "").lower()
+    return (
+        event_code in _POST_ROUND_TEAM_REWARD_EVENTS
+        or (normalized_game, event_code) in _POST_ROUND_TEAM_REWARD_GAME_EVENTS
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class _PlayerCacheKey:
     scope: str
@@ -533,6 +548,7 @@ class EventStorage:
         self._server_connected_players: dict[int, set[int]] = {}
         self._server_active_players: dict[int, set[int]] = {}
         self._server_reward_eligible_players: dict[int, set[int]] = {}
+        self._server_transient_team_reward_players: dict[int, set[int]] = {}
         self._server_player_last_activity: dict[int, dict[int, datetime]] = {}
         self._server_next_idle_prune_at: dict[int, datetime] = {}
         self._server_skill_modes: dict[int, int] = {}
@@ -556,9 +572,11 @@ class EventStorage:
         self._player_total_kills: dict[int, int] = {}
         self._player_connection_time_flush_at: dict[int, datetime] = {}
         self._player_connection_time_context: dict[int, tuple[int, str]] = {}
+        self._last_recorded_event_timestamp: datetime | None = None
         self._seen_team_change_events: set[tuple[int, int, str, str, datetime]] = set()
         self._player_last_team_change: dict[int, datetime] = {}
         self._seen_team_bonus_events: set[tuple[int, int, int, datetime]] = set()
+        self._suppress_next_round_end_kill_streak: dict[int, set[int]] = {}
         self._server_totals_dirty: set[int] = set()
         self._transaction_batch_size = 0
         self._pending_writes = 0
@@ -573,6 +591,8 @@ class EventStorage:
         self._team_bonus_stage_player_counts: dict[str, dict[int, int]] = {}
         self._team_bonus_stage_event_counts: dict[str, dict[str, int]] = {}
         self._team_bonus_stage_samples: list[dict[str, Any]] = []
+        self._db_write_trace_path = os.environ.get("HLSTATS_DB_WRITE_TRACE_PATH")
+        self._db_write_trace_handle: TextIO | None = None
 
     def _set_skip_adapter_ping(self, enabled: bool) -> None:
         setter = getattr(self._adapter, "set_skip_connection_ping", None)
@@ -610,6 +630,7 @@ class EventStorage:
             self._flush_frag_counter_buffer()
             self._event_buffer = None
             self._set_skip_adapter_ping(False)
+            self._close_db_write_trace()
             return
         self._flush_event_buffer()
         self._flush_frag_counter_buffer()
@@ -622,10 +643,12 @@ class EventStorage:
         self._event_buffer = None
         self._frag_write_deltas = None
         self._set_skip_adapter_ping(False)
+        self._close_db_write_trace()
 
     def reset_runtime_state(self) -> None:
         """Drop replay/session-local caches after a runtime reload."""
 
+        self._close_db_write_trace()
         self._player_cache.clear()
         self._player_teams.clear()
         self._player_names.clear()
@@ -638,6 +661,7 @@ class EventStorage:
         self._server_connected_players.clear()
         self._server_active_players.clear()
         self._server_reward_eligible_players.clear()
+        self._server_transient_team_reward_players.clear()
         self._server_player_last_activity.clear()
         self._server_next_idle_prune_at.clear()
         self._server_skill_modes.clear()
@@ -661,16 +685,18 @@ class EventStorage:
         self._player_total_kills.clear()
         self._player_connection_time_flush_at.clear()
         self._player_connection_time_context.clear()
+        self._last_recorded_event_timestamp = None
         self._seen_team_change_events.clear()
         self._player_last_team_change.clear()
         self._seen_team_bonus_events.clear()
+        self._suppress_next_round_end_kill_streak.clear()
         self._server_totals_dirty.clear()
 
     def finalize_import(self) -> None:
         """Apply import-tail updates after a finite stdin replay."""
 
         connection = self._connection()
-        flush_timestamp = self._clock()
+        flush_timestamp = self._connection_time_flush_timestamp()
         self._flush_event_buffer()
         self._flush_frag_counter_buffer()
         self._flush_all_open_player_connection_times(connection, flush_timestamp)
@@ -682,7 +708,7 @@ class EventStorage:
     def flush_pending(self) -> None:
         """Flush buffered inserts and commit pending batched writes."""
         connection = self._connection()
-        flush_timestamp = self._clock()
+        flush_timestamp = self._connection_time_flush_timestamp()
         self._flush_event_buffer()
         self._flush_frag_counter_buffer()
         self._flush_all_open_player_connection_times(connection, flush_timestamp)
@@ -754,6 +780,7 @@ class EventStorage:
                     flush_profile_name=False,
                     flush_connection_time_at=event_timestamp,
                 )
+                self._player_teams[player_id] = ""
             if not flushed_player_totals:
                 self._server_totals_dirty.add(server_id)
             return
@@ -765,13 +792,15 @@ class EventStorage:
         connection = self._connection()
         map_name = self._resolve_map(context)
         timestamp = self._normalize_timestamp(update.timestamp)
+        self._last_recorded_event_timestamp = timestamp
         processed_at = self._processing_timestamp(timestamp)
-        self._prune_idle_players_if_due(connection, context.server_id, timestamp)
+        post_record_prune = False
 
         try:
             if update.category is EventCategory.WORLD:
                 self._handle_world_state(connection, update, context, map_name, timestamp, processed_at)
                 self._record_world_action(connection, update, context, map_name, timestamp)
+                post_record_prune = True
                 return
 
             if update.category is EventCategory.ACTION and update.event_code in _IGNORED_PLAYER_TRIGGER_ACTIONS:
@@ -784,6 +813,7 @@ class EventStorage:
                         processed_at,
                         allow_create_player=False,
                     )
+                post_record_prune = True
                 return
 
             if update.category in {
@@ -793,18 +823,37 @@ class EventStorage:
                 EventCategory.STATSME2,
             }:
                 self._prime_player_state(connection, update, context, timestamp, processed_at)
+            elif update.category is EventCategory.GENERIC and self._should_prime_generic_for_team_sync(update):
+                self._prime_generic_team_reward_state(connection, update, context, timestamp, processed_at)
 
-            if (
-                update.category in {
-                    EventCategory.FRAG,
-                    EventCategory.ACTION,
-                    EventCategory.STATSME,
-                    EventCategory.STATSME2,
-                    EventCategory.TEAM_BONUS,
-                }
+            gateable_category = update.category in {
+                EventCategory.FRAG,
+                EventCategory.ACTION,
+                EventCategory.STATSME,
+                EventCategory.STATSME2,
+                EventCategory.TEAM_BONUS,
+            }
+            gated_by_min_players = (
+                gateable_category
                 and self._active_trackable_players_for_gate(connection, context.server_id)
                 < self._server_min_players_required(connection, context.server_id)
-            ):
+            )
+
+            if gated_by_min_players and self._suppresses_next_round_end_kill_streak(update):
+                suppressed_player_id = self._suppressed_round_end_kill_streak_player_id(
+                    connection,
+                    update,
+                    context,
+                    timestamp,
+                    processed_at,
+                )
+                if suppressed_player_id is not None:
+                    self._suppress_next_round_end_kill_streak.setdefault(context.server_id, set()).add(
+                        suppressed_player_id
+                    )
+
+            if gated_by_min_players:
+                post_record_prune = True
                 return
 
             if update.category is EventCategory.FRAG:
@@ -827,9 +876,13 @@ class EventStorage:
                 self._record_entry(connection, update, context, map_name, timestamp, processed_at)
             else:
                 self._record_generic(connection, update, context, map_name, timestamp, processed_at)
+            post_record_prune = True
         except Exception as exc:  # pragma: no cover - safety net
             self._rollback_pending()
             raise StorageError(str(exc)) from exc
+        finally:
+            if post_record_prune:
+                self._prune_idle_players_if_due(connection, context.server_id, timestamp)
         if self._transaction_batch_size > 0:
             self._pending_records += 1
         self._maybe_commit_batch()
@@ -1174,7 +1227,7 @@ class EventStorage:
             # Keep team-reward gating aligned with legacy behavior:
             # when round status is non-zero, rewardTeam should not emit rows.
             round_status = int((context.extras or {}).get("round_status") or 0)
-            if round_status == 0:
+            if round_status == 0 or _allows_post_round_team_reward(context.game, update.event_code):
                 team = action.team or str(
                     update.attributes.get("team") or self._effective_player_team(actor_id, update.actor)
                 )
@@ -1190,7 +1243,6 @@ class EventStorage:
                         bonus=action.reward_team,
                         event_code=update.event_code,
                     )
-
     def _record_chat(
         self,
         connection: proxy_db.SupportsConnection,
@@ -1430,7 +1482,7 @@ class EventStorage:
         self._execute(connection, _INCREMENT_ACTION_COUNT_QUERY, (action.action_id,))
 
         round_status = int((context.extras or {}).get("round_status") or 0)
-        if round_status != 0:
+        if round_status != 0 and not _allows_post_round_team_reward(context.game, update.event_code):
             return
         if not team or bonus == 0:
             return
@@ -1446,6 +1498,7 @@ class EventStorage:
             bonus=bonus,
             event_code=update.event_code,
         )
+        self._clear_transient_team_reward_players(context.server_id)
 
     def _record_connection(
         self,
@@ -2307,11 +2360,56 @@ class EventStorage:
         processed_at: datetime,
     ) -> None:
         if update.event_code in {"Round_End", "Round_Win", "Mini_Round_Win"}:
-            self._drain_kill_streaks(connection, context, map_name, timestamp, processed_at)
+            suppressed_player_ids: set[int] = set()
+            if update.event_code == "Round_End":
+                suppressed_player_ids = self._suppress_next_round_end_kill_streak.pop(context.server_id, set())
+            self._drain_kill_streaks(
+                connection,
+                context,
+                map_name,
+                timestamp,
+                processed_at,
+                suppressed_player_ids=suppressed_player_ids,
+            )
             self._reset_round_streaks()
+            self._clear_transient_team_reward_players(context.server_id)
+        elif update.event_code in {"Round_Start", "Mini_Round_Start", "Game_Commencing"}:
+            self._clear_transient_team_reward_players(context.server_id)
+
+    @staticmethod
+    def _suppresses_next_round_end_kill_streak(update: EventUpdate) -> bool:
+        return (
+            update.event_code in _ROUND_END_KILL_STREAK_SUPPRESS_ACTIONS
+            or update.attributes.get("raw_action") in _ROUND_END_KILL_STREAK_SUPPRESS_ACTIONS
+        )
+
+    def _suppressed_round_end_kill_streak_player_id(
+        self,
+        connection: proxy_db.SupportsConnection,
+        update: EventUpdate,
+        context: EventContext,
+        timestamp: datetime,
+        processed_at: datetime,
+    ) -> Optional[int]:
+        if update.actor is None or self._has_transient_identity(update.actor):
+            return None
+        return self._resolve_player_id(
+            connection,
+            update.actor,
+            context,
+            timestamp,
+            processed_at,
+            allow_create_player=False,
+        )
 
     def _reset_round_streaks(self) -> None:
         self._player_kill_streaks.clear()
+
+    def _clear_transient_team_reward_players(self, server_id: int) -> None:
+        transient_players = self._server_transient_team_reward_players.pop(server_id, set())
+        for player_id in transient_players:
+            self._player_teams.pop(player_id, None)
+            self._server_player_last_activity.setdefault(server_id, {}).pop(player_id, None)
 
     def _active_trackable_players(self, server_id: int) -> int:
         return len(self._server_active_players.get(server_id, set()))
@@ -2334,10 +2432,11 @@ class EventStorage:
         reward_eligible_players = self._server_reward_eligible_players.setdefault(server_id, set())
         live_players = self._server_live_players.setdefault(server_id, set())
         for player_id in stale_players:
-            if player_id in live_players:
+            was_live = player_id in live_players
+            if was_live:
                 live_players.discard(player_id)
                 self._server_totals_dirty.add(server_id)
-            if player_id in connected_players:
+            if player_id in connected_players and not was_live and not self._player_teams.get(player_id):
                 continue
             self._close_player_object(
                 connection,
@@ -2431,6 +2530,50 @@ class EventStorage:
             if normalized_team in {"UNASSIGNED", "SPECTATOR", "SPECTATORS", "SPEC"}:
                 return True
         return False
+
+    def _should_prime_generic_for_team_sync(self, update: EventUpdate) -> bool:
+        return False
+
+    def _prime_generic_team_reward_state(
+        self,
+        connection: proxy_db.SupportsConnection,
+        update: EventUpdate,
+        context: EventContext,
+        timestamp: datetime,
+        processed_at: datetime,
+    ) -> None:
+        if update.actor is None:
+            return
+        cache_key = self._cache_key_for_player(context.game, update.actor)
+        player_id = self._player_cache.get(cache_key)
+        if player_id is None:
+            player_id = self._lookup_player(connection, update.actor, context.game)
+        if player_id is None:
+            return
+        active_players = self._server_active_players.setdefault(context.server_id, set())
+        live_players = self._server_live_players.setdefault(context.server_id, set())
+        connected_players = self._server_connected_players.setdefault(context.server_id, set())
+        reward_eligible_players = self._server_reward_eligible_players.setdefault(context.server_id, set())
+        seen_at = self._server_player_last_activity.setdefault(context.server_id, {}).get(player_id)
+        stale_damage_only = seen_at is None or seen_at < timestamp - _IDLE_PRUNE_INTERVAL
+        was_roster_bound = player_id in connected_players or not stale_damage_only
+        player_id = self._resolve_player_id(
+            connection,
+            update.actor,
+            context,
+            timestamp,
+            processed_at,
+            allow_create_player=False,
+        )
+        if player_id is None:
+            return
+        if was_roster_bound:
+            return
+        active_players.discard(player_id)
+        live_players.discard(player_id)
+        connected_players.discard(player_id)
+        reward_eligible_players.discard(player_id)
+        self._server_transient_team_reward_players.setdefault(context.server_id, set()).add(player_id)
 
     def _is_legacy_filtered_chat_message(self, message: str) -> bool:
         command = message.strip()
@@ -2599,7 +2742,10 @@ class EventStorage:
         map_name: str,
         timestamp: datetime,
         processed_at: datetime,
+        *,
+        suppressed_player_ids: set[int] | None = None,
     ) -> None:
+        suppressed_player_ids = suppressed_player_ids or set()
         for player_id in list(self._player_kills_per_life):
             self._end_kill_streak(
                 connection,
@@ -2608,6 +2754,7 @@ class EventStorage:
                 timestamp=timestamp,
                 processed_at=processed_at,
                 player_id=player_id,
+                emit_derived_action=player_id not in suppressed_player_ids,
             )
 
     def _end_kill_streak(
@@ -2619,20 +2766,22 @@ class EventStorage:
         timestamp: datetime,
         processed_at: datetime,
         player_id: int,
+        emit_derived_action: bool = True,
     ) -> None:
         kill_total = self._player_kills_per_life.get(player_id, 0)
         if kill_total <= 1:
             self._player_kills_per_life[player_id] = 0
             return
-        self._record_derived_player_action(
-            connection,
-            context=context,
-            map_name=map_name,
-            timestamp=timestamp,
-            processed_at=processed_at,
-            player_id=player_id,
-            action_code=f"kill_streak_{min(kill_total, 12)}",
-        )
+        if emit_derived_action:
+            self._record_derived_player_action(
+                connection,
+                context=context,
+                map_name=map_name,
+                timestamp=timestamp,
+                processed_at=processed_at,
+                player_id=player_id,
+                action_code=f"kill_streak_{min(kill_total, 12)}",
+            )
         self._player_kills_per_life[player_id] = 0
 
     def _record_derived_player_action(
@@ -2855,11 +3004,51 @@ class EventStorage:
         event_code: str,
     ) -> None:
         active_players = self._server_active_players.get(context.server_id, set())
+        live_players = self._server_live_players.get(context.server_id, set())
         reward_eligible_players = self._server_reward_eligible_players.get(context.server_id, set())
         connected_players = self._server_connected_players.get(context.server_id, set())
-        candidate_players = set(active_players)
+        transient_team_reward_players = self._server_transient_team_reward_players.get(context.server_id, set())
+        team_bound_players = {
+            player_id
+            for player_id in self._server_players.get(context.server_id, set())
+            if self._player_teams.get(player_id) == team
+        }
+        reward_roster_players = set(active_players)
+        reward_roster_players.update(live_players)
+        reward_roster_players.update(team_bound_players)
+        reward_roster_players.update(transient_team_reward_players)
+        candidate_players = set(reward_roster_players)
         candidate_players.update(connected_players)
         candidate_players.update(reward_eligible_players)
+        sample_player = os.environ.get("HLSTATS_TEAM_BONUS_TRACE_SAMPLE_PLAYER_ID")
+        if sample_player is not None:
+            try:
+                sample_player_id = int(sample_player)
+            except ValueError:
+                sample_player_id = None
+            if sample_player_id is not None:
+                self._record_team_bonus_stage(
+                    "roster_snapshot",
+                    action_id=action.action_id,
+                    map_name=map_name,
+                    event_code=event_code,
+                    event_time=timestamp,
+                    player_id=sample_player_id,
+                    team=team,
+                    observed_team=self._player_teams.get(sample_player_id, ""),
+                    server_id=context.server_id,
+                    roster_flags={
+                        "active": sample_player_id in active_players,
+                        "live": sample_player_id in live_players,
+                        "team_bound": sample_player_id in team_bound_players,
+                        "connected": sample_player_id in connected_players,
+                        "reward_eligible": sample_player_id in reward_eligible_players,
+                        "transient_team_reward": sample_player_id in transient_team_reward_players,
+                        "candidate": sample_player_id in candidate_players,
+                        "server_player": sample_player_id
+                        in self._server_players.get(context.server_id, set()),
+                    },
+                )
         for player_id in sorted(candidate_players):
             self._record_team_bonus_stage(
                 "candidate_set",
@@ -2869,11 +3058,12 @@ class EventStorage:
                 event_time=timestamp,
                 player_id=player_id,
                 team=team,
+                observed_team=self._player_teams.get(player_id, ""),
                 server_id=context.server_id,
             )
             roster_decision = should_reward_team_player(
                 player_id=player_id,
-                active_players=active_players,
+                active_players=reward_roster_players,
                 reward_eligible_players=reward_eligible_players,
             )
             if not roster_decision.allowed:
@@ -2885,6 +3075,7 @@ class EventStorage:
                     event_time=timestamp,
                     player_id=player_id,
                     team=team,
+                    observed_team=self._player_teams.get(player_id, ""),
                     server_id=context.server_id,
                 )
                 continue
@@ -2905,6 +3096,7 @@ class EventStorage:
                     event_time=timestamp,
                     player_id=player_id,
                     team=team,
+                    observed_team=self._player_teams.get(player_id, ""),
                     server_id=context.server_id,
                 )
                 continue
@@ -2917,6 +3109,7 @@ class EventStorage:
                     event_time=timestamp,
                     player_id=player_id,
                     team=team,
+                    observed_team=self._player_teams.get(player_id, ""),
                     server_id=context.server_id,
                 )
                 continue
@@ -2931,6 +3124,7 @@ class EventStorage:
                         event_time=timestamp,
                         player_id=player_id,
                         team=team,
+                        observed_team=self._player_teams.get(player_id, ""),
                         server_id=context.server_id,
                     )
                     continue
@@ -2943,6 +3137,7 @@ class EventStorage:
                 event_time=timestamp,
                 player_id=player_id,
                 team=team,
+                observed_team=self._player_teams.get(player_id, ""),
                 server_id=context.server_id,
             )
             self._execute(
@@ -3021,6 +3216,11 @@ class EventStorage:
             return event_timestamp
         return self._normalize_timestamp(self._clock())
 
+    def _connection_time_flush_timestamp(self) -> datetime:
+        if self._use_event_timestamps_for_processing and self._last_recorded_event_timestamp is not None:
+            return self._last_recorded_event_timestamp
+        return self._normalize_timestamp(self._clock())
+
     # ------------------------------------------------------------------
     # Low level helpers
 
@@ -3060,6 +3260,7 @@ class EventStorage:
         query: str,
         params: tuple[Any, ...] | None,
     ) -> None:
+        self._trace_db_write(query, params)
         if params is not None and query in _APPEND_ONLY_EVENT_INSERT_QUERIES:
             buffer = self._event_buffer
             if buffer is not None:
@@ -3101,6 +3302,30 @@ class EventStorage:
         else:
             cursor.execute(query, params)
         self._pending_writes += 1
+
+    def _trace_db_write(self, query: str, params: tuple[Any, ...] | None) -> None:
+        trace_path = self._db_write_trace_path
+        if not trace_path:
+            return
+        payload: dict[str, Any] = {"sql": query}
+        if params is not None:
+            payload["params"] = list(params)
+        handle = self._db_write_trace_handle
+        if handle is None:
+            path = Path(trace_path)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            handle = path.open("a", encoding="utf-8")
+            self._db_write_trace_handle = handle
+        handle.write(json.dumps(payload, ensure_ascii=False, default=str))
+        handle.write("\n")
+        handle.flush()
+
+    def _close_db_write_trace(self) -> None:
+        handle = self._db_write_trace_handle
+        if handle is None:
+            return
+        self._db_write_trace_handle = None
+        handle.close()
 
     def _executemany_chunk_size(self) -> int | None:
         size = getattr(self._adapter, "executemany_chunk_size", None)
@@ -3226,6 +3451,8 @@ class EventStorage:
         player_id: int,
         team: str,
         server_id: int,
+        observed_team: str = "",
+        roster_flags: Optional[Mapping[str, bool]] = None,
     ) -> None:
         self._team_bonus_stage_counts[stage] = self._team_bonus_stage_counts.get(stage, 0) + 1
         by_action = self._team_bonus_stage_action_counts.setdefault(stage, {})
@@ -3238,7 +3465,14 @@ class EventStorage:
         event_key = f"{event_time.isoformat(sep=' ')}|{action_id}|{map_key}|{team}"
         by_event = self._team_bonus_stage_event_counts.setdefault(stage, {})
         by_event[event_key] = by_event.get(event_key, 0) + 1
-        if len(self._team_bonus_stage_samples) < 200:
+        sample_player = os.environ.get("HLSTATS_TEAM_BONUS_TRACE_SAMPLE_PLAYER_ID")
+        sample_event_time = os.environ.get("HLSTATS_TEAM_BONUS_TRACE_SAMPLE_EVENT_TIME")
+        should_sample = len(self._team_bonus_stage_samples) < 200
+        if sample_player:
+            should_sample = should_sample or str(player_id) == sample_player
+        if sample_event_time:
+            should_sample = should_sample or event_time.isoformat(sep=" ") == sample_event_time
+        if should_sample:
             self._team_bonus_stage_samples.append(
                 {
                     "stage": stage,
@@ -3246,6 +3480,8 @@ class EventStorage:
                     "action_id": action_id,
                     "player_id": player_id,
                     "team": team,
+                    "observed_team": observed_team,
+                    "roster_flags": dict(roster_flags or {}),
                     "map": map_key,
                     "event_code": event_code,
                     "server_id": server_id,

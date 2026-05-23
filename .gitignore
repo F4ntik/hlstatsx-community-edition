@@ -21,6 +21,8 @@ __pycache__/
 /scripts/replay_baseline/artifacts/*.txt
 /scripts/replay_baseline/artifacts/*.log
 /scripts/replay_baseline/artifacts/*.json
+/scripts/replay_baseline/artifacts/parity-trace-smoke/
+/scripts/replay_baseline/artifacts/parity-traces/
 /scripts/replay_baseline/artifacts/snapshots/
 /scripts/replay_baseline/comparison/.parity-state/
 /docs/audits/**/.p6d_current_run_ts

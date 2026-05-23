@@ -6,6 +6,11 @@ runtime against the Python migration on identical replayed production logs.
 **Fast multi-file Python import (stdin batch, not UDP):** canonical index and
 links — [`../../docs/replay-fast-path.md`](../../docs/replay-fast-path.md).
 
+**Residual-to-fix workflow:** use
+[`../../docs/parity-debug-pipeline.md`](../../docs/parity-debug-pipeline.md)
+to locate the source `.log`, run single-log parity, cut smaller windows, and
+only then return to `narrow-1000`.
+
 ## Layout
 
 - `legacy_prod_like/docker-compose.yml`:
@@ -148,6 +153,76 @@ links — [`../../docs/replay-fast-path.md`](../../docs/replay-fast-path.md).
    `python scripts\replay_baseline\compare_stats_dbs.py`
 10. Fix Python,
    then repeat from step 2. Do not reuse a dirty DB from a previous replay.
+
+### First-divergence DB write trace
+
+For narrow bug slices, use `parity_trace.py` before running another full
+`narrow-1000` loop. It compares normalized DB write intents and reports the
+first write that differs, so the debug window can be reduced to one file or a
+small line range before changing runtime behavior.
+
+Accepted inputs:
+
+- JSONL query capture:
+  `{"event_ref":"L0001:42","sql":"INSERT ... VALUES (%s)","params":[...]}`
+- raw MySQL general-log query lines, useful for legacy Perl capture:
+  `... Query\tINSERT INTO ...`
+
+Example:
+
+```powershell
+python scripts\replay_baseline\parity_trace.py diff `
+  --legacy scripts\replay_baseline\artifacts\legacy-writes.log `
+  --python scripts\replay_baseline\artifacts\python-writes.jsonl `
+  --unordered `
+  --include-table-prefix hlstats_ `
+  --ignore-table hlstats_Servers `
+  --table hlstats_Events_PlayerActions `
+  --param-contains "2024-01-06 00:18:10"
+```
+
+The tool filters read-only SQL, reassembles multiline legacy general-log SQL,
+and normalizes statement shape, table, operation, and bound parameters. It
+intentionally does not require byte-for-byte SQL equality because Python may
+batch or parameterize writes differently from Perl. Prefer table/time filters
+when investigating a concrete `compare_stats_dbs.py` residual.
+
+For Python runtime captures, set `HLSTATS_DB_WRITE_TRACE_PATH` and use direct
+stdin import so the trace records pre-batch storage writes:
+
+```powershell
+docker run --rm --network python_hlstatsx_python_net `
+  -v "${PWD}\scripts:/app/scripts" `
+  -v "${PWD}\scripts\replay_baseline\comparison\python\ftp_work:/tmp/ftp_work" `
+  -e PYTHONPATH=/app/scripts:/app/scripts/proxy_daemon_py `
+  -e HLSTATS_DB_WRITE_TRACE_PATH=/tmp/ftp_work/python-writes.jsonl `
+  python-hlstats-worker `
+  python /app/scripts/replay_baseline/direct_import_artifacts.py `
+    --artifacts-dir /app/scripts/replay_baseline/artifacts `
+    --configfile /app/hlstats.conf `
+    --work-dir /tmp/ftp_work `
+    --max-files 1 `
+    --gs-ip 37.230.137.48 `
+    --gs-port 27015 `
+    --parser-backend python
+```
+
+For legacy captures, enable MariaDB `general_log` on `hlstatsx-legacy-db`
+after baseline restore and before `legacy_import`, then export
+`mysql.general_log.argument` after the import. Prefer `--unordered` for
+general-log comparisons because Perl and Python do not emit writes in identical
+order.
+
+For the complete one-command workflow, use:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File scripts\replay_baseline\comparison\Run-SingleLogParity.ps1 `
+  -LogFile scripts\replay_baseline\artifacts\L0105062.log `
+  -Name rakza-kill-streak `
+  -TraceTable hlstats_Events_PlayerActions `
+  -TraceParamContains "2024-01-06 00:18:10"
+```
 
 ## Current parity state
 
