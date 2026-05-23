@@ -95,6 +95,13 @@ Use `-TraceTable` and `-TraceParamContains` to keep `write-trace-diff.txt`
 focused on the residual from `compare-stats.txt`. The logical DB compare is the
 primary pass/fail signal; write trace is the narrower diagnostic view.
 
+After the main single-log pass, the script automatically runs a second guard
+pass on a smaller `30` lines before / `30` lines after window when it can find a
+safe anchor. Anchors come from `-LineNumber`, `-EventTime`, `-Pattern`, or the
+first `YYYY-MM-DD HH:MM:SS` timestamp inside `-TraceParamContains`. The guard
+run writes to a sibling directory named `<name>-guard-30x30/` and uses
+`-SkipGuardWindow` internally to avoid recursion.
+
 ## 4. Cut A Smaller Window When Safe
 
 If the single log is large, extract a smaller window:
@@ -131,7 +138,8 @@ Use this order for each bug:
 2. Confirm the legacy Perl rule with subagent-assisted read-only analysis.
 3. Add a focused unit/regression test.
 4. Change Python behavior.
-5. Re-run the same single-log/window parity.
+5. Re-run the same single-log/window parity and inspect the automatic `30/30`
+   guard pass as a sanity check against overfitted fixes.
 6. Re-run a small cluster of related files when available.
 7. Only then run `narrow-1000`.
 

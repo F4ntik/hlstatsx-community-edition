@@ -48,6 +48,7 @@ only when it passes:
 - static/source inspection and direct SQL checks
 - focused unit or helper tests for the touched behavior
 - single-log or extracted-window parity
+- automatic `30/30` guard-window parity after point fixes
 - small related-log cluster when the bug is lifecycle-dependent
 - full `narrow-1000` contour
 - GeoIP backfill and replay-backed web smoke only when the changed surface can
@@ -99,6 +100,8 @@ Minimum replay validation loop:
 
 - targeted `pytest` for touched code
 - single-log parity or narrow contour replay
+- automatic `30/30` guard-window pass for point fixes when an event anchor is
+  available
 - `python scripts\replay_baseline\compare_stats_dbs.py --max-examples 20`
 - evidence update in `bug-plan.md`, `issues.jsonl`, or the relevant audit note
 

@@ -64,6 +64,10 @@ Canonical runbooks:
   legacy Perl rule; reproduce a single log or narrow window; add a focused
   regression test; change Python; rerun the same small contour; broaden only
   after the narrow evidence is stable.
+- After a point parity fix, the fast single-log compare must include the
+  automatic `30` lines before / `30` lines after guard-window pass when a safe
+  event anchor is available. Treat failures there as a sign that the fix is too
+  narrow or overfit to one exact line.
 - Treat full `narrow-1000`, Docker rebuilds, GeoIP backfill, and web smoke as
   promotion gates, not first-line debugging tools. Run them when the touched
   surface requires them or when a narrow fix is ready to prove against the
@@ -193,6 +197,8 @@ Current working rules:
 - use additional subagents for independent artifact grouping when a parity
   residual is non-trivial
 - use single-log and narrow-window replay before another broad contour run
+- after a point fix, inspect the automatic `30/30` guard-window parity rerun
+  from `Run-SingleLogParity.ps1` before promoting the fix
 - separate GeoIP-only player differences from real stats/session/alias drift
   before touching attribution logic
 - treat `Events_Entries legacy=0` vs `python>0` as an accepted visible

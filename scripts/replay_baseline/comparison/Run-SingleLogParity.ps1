@@ -8,9 +8,12 @@ param(
     [int]$LineNumber = 0,
     [int]$Before = 200,
     [int]$After = 100,
+    [int]$GuardBefore = 30,
+    [int]$GuardAfter = 30,
     [string]$ServerIdentity = "37.230.137.48:27015",
     [string[]]$TraceTable = @(),
     [string[]]$TraceParamContains = @(),
+    [switch]$SkipGuardWindow,
     [switch]$Build
 )
 
@@ -26,6 +29,16 @@ $ftpWork = Join-Path $here "python\ftp_work"
 if (-not (Test-Path $runDual)) { throw "Run-DualContour-1000.ps1 not found: $runDual" }
 if (-not (Test-Path $restore)) { throw "restore-baseline.ps1 not found: $restore" }
 if (-not (Test-Path $ftpWork)) { New-Item -ItemType Directory -Path $ftpWork | Out-Null }
+
+function Get-TraceTimestampAnchor {
+    param([string[]]$Terms)
+    foreach ($term in $Terms) {
+        if ($term -match '\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}') {
+            return $Matches[0]
+        }
+    }
+    return ""
+}
 
 $sourceLog = (Resolve-Path $LogFile).Path
 if (-not $Name) {
@@ -158,6 +171,72 @@ $summary = [ordered]@{
     trace_diff_exit = $traceExit
     trace_table = $TraceTable
     trace_param_contains = $TraceParamContains
+}
+
+$guardExit = $null
+$guardName = "$safeName-guard-30x30"
+$guardDir = Join-Path $traceRoot $guardName
+if (-not $SkipGuardWindow) {
+    $guardArgs = @(
+        "-NoProfile", "-ExecutionPolicy", "Bypass",
+        "-File", $MyInvocation.MyCommand.Path,
+        "-LogFile", $sourceLog,
+        "-Name", $guardName,
+        "-GuardBefore", "$GuardBefore",
+        "-GuardAfter", "$GuardAfter",
+        "-Before", "$GuardBefore",
+        "-After", "$GuardAfter",
+        "-ServerIdentity", $ServerIdentity,
+        "-SkipGuardWindow"
+    )
+    $nonEmptyTraceTables = @($TraceTable | Where-Object { $_ })
+    if ($nonEmptyTraceTables.Count -gt 0) {
+        $guardArgs += "-TraceTable"
+        $guardArgs += $nonEmptyTraceTables
+    }
+    $nonEmptyTraceTerms = @($TraceParamContains | Where-Object { $_ })
+    if ($nonEmptyTraceTerms.Count -gt 0) {
+        $guardArgs += "-TraceParamContains"
+        $guardArgs += $nonEmptyTraceTerms
+    }
+
+    if ($LineNumber -gt 0) {
+        $guardArgs += @("-LineNumber", "$LineNumber")
+    } elseif ($EventTime) {
+        $guardArgs += @("-EventTime", $EventTime)
+    } elseif ($Pattern) {
+        $guardArgs += @("-Pattern", $Pattern)
+    } else {
+        $traceTimestamp = Get-TraceTimestampAnchor -Terms $TraceParamContains
+        if ($traceTimestamp) {
+            $guardArgs += @("-EventTime", $traceTimestamp)
+        }
+    }
+
+    $hasGuardAnchor = (
+        ($LineNumber -gt 0) -or
+        [bool]$EventTime -or
+        [bool]$Pattern -or
+        [bool](Get-TraceTimestampAnchor -Terms $TraceParamContains)
+    )
+    if ($hasGuardAnchor) {
+        Write-Host "==> Guard parity pass: $GuardBefore lines before / $GuardAfter lines after"
+        powershell @guardArgs
+        $guardExit = $LASTEXITCODE
+    } else {
+        $guardExit = "skipped:no-anchor"
+        "Guard window skipped: provide -EventTime, -Pattern, -LineNumber, or a timestamp TraceParamContains." |
+            Out-File -FilePath (Join-Path $runDir "guard-window-skipped.txt") -Encoding utf8
+        Write-Host "==> Guard parity pass skipped: no line/time/pattern anchor"
+    }
+}
+$summary.guard_window = [ordered]@{
+    enabled = -not [bool]$SkipGuardWindow
+    before = $GuardBefore
+    after = $GuardAfter
+    name = $guardName
+    run_dir = $guardDir
+    exit = $guardExit
 }
 $summary | ConvertTo-Json | Out-File -FilePath (Join-Path $runDir "summary.json") -Encoding utf8
 
