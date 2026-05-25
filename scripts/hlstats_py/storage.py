@@ -2158,7 +2158,7 @@ class EventStorage:
             return
         self._player_connection_time_flush_at[player_id] = flush_timestamp
         if delta > _MAX_CONNECTION_TIME_GAP_SECONDS:
-            return
+            delta = 0
 
         player_context = self._player_connection_time_context.get(player_id)
         if player_context is None:
@@ -2172,19 +2172,20 @@ class EventStorage:
             _server_id,
         )
         history_timestamp = self._history_timestamp(flush_timestamp)
-        self._execute(
-            connection,
-            _UPSERT_PLAYER_HISTORY_QUERY,
-            (player_id, history_timestamp, game, current_skill),
-        )
         self._execute(connection, _UPDATE_PLAYER_CONNECTION_TIME_QUERY, (delta, player_id))
         self._execute(
             connection,
             _UPDATE_PLAYER_STREAKS_QUERY,
             (kill_streak, kill_streak, death_streak, death_streak, player_id),
         )
-        self._add_player_name_rollup(player_id, connection_time=delta)
-        if not ignore_bots_enabled:
+        if delta:
+            self._add_player_name_rollup(player_id, connection_time=delta)
+        if delta and not ignore_bots_enabled:
+            self._execute(
+                connection,
+                _UPSERT_PLAYER_HISTORY_QUERY,
+                (player_id, history_timestamp, game, current_skill),
+            )
             self._execute(
                 connection,
                 _UPDATE_PLAYER_HISTORY_QUERY,
@@ -3001,6 +3002,7 @@ class EventStorage:
     ) -> None:
         current_skill = self._player_skills.setdefault(player_id, 1000) + skill_delta
         self._player_skills[player_id] = current_skill
+        defer_history = True
         flush_timestamp = processed_at
         history_timestamp = self._history_timestamp(flush_timestamp)
         if not defer_history and history_timestamp != self._history_timestamp(timestamp):

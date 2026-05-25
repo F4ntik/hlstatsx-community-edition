@@ -509,6 +509,10 @@ def test_player_player_action_penalizes_victim_skill_like_legacy(
     ) in connection.executed
     assert (_UPDATE_PLAYER_SKILL_QUERY, (15, 101)) in connection.executed
     assert (_UPDATE_PLAYER_SKILL_QUERY, (-15, 102)) in connection.executed
+    assert all(query != _UPDATE_PLAYER_HISTORY_QUERY for query, _params in connection.executed)
+
+    storage.flush_pending()
+
     assert (
         _UPDATE_PLAYER_HISTORY_QUERY,
         (0, 0, 0, 0, 985, 0, 0, 0, 0, 0, 0, 0, 0, -15, 102, datetime(2024, 1, 2), "csgo"),
@@ -556,6 +560,10 @@ def test_suicide_applies_legacy_skill_penalty(dispatcher: EventDispatcher, event
     storage.record(update, event_context)
 
     assert (_UPDATE_PLAYER_SKILL_QUERY, (-5, 101)) in connection.executed
+    assert all(query != _UPDATE_PLAYER_HISTORY_QUERY for query, _params in connection.executed)
+
+    storage.flush_pending()
+
     assert (
         _UPDATE_PLAYER_HISTORY_QUERY,
         (0, 0, 0, 1, 995, 0, 0, 0, 0, 0, 0, 0, 0, -5, 101, datetime(2024, 1, 2), "csgo"),
@@ -772,8 +780,7 @@ def test_history_samples_kill_streak_only_after_life_end_flush(event_context: Ev
         for query, params in connection.executed
         if query == _UPDATE_PLAYER_HISTORY_QUERY and params[-3:] == (101, history_timestamp, "csgo")
     ]
-    assert pre_boundary_history
-    assert all(params[11] == 0 and params[12] == 0 for params in pre_boundary_history)
+    assert pre_boundary_history == []
 
     storage.record(round_end, event_context)
     storage.flush_pending()
@@ -875,6 +882,7 @@ def test_victim_history_rollup_waits_for_legacy_player_flush(event_context: Even
     assert alice_history_after_death == []
 
     storage.record(alice_next_flush, event_context)
+    storage.flush_pending()
 
     upsert_key = (
         _UPSERT_PLAYER_HISTORY_QUERY,
@@ -2644,6 +2652,8 @@ def test_flush_pending_clamps_connection_time_gap_above_600_seconds(event_contex
             ),
         ]
     )
+    assert (_UPDATE_PLAYER_CONNECTION_TIME_QUERY, (0, 101)) in connection.executed
+    assert (_UPDATE_PLAYER_STREAKS_QUERY, (0, 0, 0, 0, 101)) in connection.executed
 
     storage.record(fresh_chat_update, event_context)
     storage.finalize_import()

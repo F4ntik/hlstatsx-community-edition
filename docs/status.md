@@ -44,18 +44,15 @@ Current open residuals:
   `legacy=4753`, `python=4753`, and no stable-key TeamBonuses differences.
   Evidence:
   `docs/audits/legacy-python-parity-20260423/runtime-db-diff-p6d-narrow-1000-20260523-after-team-bonus-timeout-cadence.md`.
-- The broader player-facing drift is still in the
-  `Players` / `PlayerNames` / `Players_History` cluster (`250/250`,
-  `0/1`, and `50/50` normalized residuals respectively). The missing
-  `connection_time` persistence root cause is closed, ignored-bot history
-  policy is aligned, and `act_players` is closed. What remains is human
-  session/skill/alias attribution calibration, not another broad replay
-  bootstrap issue.
-- `P6d-M3` triage has separated the current normalized `hlstats_Players`
-  residual from stat drift: all `250/250` normalized player differences are
-  GeoIP `country`/`flag` only. Raw `connection_time` drift still exists outside
-  the current normalized compare gate and should be handled separately from
-  visible stat parity.
+- The broad `hlstats_Players` residual is now closed for the current
+  `narrow-1000` contour. After the final full replay, a strict GeoIP backfill
+  against the Python contour reduced `hlstats_Players` from the intermediate
+  `250/250` GeoIP-only `country`/`flag` diff to absent from the final logical
+  compare. The extra `Fat` (`1:58816828`) `kill_streak` drift had already been
+  closed before the GeoIP pass: legacy clamps a `connection_time` gap above
+  `600` seconds to `0`, but still continues `flushDB()` and persists pending
+  streak counters. Python now keeps the streak flush on that path while
+  suppressing only the oversized connection-time increment.
 - The first `hlstats_PlayerNames` anchor is stateful, not a clean isolated
   single-log case. The `Player21` / `Dim$0n` / `Dim$on` residual centers on
   `0:1161623468` around `L0102212.log:487`, but isolated `L0102212` produces a
@@ -102,11 +99,6 @@ Current open residuals:
   storage/validation tests pass, and fresh `narrow-1000` reduced
   `hlstats_Players_History` from `50/50` to `14/14`. Evidence:
   `docs/audits/legacy-python-parity-20260423/runtime-db-diff-p6d-history-flush-sampling-20260524.md`.
-- The fresh `narrow-1000` compare also surfaced a `0/1`
-  `hlstats_Events_TeamBonuses` Python-only row for `Dance Bear` /
-  `CTs_Win` at `2026-01-02 21:40:31`. Treat this as a separate follow-up
-  recheck of the previously closed TeamBonuses lifecycle case, not as part of
-  the `Players_History` flush-sampling fix.
 - A follow-up `Players_History` victim flush-boundary fix is in place at the
   unit level. Legacy review confirmed that an ordinary frag immediately
   flushes the killer object, while the victim's deaths/session skill remain in
@@ -118,19 +110,41 @@ Current open residuals:
   `Rakza` seed row, while the guard no longer lists `hlstats_Players_History`
   and fails only on the pre-existing `hlstats_Servers` slice residual. Evidence:
   `scripts/replay_baseline/artifacts/parity-traces/p6d-history-rakza-L0103146-victim-flush/`.
+- The broad `Players_History` flush-boundary fix is retained. A fresh
+  `narrow-1000` run after the victim-specific fix reduced
+  `hlstats_Players_History` from the previous `14/14` residual to `10/10`;
+  the remaining rows were Jan 6/Jan 7 flush-boundary splits for `Mk`
+  (`1:815451478`), `FRANKESTINE` (`0:1089759883`), `Johnny`
+  (`0:164297241`), `pardesiboi404` (`0:109115526`), and `Jerry AK`
+  (`0:1601618021`). Legacy review confirmed that `updateDB()` only marks the
+  live player dirty and `flushDB()` samples the live object into
+  `hlstats_Players_History`, so Python now defers all player history
+  stat/skill rollups to the live-object flush boundary. The final fresh
+  `narrow-1000` compare no longer lists `hlstats_Players_History`. Evidence:
+  `docs/audits/legacy-python-parity-20260423/runtime-db-diff-p6d-narrow-1000-20260525-after-history-flush-and-streak-gap-compare.txt`.
+- The previously suspected `Dance Bear` / `CTs_Win`
+  `hlstats_Events_TeamBonuses` row did not resurface in the final broad
+  contour. The final `narrow-1000` anchors are `legacy=4765`,
+  `python=4765`, and the logical compare no longer lists
+  `hlstats_Events_TeamBonuses`.
+- A final strict GeoIP rerun was required after the broad replay because the
+  replay importer repopulates `lastAddress` but does not perform maintenance
+  backfill. Before the rerun, Python still had `250` players with
+  `lastAddress <> ''` and empty `flag`/`country`; after
+  `hlstats_awards_py --geoip`, that count returned to `0` and
+  `hlstats_Players` disappeared from the broad compare. Evidence:
+  `docs/audits/legacy-python-parity-20260423/runtime-db-diff-p6d-narrow-1000-20260525-final-after-geoip-compare.txt`.
 - `hlstats_Events_Entries` remains an accepted visible policy difference:
   legacy `0`, Python `1017`.
 
 ## In Progress
 
-- [ ] `P6d-M3 (RC-C)`: recheck player identity/history attribution now that
-  TeamBonuses and the policy-volume event tables are clean in the current
-  `narrow-1000` compare. GeoIP-only `Players` drift is now separated from real
-  stat drift. The stateful `Player21` PlayerNames alias split is closed; the
-  current open focus is the remaining `Players_History` `14/14`
-  skill/stat-attribution residual and a separate TeamBonuses recheck, with
-  `XYU` / `unnamed` left as the only PlayerNames residual if PlayerNames work
-  resumes.
+- [ ] `P6d-M3 (RC-C)`: only two residuals remain in the final `narrow-1000`
+  logical compare: `hlstats_PlayerNames` `0/1` for the known Python-only
+  `XYU` / `unnamed` alias (`0:552632503`), and `hlstats_Events_Entries`
+  legacy `0` vs Python `1017` by current policy. `hlstats_Players`,
+  `hlstats_Players_History`, and `hlstats_Events_TeamBonuses` are clean in the
+  broad contour.
 
 ## Done
 
@@ -174,6 +188,18 @@ Current open residuals:
   the pre-existing `XYU` / `unnamed` Python-only alias left.
 - Reduced `hlstats_Players_History` from `50/50` to `14/14` by aligning Python
   kill-streak sampling with legacy `endKillStreak` / `flushDB` boundaries.
+- Closed the remaining broad `hlstats_Players_History` residual by deferring
+  all player history stat/skill rollups to legacy-style player `flushDB`
+  boundaries. The path went from `14/14` before the victim fix, to `10/10`
+  after the victim-only fix, to absent from the final broad compare.
+- Closed the extra `Fat` (`1:58816828`) `hlstats_Players.kill_streak` drift by
+  continuing pending streak flushes even when `connection_time` is clamped to
+  zero for gaps above `600` seconds.
+- Closed the broad `hlstats_Players` GeoIP residual by rerunning strict
+  maintenance GeoIP backfill after the final replay. The path went from
+  `250/250` `country`/`flag` diffs to absent from the final broad compare, and
+  Python players with `lastAddress <> ''` and empty `flag` dropped from `250`
+  to `0`.
 - Frontend i18n backlog (`P6a`/`P6b`/`P6c`) remains complete for the supported
   EN/RU product contour.
 
@@ -182,16 +208,10 @@ Current open residuals:
 1. Start the next parity loop on `P6d-M3` with the cost-aware protocol from
    `docs/plans.md`: legacy-first analysis, single-log/window reproduction,
    focused regression, then replay promotion.
-2. Continue `P6d-M3` with the `Players_History` anchors from the triage (`Rakza`,
-   `STEAM_0:1:55955613`, `L0103144` / `L0103146` / `L0103212`) from the
-   remaining skill/stat attribution rows; do not reopen the now-retained
-   kill-streak flush-sampling fix unless new replay evidence contradicts it.
-3. If returning to PlayerNames before `Players_History`, start from the
-   remaining `XYU` / `unnamed`, `0:552632503` Python-only alias residual rather
-   than the closed `Player21` cluster.
-4. Recheck the fresh `Dance Bear` / `CTs_Win` TeamBonuses row as a separate
-   lifecycle follow-up.
-5. Keep `Events_Entries legacy=0` vs `python>0` visible in compare output
+2. If returning to PlayerNames, start from the remaining `XYU` / `unnamed`,
+   `0:552632503` Python-only alias residual rather than the closed `Player21`
+   cluster.
+3. Keep `Events_Entries legacy=0` vs `python>0` visible in compare output
    unless the acceptance policy is explicitly changed.
 
 ## Decisions
@@ -216,8 +236,8 @@ Current open residuals:
   even when the local unit slice is already green.
 - Some Python test commands still require explicit `PYTHONPATH` setup because
   the imported package roots do not yet have a unified developer bootstrap.
-- The remaining `Players` / `PlayerNames` / `Players_History` residuals are
-  visible-product drift, not just compare noise, so they should not be
-  downgraded without explicit evidence or acceptance notes.
+- The remaining `PlayerNames` alias residual should not be downgraded without
+  explicit evidence or acceptance notes; `Players` and `Players_History` are
+  no longer open broad-contour residuals.
 - The replay comparison contour still uses fixed local container names, so
   concurrent local stacks can block rebuild or smoke passes.

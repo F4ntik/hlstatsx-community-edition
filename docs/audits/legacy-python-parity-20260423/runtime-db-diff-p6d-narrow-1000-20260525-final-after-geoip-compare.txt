@@ -1,0 +1,16 @@
+Found logical replay differences in 2 table(s).
+
+[hlstats_PlayerNames]
+  legacy rows: 415, python rows: 416, legacy-only normalized rows: 0, python-only normalized rows: 1
+  python-only examples:
+    {"_count": 1, "deaths": 0, "headshots": 0, "hits": 0, "kills": 0, "name": "unnamed", "player": {"game": "cstrike", "name": "XYU", "unique_ids": ["0:552632503"]}, "shots": 0, "suicides": 0}
+
+[hlstats_Events_Entries]
+  legacy rows: 0, python rows: 1017, legacy-only normalized rows: 0, python-only normalized rows: 1017
+  python-only examples:
+    {"_count": 1, "event_time": "2024-01-01 03:17:38", "map": "cs_estate", "player": {"game": "cstrike", "name": "bnja[7201]", "unique_ids": ["0:1297163697"]}, "server": {"address": "37.230.137.48", "endpoint": "37.230.137.48:27015", "game": "cstrike", "name": "Replay Server 37.230.137.48", "port": 27015}}
+    {"_count": 1, "event_time": "2024-01-01 08:08:45", "map": "cs_mansion", "player": {"game": "cstrike", "name": "Silver", "unique_ids": ["0:561465711"]}, "server": {"address": "37.230.137.48", "endpoint": "37.230.137.48:27015", "game": "cstrike", "name": "Replay Server 37.230.137.48", "port": 27015}}
+    {"_count": 1, "event_time": "2024-01-01 15:18:35", "map": "de_dust", "player": {"game": "cstrike", "name": "Хёг", "unique_ids": ["0:97609953"]}, "server": {"address": "37.230.137.48", "endpoint": "37.230.137.48:27015", "game": "cstrike", "name": "Replay Server 37.230.137.48", "port": 27015}}
+    {"_count": 1, "event_time": "2024-01-01 15:57:08", "map": "de_inferno", "player": {"game": "cstrike", "name": "Хёг", "unique_ids": ["0:97609953"]}, "server": {"address": "37.230.137.48", "endpoint": "37.230.137.48:27015", "game": "cstrike", "name": "Replay Server 37.230.137.48", "port": 27015}}
+    {"_count": 1, "event_time": "2024-01-01 15:57:55", "map": "de_inferno", "player": {"game": "cstrike", "name": "aXe", "unique_ids": ["0:865569348"]}, "server": {"address": "37.230.137.48", "endpoint": "37.230.137.48:27015", "game": "cstrike", "name": "Replay Server 37.230.137.48", "port": 27015}}
+
