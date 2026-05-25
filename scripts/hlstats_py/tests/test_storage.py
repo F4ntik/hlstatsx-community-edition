@@ -832,6 +832,63 @@ def test_history_samples_single_kill_streak_without_derived_action(event_context
     ) in connection.executed
 
 
+def test_victim_history_rollup_waits_for_legacy_player_flush(event_context: EventContext) -> None:
+    dispatcher = EventDispatcher([KillEventHandler()])
+    alice_death = dispatcher.dispatch(
+        parse_log_event(
+            'L 01/02/2024 - 23:59:50: "Bob<3><STEAM_1:3><TERRORIST>" killed '
+            '"Alice<2><STEAM_1:2><CT>" with "ak47"'
+        ),
+        event_context,
+    )
+    alice_next_flush = dispatcher.dispatch(
+        parse_log_event(
+            'L 01/03/2024 - 00:00:05: "Alice<2><STEAM_1:2><CT>" killed '
+            '"Bob<3><STEAM_1:3><TERRORIST>" with "ak47"'
+        ),
+        event_context,
+    )
+    alice_id = 101
+    bob_id = 102
+    death_day = datetime(2024, 1, 2)
+    flush_day = datetime(2024, 1, 3)
+    responses: Dict[QueryKey, List[QueryResponse]] = {
+        (_PLAYER_BY_UNIQUE_QUERY, ("STEAM_1:2", "csgo")): [QueryResponse(fetchone=(alice_id,))],
+        (_PLAYER_BY_UNIQUE_QUERY, ("STEAM_1:3", "csgo")): [QueryResponse(fetchone=(bob_id,))],
+        (_SELECT_PLAYER_STATE_QUERY, (alice_id,)): [QueryResponse(fetchone=(1000, 0, "", 0))],
+        (_SELECT_PLAYER_STATE_QUERY, (bob_id,)): [QueryResponse(fetchone=(1000, 0, "", 0))],
+    }
+    connection = FakeConnection(responses)
+    storage = EventStorage(
+        StubAdapter(connection),
+        clock=lambda: alice_death.timestamp,
+        use_event_timestamps_for_processing=True,
+    )
+
+    storage.record(alice_death, event_context)
+
+    alice_history_after_death = [
+        params
+        for query, params in connection.executed
+        if query == _UPDATE_PLAYER_HISTORY_QUERY and params[-3:] == (alice_id, death_day, "csgo")
+    ]
+    assert alice_history_after_death == []
+
+    storage.record(alice_next_flush, event_context)
+
+    upsert_key = (
+        _UPSERT_PLAYER_HISTORY_QUERY,
+        (alice_id, flush_day, "csgo", 1000),
+    )
+    update_key = (
+        _UPDATE_PLAYER_HISTORY_QUERY,
+        (0, 1, 1, 0, 1000, 0, 0, 0, 0, 1, 1, 0, 0, 0, alice_id, flush_day, "csgo"),
+    )
+    assert upsert_key in connection.executed
+    assert update_key in connection.executed
+    assert connection.executed.index(upsert_key) < connection.executed.index(update_key)
+
+
 def test_record_chat_reuses_cached_player(event_context: EventContext) -> None:
     chat_dispatcher = EventDispatcher([ChatEventHandler()])
     chat_event = parse_log_event(

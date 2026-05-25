@@ -522,6 +522,61 @@ class _PlayerNameRollup:
         )
 
 
+@dataclass(slots=True)
+class _PlayerHistoryRollup:
+    kills: int = 0
+    deaths: int = 0
+    suicides: int = 0
+    headshots: int = 0
+    shots: int = 0
+    hits: int = 0
+    teamkills: int = 0
+    skill_delta: int = 0
+    kill_streak: int = 0
+    death_streak: int = 0
+
+    def add(
+        self,
+        *,
+        kills: int = 0,
+        deaths: int = 0,
+        suicides: int = 0,
+        headshots: int = 0,
+        shots: int = 0,
+        hits: int = 0,
+        teamkills: int = 0,
+        skill_delta: int = 0,
+        kill_streak: int = 0,
+        death_streak: int = 0,
+    ) -> None:
+        self.kills += kills
+        self.deaths += deaths
+        self.suicides += suicides
+        self.headshots += headshots
+        self.shots += shots
+        self.hits += hits
+        self.teamkills += teamkills
+        self.skill_delta += skill_delta
+        self.kill_streak = max(self.kill_streak, kill_streak)
+        self.death_streak = max(self.death_streak, death_streak)
+
+    def has_values(self) -> bool:
+        return any(
+            (
+                self.kills,
+                self.deaths,
+                self.suicides,
+                self.headshots,
+                self.shots,
+                self.hits,
+                self.teamkills,
+                self.skill_delta,
+                self.kill_streak,
+                self.death_streak,
+            )
+        )
+
+
 class EventStorage:
     """Translate :class:`EventUpdate` objects into SQL statements."""
 
@@ -542,6 +597,7 @@ class EventStorage:
         self._player_name_uses: set[tuple[int, str]] = set()
         self._player_name_lastuse: dict[tuple[int, str], datetime] = {}
         self._player_name_rollups: dict[int, _PlayerNameRollup] = {}
+        self._player_history_rollups: dict[int, _PlayerHistoryRollup] = {}
         self._closed_player_objects: set[int] = set()
         self._server_players: dict[int, set[int]] = {}
         self._server_live_players: dict[int, set[int]] = {}
@@ -655,6 +711,7 @@ class EventStorage:
         self._player_name_uses.clear()
         self._player_name_lastuse.clear()
         self._player_name_rollups.clear()
+        self._player_history_rollups.clear()
         self._closed_player_objects.clear()
         self._server_players.clear()
         self._server_live_players.clear()
@@ -700,6 +757,7 @@ class EventStorage:
         self._flush_event_buffer()
         self._flush_frag_counter_buffer()
         self._flush_all_open_player_connection_times(connection, flush_timestamp)
+        self._flush_all_pending_player_history_rollups(connection, flush_timestamp)
         self._flush_all_player_profile_names(connection)
         self._execute(connection, _FINALIZE_PLAYER_LAST_EVENT_QUERY, None)
         self._maybe_commit_batch()
@@ -712,6 +770,7 @@ class EventStorage:
         self._flush_event_buffer()
         self._flush_frag_counter_buffer()
         self._flush_all_open_player_connection_times(connection, flush_timestamp)
+        self._flush_all_pending_player_history_rollups(connection, flush_timestamp)
         self._flush_all_player_profile_names(connection)
         self._commit_pending()
 
@@ -1069,6 +1128,7 @@ class EventStorage:
                 deaths=1,
                 skill_delta=victim_skill_delta,
                 death_streak=self._player_max_death_streaks.get(victim_id, victim_streak),
+                defer_history=True,
             )
 
             if headshot:
@@ -1987,6 +2047,11 @@ class EventStorage:
     ) -> None:
         if flush_connection_time_at is not None:
             self._flush_player_connection_time(connection, player_id, flush_connection_time_at)
+        self._flush_pending_player_history_rollup(
+            connection,
+            player_id,
+            flush_connection_time_at or self._connection_time_flush_timestamp(),
+        )
         self._reset_player_connection_time_session(player_id)
         if flush_profile_name:
             self._flush_player_profile_name(connection, player_id)
@@ -2015,6 +2080,68 @@ class EventStorage:
     ) -> None:
         for player_id in sorted(self._player_connection_time_flush_at):
             self._flush_player_connection_time(connection, player_id, flush_timestamp)
+
+    def _flush_all_pending_player_history_rollups(
+        self,
+        connection: proxy_db.SupportsConnection,
+        flush_timestamp: datetime,
+    ) -> None:
+        for player_id in sorted(self._player_history_rollups):
+            self._flush_pending_player_history_rollup(connection, player_id, flush_timestamp)
+
+    def _flush_pending_player_history_rollup(
+        self,
+        connection: proxy_db.SupportsConnection,
+        player_id: int,
+        flush_timestamp: datetime,
+    ) -> None:
+        rollup = self._player_history_rollups.pop(player_id, None)
+        if rollup is None or not rollup.has_values():
+            return
+        player_context = self._player_connection_time_context.get(player_id)
+        if player_context is None:
+            return
+        _server_id, game = player_context
+        if self._should_skip_player_history(connection, player_id, _server_id):
+            return
+        current_skill = self._player_skills.setdefault(player_id, 1000)
+        history_timestamp = self._history_timestamp(flush_timestamp)
+        self._execute(
+            connection,
+            _UPSERT_PLAYER_HISTORY_QUERY,
+            (player_id, history_timestamp, game, current_skill),
+        )
+        self._execute(
+            connection,
+            _UPDATE_PLAYER_HISTORY_QUERY,
+            (
+                0,
+                rollup.kills,
+                rollup.deaths,
+                rollup.suicides,
+                current_skill,
+                rollup.headshots,
+                rollup.shots,
+                rollup.hits,
+                rollup.teamkills,
+                rollup.death_streak,
+                rollup.death_streak,
+                rollup.kill_streak,
+                rollup.kill_streak,
+                rollup.skill_delta,
+                player_id,
+                history_timestamp,
+                game,
+            ),
+        )
+
+    def _should_skip_player_history(
+        self,
+        connection: proxy_db.SupportsConnection,
+        player_id: int,
+        server_id: int,
+    ) -> bool:
+        return self._player_is_bot.get(player_id, False) and self._server_ignore_bots_enabled(connection, server_id)
 
     def _flush_player_connection_time(
         self,
@@ -2870,11 +2997,13 @@ class EventStorage:
         skill_delta: int = 0,
         kill_streak: int | None = None,
         death_streak: int | None = None,
+        defer_history: bool = False,
     ) -> None:
         current_skill = self._player_skills.setdefault(player_id, 1000) + skill_delta
         self._player_skills[player_id] = current_skill
-        history_timestamp = self._history_timestamp(processed_at)
-        if history_timestamp != self._history_timestamp(timestamp):
+        flush_timestamp = processed_at
+        history_timestamp = self._history_timestamp(flush_timestamp)
+        if not defer_history and history_timestamp != self._history_timestamp(timestamp):
             self._ensure_player_history_row(connection, context, player_id, timestamp)
 
         self._add_player_name_rollup(
@@ -2889,6 +3018,44 @@ class EventStorage:
 
         resolved_death_streak = death_streak or 0
         resolved_kill_streak = kill_streak or 0
+        if defer_history:
+            rollup = self._player_history_rollups.setdefault(player_id, _PlayerHistoryRollup())
+            rollup.add(
+                kills=kills,
+                deaths=deaths,
+                suicides=suicides,
+                headshots=headshots,
+                shots=shots,
+                hits=hits,
+                teamkills=teamkills,
+                skill_delta=skill_delta,
+                death_streak=resolved_death_streak,
+                kill_streak=resolved_kill_streak,
+            )
+            return
+
+        pending_rollup = self._player_history_rollups.pop(player_id, None)
+        merged_pending_rollup = False
+        if pending_rollup is not None and pending_rollup.has_values():
+            if not self._should_skip_player_history(connection, player_id, context.server_id):
+                kills += pending_rollup.kills
+                deaths += pending_rollup.deaths
+                suicides += pending_rollup.suicides
+                headshots += pending_rollup.headshots
+                shots += pending_rollup.shots
+                hits += pending_rollup.hits
+                teamkills += pending_rollup.teamkills
+                skill_delta += pending_rollup.skill_delta
+                resolved_death_streak = max(resolved_death_streak, pending_rollup.death_streak)
+                resolved_kill_streak = max(resolved_kill_streak, pending_rollup.kill_streak)
+                merged_pending_rollup = True
+        if merged_pending_rollup:
+            self._execute(
+                connection,
+                _UPSERT_PLAYER_HISTORY_QUERY,
+                (player_id, history_timestamp, context.game, current_skill),
+            )
+
         self._execute(
             connection,
             _UPDATE_PLAYER_HISTORY_QUERY,

@@ -2,7 +2,7 @@
 
 ## Snapshot
 
-- Last updated: `2026-05-23`
+- Last updated: `2026-05-25`
 - The active lane is still `P6d`: legacy-vs-Python parity audit, not
   bootstrap/import/i18n remediation.
 - The current debug loop should start from
@@ -107,6 +107,17 @@ Current open residuals:
   `CTs_Win` at `2026-01-02 21:40:31`. Treat this as a separate follow-up
   recheck of the previously closed TeamBonuses lifecycle case, not as part of
   the `Players_History` flush-sampling fix.
+- A follow-up `Players_History` victim flush-boundary fix is in place at the
+  unit level. Legacy review confirmed that an ordinary frag immediately
+  flushes the killer object, while the victim's deaths/session skill remain in
+  the live object until the next `flushDB()` boundary; Python now defers
+  victim-side history rollups and writes them on the later player flush date.
+  Targeted storage tests pass, including the new cross-day victim-flush
+  regression. Single-log `L0103146` replay was rerun with a `30/30` guard
+  window: the main sliced log still has the known artificial current-date
+  `Rakza` seed row, while the guard no longer lists `hlstats_Players_History`
+  and fails only on the pre-existing `hlstats_Servers` slice residual. Evidence:
+  `scripts/replay_baseline/artifacts/parity-traces/p6d-history-rakza-L0103146-victim-flush/`.
 - `hlstats_Events_Entries` remains an accepted visible policy difference:
   legacy `0`, Python `1017`.
 
