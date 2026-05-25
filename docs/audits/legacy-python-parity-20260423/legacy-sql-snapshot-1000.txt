@@ -1,6 +1,6 @@
 ﻿stack=legacy
 container=hlstatsx-legacy-db
-timestamp=2026-05-23T04:31:38
+timestamp=2026-05-24T18:02:51
 
 [counts]
 players=323

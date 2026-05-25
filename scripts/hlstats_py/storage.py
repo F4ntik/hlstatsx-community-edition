@@ -1805,14 +1805,20 @@ class EventStorage:
             self._update_player_presence(context.server_id, player_id, normalized_team)
         elif not userid_rollover and player_id not in self._closed_player_objects:
             self._player_teams.setdefault(player_id, "")
-        self._set_player_runtime_name(
-            connection,
-            player_id,
-            descriptor.name,
-            processed_at,
-            track_player_name=track_player_name,
-            force_alias_use=force_alias_use,
+        should_update_runtime_name = (
+            player_id not in self._player_names
+            or force_alias_use
+            or player_id in self._closed_player_objects
         )
+        if should_update_runtime_name:
+            self._set_player_runtime_name(
+                connection,
+                player_id,
+                descriptor.name,
+                processed_at,
+                track_player_name=track_player_name,
+                force_alias_use=force_alias_use,
+            )
         self._ensure_player_history_row(connection, context, player_id, timestamp)
         if self._history_timestamp(processed_at) != self._history_timestamp(timestamp):
             self._ensure_player_history_row(connection, context, player_id, processed_at)
@@ -1992,6 +1998,8 @@ class EventStorage:
         self._player_kills_per_life.pop(player_id, None)
         self._player_kill_streaks.pop(player_id, None)
         self._player_death_streaks.pop(player_id, None)
+        self._player_max_kill_streaks.pop(player_id, None)
+        self._player_max_death_streaks.pop(player_id, None)
 
     def _flush_all_player_profile_names(
         self,
@@ -2030,6 +2038,8 @@ class EventStorage:
             return
         _server_id, game = player_context
         current_skill = self._player_skills.setdefault(player_id, 1000)
+        kill_streak = self._player_max_kill_streaks.get(player_id, 0)
+        death_streak = self._player_max_death_streaks.get(player_id, 0)
         ignore_bots_enabled = self._player_is_bot.get(player_id, False) and self._server_ignore_bots_enabled(
             connection,
             _server_id,
@@ -2041,6 +2051,11 @@ class EventStorage:
             (player_id, history_timestamp, game, current_skill),
         )
         self._execute(connection, _UPDATE_PLAYER_CONNECTION_TIME_QUERY, (delta, player_id))
+        self._execute(
+            connection,
+            _UPDATE_PLAYER_STREAKS_QUERY,
+            (kill_streak, kill_streak, death_streak, death_streak, player_id),
+        )
         self._add_player_name_rollup(player_id, connection_time=delta)
         if not ignore_bots_enabled:
             self._execute(
@@ -2056,10 +2071,10 @@ class EventStorage:
                     0,
                     0,
                     0,
-                    0,
-                    0,
-                    0,
-                    0,
+                    death_streak,
+                    death_streak,
+                    kill_streak,
+                    kill_streak,
                     0,
                     player_id,
                     history_timestamp,
@@ -2314,10 +2329,9 @@ class EventStorage:
         death_streak += death_delta
         self._player_kill_streaks[player_id] = kill_streak
         self._player_death_streaks[player_id] = death_streak
-        max_kill_streak = max(kill_streak, self._player_max_kill_streaks.get(player_id, 0))
-        max_death_streak = max(death_streak, self._player_max_death_streaks.get(player_id, 0))
-        self._player_max_kill_streaks[player_id] = max_kill_streak
-        self._player_max_death_streaks[player_id] = max_death_streak
+        if death_delta:
+            max_death_streak = max(death_streak, self._player_max_death_streaks.get(player_id, 0))
+            self._player_max_death_streaks[player_id] = max_death_streak
         return kill_streak
 
     def _apply_frag_player_rollup(
@@ -2769,6 +2783,10 @@ class EventStorage:
         emit_derived_action: bool = True,
     ) -> None:
         kill_total = self._player_kills_per_life.get(player_id, 0)
+        if kill_total <= 0:
+            self._player_kills_per_life[player_id] = 0
+            return
+        self._player_max_kill_streaks[player_id] = max(kill_total, self._player_max_kill_streaks.get(player_id, 0))
         if kill_total <= 1:
             self._player_kills_per_life[player_id] = 0
             return

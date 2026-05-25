@@ -718,6 +718,120 @@ def test_restart_round_does_not_end_kill_streak_before_actual_life_end(event_con
     assert (_INSERT_PLAYER_ACTION_QUERY, (life_end.timestamp, 7, "de_dust2", 101, 702, 0)) in connection.executed
 
 
+def test_history_samples_kill_streak_only_after_life_end_flush(event_context: EventContext) -> None:
+    dispatcher = EventDispatcher(
+        [ConnectEventHandler(), KillEventHandler(), WorldEventHandler()],
+        fallback=GenericEventHandler(),
+    )
+    connected = dispatcher.dispatch(
+        parse_log_event(
+            'L 01/02/2024 - 03:04:00: "Alice<2><STEAM_1:2><>" connected, address "1.2.3.4:27005"'
+        ),
+        event_context,
+    )
+    first_kill = dispatcher.dispatch(
+        parse_log_event(
+            'L 01/02/2024 - 03:04:05: "Alice<2><STEAM_1:2><CT>" killed '
+            '"Bob<3><STEAM_1:3><TERRORIST>" with "ak47"'
+        ),
+        event_context,
+    )
+    second_kill = dispatcher.dispatch(
+        parse_log_event(
+            'L 01/02/2024 - 03:04:06: "Alice<2><STEAM_1:2><CT>" killed '
+            '"Charlie<4><STEAM_1:4><TERRORIST>" with "ak47"'
+        ),
+        event_context,
+    )
+    round_end = dispatcher.dispatch(
+        parse_log_event('L 01/02/2024 - 03:04:07: World triggered "Round_End"'),
+        event_context,
+    )
+    history_timestamp = datetime(2024, 1, 2)
+    responses: Dict[QueryKey, List[QueryResponse]] = {
+        (_PLAYER_BY_UNIQUE_QUERY, ("STEAM_1:2", "csgo")): [QueryResponse(fetchone=(101,))],
+        (_PLAYER_BY_UNIQUE_QUERY, ("STEAM_1:3", "csgo")): [QueryResponse(fetchone=(102,))],
+        (_PLAYER_BY_UNIQUE_QUERY, ("STEAM_1:4", "csgo")): [QueryResponse(fetchone=(103,))],
+        (_SELECT_PLAYER_STATE_QUERY, (101,)): [QueryResponse(fetchone=(1000, 0, "", 0))],
+        (_SELECT_SERVER_CONFIG_QUERY, (7, "MinPlayers")): [QueryResponse(fetchone=(0,))],
+        (_SELECT_ACTION_QUERY, ("csgo", "kill_streak_2")): [QueryResponse(fetchone=(702, 0, 0))],
+    }
+    connection = FakeConnection(responses)
+    storage = EventStorage(
+        StubAdapter(connection),
+        clock=lambda: connected.timestamp,
+        use_event_timestamps_for_processing=True,
+    )
+
+    storage.record(connected, event_context)
+    storage.record(first_kill, event_context)
+    storage.record(second_kill, event_context)
+
+    pre_boundary_history = [
+        params
+        for query, params in connection.executed
+        if query == _UPDATE_PLAYER_HISTORY_QUERY and params[-3:] == (101, history_timestamp, "csgo")
+    ]
+    assert pre_boundary_history
+    assert all(params[11] == 0 and params[12] == 0 for params in pre_boundary_history)
+
+    storage.record(round_end, event_context)
+    storage.flush_pending()
+
+    assert (
+        _UPDATE_PLAYER_HISTORY_QUERY,
+        (7, 0, 0, 0, 1004, 0, 0, 0, 0, 0, 0, 2, 2, 0, 101, history_timestamp, "csgo"),
+    ) in connection.executed
+
+
+def test_history_samples_single_kill_streak_without_derived_action(event_context: EventContext) -> None:
+    dispatcher = EventDispatcher(
+        [ConnectEventHandler(), KillEventHandler(), WorldEventHandler()],
+        fallback=GenericEventHandler(),
+    )
+    connected = dispatcher.dispatch(
+        parse_log_event(
+            'L 01/02/2024 - 03:04:00: "Alice<2><STEAM_1:2><>" connected, address "1.2.3.4:27005"'
+        ),
+        event_context,
+    )
+    kill = dispatcher.dispatch(
+        parse_log_event(
+            'L 01/02/2024 - 03:04:05: "Alice<2><STEAM_1:2><CT>" killed '
+            '"Bob<3><STEAM_1:3><TERRORIST>" with "ak47"'
+        ),
+        event_context,
+    )
+    round_end = dispatcher.dispatch(
+        parse_log_event('L 01/02/2024 - 03:04:07: World triggered "Round_End"'),
+        event_context,
+    )
+    history_timestamp = datetime(2024, 1, 2)
+    responses: Dict[QueryKey, List[QueryResponse]] = {
+        (_PLAYER_BY_UNIQUE_QUERY, ("STEAM_1:2", "csgo")): [QueryResponse(fetchone=(101,))],
+        (_PLAYER_BY_UNIQUE_QUERY, ("STEAM_1:3", "csgo")): [QueryResponse(fetchone=(102,))],
+        (_SELECT_PLAYER_STATE_QUERY, (101,)): [QueryResponse(fetchone=(1000, 0, "", 0))],
+        (_SELECT_SERVER_CONFIG_QUERY, (7, "MinPlayers")): [QueryResponse(fetchone=(0,))],
+    }
+    connection = FakeConnection(responses)
+    storage = EventStorage(
+        StubAdapter(connection),
+        clock=lambda: connected.timestamp,
+        use_event_timestamps_for_processing=True,
+    )
+
+    storage.record(connected, event_context)
+    storage.record(kill, event_context)
+    storage.record(round_end, event_context)
+    storage.flush_pending()
+
+    assert all(query != _INSERT_PLAYER_ACTION_QUERY for query, _params in connection.executed)
+    assert (
+        _UPDATE_PLAYER_HISTORY_QUERY,
+        (7, 0, 0, 0, 1002, 0, 0, 0, 0, 0, 0, 1, 1, 0, 101, history_timestamp, "csgo"),
+    ) in connection.executed
+
+
 def test_record_chat_reuses_cached_player(event_context: EventContext) -> None:
     chat_dispatcher = EventDispatcher([ChatEventHandler()])
     chat_event = parse_log_event(
@@ -980,6 +1094,59 @@ def test_player_name_totals_flush_to_current_alias_after_name_change(
         _UPDATE_PLAYERNAME_TOTALS_QUERY,
         (1, 1, 0, 0, 1, 0, 0, 101, "Alice"),
     ) not in connection.executed
+
+
+def test_existing_live_player_keeps_constructor_alias_until_explicit_name_change(
+    event_context: EventContext,
+) -> None:
+    dispatcher = EventDispatcher(
+        [ConnectEventHandler(), DisconnectEventHandler(), TriggerEventHandler()],
+        fallback=GenericEventHandler(),
+    )
+    connected = dispatcher.dispatch(
+        parse_log_event(
+            'L 01/02/2024 - 03:04:05: "Player21<136><STEAM_1:0:1161623468><>" '
+            'connected, address "109.106.244.53:27005"'
+        ),
+        event_context,
+    )
+    stats = dispatcher.dispatch(
+        parse_log_event(
+            'L 01/02/2024 - 03:04:05: "Dim$0n<136><STEAM_1:0:1161623468><TERRORIST>" '
+            'triggered "weaponstats" (weapon "ak47") (shots "190") (hits "31") '
+            '(kills "3") (headshots "1") (tks "0") (damage "400") (deaths "3")'
+        ),
+        event_context,
+    )
+    disconnected = dispatcher.dispatch(
+        parse_log_event(
+            'L 01/02/2024 - 03:04:05: "Dim$0n<136><STEAM_1:0:1161623468><TERRORIST>" disconnected'
+        ),
+        event_context,
+    )
+
+    responses: Dict[QueryKey, List[QueryResponse]] = {
+        (_PLAYER_BY_UNIQUE_QUERY, ("STEAM_1:0:1161623468", "csgo")): [QueryResponse(fetchone=(101,))],
+        (_SELECT_SERVER_CONFIG_QUERY, (7, "MinPlayers")): [QueryResponse(fetchone=(0,))],
+    }
+    connection = FakeConnection(responses)
+    storage = EventStorage(StubAdapter(connection), clock=lambda: connected.timestamp)
+
+    storage.record(connected, event_context)
+    storage.record(stats, event_context)
+    storage.record(disconnected, event_context)
+
+    alias_touches = [params for query, params in connection.executed if query == _UPSERT_PLAYER_NAME_QUERY]
+    assert alias_touches == [(101, "Player21", connected.timestamp)]
+    assert (
+        _UPDATE_PLAYERNAME_TOTALS_QUERY,
+        (0, 0, 0, 0, 0, 190, 31, 101, "Player21"),
+    ) in connection.executed
+    assert all(
+        params[-1] != "Dim$0n"
+        for query, params in connection.executed
+        if query == _UPDATE_PLAYERNAME_TOTALS_QUERY
+    )
 
 
 def test_stdin_batch_commit_does_not_flush_player_name_totals(

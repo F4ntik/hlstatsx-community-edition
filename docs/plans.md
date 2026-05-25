@@ -201,6 +201,32 @@ Current working rules:
   from `Run-SingleLogParity.ps1` before promoting the fix
 - separate GeoIP-only player differences from real stats/session/alias drift
   before touching attribution logic
+- current `hlstats_Players` normalized drift is already classified as
+  GeoIP-only (`country`/`flag`), so the active attribution work should stay on
+  `hlstats_PlayerNames` and `hlstats_Players_History`
+- the first `PlayerNames` case was stateful across the neighboring
+  `L0102209..L0102213` logs; it is now fixed by preserving the legacy
+  live-object constructor alias across ordinary same-live-object descriptors
+- broad `hlstats_PlayerNames` is now down to the remaining `XYU` / `unnamed`,
+  `0:552632503` Python-only alias residual; do not reopen the closed
+  `Player21` / `Dim$0n` / `Dim$on` cluster unless new evidence contradicts the
+  clean same-cluster replay
+- do not repeat the rejected `changed name to` alias-rollup flush fix: it was
+  rolled back because it was based on an oversimplified unit-level hypothesis
+  and failed the full `L0102212` plus `L0102209..L0102213` replay evidence
+- next active M3 block is `hlstats_Players_History` streak attribution, starting
+  from `Rakza`, `STEAM_0:1:55955613`, `L0103144` / `L0103146` / `L0103212`
+- do not apply the rejected event-level "current streak instead of max streak"
+  shortcut for `Players_History`; the 2026-05-24 promotion replay broadened
+  history drift from `50/50` to `106/106`, so the next candidate must trace
+  legacy `flushDB` sampling cadence first
+- the retained flush-sampling fix now aligns Python with legacy
+  `endKillStreak` / `flushDB` boundaries and reduces `Players_History` to
+  `14/14`; remaining history work should focus on skill/stat attribution
+  examples, not another broad kill-streak shortcut
+- the fresh `narrow-1000` after that fix surfaced one Python-only
+  `Events_TeamBonuses` `Dance Bear` / `CTs_Win` row; recheck that lifecycle
+  separately before calling the current contour TeamBonuses-clean again
 - treat `Events_Entries legacy=0` vs `python>0` as an accepted visible
   difference unless the acceptance policy is explicitly changed
 - keep detailed compare counts, replay transcripts, and slice-by-slice triage

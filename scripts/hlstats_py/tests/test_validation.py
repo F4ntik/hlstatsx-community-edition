@@ -113,7 +113,7 @@ def test_replay_runner_builds_consistent_snapshot() -> None:
     assert bob.kills == 0
     assert bob.deaths == 1
     assert bob.suicides == 1
-    assert bob.skill == 998
+    assert bob.skill == 993
     assert bob.connections == 1
     assert bob.disconnects == 0
 
