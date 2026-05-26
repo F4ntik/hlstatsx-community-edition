@@ -2012,6 +2012,8 @@ class EventStorage:
         force_alias_use: bool = False,
     ) -> None:
         if not player_name:
+            self._player_names[player_id] = ""
+            self._closed_player_objects.discard(player_id)
             return
         previous_name = self._player_names.get(player_id)
         force_alias_use = force_alias_use or player_id in self._closed_player_objects

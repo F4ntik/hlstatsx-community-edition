@@ -134,15 +134,25 @@ Current open residuals:
   `hlstats_awards_py --geoip`, that count returned to `0` and
   `hlstats_Players` disappeared from the broad compare. Evidence:
   `docs/audits/legacy-python-parity-20260423/runtime-db-diff-p6d-narrow-1000-20260525-final-after-geoip-compare.txt`.
+- The remaining `XYU` / `unnamed` `hlstats_PlayerNames` residual is closed.
+  Legacy evidence showed that the player object for `0:552632503` is created
+  from a blank-name connect in `L0103048.log`, so later ordinary `unnamed`
+  descriptors must not create an alias row; only the explicit
+  `changed name to "XYU"` event should touch `hlstats_PlayerNames`. Python now
+  preserves the blank constructor alias state without writing a blank/unnamed
+  row. Fresh broad `narrow-1000` plus strict GeoIP backfill reduced
+  `hlstats_PlayerNames` from `0/1` to absent from the logical compare; direct
+  anchors are `legacy=415`, `python=415`, and both DBs now have only
+  `(playerId=203, name=XYU)` for `0:552632503`. Evidence:
+  `docs/audits/legacy-python-parity-20260423/runtime-db-diff-p6d-narrow-1000-20260525-after-playernames-blank-alias-compare.txt`.
 - `hlstats_Events_Entries` remains an accepted visible policy difference:
   legacy `0`, Python `1017`.
 
 ## In Progress
 
-- [ ] `P6d-M3 (RC-C)`: only two residuals remain in the final `narrow-1000`
-  logical compare: `hlstats_PlayerNames` `0/1` for the known Python-only
-  `XYU` / `unnamed` alias (`0:552632503`), and `hlstats_Events_Entries`
-  legacy `0` vs Python `1017` by current policy. `hlstats_Players`,
+- [ ] `P6d-M3 (RC-C)`: only the accepted `hlstats_Events_Entries` policy
+  residual remains in the final `narrow-1000` logical compare: legacy `0` vs
+  Python `1017`. `hlstats_PlayerNames`, `hlstats_Players`,
   `hlstats_Players_History`, and `hlstats_Events_TeamBonuses` are clean in the
   broad contour.
 
@@ -200,19 +210,19 @@ Current open residuals:
   `250/250` `country`/`flag` diffs to absent from the final broad compare, and
   Python players with `lastAddress <> ''` and empty `flag` dropped from `250`
   to `0`.
+- Closed the final real `hlstats_PlayerNames` drift for `XYU`
+  (`0:552632503`) by treating blank-name connects as a constructed live object
+  state without persisting a placeholder alias. The broad logical compare moved
+  from `hlstats_PlayerNames` `0/1` to `0/0`.
 - Frontend i18n backlog (`P6a`/`P6b`/`P6c`) remains complete for the supported
   EN/RU product contour.
 
 ## Next
 
-1. Start the next parity loop on `P6d-M3` with the cost-aware protocol from
-   `docs/plans.md`: legacy-first analysis, single-log/window reproduction,
-   focused regression, then replay promotion.
-2. If returning to PlayerNames, start from the remaining `XYU` / `unnamed`,
-   `0:552632503` Python-only alias residual rather than the closed `Player21`
-   cluster.
-3. Keep `Events_Entries legacy=0` vs `python>0` visible in compare output
+1. Keep `Events_Entries legacy=0` vs `python>0` visible in compare output
    unless the acceptance policy is explicitly changed.
+2. If the policy changes, revisit `hlstats_Events_Entries` as the only current
+   broad logical compare residual.
 
 ## Decisions
 
@@ -236,8 +246,7 @@ Current open residuals:
   even when the local unit slice is already green.
 - Some Python test commands still require explicit `PYTHONPATH` setup because
   the imported package roots do not yet have a unified developer bootstrap.
-- The remaining `PlayerNames` alias residual should not be downgraded without
-  explicit evidence or acceptance notes; `Players` and `Players_History` are
-  no longer open broad-contour residuals.
+- `PlayerNames`, `Players`, and `Players_History` are no longer open
+  broad-contour residuals; avoid reopening them without fresh focused evidence.
 - The replay comparison contour still uses fixed local container names, so
   concurrent local stacks can block rebuild or smoke passes.

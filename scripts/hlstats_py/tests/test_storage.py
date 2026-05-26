@@ -1214,6 +1214,63 @@ def test_existing_live_player_keeps_constructor_alias_until_explicit_name_change
     )
 
 
+def test_empty_constructor_name_suppresses_placeholder_alias_until_explicit_name_change(
+    event_context: EventContext,
+) -> None:
+    dispatcher = EventDispatcher(
+        [ConnectEventHandler(), EntryEventHandler(), TeamEventHandler()],
+        fallback=GenericEventHandler(),
+    )
+    connected = dispatcher.dispatch(
+        parse_log_event(
+            'L 01/03/2024 - 16:06:20: "<1216><STEAM_0:0:552632503><>" '
+            'connected, address "178.185.29.98:27005"'
+        ),
+        event_context,
+    )
+    reconnected = dispatcher.dispatch(
+        parse_log_event(
+            'L 01/03/2024 - 16:06:25: "<1217><STEAM_0:0:552632503><>" '
+            'connected, address "178.185.29.98:27005"'
+        ),
+        event_context,
+    )
+    entered = dispatcher.dispatch(
+        parse_log_event('L 01/03/2024 - 16:06:29: "unnamed<1217><STEAM_0:0:552632503><>" entered the game'),
+        event_context,
+    )
+    joined = dispatcher.dispatch(
+        parse_log_event('L 01/03/2024 - 16:06:37: "unnamed<1217><STEAM_0:0:552632503><>" joined team "TERRORIST"'),
+        event_context,
+    )
+    changed = dispatcher.dispatch(
+        parse_log_event(
+            'L 01/03/2024 - 16:13:13: "unnamed<1219><STEAM_0:0:552632503><TERRORIST>" '
+            'changed name to "XYU"'
+        ),
+        event_context,
+    )
+
+    responses: Dict[QueryKey, List[QueryResponse]] = {
+        (_PLAYER_BY_UNIQUE_QUERY, ("0:552632503", "csgo")): [QueryResponse(fetchone=(203,))],
+    }
+    connection = FakeConnection(responses)
+    storage = EventStorage(
+        StubAdapter(connection),
+        clock=lambda: connected.timestamp,
+        use_event_timestamps_for_processing=True,
+    )
+
+    storage.record(connected, event_context)
+    storage.record(reconnected, event_context)
+    storage.record(entered, event_context)
+    storage.record(joined, event_context)
+    storage.record(changed, event_context)
+
+    alias_touches = [params for query, params in connection.executed if query == _UPSERT_PLAYER_NAME_QUERY]
+    assert alias_touches == [(203, "XYU", changed.timestamp)]
+
+
 def test_stdin_batch_commit_does_not_flush_player_name_totals(
     dispatcher: EventDispatcher,
     event_context: EventContext,
