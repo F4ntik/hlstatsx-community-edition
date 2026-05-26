@@ -2,7 +2,7 @@
 
 ## Snapshot
 
-- Last updated: `2026-05-25`
+- Last updated: `2026-05-26`
 - The active lane is still `P6d`: legacy-vs-Python parity audit, not
   bootstrap/import/i18n remediation.
 - The current debug loop should start from
@@ -44,15 +44,23 @@ Current open residuals:
   `legacy=4753`, `python=4753`, and no stable-key TeamBonuses differences.
   Evidence:
   `docs/audits/legacy-python-parity-20260423/runtime-db-diff-p6d-narrow-1000-20260523-after-team-bonus-timeout-cadence.md`.
-- The broad `hlstats_Players` residual is now closed for the current
-  `narrow-1000` contour. After the final full replay, a strict GeoIP backfill
-  against the Python contour reduced `hlstats_Players` from the intermediate
-  `250/250` GeoIP-only `country`/`flag` diff to absent from the final logical
-  compare. The extra `Fat` (`1:58816828`) `kill_streak` drift had already been
-  closed before the GeoIP pass: legacy clamps a `connection_time` gap above
-  `600` seconds to `0`, but still continues `flushDB()` and persists pending
-  streak counters. Python now keeps the streak flush on that path while
-  suppressing only the oversized connection-time increment.
+- P6d-M4 `hlstats_Players` is now closed and classified as a GeoIP-only
+  contour/policy residual. The live compare shows `323/323` with
+  `250` legacy-only normalized rows and `250` python-only normalized rows;
+  the field classifier reports `250 geoip_only_rows` and `0 non_geoip_rows`.
+  Only `country` and `flag` differ, while `lastAddress`, `kills`, `deaths`,
+  `suicides`, `skill`, `shots`, `hits`, `teamkills`, `headshots`,
+  `kill_streak`, `death_streak`, `activity`, and `hideranking` match. Direct
+  SQL anchors confirm `SELECT COUNT(*) FROM hlstats_Players WHERE country <> ''
+  OR flag <> '';` as `legacy=250` and `python=0`. Legacy `getAddress` writes
+  `lastAddress`, `geoLookup` writes only `country`/`flag`, and `flushDB()`
+  stats/session fields do not write `country`/`flag`; on the Python path,
+  `storage.py` runtime writes `lastAddress`/stats/session while GeoIP fields
+  are maintenance/backfill via `hlstats_awards_py` and not stdin replay. No
+  minimal runtime fix remains for `hlstats_Players`; the remaining accepted
+  compare difference is the GeoIP-only contour/policy residual, and `P6d-M5
+  hlstats_Events_ChangeTeam` is now closed after the second TDD fix and the
+  narrow-1000 replay/compare.
 - The first `hlstats_PlayerNames` anchor is stateful, not a clean isolated
   single-log case. The `Player21` / `Dim$0n` / `Dim$on` residual centers on
   `0:1161623468` around `L0102212.log:487`, but isolated `L0102212` produces a
@@ -145,19 +153,56 @@ Current open residuals:
   anchors are `legacy=415`, `python=415`, and both DBs now have only
   `(playerId=203, name=XYU)` for `0:552632503`. Evidence:
   `docs/audits/legacy-python-parity-20260423/runtime-db-diff-p6d-narrow-1000-20260525-after-playernames-blank-alias-compare.txt`.
-- `hlstats_Events_Entries` remains an accepted visible policy difference:
-  legacy `0`, Python `1017`.
+- The `hlstats_Events_Entries` residual is now confirmed closed for the
+  current narrow contour/default Python path. After Docker Desktop was
+  started, the narrow contour command succeeded and the compare command
+  `python scripts/replay_baseline/compare_stats_dbs.py --max-examples 20`
+  no longer lists `hlstats_Events_Entries`; the direct counts are
+  `legacy=0`, `python=0`. Evidence was recorded in
+  `docs/audits/legacy-python-parity-20260423/python-sql-snapshot-1000.txt`
+  and `scripts/replay_baseline/comparison/.parity-state/20260526-061001.json`.
+- P6d-M5 `hlstats_Events_ChangeTeam` is closed after the second TDD fix and
+  the narrow-1000 replay/compare. Root cause: Python lost the blank team seed
+  after userid rollover/blank reconnect/entry, so the first ignored
+  time/latency `<UNASSIGNED>` saw `previous_team=None` and suppressed the
+  implicit `ChangeTeam`; legacy records descriptor-driven nonblank team
+  transitions. The fix keeps `seed_blank_team_on_rollover` for ignored
+  time/latency priming and now also uses it for connect in `_record_connection`,
+  while blank seeding stays guarded by closed-player checks. Targeted tests
+  `test_rollover_blank_status_followed_by_unassigned_trigger_emits_implicit_change_team`
+  and `test_rollover_blank_connect_and_blank_entry_before_unassigned_trigger_emits_implicit_change_team`
+  passed; `unassigned or team_change or rollover` was `12/12`,
+  `test_storage.py` was `133/133`, and the final `Run-DualContour-1000` rerun
+  with `-ReuseValidLegacy` reused valid legacy from run state
+  `20260526-081158.json`. The final compare had no
+  `hlstats_Events_ChangeTeam` residual; the only remaining compare difference
+  was the accepted `hlstats_Players` GeoIP-only contour/policy residual
+  (`323/323`, `250` legacy-only rows, `250` python-only rows). SQL anchors for
+  `ChangeTeam` were `legacy total=1345/unassigned=47` and
+  `python total=1345/unassigned=47`.
 
 ## In Progress
 
-- [ ] `P6d-M3 (RC-C)`: only the accepted `hlstats_Events_Entries` policy
-  residual remains in the final `narrow-1000` logical compare: legacy `0` vs
-  Python `1017`. `hlstats_PlayerNames`, `hlstats_Players`,
-  `hlstats_Players_History`, and `hlstats_Events_TeamBonuses` are clean in the
-  broad contour.
+- [x] The targeted `hlstats_Events_Entries` fix is confirmed closed for the
+  current narrow contour/default Python path. The next focus is the unrelated
+  remaining compare residuals, without reopening `PlayerNames`,
+  `Players_History`, or `TeamBonuses`.
 
 ## Done
 
+- Restored legacy-style daily `last_skill_change` persistence for the Python
+  runtime so the existing player/clan/country ranking arrows render from live
+  replay data again. The web layer already consumed `hlstats_Players.last_skill_change`;
+  the missing piece was runtime flush parity. Python now persists daily
+  cumulative skill deltas to `hlstats_Players.last_skill_change`, keeps
+  `hlstats_Players_History.skill_change` on the per-day history row, resets
+  the cumulative value on day rollover, and keeps ignored-bot trend neutral.
+  Targeted storage tests passed, the broader `test_runtime_decisions.py` +
+  `test_storage.py` suite passed, fresh `Run-DualContour-1000 -ReuseValidLegacy`
+  completed, `compare_stats_dbs.py --max-examples 20` still reports only the
+  accepted GeoIP-only `hlstats_Players` residual, and replay-backed
+  `mode=players` HTML on the Python contour now contains rendered `t0/t1/t2`
+  trend icons.
 - Closed the earlier `hlstats_Servers.act_players` residual and removed it from
   the active parity gate.
 - Added the single-log parity-debug workflow on
@@ -190,6 +235,10 @@ Current open residuals:
   `python=4753`, with empty legacy-only and python-only sets.
 - Closed `P6d-M2` for the current contour: `ChangeTeam`, `Connects`, `Chat`,
   and `PlayerActions` no longer appear in the fresh logical compare.
+- Added targeted unit coverage for suppressing empty-team exact `entered the
+  game` rows in Python `hlstats_Events_Entries`. The default-path fix is in
+  place, and the remaining replay promotion still needs to confirm the row is
+  gone in the contour.
 - Closed the stateful `Player21` / `Dim$0n` / `Dim$on` PlayerNames alias
   attribution cluster by preserving the legacy live-object constructor alias
   across ordinary same-live-object descriptors. Targeted storage tests,
@@ -219,10 +268,11 @@ Current open residuals:
 
 ## Next
 
-1. Keep `Events_Entries legacy=0` vs `python>0` visible in compare output
-   unless the acceptance policy is explicitly changed.
-2. If the policy changes, revisit `hlstats_Events_Entries` as the only current
-   broad logical compare residual.
+1. Run the narrow replay/compare for `hlstats_Events_ChangeTeam` only to
+   verify the P6d-M5 fix before calling the contour clean.
+2. Keep `hlstats_Events_Entries` closed for the current narrow
+   contour/default Python path and do not reopen `PlayerNames`,
+   `Players_History`, or `TeamBonuses` from this confirmation.
 
 ## Decisions
 

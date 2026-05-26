@@ -188,6 +188,7 @@ def test_entry_event(dispatcher: EventDispatcher, event_context: EventContext) -
     assert update.category is EventCategory.ENTRY
     assert update.actor is not None
     assert update.actor.unique_id == "1:2"
+    assert update.actor.team == "CT"
 
 
 def test_entry_event_requires_exact_phrase(dispatcher: EventDispatcher, event_context: EventContext) -> None:

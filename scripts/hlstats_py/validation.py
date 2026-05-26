@@ -39,6 +39,7 @@ from .storage import (
     _UPDATE_PLAYER_CONNECTION_TIME_QUERY,
     _UPDATE_PLAYER_FRAG_ROLLUP_QUERY,
     _UPDATE_PLAYER_KILLS_QUERY,
+    _UPDATE_PLAYER_LAST_SKILL_CHANGE_QUERY,
     _UPDATE_PLAYER_NAME_QUERY,
     _UPDATE_PLAYER_STREAKS_QUERY,
     _UPDATE_PLAYER_HISTORY_QUERY,
@@ -222,6 +223,7 @@ class _PlayerRecord:
     suicides: int = 0
     teamkills: int = 0
     skill: int = 1000
+    last_skill_change: int = 0
     connections: int = 0
     disconnects: int = 0
     last_address: Optional[str] = None
@@ -338,7 +340,9 @@ class ReplayDatabase:
             record = self._players.get(int(player_id))
             if record is None:
                 return _ExecutionResult(fetchone=None)
-            return _ExecutionResult(fetchone=(record.skill, record.kills, record.last_address, 0))
+            return _ExecutionResult(
+                fetchone=(record.skill, record.kills, record.last_address, 0, record.last_skill_change)
+            )
         if query == _UPDATE_PLAYER_NAME_QUERY:
             assert normalized_params is not None
             name, player_id = normalized_params
@@ -685,6 +689,12 @@ class ReplayDatabase:
             delta, player_id = normalized_params
             record = self._players[int(player_id)]
             record.connection_time += int(delta)
+            return _ExecutionResult()
+        if query == _UPDATE_PLAYER_LAST_SKILL_CHANGE_QUERY:
+            assert normalized_params is not None
+            value, player_id = normalized_params
+            record = self._players[int(player_id)]
+            record.last_skill_change = int(value)
             return _ExecutionResult()
         if query == _UPDATE_SERVER_PLAYER_TOTALS_QUERY:
             return _ExecutionResult()

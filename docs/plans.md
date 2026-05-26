@@ -187,8 +187,43 @@ Current gates:
   current full `narrow-1000` contour and direct stable-key SQL.
 - `[x] P6d-M2 (RC-B)`: `ChangeTeam`, `Connects`, `Chat`, and `PlayerActions`
   no longer appear in the current full `narrow-1000` logical compare.
-- `[ ] P6d-M3 (RC-C)`: recheck player identity/history attribution now that
-  M1/M2 are stable.
+- `[x] P6d-M3 (RC-C)`: the targeted `hlstats_Events_Entries` default-path fix
+  is confirmed on the current narrow contour/default Python path. The narrow
+  replay compare now reports `legacy=0`, `python=0`, and `hlstats_Events_Entries`
+  no longer appears in the logical compare; the remaining compare residual was
+  the unrelated `hlstats_Players` row, and `hlstats_Events_ChangeTeam` was
+  closed in P6d-M5.
+
+Next scoped tasks:
+
+- `[x] P6d-M4`: triage the current `hlstats_Players` residual from the
+  2026-05-26 narrow replay/compare. Classified as a closed GeoIP-only
+  contour/policy residual after direct SQL anchors showed
+  `legacy=250`/`python=0` for `country`/`flag`, while the remaining
+  stats/session/alias columns matched and the legacy/Python paths confirmed
+  GeoIP lives in maintenance/backfill rather than stdin replay. Do not reopen
+  `hlstats_Events_Entries`, `hlstats_PlayerNames`, `hlstats_Players_History`,
+  or `hlstats_Events_TeamBonuses`.
+- `[x] P6d-M5`: triage the current `hlstats_Events_ChangeTeam` residual from
+  the same 2026-05-26 narrow replay/compare. Closed after the second TDD fix
+  and narrow-1000 replay/compare. Root cause: Python lost the blank team seed
+  after userid rollover/blank reconnect/entry, so the first ignored
+  time/latency `<UNASSIGNED>` saw `previous_team=None` and suppressed the
+  implicit `ChangeTeam`; legacy records descriptor-driven nonblank team
+  transitions. The fix keeps `seed_blank_team_on_rollover` for ignored
+  time/latency priming and now also uses it for connect in `_record_connection`,
+  while blank seeding stays guarded by closed-player checks. Targeted tests
+  `test_rollover_blank_status_followed_by_unassigned_trigger_emits_implicit_change_team`
+  and `test_rollover_blank_connect_and_blank_entry_before_unassigned_trigger_emits_implicit_change_team`
+  passed; `unassigned or team_change or rollover` was `12/12`,
+  `test_storage.py` was `133/133`, and the final `Run-DualContour-1000` rerun
+  with `-ReuseValidLegacy` reused valid legacy from run state
+  `20260526-081158.json`. The final compare had no
+  `hlstats_Events_ChangeTeam` residual; the only remaining compare difference
+  was the accepted `hlstats_Players` GeoIP-only contour/policy residual
+  (`323/323`, `250` legacy-only rows, `250` python-only rows). SQL anchors for
+  `ChangeTeam` were `legacy total=1345/unassigned=47` and
+  `python total=1345/unassigned=47`.
 
 Current working rules:
 
@@ -201,9 +236,10 @@ Current working rules:
   from `Run-SingleLogParity.ps1` before promoting the fix
 - separate GeoIP-only player differences from real stats/session/alias drift
   before touching attribution logic
-- current `hlstats_Players` normalized drift is already classified as
-  GeoIP-only (`country`/`flag`), so the active attribution work should stay on
-  `hlstats_PlayerNames` and `hlstats_Players_History`
+- `P6d-M4` is closed as a GeoIP-only contour/policy residual; the remaining
+  accepted parity residual is `hlstats_Players`, and `P6d-M5
+  hlstats_Events_ChangeTeam` is now closed after the second TDD fix and the
+  narrow-1000 replay/compare
 - the first `PlayerNames` case was stateful across the neighboring
   `L0102209..L0102213` logs; it is now fixed by preserving the legacy
   live-object constructor alias across ordinary same-live-object descriptors
@@ -227,8 +263,10 @@ Current working rules:
 - the fresh `narrow-1000` after that fix surfaced one Python-only
   `Events_TeamBonuses` `Dance Bear` / `CTs_Win` row; recheck that lifecycle
   separately before calling the current contour TeamBonuses-clean again
-- treat `Events_Entries legacy=0` vs `python>0` as an accepted visible
-  difference unless the acceptance policy is explicitly changed
+- `hlstats_Events_Entries` is confirmed closed for the current narrow
+  contour/default Python path; keep the next focus on the unrelated remaining
+  compare residuals and do not reopen `PlayerNames`, `Players_History`, or
+  `TeamBonuses` from this confirmation
 - keep detailed compare counts, replay transcripts, and slice-by-slice triage
   in `docs/audits/legacy-python-parity-20260423/`, not in this plan
 - keep the acceptance matrix in

@@ -168,6 +168,9 @@ _UPDATE_PLAYER_LAST_ADDRESS_QUERY = "UPDATE hlstats_Players SET `lastAddress` = 
 _UPDATE_PLAYER_CONNECTION_TIME_QUERY = (
     "UPDATE hlstats_Players SET `connection_time` = `connection_time` + %s WHERE `playerId` = %s"
 )
+_UPDATE_PLAYER_LAST_SKILL_CHANGE_QUERY = (
+    "UPDATE hlstats_Players SET `last_skill_change` = %s WHERE `playerId` = %s"
+)
 _UPSERT_PLAYER_NAME_QUERY = (
     "INSERT INTO hlstats_PlayerNames (`playerId`, `name`, `lastuse`, `numuses`) VALUES (%s, %s, %s, 1) "
     "ON DUPLICATE KEY UPDATE `lastuse` = VALUES(`lastuse`), `numuses` = `numuses` + 1"
@@ -598,6 +601,9 @@ class EventStorage:
         self._player_name_lastuse: dict[tuple[int, str], datetime] = {}
         self._player_name_rollups: dict[int, _PlayerNameRollup] = {}
         self._player_history_rollups: dict[int, _PlayerHistoryRollup] = {}
+        self._player_daily_skill_changes: dict[int, int] = {}
+        self._player_daily_skill_change_days: dict[int, datetime] = {}
+        self._player_last_flushed_skills: dict[int, int] = {}
         self._closed_player_objects: set[int] = set()
         self._server_players: dict[int, set[int]] = {}
         self._server_live_players: dict[int, set[int]] = {}
@@ -712,6 +718,9 @@ class EventStorage:
         self._player_name_lastuse.clear()
         self._player_name_rollups.clear()
         self._player_history_rollups.clear()
+        self._player_daily_skill_changes.clear()
+        self._player_daily_skill_change_days.clear()
+        self._player_last_flushed_skills.clear()
         self._closed_player_objects.clear()
         self._server_players.clear()
         self._server_live_players.clear()
@@ -871,6 +880,7 @@ class EventStorage:
                         timestamp,
                         processed_at,
                         allow_create_player=False,
+                        seed_blank_team_on_rollover=True,
                     )
                 post_record_prune = True
                 return
@@ -1578,6 +1588,7 @@ class EventStorage:
             timestamp,
             processed_at,
             update_live_roster=update.event_code == "connect",
+            seed_blank_team_on_rollover=update.event_code == "connect",
         )
         if update.event_code == "connect":
             address = str(update.attributes.get("address") or "")
@@ -1648,6 +1659,8 @@ class EventStorage:
         processed_at: datetime,
     ) -> None:
         if self._has_transient_identity(update.actor):
+            return
+        if not self._normalize_team_name(update.actor.team if update.actor else None):
             return
         actor_id = self._resolve_player_id(connection, update.actor, context, timestamp, processed_at)
         if actor_id is None or self._player_is_bot.get(actor_id, False):
@@ -1740,6 +1753,7 @@ class EventStorage:
         processed_at: datetime,
         *,
         allow_create_player: bool = True,
+        seed_blank_team_on_rollover: bool = False,
     ) -> None:
         descriptors: list[PlayerDescriptor] = []
         if update.actor is not None:
@@ -1760,6 +1774,7 @@ class EventStorage:
                 timestamp,
                 processed_at,
                 allow_create_player=allow_create_player,
+                seed_blank_team_on_rollover=seed_blank_team_on_rollover,
             )
 
     # ------------------------------------------------------------------
@@ -1780,6 +1795,7 @@ class EventStorage:
         emit_implicit_team_change: bool = True,
         allow_create_player: bool = True,
         update_live_roster: bool = False,
+        seed_blank_team_on_rollover: bool = False,
     ) -> Optional[int]:
         if descriptor is None:
             return None
@@ -1863,7 +1879,9 @@ class EventStorage:
                 )
             self._player_teams[player_id] = normalized_team
             self._update_player_presence(context.server_id, player_id, normalized_team)
-        elif not userid_rollover and player_id not in self._closed_player_objects:
+        elif player_id not in self._closed_player_objects and (
+            not userid_rollover or seed_blank_team_on_rollover
+        ):
             self._player_teams.setdefault(player_id, "")
         should_update_runtime_name = (
             player_id not in self._player_names
@@ -2105,9 +2123,23 @@ class EventStorage:
             return
         _server_id, game = player_context
         if self._should_skip_player_history(connection, player_id, _server_id):
+            self._flush_player_last_skill_change(
+                connection,
+                player_id=player_id,
+                server_id=_server_id,
+                game=game,
+                flush_timestamp=flush_timestamp,
+            )
             return
         current_skill = self._player_skills.setdefault(player_id, 1000)
         history_timestamp = self._history_timestamp(flush_timestamp)
+        self._flush_player_last_skill_change(
+            connection,
+            player_id=player_id,
+            server_id=_server_id,
+            game=game,
+            flush_timestamp=flush_timestamp,
+        )
         self._execute(
             connection,
             _UPSERT_PLAYER_HISTORY_QUERY,
@@ -2156,10 +2188,12 @@ class EventStorage:
             self._player_connection_time_flush_at[player_id] = flush_timestamp
             return
         delta = int((flush_timestamp - last_flush_at).total_seconds())
-        if delta <= 0:
-            return
-        self._player_connection_time_flush_at[player_id] = flush_timestamp
+        if delta > 0:
+            self._player_connection_time_flush_at[player_id] = flush_timestamp
+        else:
+            delta = 0
         if delta > _MAX_CONNECTION_TIME_GAP_SECONDS:
+            self._player_connection_time_flush_at[player_id] = flush_timestamp
             delta = 0
 
         player_context = self._player_connection_time_context.get(player_id)
@@ -2174,6 +2208,13 @@ class EventStorage:
             _server_id,
         )
         history_timestamp = self._history_timestamp(flush_timestamp)
+        self._flush_player_last_skill_change(
+            connection,
+            player_id=player_id,
+            server_id=_server_id,
+            game=game,
+            flush_timestamp=flush_timestamp,
+        )
         self._execute(connection, _UPDATE_PLAYER_CONNECTION_TIME_QUERY, (delta, player_id))
         self._execute(
             connection,
@@ -2215,6 +2256,62 @@ class EventStorage:
     def _reset_player_connection_time_session(self, player_id: int) -> None:
         self._player_connection_time_flush_at.pop(player_id, None)
         self._player_connection_time_context.pop(player_id, None)
+
+    def _prime_player_skill_change_state(
+        self,
+        connection: proxy_db.SupportsConnection,
+        *,
+        player_id: int,
+        game: str,
+        history_day: datetime,
+        baseline_skill: int,
+    ) -> None:
+        cached_day = self._player_daily_skill_change_days.get(player_id)
+        if cached_day == history_day and player_id in self._player_daily_skill_changes:
+            self._player_last_flushed_skills.setdefault(player_id, baseline_skill)
+            return
+
+        row = self._fetchone(
+            connection,
+            _SELECT_PLAYER_HISTORY_SNAPSHOT_QUERY,
+            (player_id, history_day, game),
+        )
+        daily_skill_change = int(row[11] or 0) if row is not None else 0
+        self._player_daily_skill_changes[player_id] = daily_skill_change
+        self._player_daily_skill_change_days[player_id] = history_day
+        self._player_last_flushed_skills[player_id] = baseline_skill
+
+    def _flush_player_last_skill_change(
+        self,
+        connection: proxy_db.SupportsConnection,
+        *,
+        player_id: int,
+        server_id: int,
+        game: str,
+        flush_timestamp: datetime,
+    ) -> None:
+        current_skill = self._player_skills.setdefault(player_id, 1000)
+        history_day = self._history_timestamp(flush_timestamp)
+        self._prime_player_skill_change_state(
+            connection,
+            player_id=player_id,
+            game=game,
+            history_day=history_day,
+            baseline_skill=current_skill,
+        )
+
+        if self._should_skip_player_history(connection, player_id, server_id):
+            self._player_daily_skill_changes[player_id] = 0
+            self._player_last_flushed_skills[player_id] = current_skill
+            self._execute(connection, _UPDATE_PLAYER_LAST_SKILL_CHANGE_QUERY, (0, player_id))
+            return
+
+        last_flushed_skill = self._player_last_flushed_skills.get(player_id, current_skill)
+        add_history_skill = current_skill - last_flushed_skill if last_flushed_skill > 0 else 0
+        daily_skill_change = self._player_daily_skill_changes.get(player_id, 0) + add_history_skill
+        self._player_daily_skill_changes[player_id] = daily_skill_change
+        self._player_last_flushed_skills[player_id] = current_skill
+        self._execute(connection, _UPDATE_PLAYER_LAST_SKILL_CHANGE_QUERY, (daily_skill_change, player_id))
 
     def _touch_player_name(
         self,
@@ -3167,6 +3264,14 @@ class EventStorage:
         player_id: int,
         delta: int,
     ) -> None:
+        current_skill = self._player_skills.setdefault(player_id, 1000)
+        self._prime_player_skill_change_state(
+            connection,
+            player_id=player_id,
+            game=context.game,
+            history_day=self._history_timestamp(processed_at),
+            baseline_skill=current_skill,
+        )
         self._execute(connection, _UPDATE_PLAYER_SKILL_QUERY, (delta, player_id))
         self._update_player_rollups(
             connection,

@@ -84,6 +84,9 @@ _UPDATE_SERVER_SUICIDE_TOTALS_QUERY = "UPDATE hlstats_Servers SET `suicides` = `
 _UPDATE_PLAYER_CONNECTION_TIME_QUERY = (
     "UPDATE hlstats_Players SET `connection_time` = `connection_time` + %s WHERE `playerId` = %s"
 )
+_UPDATE_PLAYER_LAST_SKILL_CHANGE_QUERY = (
+    "UPDATE hlstats_Players SET `last_skill_change` = %s WHERE `playerId` = %s"
+)
 
 
 @dataclass
@@ -517,6 +520,205 @@ def test_player_player_action_penalizes_victim_skill_like_legacy(
         _UPDATE_PLAYER_HISTORY_QUERY,
         (0, 0, 0, 0, 985, 0, 0, 0, 0, 0, 0, 0, 0, -15, 102, datetime(2024, 1, 2), "csgo"),
     ) in connection.executed
+
+
+def test_player_player_action_updates_daily_last_skill_change(
+    dispatcher: EventDispatcher,
+    event_context: EventContext,
+) -> None:
+    event = parse_log_event(
+        'L 01/02/2024 - 03:04:05: "Alice<2><STEAM_1:2><CT>" triggered "domination" '
+        'against "Bob<3><STEAM_1:3><TERRORIST>"'
+    )
+    update = dispatcher.dispatch(event, event_context)
+    responses: Dict[QueryKey, List[QueryResponse]] = {
+        (_PLAYER_BY_UNIQUE_QUERY, ("STEAM_1:2", "csgo")): [QueryResponse(fetchone=(101,))],
+        (_PLAYER_BY_UNIQUE_QUERY, ("STEAM_1:3", "csgo")): [QueryResponse(fetchone=(102,))],
+        (_SELECT_SERVER_CONFIG_QUERY, (7, "MinPlayers")): [QueryResponse(fetchone=(0,))],
+        (_SELECT_ACTION_QUERY, ("csgo", "domination")): [QueryResponse(fetchone=(88, 15, 0, ""))],
+        (_SELECT_PLAYER_STATE_QUERY, (101,)): [QueryResponse(fetchone=(1000, 0, "", 0, 0))],
+        (_SELECT_PLAYER_STATE_QUERY, (102,)): [QueryResponse(fetchone=(1000, 0, "", 0, 0))],
+    }
+    connection = FakeConnection(responses)
+    storage = EventStorage(StubAdapter(connection), clock=lambda: update.timestamp)
+
+    storage.record(update, event_context)
+
+    assert all(query != _UPDATE_PLAYER_LAST_SKILL_CHANGE_QUERY for query, _params in connection.executed)
+
+    storage.flush_pending()
+
+    assert (_UPDATE_PLAYER_LAST_SKILL_CHANGE_QUERY, (15, 101)) in connection.executed
+    assert (_UPDATE_PLAYER_LAST_SKILL_CHANGE_QUERY, (-15, 102)) in connection.executed
+
+
+def test_player_last_skill_change_accumulates_across_same_day_flushes(
+    dispatcher: EventDispatcher,
+    event_context: EventContext,
+) -> None:
+    first_event = parse_log_event(
+        'L 01/02/2024 - 03:04:05: "Alice<2><STEAM_1:2><CT>" triggered "domination" '
+        'against "Bob<3><STEAM_1:3><TERRORIST>"'
+    )
+    second_event = parse_log_event(
+        'L 01/02/2024 - 03:05:05: "Alice<2><STEAM_1:2><CT>" triggered "domination" '
+        'against "Bob<3><STEAM_1:3><TERRORIST>"'
+    )
+    first_update = dispatcher.dispatch(first_event, event_context)
+    second_update = dispatcher.dispatch(second_event, event_context)
+    responses: Dict[QueryKey, List[QueryResponse]] = {
+        (_PLAYER_BY_UNIQUE_QUERY, ("STEAM_1:2", "csgo")): [QueryResponse(fetchone=(101,))],
+        (_PLAYER_BY_UNIQUE_QUERY, ("STEAM_1:3", "csgo")): [QueryResponse(fetchone=(102,))],
+        (_SELECT_SERVER_CONFIG_QUERY, (7, "MinPlayers")): [QueryResponse(fetchone=(0,))],
+        (_SELECT_ACTION_QUERY, ("csgo", "domination")): [QueryResponse(fetchone=(88, 15, 0, ""))],
+        (_SELECT_PLAYER_STATE_QUERY, (101,)): [QueryResponse(fetchone=(1000, 0, "", 0, 0))],
+        (_SELECT_PLAYER_STATE_QUERY, (102,)): [QueryResponse(fetchone=(1000, 0, "", 0, 0))],
+    }
+    connection = FakeConnection(responses)
+    storage = EventStorage(
+        StubAdapter(connection),
+        clock=lambda: second_update.timestamp,
+        use_event_timestamps_for_processing=True,
+    )
+
+    storage.record(first_update, event_context)
+    storage.flush_pending()
+    storage.record(second_update, event_context)
+    storage.flush_pending()
+
+    actor_updates = [
+        params for query, params in connection.executed if query == _UPDATE_PLAYER_LAST_SKILL_CHANGE_QUERY and params[1] == 101
+    ]
+    victim_updates = [
+        params for query, params in connection.executed if query == _UPDATE_PLAYER_LAST_SKILL_CHANGE_QUERY and params[1] == 102
+    ]
+
+    assert actor_updates[0] == (15, 101)
+    assert actor_updates[-1] == (30, 101)
+    assert set(actor_updates) == {(15, 101), (30, 101)}
+    assert victim_updates[0] == (-15, 102)
+    assert victim_updates[-1] == (-30, 102)
+    assert set(victim_updates) == {(-15, 102), (-30, 102)}
+
+
+def test_player_last_skill_change_does_not_double_count_multiple_events_before_flush(
+    dispatcher: EventDispatcher,
+    event_context: EventContext,
+) -> None:
+    first_event = parse_log_event(
+        'L 01/02/2024 - 03:04:05: "Alice<2><STEAM_1:2><CT>" triggered "domination" '
+        'against "Bob<3><STEAM_1:3><TERRORIST>"'
+    )
+    second_event = parse_log_event(
+        'L 01/02/2024 - 03:04:06: "Alice<2><STEAM_1:2><CT>" triggered "domination" '
+        'against "Bob<3><STEAM_1:3><TERRORIST>"'
+    )
+    first_update = dispatcher.dispatch(first_event, event_context)
+    second_update = dispatcher.dispatch(second_event, event_context)
+    responses: Dict[QueryKey, List[QueryResponse]] = {
+        (_PLAYER_BY_UNIQUE_QUERY, ("STEAM_1:2", "csgo")): [QueryResponse(fetchone=(101,))],
+        (_PLAYER_BY_UNIQUE_QUERY, ("STEAM_1:3", "csgo")): [QueryResponse(fetchone=(102,))],
+        (_SELECT_SERVER_CONFIG_QUERY, (7, "MinPlayers")): [QueryResponse(fetchone=(0,))],
+        (_SELECT_ACTION_QUERY, ("csgo", "domination")): [QueryResponse(fetchone=(88, 15, 0, ""))],
+        (_SELECT_PLAYER_STATE_QUERY, (101,)): [QueryResponse(fetchone=(1000, 0, "", 0, 0))],
+        (_SELECT_PLAYER_STATE_QUERY, (102,)): [QueryResponse(fetchone=(1000, 0, "", 0, 0))],
+    }
+    connection = FakeConnection(responses)
+    storage = EventStorage(
+        StubAdapter(connection),
+        clock=lambda: second_update.timestamp,
+        use_event_timestamps_for_processing=True,
+    )
+
+    storage.record(first_update, event_context)
+    storage.record(second_update, event_context)
+    storage.flush_pending()
+
+    actor_updates = [
+        params for query, params in connection.executed if query == _UPDATE_PLAYER_LAST_SKILL_CHANGE_QUERY and params[1] == 101
+    ]
+    victim_updates = [
+        params for query, params in connection.executed if query == _UPDATE_PLAYER_LAST_SKILL_CHANGE_QUERY and params[1] == 102
+    ]
+
+    assert actor_updates[-1] == (30, 101)
+    assert victim_updates[-1] == (-30, 102)
+
+
+def test_player_last_skill_change_resets_on_new_history_day(
+    dispatcher: EventDispatcher,
+    event_context: EventContext,
+) -> None:
+    first_event = parse_log_event(
+        'L 01/02/2024 - 23:59:50: "Alice<2><STEAM_1:2><CT>" triggered "domination" '
+        'against "Bob<3><STEAM_1:3><TERRORIST>"'
+    )
+    second_event = parse_log_event(
+        'L 01/03/2024 - 00:00:05: "Alice<2><STEAM_1:2><CT>" triggered "domination" '
+        'against "Bob<3><STEAM_1:3><TERRORIST>"'
+    )
+    first_update = dispatcher.dispatch(first_event, event_context)
+    second_update = dispatcher.dispatch(second_event, event_context)
+    responses: Dict[QueryKey, List[QueryResponse]] = {
+        (_PLAYER_BY_UNIQUE_QUERY, ("STEAM_1:2", "csgo")): [QueryResponse(fetchone=(101,))],
+        (_PLAYER_BY_UNIQUE_QUERY, ("STEAM_1:3", "csgo")): [QueryResponse(fetchone=(102,))],
+        (_SELECT_SERVER_CONFIG_QUERY, (7, "MinPlayers")): [QueryResponse(fetchone=(0,))],
+        (_SELECT_ACTION_QUERY, ("csgo", "domination")): [QueryResponse(fetchone=(88, 15, 0, ""))],
+        (_SELECT_PLAYER_STATE_QUERY, (101,)): [QueryResponse(fetchone=(1000, 0, "", 0, 0))],
+        (_SELECT_PLAYER_STATE_QUERY, (102,)): [QueryResponse(fetchone=(1000, 0, "", 0, 0))],
+    }
+    connection = FakeConnection(responses)
+    storage = EventStorage(
+        StubAdapter(connection),
+        clock=lambda: second_update.timestamp,
+        use_event_timestamps_for_processing=True,
+    )
+
+    storage.record(first_update, event_context)
+    storage.flush_pending()
+    storage.record(second_update, event_context)
+    storage.flush_pending()
+
+    actor_updates = [
+        params for query, params in connection.executed if query == _UPDATE_PLAYER_LAST_SKILL_CHANGE_QUERY and params[1] == 101
+    ]
+    victim_updates = [
+        params for query, params in connection.executed if query == _UPDATE_PLAYER_LAST_SKILL_CHANGE_QUERY and params[1] == 102
+    ]
+
+    assert actor_updates[0] == (15, 101)
+    assert actor_updates[-1] == (15, 101)
+    assert (30, 101) not in actor_updates
+    assert victim_updates[0] == (-15, 102)
+    assert victim_updates[-1] == (-15, 102)
+    assert (-30, 102) not in victim_updates
+
+
+def test_ignore_bots_keep_last_skill_change_neutral_on_flush(
+    event_context: EventContext,
+) -> None:
+    dispatcher = EventDispatcher([ConnectEventHandler(), DisconnectEventHandler()])
+    connect_update = dispatcher.dispatch(
+        parse_log_event(
+            'L 01/02/2024 - 03:04:05: "BotOne<664><BOT><CT>" connected, address "1.2.3.4:27005"'
+        ),
+        event_context,
+    )
+    disconnect_update = dispatcher.dispatch(
+        parse_log_event('L 01/02/2024 - 03:04:12: "BotOne<664><BOT><CT>" disconnected'),
+        event_context,
+    )
+    responses: Dict[QueryKey, List[QueryResponse]] = {
+        (_LAST_INSERT_ID_QUERY, None): [QueryResponse(fetchone=(201,))],
+        (_SELECT_SERVER_CONFIG_QUERY, (7, "IgnoreBots")): [QueryResponse(fetchone=(1,))],
+    }
+    connection = FakeConnection(responses)
+    storage = EventStorage(StubAdapter(connection), clock=lambda: connect_update.timestamp)
+
+    storage.record(connect_update, event_context)
+    storage.record(disconnect_update, event_context)
+
+    assert (_UPDATE_PLAYER_LAST_SKILL_CHANGE_QUERY, (0, 201)) in connection.executed
 
 
 def test_record_suicide_event_uses_suicides_table(dispatcher: EventDispatcher, event_context: EventContext) -> None:
@@ -3752,6 +3954,84 @@ def test_implicit_team_change_emits_on_blank_to_unassigned_from_status_trigger(e
     assert storage._player_teams[101] == "UNASSIGNED"
 
 
+def test_rollover_blank_status_followed_by_unassigned_trigger_emits_implicit_change_team(
+    event_context: EventContext,
+) -> None:
+    chat_dispatcher = EventDispatcher([ChatEventHandler()])
+    trigger_dispatcher = EventDispatcher([TriggerEventHandler(), GenericEventHandler()], fallback=GenericEventHandler())
+    first_update = chat_dispatcher.dispatch(
+        parse_log_event('L 01/02/2024 - 03:04:05: "Silver<2><STEAM_1:2><TERRORIST>" say "ready"'),
+        event_context,
+    )
+    rollover_update = trigger_dispatcher.dispatch(
+        parse_log_event('L 01/02/2024 - 03:04:06: "Silver<3><STEAM_1:2><>" triggered "time"'),
+        event_context,
+    )
+    unassigned_update = trigger_dispatcher.dispatch(
+        parse_log_event('L 01/02/2024 - 03:04:07: "Silver<3><STEAM_1:2><UNASSIGNED>" triggered "time"'),
+        event_context,
+    )
+    responses: Dict[QueryKey, List[QueryResponse]] = {
+        (_PLAYER_BY_UNIQUE_QUERY, ("STEAM_1:2", "csgo")): [QueryResponse(fetchone=(101,))],
+    }
+    connection = FakeConnection(responses)
+    storage = EventStorage(StubAdapter(connection), clock=lambda: unassigned_update.timestamp)
+
+    storage.record(first_update, event_context)
+    storage.record(rollover_update, event_context)
+    storage.record(unassigned_update, event_context)
+
+    assert (_INSERT_TEAM_CHANGE_QUERY, (unassigned_update.timestamp, 7, "de_dust2", 101, "UNASSIGNED")) in connection.executed
+    assert storage._player_teams[101] == "UNASSIGNED"
+
+
+def test_rollover_blank_connect_and_blank_entry_before_unassigned_trigger_emits_implicit_change_team(
+    event_context: EventContext,
+) -> None:
+    dispatcher = EventDispatcher(
+        [ConnectEventHandler(), EntryEventHandler(), TriggerEventHandler(), GenericEventHandler()],
+        fallback=GenericEventHandler(),
+    )
+    first_connect_update = dispatcher.dispatch(
+        parse_log_event(
+            'L 01/02/2024 - 03:04:05: "Silver<719><STEAM_1:2><>" connected, address "1.2.3.4:27005"'
+        ),
+        event_context,
+    )
+    rollover_connect_update = dispatcher.dispatch(
+        parse_log_event(
+            'L 01/02/2024 - 03:04:06: "Silver<720><STEAM_1:2><>" connected, address "1.2.3.4:27005"'
+        ),
+        event_context,
+    )
+    entry_update = dispatcher.dispatch(
+        parse_log_event('L 01/02/2024 - 03:04:07: "Silver<720><STEAM_1:2><>" entered the game'),
+        event_context,
+    )
+    unassigned_update = dispatcher.dispatch(
+        parse_log_event('L 01/02/2024 - 03:04:08: "Silver<720><STEAM_1:2><UNASSIGNED>" triggered "time"'),
+        event_context,
+    )
+    responses: Dict[QueryKey, List[QueryResponse]] = {
+        (_PLAYER_BY_UNIQUE_QUERY, ("STEAM_1:2", "csgo")): [QueryResponse(fetchone=(101,))],
+    }
+    connection = FakeConnection(responses)
+    storage = EventStorage(StubAdapter(connection), clock=lambda: unassigned_update.timestamp)
+
+    storage.record(first_connect_update, event_context)
+    storage.record(rollover_connect_update, event_context)
+    storage.record(entry_update, event_context)
+    storage.record(unassigned_update, event_context)
+
+    team_change_rows = [
+        entry for entry in connection.executed if entry[0] == _INSERT_TEAM_CHANGE_QUERY
+    ]
+    assert team_change_rows == [
+        (_INSERT_TEAM_CHANGE_QUERY, (unassigned_update.timestamp, 7, "de_dust2", 101, "UNASSIGNED"))
+    ]
+    assert storage._player_teams[101] == "UNASSIGNED"
+
+
 def test_closed_player_blank_status_does_not_seed_implicit_change_team(event_context: EventContext) -> None:
     dispatcher = EventDispatcher([TriggerEventHandler(), GenericEventHandler()], fallback=GenericEventHandler())
     blank_update = dispatcher.dispatch(
@@ -4216,4 +4496,57 @@ def test_entry_event_ignores_bots(event_context: EventContext) -> None:
     storage.record(connect_update, event_context)
     storage.record(entry_update, event_context)
 
+    assert all(query != _INSERT_ENTRY_QUERY for query, _params in connection.executed)
+
+
+def test_entry_event_records_non_empty_team_players(event_context: EventContext) -> None:
+    dispatcher = EventDispatcher(
+        [ConnectEventHandler(), EntryEventHandler()],
+        fallback=GenericEventHandler(),
+    )
+    connect_event = parse_log_event(
+        'L 01/02/2024 - 03:04:04: "Alice<664><STEAM_0:1:2><CT>" connected, address "1.2.3.4:27005"'
+    )
+    entry_event = parse_log_event('L 01/02/2024 - 03:04:05: "Alice<664><STEAM_0:1:2><CT>" entered the game')
+    connect_update = dispatcher.dispatch(connect_event, event_context)
+    entry_update = dispatcher.dispatch(entry_event, event_context)
+
+    responses: Dict[QueryKey, List[QueryResponse]] = {
+        (_LAST_INSERT_ID_QUERY, None): [QueryResponse(fetchone=(301,))],
+    }
+    connection = FakeConnection(responses)
+    storage = EventStorage(StubAdapter(connection), clock=lambda: datetime(2024, 1, 2, 3, 4, 5))
+
+    storage.record(connect_update, event_context)
+    storage.record(entry_update, event_context)
+
+    entry_rows = [params for query, params in connection.executed if query == _INSERT_ENTRY_QUERY]
+    assert entry_update.actor is not None
+    assert entry_update.actor.team == "CT"
+    assert entry_rows == [(datetime(2024, 1, 2, 3, 4, 5), 7, "de_dust2", 301)]
+
+
+def test_entry_event_skips_empty_team_players(event_context: EventContext) -> None:
+    dispatcher = EventDispatcher(
+        [ConnectEventHandler(), EntryEventHandler()],
+        fallback=GenericEventHandler(),
+    )
+    connect_event = parse_log_event(
+        'L 01/02/2024 - 03:04:04: "Alice<664><STEAM_0:1:2><>" connected, address "1.2.3.4:27005"'
+    )
+    entry_event = parse_log_event('L 01/02/2024 - 03:04:05: "Alice<664><STEAM_0:1:2><>" entered the game')
+    connect_update = dispatcher.dispatch(connect_event, event_context)
+    entry_update = dispatcher.dispatch(entry_event, event_context)
+
+    responses: Dict[QueryKey, List[QueryResponse]] = {
+        (_LAST_INSERT_ID_QUERY, None): [QueryResponse(fetchone=(301,))],
+    }
+    connection = FakeConnection(responses)
+    storage = EventStorage(StubAdapter(connection), clock=lambda: datetime(2024, 1, 2, 3, 4, 5))
+
+    storage.record(connect_update, event_context)
+    storage.record(entry_update, event_context)
+
+    assert entry_update.actor is not None
+    assert entry_update.actor.team == ""
     assert all(query != _INSERT_ENTRY_QUERY for query, _params in connection.executed)
