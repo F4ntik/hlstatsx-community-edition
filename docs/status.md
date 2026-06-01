@@ -2,15 +2,19 @@
 
 ## Snapshot
 
-- Last updated: `2026-05-26`
-- The active lane is still `P6d`: legacy-vs-Python parity audit, not
-  bootstrap/import/i18n remediation.
-- The current debug loop should start from
+- Last updated: `2026-06-01`
+- `P6d` is no longer an active residual hunt for `Entries`, `ChangeTeam`,
+  `PlayerNames`, `Players_History`, or `TeamBonuses`; those gates are closed
+  for the supported narrow/default Python contour.
+- The active autonomy track is now release-readiness/product hardening:
+  docs truth, repository-wide CI, package/runtime boundaries, lifecycle and
+  control-plane hardening, explicit DB modes, and parity acceptance automation.
+- If a future parity-affecting change creates a new residual, restart from
   [`docs/parity-debug-pipeline.md`](parity-debug-pipeline.md) and
   [`docs/replay-fast-path.md`](replay-fast-path.md), then write evidence into
   `docs/audits/legacy-python-parity-20260423/`.
 
-Current open residuals:
+Current parity state:
 
 - The defuse-boundary `kill_streak_*` residual is closed. The follow-up
   `L0102207.log` case showed that a recorded `Defused_The_Bomb` should not
@@ -44,8 +48,8 @@ Current open residuals:
   `legacy=4753`, `python=4753`, and no stable-key TeamBonuses differences.
   Evidence:
   `docs/audits/legacy-python-parity-20260423/runtime-db-diff-p6d-narrow-1000-20260523-after-team-bonus-timeout-cadence.md`.
-- P6d-M4 `hlstats_Players` is now closed and classified as a GeoIP-only
-  contour/policy residual. The live compare shows `323/323` with
+- P6d-M4 `hlstats_Players` is closed as a GeoIP-only contour/policy rule. The
+  raw replay compare, before maintenance GeoIP backfill, can show `323/323` with
   `250` legacy-only normalized rows and `250` python-only normalized rows;
   the field classifier reports `250 geoip_only_rows` and `0 non_geoip_rows`.
   Only `country` and `flag` differ, while `lastAddress`, `kills`, `deaths`,
@@ -56,11 +60,11 @@ Current open residuals:
   `lastAddress`, `geoLookup` writes only `country`/`flag`, and `flushDB()`
   stats/session fields do not write `country`/`flag`; on the Python path,
   `storage.py` runtime writes `lastAddress`/stats/session while GeoIP fields
-  are maintenance/backfill via `hlstats_awards_py` and not stdin replay. No
-  minimal runtime fix remains for `hlstats_Players`; the remaining accepted
-  compare difference is the GeoIP-only contour/policy residual, and `P6d-M5
-  hlstats_Events_ChangeTeam` is now closed after the second TDD fix and the
-  narrow-1000 replay/compare.
+  are maintenance/backfill via `hlstats_awards_py` and not stdin replay. Raw
+  replay parity may therefore carry this accepted GeoIP-only diff; release-clean
+  parity requires post-replay `hlstats_awards_py --geoip`, after which
+  `hlstats_Players` should disappear from the compare. No minimal runtime fix
+  remains for `hlstats_Players`.
 - The first `hlstats_PlayerNames` anchor is stateful, not a clean isolated
   single-log case. The `Player21` / `Dim$0n` / `Dim$on` residual centers on
   `0:1161623468` around `L0102212.log:487`, but isolated `L0102212` produces a
@@ -175,18 +179,17 @@ Current open residuals:
   `test_storage.py` was `133/133`, and the final `Run-DualContour-1000` rerun
   with `-ReuseValidLegacy` reused valid legacy from run state
   `20260526-081158.json`. The final compare had no
-  `hlstats_Events_ChangeTeam` residual; the only remaining compare difference
-  was the accepted `hlstats_Players` GeoIP-only contour/policy residual
-  (`323/323`, `250` legacy-only rows, `250` python-only rows). SQL anchors for
-  `ChangeTeam` were `legacy total=1345/unassigned=47` and
-  `python total=1345/unassigned=47`.
+  `hlstats_Events_ChangeTeam` residual. The only raw-replay difference was the
+  accepted pre-backfill `hlstats_Players` GeoIP-only contour/policy diff
+  (`323/323`, `250` legacy-only rows, `250` python-only rows); release-clean
+  validation applies the post-replay GeoIP backfill described above. SQL anchors
+  for `ChangeTeam` were `legacy total=1345/unassigned=47` and `python
+  total=1345/unassigned=47`.
 
 ## In Progress
 
-- [x] The targeted `hlstats_Events_Entries` fix is confirmed closed for the
-  current narrow contour/default Python path. The next focus is the unrelated
-  remaining compare residuals, without reopening `PlayerNames`,
-  `Players_History`, or `TeamBonuses`.
+- [ ] Phase 1 of `docs/autonomy-work-plan-20260601.md`: expand
+  repository-wide CI after the Phase 0 docs truth synchronization.
 
 ## Done
 
@@ -199,10 +202,10 @@ Current open residuals:
   the cumulative value on day rollover, and keeps ignored-bot trend neutral.
   Targeted storage tests passed, the broader `test_runtime_decisions.py` +
   `test_storage.py` suite passed, fresh `Run-DualContour-1000 -ReuseValidLegacy`
-  completed, `compare_stats_dbs.py --max-examples 20` still reports only the
-  accepted GeoIP-only `hlstats_Players` residual, and replay-backed
-  `mode=players` HTML on the Python contour now contains rendered `t0/t1/t2`
-  trend icons.
+  completed, the raw `compare_stats_dbs.py --max-examples 20` report still had
+  only the accepted pre-backfill GeoIP-only `hlstats_Players` diff, and
+  replay-backed `mode=players` HTML on the Python contour now contains rendered
+  `t0/t1/t2` trend icons.
 - Closed the earlier `hlstats_Servers.act_players` residual and removed it from
   the active parity gate.
 - Added the single-log parity-debug workflow on
@@ -235,16 +238,14 @@ Current open residuals:
   `python=4753`, with empty legacy-only and python-only sets.
 - Closed `P6d-M2` for the current contour: `ChangeTeam`, `Connects`, `Chat`,
   and `PlayerActions` no longer appear in the fresh logical compare.
-- Added targeted unit coverage for suppressing empty-team exact `entered the
-  game` rows in Python `hlstats_Events_Entries`. The default-path fix is in
-  place, and the remaining replay promotion still needs to confirm the row is
-  gone in the contour.
+- Closed `hlstats_Events_Entries` for the current narrow contour/default Python
+  path after targeted unit coverage and replay promotion; direct counts are
+  `legacy=0`, `python=0`.
 - Closed the stateful `Player21` / `Dim$0n` / `Dim$on` PlayerNames alias
   attribution cluster by preserving the legacy live-object constructor alias
   across ordinary same-live-object descriptors. Targeted storage tests,
   `hlstats-worker` rebuild, same-cluster replay, and fresh full `narrow-1000`
-  were rerun; broad `hlstats_PlayerNames` is now `0/1` normalized with only
-  the pre-existing `XYU` / `unnamed` Python-only alias left.
+  were rerun; the later `XYU` / `unnamed` alias residual is also closed.
 - Reduced `hlstats_Players_History` from `50/50` to `14/14` by aligning Python
   kill-streak sampling with legacy `endKillStreak` / `flushDB` boundaries.
 - Closed the remaining broad `hlstats_Players_History` residual by deferring
@@ -263,16 +264,21 @@ Current open residuals:
   (`0:552632503`) by treating blank-name connects as a constructed live object
   state without persisting a placeholder alias. The broad logical compare moved
   from `hlstats_PlayerNames` `0/1` to `0/0`.
+- Completed Phase 0 of `docs/autonomy-work-plan-20260601.md`: `docs/status.md`,
+  `docs/plans.md`, and `docs/test-plan.md` now agree that P6d is closed for the
+  supported contour, stale reopened parity items are not active work, and the
+  GeoIP rule is raw replay diff before backfill versus release-clean parity
+  after post-replay `hlstats_awards_py --geoip`.
 - Frontend i18n backlog (`P6a`/`P6b`/`P6c`) remains complete for the supported
   EN/RU product contour.
 
 ## Next
 
-1. Run the narrow replay/compare for `hlstats_Events_ChangeTeam` only to
-   verify the P6d-M5 fix before calling the contour clean.
-2. Keep `hlstats_Events_Entries` closed for the current narrow
-   contour/default Python path and do not reopen `PlayerNames`,
-   `Players_History`, or `TeamBonuses` from this confirmation.
+1. Start Phase 1: expand repository-wide CI for
+   `proxy_daemon_py`, `hlstats_py`, replay tooling, PHP lint, docs checks, and
+   a placeholder/nightly parity workflow.
+2. Keep the stale reconnect-code fix out of scope unless fresh code or test
+   evidence contradicts the current implementation.
 
 ## Decisions
 

@@ -25,6 +25,17 @@ Canonical runbooks:
 - audit evidence and bug triage:
   [`docs/audits/legacy-python-parity-20260423/README.md`](audits/legacy-python-parity-20260423/README.md)
 
+Current autonomy follow-up entrypoint:
+
+- if the task is to continue repo autonomy / release-readiness follow-up, read
+  these in order after `docs/status.md`:
+  [`docs/autonomy-review-20260601.md`](autonomy-review-20260601.md),
+  [`docs/autonomy-work-plan-20260601.md`](autonomy-work-plan-20260601.md)
+- the autonomy work plan starts with doc-truth synchronization, then CI
+  expansion, then package/runtime boundary work; do not reopen the stale
+  `_ensure_connection()` bugfix path unless fresh evidence contradicts the
+  current code/tests
+
 ## Product contract
 
 - Default runtime path:
@@ -41,9 +52,14 @@ Canonical runbooks:
 ## Current focus
 
 - Keep the repo release-clean as the integrated Python+i18n product lane.
-- Close or explicitly accept the remaining legacy-vs-Python parity residuals.
+- Keep the closed/accepted legacy-vs-Python parity state current without
+  reopening stale `Entries`, `ChangeTeam`, `PlayerNames`, `Players_History`, or
+  `TeamBonuses` residuals.
 - Keep replay, compare, and representative EN/RU smoke checks runnable without
   duplicating their runbooks across multiple docs.
+- For autonomy/release-readiness continuation, treat
+  [`docs/autonomy-work-plan-20260601.md`](autonomy-work-plan-20260601.md) as the
+  phased execution plan and start with its `Phase 0`.
 - Use a legacy-first, subagent-assisted debug loop for parity changes: inspect
   the Perl algorithm before changing Python, reduce each residual to a
   single-log/window case, add a regression test, rerun the same replay, and
@@ -69,9 +85,10 @@ Canonical runbooks:
   event anchor is available. Treat failures there as a sign that the fix is too
   narrow or overfit to one exact line.
 - Treat full `narrow-1000`, Docker rebuilds, GeoIP backfill, and web smoke as
-  promotion gates, not first-line debugging tools. Run them when the touched
-  surface requires them or when a narrow fix is ready to prove against the
-  supported contour.
+  promotion gates, not first-line debugging tools. Raw replay compare can show
+  an accepted GeoIP-only `hlstats_Players` diff because stdin replay does not
+  run maintenance backfill; release-clean parity requires the post-replay
+  `hlstats_awards_py --geoip` step.
 - Keep context compact:
   summarize findings, link audit notes, avoid pasting long command transcripts,
   and store detailed SQL/replay evidence under
@@ -174,12 +191,12 @@ Outcome:
 Release-style frontend and language-persistence revalidation was completed for
 the remediated product contour.
 
-### [ ] P6d. Full legacy-vs-Python product parity audit
+### [x] P6d. Full legacy-vs-Python product parity audit
 
 Goal:
 Run a 1:1 audit against the original non-Python HLstatsX contour and the
-integrated Python+i18n contour, then convert the remaining differences into a
-deduplicated bug plan or explicit accepted differences.
+integrated Python+i18n contour, then convert differences into fixed behavior or
+explicit accepted differences.
 
 Current gates:
 
@@ -187,86 +204,32 @@ Current gates:
   current full `narrow-1000` contour and direct stable-key SQL.
 - `[x] P6d-M2 (RC-B)`: `ChangeTeam`, `Connects`, `Chat`, and `PlayerActions`
   no longer appear in the current full `narrow-1000` logical compare.
-- `[x] P6d-M3 (RC-C)`: the targeted `hlstats_Events_Entries` default-path fix
-  is confirmed on the current narrow contour/default Python path. The narrow
-  replay compare now reports `legacy=0`, `python=0`, and `hlstats_Events_Entries`
-  no longer appears in the logical compare; the remaining compare residual was
-  the unrelated `hlstats_Players` row, and `hlstats_Events_ChangeTeam` was
-  closed in P6d-M5.
-
-Next scoped tasks:
-
-- `[x] P6d-M4`: triage the current `hlstats_Players` residual from the
-  2026-05-26 narrow replay/compare. Classified as a closed GeoIP-only
-  contour/policy residual after direct SQL anchors showed
-  `legacy=250`/`python=0` for `country`/`flag`, while the remaining
-  stats/session/alias columns matched and the legacy/Python paths confirmed
-  GeoIP lives in maintenance/backfill rather than stdin replay. Do not reopen
-  `hlstats_Events_Entries`, `hlstats_PlayerNames`, `hlstats_Players_History`,
-  or `hlstats_Events_TeamBonuses`.
-- `[x] P6d-M5`: triage the current `hlstats_Events_ChangeTeam` residual from
-  the same 2026-05-26 narrow replay/compare. Closed after the second TDD fix
-  and narrow-1000 replay/compare. Root cause: Python lost the blank team seed
-  after userid rollover/blank reconnect/entry, so the first ignored
-  time/latency `<UNASSIGNED>` saw `previous_team=None` and suppressed the
-  implicit `ChangeTeam`; legacy records descriptor-driven nonblank team
-  transitions. The fix keeps `seed_blank_team_on_rollover` for ignored
-  time/latency priming and now also uses it for connect in `_record_connection`,
-  while blank seeding stays guarded by closed-player checks. Targeted tests
-  `test_rollover_blank_status_followed_by_unassigned_trigger_emits_implicit_change_team`
-  and `test_rollover_blank_connect_and_blank_entry_before_unassigned_trigger_emits_implicit_change_team`
-  passed; `unassigned or team_change or rollover` was `12/12`,
-  `test_storage.py` was `133/133`, and the final `Run-DualContour-1000` rerun
-  with `-ReuseValidLegacy` reused valid legacy from run state
-  `20260526-081158.json`. The final compare had no
-  `hlstats_Events_ChangeTeam` residual; the only remaining compare difference
-  was the accepted `hlstats_Players` GeoIP-only contour/policy residual
-  (`323/323`, `250` legacy-only rows, `250` python-only rows). SQL anchors for
-  `ChangeTeam` were `legacy total=1345/unassigned=47` and
-  `python total=1345/unassigned=47`.
+- `[x] P6d-M3 (RC-C)`: `hlstats_Events_Entries` is confirmed on the current
+  narrow contour/default Python path. The narrow replay compare reports
+  `legacy=0`, `python=0`, and `hlstats_Events_Entries` no longer appears in the
+  logical compare.
+- `[x] P6d-M4`: `hlstats_Players` is classified as a closed GeoIP-only
+  contour/policy rule. Raw replay compare can show `250/250` `country`/`flag`
+  rows because stdin replay writes `lastAddress` but does not run maintenance
+  GeoIP backfill. Release-clean parity requires post-replay
+  `hlstats_awards_py --geoip`, after which `hlstats_Players` should disappear
+  from the compare.
+- `[x] P6d-M5`: `hlstats_Events_ChangeTeam` is closed after the second TDD fix
+  and narrow-1000 replay/compare. The final compare had no
+  `hlstats_Events_ChangeTeam` residual; SQL anchors were `legacy
+  total=1345/unassigned=47` and `python total=1345/unassigned=47`.
 
 Current working rules:
 
-- before starting a non-trivial parity fix, use a read-only subagent to inspect
-  and document how the legacy Perl code implements the behavior
-- use additional subagents for independent artifact grouping when a parity
-  residual is non-trivial
-- use single-log and narrow-window replay before another broad contour run
-- after a point fix, inspect the automatic `30/30` guard-window parity rerun
-  from `Run-SingleLogParity.ps1` before promoting the fix
-- separate GeoIP-only player differences from real stats/session/alias drift
-  before touching attribution logic
-- `P6d-M4` is closed as a GeoIP-only contour/policy residual; the remaining
-  accepted parity residual is `hlstats_Players`, and `P6d-M5
-  hlstats_Events_ChangeTeam` is now closed after the second TDD fix and the
-  narrow-1000 replay/compare
-- the first `PlayerNames` case was stateful across the neighboring
-  `L0102209..L0102213` logs; it is now fixed by preserving the legacy
-  live-object constructor alias across ordinary same-live-object descriptors
-- broad `hlstats_PlayerNames` is now down to the remaining `XYU` / `unnamed`,
-  `0:552632503` Python-only alias residual; do not reopen the closed
-  `Player21` / `Dim$0n` / `Dim$on` cluster unless new evidence contradicts the
-  clean same-cluster replay
-- do not repeat the rejected `changed name to` alias-rollup flush fix: it was
-  rolled back because it was based on an oversimplified unit-level hypothesis
-  and failed the full `L0102212` plus `L0102209..L0102213` replay evidence
-- next active M3 block is `hlstats_Players_History` streak attribution, starting
-  from `Rakza`, `STEAM_0:1:55955613`, `L0103144` / `L0103146` / `L0103212`
-- do not apply the rejected event-level "current streak instead of max streak"
-  shortcut for `Players_History`; the 2026-05-24 promotion replay broadened
-  history drift from `50/50` to `106/106`, so the next candidate must trace
-  legacy `flushDB` sampling cadence first
-- the retained flush-sampling fix now aligns Python with legacy
-  `endKillStreak` / `flushDB` boundaries and reduces `Players_History` to
-  `14/14`; remaining history work should focus on skill/stat attribution
-  examples, not another broad kill-streak shortcut
-- the fresh `narrow-1000` after that fix surfaced one Python-only
-  `Events_TeamBonuses` `Dance Bear` / `CTs_Win` row; recheck that lifecycle
-  separately before calling the current contour TeamBonuses-clean again
-- `hlstats_Events_Entries` is confirmed closed for the current narrow
-  contour/default Python path; keep the next focus on the unrelated remaining
-  compare residuals and do not reopen `PlayerNames`, `Players_History`, or
-  `TeamBonuses` from this confirmation
+- Do not reopen `Entries`, `ChangeTeam`, `PlayerNames`, `Players_History`, or
+  `TeamBonuses` without fresh focused evidence.
+- Before starting any non-trivial new parity fix, use a read-only subagent to
+  inspect and document how the legacy Perl code implements the behavior.
+- Use single-log and narrow-window replay before another broad contour run.
+- After a point fix, inspect the automatic `30/30` guard-window parity rerun
+  from `Run-SingleLogParity.ps1` before promoting the fix.
+- Separate raw replay GeoIP-only player differences from real
+  stats/session/alias drift before touching attribution logic.
 - keep detailed compare counts, replay transcripts, and slice-by-slice triage
   in `docs/audits/legacy-python-parity-20260423/`, not in this plan
 - keep the acceptance matrix in

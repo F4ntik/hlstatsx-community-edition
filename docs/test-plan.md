@@ -85,16 +85,30 @@ Required checks when parity-affecting runtime/storage code changes:
 - restore a clean comparison baseline
 - run the relevant single-log or narrow-window replay first
 - run `compare_stats_dbs.py`
-- run GeoIP backfill only when the diff or page surface depends on it
+- run GeoIP backfill when claiming release-clean parity, validating
+  `hlstats_Players`/country/flag output, or checking pages that render GeoIP
+  fields; otherwise document raw replay GeoIP-only diffs as pre-backfill
 - record residual classification in `docs/audits/legacy-python-parity-20260423/`
 
 Current parity gates:
 
-- `P6d-M1`: `hlstats_Events_TeamBonuses`
-- `P6d-M2`: `ChangeTeam`, `Connects`, `Chat`, `PlayerActions`
-- `P6d-M3`: `Players`, `PlayerNames`, `Players_History`
-- accepted visible difference:
-  `Events_Entries legacy=0` vs `python>0`
+- `P6d-M1`: `hlstats_Events_TeamBonuses` is closed for the current
+  `narrow-1000` contour.
+- `P6d-M2`: `ChangeTeam`, `Connects`, `Chat`, and `PlayerActions` are closed
+  for the current `narrow-1000` contour.
+- `P6d-M3`: `hlstats_Events_Entries` is closed for the current narrow
+  contour/default Python path; direct counts are `legacy=0`, `python=0`.
+- `P6d-M4`: `hlstats_Players` raw replay compare can show an accepted
+  GeoIP-only `country`/`flag` diff because stdin replay does not run
+  maintenance GeoIP backfill. Release-clean parity requires post-replay
+  `hlstats_awards_py --geoip`, after which `hlstats_Players` should disappear
+  from the compare.
+- `P6d-M5`: `hlstats_Events_ChangeTeam` is closed for the current
+  `narrow-1000` contour; direct SQL anchors are `legacy
+  total=1345/unassigned=47` and `python total=1345/unassigned=47`.
+
+No current parity gate should reopen `PlayerNames`, `Players_History`,
+`TeamBonuses`, `Entries`, or `ChangeTeam` without fresh focused evidence.
 
 Minimum replay validation loop:
 
@@ -103,6 +117,8 @@ Minimum replay validation loop:
 - automatic `30/30` guard-window pass for point fixes when an event anchor is
   available
 - `python scripts\replay_baseline\compare_stats_dbs.py --max-examples 20`
+- post-replay `hlstats_awards_py --geoip` when claiming release-clean parity or
+  validating `hlstats_Players`/country/flag output
 - evidence update in `bug-plan.md`, `issues.jsonl`, or the relevant audit note
 
 ### Frontend / i18n
