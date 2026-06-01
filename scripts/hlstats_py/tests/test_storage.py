@@ -182,9 +182,13 @@ class StubAdapter:
     def __init__(self, connection: FakeConnection) -> None:
         self._connection = connection
         self.executemany_chunk_size = 1000
+        self.skip_connection_ping_calls: list[bool] = []
 
     def connection(self) -> FakeConnection:
         return self._connection
+
+    def set_skip_connection_ping(self, enabled: bool) -> None:
+        self.skip_connection_ping_calls.append(enabled)
 
 
 @pytest.fixture()
@@ -218,6 +222,26 @@ def test_db_write_trace_env_records_pre_batch_jsonl(
         "sql": _UPDATE_PLAYER_SKILL_QUERY,
         "params": [5, 162],
     }
+
+
+def test_stdin_batch_toggles_adapter_connection_ping() -> None:
+    adapter = StubAdapter(FakeConnection())
+    storage = EventStorage(adapter)
+
+    storage.begin_stdin_batch(transaction_batch_size=2)
+    storage.end_stdin_batch()
+
+    assert adapter.skip_connection_ping_calls == [True, False]
+
+
+def test_disabled_stdin_batch_keeps_adapter_connection_ping_enabled() -> None:
+    adapter = StubAdapter(FakeConnection())
+    storage = EventStorage(adapter)
+
+    storage.begin_stdin_batch(transaction_batch_size=0)
+    storage.end_stdin_batch()
+
+    assert adapter.skip_connection_ping_calls == [False, False]
 
 
 def test_db_write_trace_reuses_open_file_handle(

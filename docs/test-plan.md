@@ -73,6 +73,10 @@ CI coverage:
 - Until Phase 3 removes the package coupling, the `hlstats_py` CI job must keep
   the explicit `PYTHONPATH=scripts:scripts/proxy_daemon_py` bridge rather than
   pretending the package boundary is already autonomous.
+- Reconnect regression coverage lives in `scripts/proxy_daemon_py/tests/test_db.py`
+  and pins lazy connect, disabled ping, successful `ping(reconnect=False)`, and
+  failed-ping reconnect behavior. `scripts/hlstats_py/tests/test_storage.py`
+  pins the stdin batch skip-ping bridge that currently consumes that adapter.
 - `.github/workflows/nightly-parity.yml` is the Phase 1 scheduled/manual
   placeholder for parity automation. It runs lightweight replay helper smoke;
   the full Docker-backed legacy-vs-Python replay gate remains a Phase 7

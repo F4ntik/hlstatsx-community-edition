@@ -68,6 +68,7 @@ class FakeConnection(db.SupportsConnection):
         self.autocommit_value: bool | None = None
         self.closed = False
         self.pings = 0
+        self.ping_reconnect_values: list[bool] = []
 
     def cursor(self) -> FakeCursor:
         return FakeCursor(self._store)
@@ -77,6 +78,7 @@ class FakeConnection(db.SupportsConnection):
 
     def ping(self, reconnect: bool = False) -> bool:
         self.pings += 1
+        self.ping_reconnect_values.append(reconnect)
         return True
 
     def close(self) -> None:
@@ -167,6 +169,75 @@ def test_connection_returns_existing_connection() -> None:
     adapter.connect()
 
     assert adapter.connection() is connection
+
+
+def test_connection_lazily_opens_missing_connection() -> None:
+    connection = FakeConnection()
+    attempts = 0
+
+    def connector(**_: object) -> db.SupportsConnection:
+        nonlocal attempts
+        attempts += 1
+        return connection
+
+    adapter = db.SyncDatabaseAdapter(CONFIG, connector=connector)
+
+    assert adapter.connection() is connection
+    assert attempts == 1
+    assert connection.pings == 0
+    assert connection.autocommit_value is True
+
+
+def test_connection_skip_ping_returns_existing_connection_without_ping() -> None:
+    connection = FakeConnection()
+    adapter = db.SyncDatabaseAdapter(CONFIG, connector=connector_for(connection))
+    adapter.connect()
+    adapter.set_skip_connection_ping(True)
+
+    assert adapter.connection() is connection
+    assert connection.pings == 0
+
+
+def test_connection_successful_ping_keeps_existing_connection() -> None:
+    connection = FakeConnection()
+    attempts = 0
+
+    def connector(**_: object) -> db.SupportsConnection:
+        nonlocal attempts
+        attempts += 1
+        return connection
+
+    adapter = db.SyncDatabaseAdapter(CONFIG, connector=connector)
+    adapter.connect()
+
+    assert adapter.connection() is connection
+    assert attempts == 1
+    assert connection.pings == 1
+    assert connection.ping_reconnect_values == [False]
+
+
+def test_connection_failed_ping_reconnects() -> None:
+    class BrokenPingConnection(FakeConnection):
+        def ping(self, reconnect: bool = False) -> bool:
+            self.pings += 1
+            self.ping_reconnect_values.append(reconnect)
+            raise OSError("stale connection")
+
+    stale_connection = BrokenPingConnection()
+    fresh_connection = FakeConnection()
+    connections = [stale_connection, fresh_connection]
+
+    def connector(**_: object) -> db.SupportsConnection:
+        return connections.pop(0)
+
+    adapter = db.SyncDatabaseAdapter(CONFIG, connector=connector)
+    adapter.connect()
+
+    assert adapter.connection() is fresh_connection
+    assert stale_connection.pings == 1
+    assert stale_connection.ping_reconnect_values == [False]
+    assert fresh_connection.pings == 0
+    assert fresh_connection.autocommit_value is True
 
 
 def test_sync_fetch_options_returns_mapping() -> None:

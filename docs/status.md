@@ -188,9 +188,9 @@ Current parity state:
 
 ## In Progress
 
-- [ ] Phase 2 of `docs/autonomy-work-plan-20260601.md`: add reconnect
-  regression coverage for the current `_ensure_connection()` behavior without
-  treating the old review item as an active code bug.
+- [ ] Phase 3 of `docs/autonomy-work-plan-20260601.md`: inventory and remove
+  the hidden `hlstats_py -> proxy_daemon_py` package coupling, replacing the
+  current manual `PYTHONPATH` bridge with an explicit package boundary.
 
 ## Done
 
@@ -282,14 +282,24 @@ Current parity state:
   `scripts/proxy_daemon_py/tests`; local PHP lint could not be run because the
   Windows workspace does not currently have `php` on `PATH`, while GitHub CI
   installs PHP 8.2 explicitly.
+- Completed Phase 2 of `docs/autonomy-work-plan-20260601.md`: added regression
+  coverage around the current `SyncDatabaseAdapter._ensure_connection()`
+  behavior without changing production code or reopening the stale reconnect
+  bugfix. The new tests cover lazy connection creation, disabled ping,
+  successful ping reuse, `ping(reconnect=False)`, and reconnect after a failed
+  ping. `hlstats_py` storage tests now also pin the stdin batch skip-ping bridge
+  that uses this shared adapter. Targeted selected tests passed with
+  `--coverage-threshold=0` because the proxy test harness has a global coverage
+  gate that is not meaningful for a `-k` slice; the full
+  `scripts/proxy_daemon_py/tests` suite passed with the normal coverage gate.
 - Frontend i18n backlog (`P6a`/`P6b`/`P6c`) remains complete for the supported
   EN/RU product contour.
 
 ## Next
 
-1. Start Phase 2: add focused regression tests for the already-correct
-   `_ensure_connection()` scenarios: no connection, ping disabled, successful
-   ping, failed ping reconnect, and no proxy daemon regression.
+1. Start Phase 3: inventory `hlstats_py` imports from `proxy_daemon_py`, define
+   the minimal shared package boundary, and remove the manual `PYTHONPATH`
+   dependency without moving replay/parity business logic.
 2. Keep the stale reconnect-code fix out of scope unless fresh code or test
    evidence contradicts the current implementation.
 
