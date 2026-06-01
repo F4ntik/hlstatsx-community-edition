@@ -65,6 +65,19 @@ Run targeted `pytest` for the touched surface:
 - `scripts/proxy_daemon_py/tests`
 - `scripts/replay_baseline/tests`
 
+CI coverage:
+
+- `.github/workflows/product-ci.yml` runs `proxy_daemon_py` lint/type/test,
+  `hlstats_py` tests, `replay_baseline` helper tests, PHP syntax lint for
+  `web/`, and docs sanity checks on product-lane changes.
+- Until Phase 3 removes the package coupling, the `hlstats_py` CI job must keep
+  the explicit `PYTHONPATH=scripts:scripts/proxy_daemon_py` bridge rather than
+  pretending the package boundary is already autonomous.
+- `.github/workflows/nightly-parity.yml` is the Phase 1 scheduled/manual
+  placeholder for parity automation. It runs lightweight replay helper smoke;
+  the full Docker-backed legacy-vs-Python replay gate remains a Phase 7
+  promotion target.
+
 Boundary checks:
 
 - `hlstats_py.runtime --stdin` CLI contract when the runtime flags or import
@@ -128,6 +141,10 @@ Run targeted checks when frontend-visible behavior changes:
 - `php -l` for every touched PHP file
 - representative EN/RU smoke for the affected route group
 - language persistence and fallback behavior if request/session handling changed
+
+CI now runs `php -l` over all `web/**/*.php` files using PHP 8.2. Local Windows
+validation may require installing PHP or running the lint inside the web
+container.
 
 Representative route groups:
 

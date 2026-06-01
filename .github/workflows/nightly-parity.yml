@@ -1,0 +1,35 @@
+name: Nightly Parity Placeholder
+
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  replay-helper-smoke:
+    name: Replay helper smoke
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: scripts:scripts/replay_baseline
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install test dependencies
+        run: python -m pip install pytest==7.4.3
+
+      - name: Run lightweight replay helper tests
+        run: python -m pytest scripts/replay_baseline/tests
+
+      - name: Heavy parity gate is deferred
+        run: |
+          echo "Full Docker-backed legacy-vs-Python parity replay remains a Phase 7 nightly gate."
+          echo "This scheduled workflow is the Phase 1 placeholder plus lightweight helper smoke."

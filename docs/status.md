@@ -188,8 +188,9 @@ Current parity state:
 
 ## In Progress
 
-- [ ] Phase 1 of `docs/autonomy-work-plan-20260601.md`: expand
-  repository-wide CI after the Phase 0 docs truth synchronization.
+- [ ] Phase 2 of `docs/autonomy-work-plan-20260601.md`: add reconnect
+  regression coverage for the current `_ensure_connection()` behavior without
+  treating the old review item as an active code bug.
 
 ## Done
 
@@ -269,14 +270,26 @@ Current parity state:
   supported contour, stale reopened parity items are not active work, and the
   GeoIP rule is raw replay diff before backfill versus release-clean parity
   after post-replay `hlstats_awards_py --geoip`.
+- Completed Phase 1 of `docs/autonomy-work-plan-20260601.md`: the old
+  proxy-only workflow was replaced by repository-wide product CI covering
+  `proxy_daemon_py` lint/type/test, `hlstats_py` tests with the current explicit
+  `PYTHONPATH` bridge, `replay_baseline` helper tests, PHP syntax lint for
+  `web/`, and docs sanity checks. A scheduled/manual nightly parity placeholder
+  now runs lightweight replay helper smoke while the full Docker-backed parity
+  gate remains deferred to Phase 7. Local Phase 1 validation passed for
+  `scripts/replay_baseline/tests`, `scripts/hlstats_py/tests` with
+  `PYTHONPATH=scripts;scripts\proxy_daemon_py`, and
+  `scripts/proxy_daemon_py/tests`; local PHP lint could not be run because the
+  Windows workspace does not currently have `php` on `PATH`, while GitHub CI
+  installs PHP 8.2 explicitly.
 - Frontend i18n backlog (`P6a`/`P6b`/`P6c`) remains complete for the supported
   EN/RU product contour.
 
 ## Next
 
-1. Start Phase 1: expand repository-wide CI for
-   `proxy_daemon_py`, `hlstats_py`, replay tooling, PHP lint, docs checks, and
-   a placeholder/nightly parity workflow.
+1. Start Phase 2: add focused regression tests for the already-correct
+   `_ensure_connection()` scenarios: no connection, ping disabled, successful
+   ping, failed ping reconnect, and no proxy daemon regression.
 2. Keep the stale reconnect-code fix out of scope unless fresh code or test
    evidence contradicts the current implementation.
 
