@@ -143,6 +143,30 @@ cd scripts/hlstats_py
 poetry run pytest tests
 ```
 
+### 3.5 Lifecycle launcher-ы для deployment
+
+Python runtime-ы можно запускать через shell launcher-ы из `scripts/`:
+
+```bash
+cd scripts
+./run_proxy_py start
+./run_hlstats_py start 1 28000 1
+```
+
+Остановка использует production-safe порядок: сначала `SIGTERM`, затем ожидание
+до `HLX_STOP_TIMEOUT` секунд, и только после timeout отправляется `SIGKILL`.
+Тот же helper очищает stale PID-файлы, если процесс уже завершился или PID-файл
+повреждён:
+
+```bash
+HLX_STOP_TIMEOUT=15 ./run_proxy_py stop
+HLX_STOP_TIMEOUT=15 ./run_hlstats_py stop 28000
+```
+
+Для systemd/инициализационных шаблонов вызывайте `stop`/`restart` этих
+launcher-ов, а не прямой `kill -9`: Python runtimes обрабатывают `SIGTERM` и
+успевают закрыть UDP transport и соединения с БД.
+
 ## 4. Скрипт наград hlstats_awards_py (scripts/hlstats_awards_py)
 
 Python-порт `hlstats-awards.pl` отвечает за пересчёт наград, лент, отчётов по кланам и обслуживание архивов.

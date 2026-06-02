@@ -8,6 +8,9 @@ PYTHON_BIN="${PYTHON_BIN:-python3}"
 LOGDIR="${SCRIPTPATH}/logs"
 PIDDIR="${SCRIPTPATH}"
 MODULE="hlstats_py.runtime"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+source "${SCRIPT_DIR}/lib/process_lifecycle.sh"
 
 mkdir -p "${LOGDIR}"
 
@@ -34,14 +37,7 @@ stop_worker() {
   local port="$1"
   local pidfile="${PIDDIR}/hlstats_py_${port}.pid"
 
-  if [ ! -f "${pidfile}" ]; then
-    echo "No Python stats worker running on port ${port}"
-    return 0
-  fi
-
-  kill -9 "$(cat "${pidfile}")" >/dev/null 2>&1 || true
-  rm -f "${pidfile}"
-  echo "Stopped Python stats worker on port ${port}"
+  hlx_stop_pid_file "${pidfile}" "Python stats worker on port ${port}"
 }
 
 status_worker() {

@@ -188,9 +188,8 @@ Current parity state:
 
 ## In Progress
 
-- [ ] Phase 4 of `docs/autonomy-work-plan-20260601.md`: harden lifecycle
-  scripts so `run_proxy_py` and `run_hlstats_py` prefer graceful stop and use
-  `SIGKILL` only as a fallback.
+- [ ] Phase 5 of `docs/autonomy-work-plan-20260601.md`: harden the real
+  control-plane surface without inventing a `proxy_daemon_py` KILL path.
 
 ## Done
 
@@ -303,14 +302,24 @@ Current parity state:
   source imports, isolated venv install/import smoke, `hlstats_py` +
   `hlstats_resolve_py` tests, and the full `proxy_daemon_py` suite with the
   normal coverage gate.
+- Completed Phase 4 of `docs/autonomy-work-plan-20260601.md`:
+  `scripts/run_proxy_py` and `scripts/run_hlstats_py` now share
+  `scripts/lib/process_lifecycle.sh`, stop with `SIGTERM` first, wait up to
+  `HLX_STOP_TIMEOUT`, and reserve `SIGKILL` for timeout fallback. Deployment
+  notes in `docs/python_migration_usage_guide.md` direct service templates to
+  call launcher `stop`/`restart` instead of hard-killing runtime processes.
+  Validation used Git Bash for `bash -n`, smoke-tested both graceful PID-file
+  stop and TERM-ignoring fallback stop, ran `git diff --check` and docs UTF-8
+  reads, and covered the runtime signal-adjacent Python slices. The selected
+  proxy slice was run with `--coverage-threshold=0` because the package-level
+  coverage gate is not meaningful for a tiny lifecycle-adjacent subset.
 - Frontend i18n backlog (`P6a`/`P6b`/`P6c`) remains complete for the supported
   EN/RU product contour.
 
 ## Next
 
-1. Start Phase 4: replace primary `kill -9` lifecycle behavior in
-   `scripts/run_proxy_py` and `scripts/run_hlstats_py` with graceful stop,
-   timeout wait, and forced kill fallback.
+1. Start Phase 5: inspect and harden only the real control-plane commands for
+   the proxy daemon; do not assume a KILL command exists.
 2. Keep the stale reconnect-code fix out of scope unless fresh code or test
    evidence contradicts the current implementation.
 

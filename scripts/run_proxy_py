@@ -9,9 +9,12 @@ logdir=logs
 logfile="proxy_py$(date +_%Y%m%d_%H-%M-%S)"
 piddir="${confdir}"
 pidfile="${piddir}/proxy-daemon-py.pid"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 pythonpath="${confdir}/proxy_daemon_py"
 module="proxy_daemon_py.runtime"
+
+source "${script_dir}/lib/process_lifecycle.sh"
 
 if [ ! -f "${confdir}/${conffile}" ]; then
   echo "Missing configuration file (${conffile})"
@@ -38,13 +41,7 @@ start_proxy() {
 }
 
 stop_proxy() {
-  if [ ! -f "${pidfile}" ]; then
-    echo "HLstatsX proxy runtime is not running"
-    return 0
-  fi
-  kill -9 "$(cat "${pidfile}")" >/dev/null 2>&1 || true
-  rm -f "${pidfile}"
-  echo "Stopped HLstatsX Python proxy runtime"
+  hlx_stop_pid_file "${pidfile}" "HLstatsX Python proxy runtime"
 }
 
 case "${1:-}" in

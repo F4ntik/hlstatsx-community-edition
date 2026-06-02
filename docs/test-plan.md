@@ -89,6 +89,11 @@ Boundary checks:
   path change
 - `scripts/hlstats_ftp_py` only when FTP/replay ordering logic changes
 - `scripts/import_bans_py` only when maintenance CLI behavior changes
+- Lifecycle launcher changes require `bash -n` syntax checks for
+  `scripts/run_proxy_py`, `scripts/run_hlstats_py`, and
+  `scripts/lib/process_lifecycle.sh`, plus stop-path smoke tests against a
+  short-lived PID-file process and a TERM-ignoring process to prove `SIGKILL`
+  remains fallback-only.
 
 ### Replay / runtime parity
 
