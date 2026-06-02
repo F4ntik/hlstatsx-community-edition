@@ -8,9 +8,9 @@ from unittest.mock import patch
 
 from hlstats_py.runtime import HlstatsRuntime, build_dispatcher
 from hlstats_py.cli import load_settings
-from proxy_daemon_py.db import GameServer
-from proxy_daemon_py.log import LoggerConfig, ProxyLogger
-from proxy_daemon_py.transport import ProxyUdpServer
+from hlx_core.db import GameServer
+from hlx_core.log import LoggerConfig, ProxyLogger
+from hlx_core.transport import ProxyUdpServer
 
 
 @dataclass(slots=True)

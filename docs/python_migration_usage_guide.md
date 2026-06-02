@@ -104,25 +104,26 @@ poetry run pytest
 ### 3.1 Расположение и назначение
 
 * **Каталог**: `scripts/hlstats_py`
-<<<<<<< HEAD
 * **Основные пакеты**: `hlstats_py.runtime`, `hlstats_py.events`, `hlstats_py.storage`
 * **Назначение**: приём событий от прокси-демона, построение внутренних моделей и применение SQL-операций.
 
 ### 3.2 Подготовка окружения
 
-`hlstats_py` использует окружение прокси-демона. Повторно активируйте его при необходимости:
+`hlstats_py` имеет собственное Poetry-окружение и использует общий пакет
+`hlx_core` для конфигурации, БД, логирования и UDP transport helpers:
 ```bash
-cd scripts/proxy_daemon_py
-poetry shell
+cd scripts/hlstats_py
+poetry install
 ```
-После активации можно вернуться в корень (`cd ../..`) или оставаться в каталоге прокси, добавляя `PYTHONPATH=..` к командам.
+Для прямого запуска из корня без активированного окружения достаточно
+`PYTHONPATH=scripts`.
 
 ### 3.3 Основные сценарии использования
 
 * **Запуск worker на downstream-порту**:
   ```bash
-  cd scripts/proxy_daemon_py
-  PYTHONPATH=.. poetry run python -m hlstats_py.runtime \
+  cd scripts/hlstats_py
+  poetry run python -m hlstats_py.runtime \
     --configfile ../hlstats.local.conf \
     --port 28000 \
     --foreground
@@ -130,16 +131,16 @@ poetry shell
 * **Переиспользование в сервисах**: импортируйте `parse_proxy_envelope`, `parse_log_event`, `EventDispatcher`, `EventStorage`.
 * **Ручная валидация**: воспроизведите тестовый поток пакетов для сравнения с Perl-версией:
   ```bash
-  cd scripts/proxy_daemon_py
-  PYTHONPATH=.. poetry run pytest ../hlstats_py/tests/test_validation.py -k replay
+  cd scripts/hlstats_py
+  poetry run pytest tests/test_validation.py -k replay
   ```
 
 ### 3.4 Тестирование
 
-Все автотесты требуют наличия каталога `scripts/` в `PYTHONPATH`:
+Локальный запуск из пакета:
 ```bash
-cd scripts/proxy_daemon_py
-PYTHONPATH=.. poetry run pytest ../hlstats_py/tests
+cd scripts/hlstats_py
+poetry run pytest tests
 ```
 
 ## 4. Скрипт наград hlstats_awards_py (scripts/hlstats_awards_py)
@@ -214,26 +215,28 @@ poetry run pytest
 cd scripts/proxy_daemon_py
 poetry shell
 ```
-Активированное окружение предоставляет `mysqlclient` и общие служебные пакеты. Если вы не используете `poetry shell`, добавляйте `PYTHONPATH=..` к командам `poetry run`.
+Активированное окружение предоставляет `mysqlclient` и общие служебные пакеты.
+Если вы запускаете модуль из корня репозитория без установки пакета, добавляйте
+`PYTHONPATH=scripts`.
 
 ### 5.3 Основные сценарии запуска
 
 * Получить список флагов:
   ```bash
-  cd scripts/proxy_daemon_py
-  PYTHONPATH=.. poetry run python -m hlstats_resolve_py.cli --help
+  cd ../..
+  PYTHONPATH=scripts python -m hlstats_resolve_py.cli --help
   ```
 * Запуск из cron в режиме regroup без DNS-запросов:
   ```bash
-  cd scripts/proxy_daemon_py
-  PYTHONPATH=.. poetry run python -m hlstats_resolve_py.cli \
+  cd ../..
+  PYTHONPATH=scripts python -m hlstats_resolve_py.cli \
     --configfile /etc/hlstats.conf \
     --regroup
   ```
 * Полный прогон с DNS и повышенным логированием:
   ```bash
-  cd scripts/proxy_daemon_py
-  PYTHONPATH=.. poetry run python -m hlstats_resolve_py.cli \
+  cd ../..
+  PYTHONPATH=scripts python -m hlstats_resolve_py.cli \
     --configfile /path/to/hlstats.conf \
     --dns-timeout 5 \
     --debug
@@ -244,8 +247,8 @@ poetry shell
 ### 5.4 Тестирование
 
 ```bash
-cd scripts/proxy_daemon_py
-PYTHONPATH=.. poetry run pytest ../hlstats_resolve_py/tests
+cd ../..
+PYTHONPATH=scripts python -m pytest scripts/hlstats_resolve_py/tests
 ```
 Набор тестов покрывает парсинг CLI и работу резолвера с подменным DNS-слоем.
 
@@ -273,8 +276,8 @@ Python-порт heatmaps теперь доступен как отдельный
 legacy-модель запуска без встраивания в `hlstats_py.runtime`:
 
 ```bash
-cd scripts/proxy_daemon_py
-PYTHONPATH=.. poetry run python -m hlstats_py.heatmaps \
+cd scripts/hlstats_py
+poetry run python -m hlstats_py.heatmaps \
   --configfile ../hlstats.conf \
   --web-root ../web \
   --heatmaps-root ../heatmaps
@@ -295,8 +298,8 @@ PYTHONPATH=.. poetry run python -m hlstats_py.heatmaps \
 Пример точечного запуска для одной карты:
 
 ```bash
-cd scripts/proxy_daemon_py
-PYTHONPATH=.. poetry run python -m hlstats_py.heatmaps \
+cd scripts/hlstats_py
+poetry run python -m hlstats_py.heatmaps \
   --configfile ../hlstats.conf \
   --web-root ../web \
   --heatmaps-root ../heatmaps \

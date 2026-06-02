@@ -140,7 +140,7 @@ if ($UseUdpReplay) {
 docker compose -f $compose run -T --rm --no-deps `
     -v "${scripts}:/app/scripts" `
     -v "${ftpWork}:/tmp/ftp_work" `
-    -e PYTHONPATH=/app/scripts:/app/scripts/proxy_daemon_py `
+    -e PYTHONPATH=/app/scripts `
     -e HLSTATS_FTP_PASSWORD `
     hlstats-worker `
     sh -c $shCmd
@@ -155,7 +155,7 @@ if (-not $SkipGeoIp) {
     }
     docker compose -f $compose run -T --rm --no-deps `
         -v "${scripts}:/app/scripts" `
-        -e PYTHONPATH=/app/scripts:/app/scripts/proxy_daemon_py `
+        -e PYTHONPATH=/app/scripts `
         hlstats-worker `
         sh -c $geoipCmd
 } else {

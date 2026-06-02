@@ -9,9 +9,11 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY scripts/proxy_daemon_py /app/scripts/proxy_daemon_py
+COPY scripts/hlx_core /app/scripts/hlx_core
 COPY scripts/hlstats_py /app/scripts/hlstats_py
 
 RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir /app/scripts/hlx_core \
     && pip install --no-cache-dir /app/scripts/proxy_daemon_py
 
 COPY scripts/replay_baseline/comparison/python/hlstats.conf /app/hlstats.conf

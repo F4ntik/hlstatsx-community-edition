@@ -7,7 +7,6 @@ CONFFILE=hlstats.conf
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 LOGDIR="${SCRIPTPATH}/logs"
 PIDDIR="${SCRIPTPATH}"
-PYTHONPATH_VALUE="${SCRIPTPATH}:${SCRIPTPATH}/proxy_daemon_py"
 MODULE="hlstats_py.runtime"
 
 mkdir -p "${LOGDIR}"
@@ -23,7 +22,7 @@ start_worker() {
   fi
 
   rm -f "${pidfile}"
-  PYTHONPATH="${PYTHONPATH_VALUE}" "${PYTHON_BIN}" -m "${MODULE}" \
+  "${PYTHON_BIN}" -m "${MODULE}" \
     --configfile="${CONFFILE}" \
     --port="${port}" \
     --foreground > "${log}" 2>&1 &

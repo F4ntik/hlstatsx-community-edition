@@ -194,7 +194,7 @@ stdin import so the trace records pre-batch storage writes:
 docker run --rm --network python_hlstatsx_python_net `
   -v "${PWD}\scripts:/app/scripts" `
   -v "${PWD}\scripts\replay_baseline\comparison\python\ftp_work:/tmp/ftp_work" `
-  -e PYTHONPATH=/app/scripts:/app/scripts/proxy_daemon_py `
+  -e PYTHONPATH=/app/scripts `
   -e HLSTATS_DB_WRITE_TRACE_PATH=/tmp/ftp_work/python-writes.jsonl `
   python-hlstats-worker `
   python /app/scripts/replay_baseline/direct_import_artifacts.py `

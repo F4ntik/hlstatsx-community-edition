@@ -17,10 +17,10 @@ from hlstats_py.cli import RuntimeSettings, load_settings
 from hlstats_py.goldsrc_physical_lines import iter_merged_goldsrc_physical_lines
 from hlstats_py.runtime import HlstatsRuntime, build_dispatcher
 from hlstats_py.storage import EventStorage
-from proxy_daemon_py.bootstrap import database_config_from_proxy_config
-from proxy_daemon_py.db import SyncDatabaseAdapter
-from proxy_daemon_py.log import LoggerConfig, ProxyLogger
-from proxy_daemon_py.transport import ProxyUdpServer
+from hlx_core.bootstrap import database_config_from_proxy_config
+from hlx_core.db import SyncDatabaseAdapter
+from hlx_core.log import LoggerConfig, ProxyLogger
+from hlx_core.transport import ProxyUdpServer
 
 from hlstats_ftp_py.core import (
     LogFileEntry,
@@ -134,11 +134,7 @@ def _log(quiet: bool, msg: str) -> None:
 
 
 def _pythonpath_for_worker() -> str:
-    scripts = str(_SCRIPTS_DIR)
-    proxy = str(_SCRIPTS_DIR / "proxy_daemon_py")
-    extra = os.pathsep.join([scripts, proxy])
-    existing = os.environ.get("PYTHONPATH", "")
-    return extra if not existing else f"{extra}{os.pathsep}{existing}"
+    return os.environ.get("PYTHONPATH", "")
 
 
 def _parse_mdtm_response(ts: str) -> float | None:
@@ -408,7 +404,12 @@ def run(argv: list[str] | None = None) -> int:
         _log(not args.quiet, "OK.\n")
     download_elapsed = time.perf_counter() - download_started
 
-    env = {**os.environ, "PYTHONPATH": _pythonpath_for_worker()}
+    env = dict(os.environ)
+    pythonpath = _pythonpath_for_worker()
+    if pythonpath:
+        env["PYTHONPATH"] = pythonpath
+    else:
+        env.pop("PYTHONPATH", None)
     worker_base = [
         sys.executable,
         "-m",

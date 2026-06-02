@@ -10,8 +10,8 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from proxy_daemon_py.db import DatabaseConfig as DaemonDatabaseConfig
-from proxy_daemon_py.db import SupportsConnection, SyncDatabaseAdapter
+from hlx_core.db import DatabaseConfig as DaemonDatabaseConfig
+from hlx_core.db import SupportsConnection, SyncDatabaseAdapter
 
 from .cli import AwardsAction, RuntimePolicy, RuntimeSettings
 

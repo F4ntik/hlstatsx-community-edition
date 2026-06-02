@@ -11,8 +11,8 @@ and persists them to the existing HLstats MySQL schema through
 Typical local usage from the shared Poetry environment:
 
 ```bash
-cd scripts/proxy_daemon_py
-PYTHONPATH=.. poetry run python -m hlstats_py.runtime --configfile ../hlstats.conf --port 28000 --foreground
+cd scripts/hlstats_py
+poetry run python -m hlstats_py.runtime --configfile ../hlstats.conf --port 28000 --foreground
 ```
 
 Offline legacy-style import from a `.log` file now also has a dedicated stdin
@@ -20,7 +20,7 @@ mode. It requires the canonical source server identity so replayed lines can be
 attributed to the correct `hlstats_Servers` row:
 
 ```bash
-cd scripts/proxy_daemon_py
+cd scripts/hlstats_py
 Get-Content -Raw ..\replay_baseline\artifacts\L0415056.log | `
   python -m hlstats_py.runtime --configfile ..\hlstats.conf --stdin `
   --server-ip 172.19.0.1 --server-port 27015
@@ -40,8 +40,8 @@ published asset names expected by the PHP web layer.
 Typical local usage from the shared Poetry environment:
 
 ```bash
-cd scripts/proxy_daemon_py
-PYTHONPATH=.. poetry run python -m hlstats_py.heatmaps \
+cd scripts/hlstats_py
+poetry run python -m hlstats_py.heatmaps \
   --configfile ../hlstats.conf \
   --web-root ../web \
   --heatmaps-root ../heatmaps
@@ -61,8 +61,8 @@ The generator keeps the legacy execution model:
 Supported legacy selectors are available as direct CLI flags:
 
 ```bash
-cd scripts/proxy_daemon_py
-PYTHONPATH=.. poetry run python -m hlstats_py.heatmaps \
+cd scripts/hlstats_py
+poetry run python -m hlstats_py.heatmaps \
   --configfile ../hlstats.conf \
   --game cstrike \
   --map de_dust2 \

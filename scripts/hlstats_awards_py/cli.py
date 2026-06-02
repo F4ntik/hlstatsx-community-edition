@@ -11,8 +11,8 @@ from enum import Enum, auto
 from pathlib import Path
 from typing import Final
 
-from proxy_daemon_py.config import ConfigError, ProxyConfig, load_config
-from proxy_daemon_py.db import DatabaseError, SyncDatabaseAdapter
+from hlx_core.config import ConfigError, ProxyConfig, load_config
+from hlx_core.db import DatabaseError, SyncDatabaseAdapter
 
 DEFAULT_CONFIG_PATH: Final[Path] = Path("./hlstats.conf")
 

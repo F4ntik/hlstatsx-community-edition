@@ -44,7 +44,7 @@ backfill for this lane:
 Typical local invocation from the repository root:
 
 ```powershell
-$env:PYTHONPATH="scripts;scripts/proxy_daemon_py"
+$env:PYTHONPATH="scripts"
 python -m hlstats_awards_py --configfile scripts/hlstats.conf --geoip
 ```
 

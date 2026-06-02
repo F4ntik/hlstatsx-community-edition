@@ -5,10 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import tzinfo
 
+from hlx_core.bootstrap import database_config_from_proxy_config
+
 from .balancer import ServerBalancer
 from .config import ProxyConfig
 from .daemon import ProxyDaemon
-from .db import DatabaseAdapter, DatabaseConfig
+from .db import DatabaseAdapter
 from .heartbeat import HeartbeatManager
 from .log import LogLevel, LoggerConfig, ProxyLogger
 from .transport import ProxyUdpServer
@@ -29,33 +31,6 @@ class ProxyDaemonComponents:
     heartbeat: HeartbeatManager
     transport: ProxyUdpServer
     daemon: ProxyDaemon
-
-
-def database_config_from_proxy_config(config: ProxyConfig) -> DatabaseConfig:
-    """Translate ``hlstats.conf`` DB options into :class:`DatabaseConfig`."""
-
-    host = config.db_host.strip()
-    if not host:
-        raise ValueError("DBHost must be configured in hlstats.conf")
-
-    port = 3306
-    if ":" in host:
-        host, port_text = host.rsplit(":", 1)
-        try:
-            port = int(port_text)
-        except ValueError as exc:  # pragma: no cover - defensive configuration handling
-            raise ValueError(f"Invalid DBHost value '{config.db_host}': port must be numeric") from exc
-        host = host.strip()
-        if not host:
-            raise ValueError("DBHost must include a hostname when specifying a port")
-
-    return DatabaseConfig(
-        host=host,
-        port=port,
-        username=config.db_username,
-        password=config.db_password,
-        database=config.db_name,
-    )
 
 
 def build_components(

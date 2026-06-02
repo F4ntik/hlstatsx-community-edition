@@ -11,7 +11,7 @@ from pathlib import Path
 import re
 from typing import Any, Callable, Optional, Protocol, TextIO
 
-from proxy_daemon_py import db as proxy_db
+from hlx_core import db as proxy_db
 from .events import EventCategory, EventContext, EventUpdate
 from .event_buffer import BufferPolicy, EventBuffer
 from .frag_write_delta_buffer import FragWriteDeltaBuffer
@@ -23,11 +23,6 @@ from .runtime_decisions import (
     should_persist_player_identity,
     should_reward_team_player,
 )
-
-# Public re-exports from ``proxy_daemon_py`` are defined in ``__init__`` so we
-# import lazily and guard for type checkers. The runtime package layout keeps the
-# modules side by side under ``scripts``.
-
 
 class StorageError(RuntimeError):
     """Raised when an event update cannot be written to the database."""

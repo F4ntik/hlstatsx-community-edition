@@ -8,8 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, Sequence
 
-from proxy_daemon_py.config import ConfigError, load_config
-from proxy_daemon_py.db import DatabaseConfig, DatabaseError, SyncDatabaseAdapter
+from hlx_core.config import ConfigError, load_config
+from hlx_core.db import DatabaseConfig, DatabaseError, SyncDatabaseAdapter
 
 
 @dataclass(frozen=True, slots=True)

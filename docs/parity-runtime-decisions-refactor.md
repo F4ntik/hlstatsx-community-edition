@@ -247,7 +247,7 @@ player-object lifecycle for those rows.
 For any behavior-neutral refactor:
 
 ```powershell
-$env:PYTHONPATH='scripts;scripts/proxy_daemon_py'
+$env:PYTHONPATH='scripts'
 python -m pytest scripts/hlstats_py/tests
 ```
 

@@ -5,7 +5,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
 
-from proxy_daemon_py import db as proxy_db
+from hlx_core import db as proxy_db
 
 
 @dataclass(slots=True)

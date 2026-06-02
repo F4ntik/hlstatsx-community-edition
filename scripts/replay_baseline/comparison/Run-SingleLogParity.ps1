@@ -114,7 +114,7 @@ $dockerArgs = @(
     "-v", "${repoRoot}\scripts:/app/scripts",
     "-v", "${ftpWork}:/tmp/ftp_work",
     "-v", "${inputDir}:/tmp/single-log-window:ro",
-    "-e", "PYTHONPATH=/app/scripts:/app/scripts/proxy_daemon_py",
+    "-e", "PYTHONPATH=/app/scripts",
     "-e", "HLSTATS_DB_WRITE_TRACE_PATH=$pythonContainerTrace",
     "python-hlstats-worker",
     "python", "/app/scripts/replay_baseline/direct_import_artifacts.py",

@@ -70,9 +70,10 @@ CI coverage:
 - `.github/workflows/product-ci.yml` runs `proxy_daemon_py` lint/type/test,
   `hlstats_py` tests, `replay_baseline` helper tests, PHP syntax lint for
   `web/`, and docs sanity checks on product-lane changes.
-- Until Phase 3 removes the package coupling, the `hlstats_py` CI job must keep
-  the explicit `PYTHONPATH=scripts:scripts/proxy_daemon_py` bridge rather than
-  pretending the package boundary is already autonomous.
+- `hlstats_py` CI installs `scripts/hlstats_py`, which declares `hlx_core` as a
+  path dependency, then runs an import smoke before tests. This verifies the
+  package boundary instead of the old `scripts:scripts/proxy_daemon_py`
+  source-tree bridge.
 - Reconnect regression coverage lives in `scripts/proxy_daemon_py/tests/test_db.py`
   and pins lazy connect, disabled ping, successful `ping(reconnect=False)`, and
   failed-ping reconnect behavior. `scripts/hlstats_py/tests/test_storage.py`

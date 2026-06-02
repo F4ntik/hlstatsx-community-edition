@@ -8,7 +8,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-proxy-daemon-py = { path = "../proxy_daemon_py", develop = true }
+hlx-core = { path = "../hlx_core", develop = true }
 
 [tool.poetry.group.dev.dependencies]
 black = "^23.12.1"

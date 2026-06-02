@@ -50,7 +50,7 @@
 ## Как использовать
 
 ```python
-from proxy_daemon_py.db import SyncDatabaseAdapter, DatabaseConfig
+from hlx_core.db import SyncDatabaseAdapter, DatabaseConfig
 from hlstats_py import EventStorage
 
 adapter = SyncDatabaseAdapter(DatabaseConfig(...))

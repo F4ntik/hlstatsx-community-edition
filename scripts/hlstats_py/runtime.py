@@ -13,10 +13,10 @@ from types import MappingProxyType
 from datetime import datetime
 from typing import Literal, Protocol
 
-from proxy_daemon_py.bootstrap import database_config_from_proxy_config
-from proxy_daemon_py.db import GameServer, SyncDatabaseAdapter
-from proxy_daemon_py.log import LoggerConfig, ProxyLogger
-from proxy_daemon_py.transport import InboundDatagram, ProxyUdpServer
+from hlx_core.bootstrap import database_config_from_proxy_config
+from hlx_core.db import GameServer, SyncDatabaseAdapter
+from hlx_core.log import LoggerConfig, ProxyLogger
+from hlx_core.transport import InboundDatagram, ProxyUdpServer
 
 from . import (
     ChatEventHandler,

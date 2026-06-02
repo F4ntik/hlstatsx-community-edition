@@ -21,11 +21,11 @@ runtime ingest first, maintenance backfill second.
 - One of these GeoIP sources is available:
   - populated `geoLiteCity_Blocks` + `geoLiteCity_Location` tables
   - or `scripts/GeoLiteCity/GeoLite2-City.mmdb` with `UseGeoIPBinary > 0`
-- `PYTHONPATH` includes both imported package roots when running from the repo
-  root:
+- install the package dependencies, or run from the repository root with
+  `scripts` on `PYTHONPATH`:
 
 ```powershell
-$env:PYTHONPATH="scripts;scripts/proxy_daemon_py"
+$env:PYTHONPATH="scripts"
 ```
 
 ## Run command
@@ -33,7 +33,7 @@ $env:PYTHONPATH="scripts;scripts/proxy_daemon_py"
 From the repository root:
 
 ```powershell
-$env:PYTHONPATH="scripts;scripts/proxy_daemon_py"
+$env:PYTHONPATH="scripts"
 python -m hlstats_awards_py --configfile scripts/hlstats.conf --geoip
 ```
 

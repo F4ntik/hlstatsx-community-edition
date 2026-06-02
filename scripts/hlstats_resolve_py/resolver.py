@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeou
 from dataclasses import dataclass
 from typing import Callable, Sequence, TYPE_CHECKING
 
-from proxy_daemon_py.db import (
+from hlx_core.db import (
     DatabaseConfig as DaemonDatabaseConfig,
     SupportsConnection,
     SyncDatabaseAdapter,

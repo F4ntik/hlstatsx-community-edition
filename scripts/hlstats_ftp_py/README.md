@@ -6,7 +6,8 @@ Python replacement for [`HLStatsFTP/hlstats-ftp.pl`](../HLStatsFTP/hlstats-ftp.p
 
 - Python 3.10+
 - Working HLstats DB and a readable `hlstats.conf` (same file the PHP stack uses)
-- `PYTHONPATH` must include the `scripts` directory (same layout as [`run_hlstats_py`](../run_hlstats_py))
+- Install `hlstats_py`/`hlx_core` in the Python environment used by the FTP
+  runner and worker subprocess.
 
 ## Flags (Perl → Python)
 
@@ -38,7 +39,7 @@ State files match Perl names in the working directory: `hlstats-ftp-<gs_ip>-<gs_
 
 ```cron
 # Run every 10 minutes from the directory that holds .last / .tmp
-*/10 * * * * cd /opt/hlstatsx/scripts && PYTHONPATH=/opt/hlstatsx/scripts:/opt/hlstatsx/scripts/proxy_daemon_py HLSTATS_FTP_PASSWORD='***' /usr/bin/python3 -m hlstats_ftp_py --gs-ip=GAME_IP --gs-port=27015 --ftp-usr=loguser --ftp-dir=/cstrike/logs --configfile=/opt/hlstatsx/web/hlstats.conf --quiet
+*/10 * * * * cd /opt/hlstatsx/scripts && HLSTATS_FTP_PASSWORD='***' /opt/hlstatsx/.venv/bin/python -m hlstats_ftp_py --gs-ip=GAME_IP --gs-port=27015 --ftp-usr=loguser --ftp-dir=/cstrike/logs --configfile=/opt/hlstatsx/web/hlstats.conf --quiet
 ```
 
 Adjust paths and use a root-only file or secret manager for the password instead of inline env when possible.

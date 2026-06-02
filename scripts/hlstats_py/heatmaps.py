@@ -12,9 +12,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Protocol
 
-from proxy_daemon_py.bootstrap import database_config_from_proxy_config
-from proxy_daemon_py.config import ConfigError, ProxyConfig, load_config
-from proxy_daemon_py.db import SyncDatabaseAdapter
+from hlx_core.bootstrap import database_config_from_proxy_config
+from hlx_core.config import ConfigError, ProxyConfig, load_config
+from hlx_core.db import SyncDatabaseAdapter
 
 try:
     from PIL import Image, ImageDraw, ImageFont

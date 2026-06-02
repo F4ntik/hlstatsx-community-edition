@@ -188,9 +188,9 @@ Current parity state:
 
 ## In Progress
 
-- [ ] Phase 3 of `docs/autonomy-work-plan-20260601.md`: inventory and remove
-  the hidden `hlstats_py -> proxy_daemon_py` package coupling, replacing the
-  current manual `PYTHONPATH` bridge with an explicit package boundary.
+- [ ] Phase 4 of `docs/autonomy-work-plan-20260601.md`: harden lifecycle
+  scripts so `run_proxy_py` and `run_hlstats_py` prefer graceful stop and use
+  `SIGKILL` only as a fallback.
 
 ## Done
 
@@ -272,16 +272,14 @@ Current parity state:
   after post-replay `hlstats_awards_py --geoip`.
 - Completed Phase 1 of `docs/autonomy-work-plan-20260601.md`: the old
   proxy-only workflow was replaced by repository-wide product CI covering
-  `proxy_daemon_py` lint/type/test, `hlstats_py` tests with the current explicit
-  `PYTHONPATH` bridge, `replay_baseline` helper tests, PHP syntax lint for
-  `web/`, and docs sanity checks. A scheduled/manual nightly parity placeholder
-  now runs lightweight replay helper smoke while the full Docker-backed parity
-  gate remains deferred to Phase 7. Local Phase 1 validation passed for
-  `scripts/replay_baseline/tests`, `scripts/hlstats_py/tests` with
-  `PYTHONPATH=scripts;scripts\proxy_daemon_py`, and
-  `scripts/proxy_daemon_py/tests`; local PHP lint could not be run because the
-  Windows workspace does not currently have `php` on `PATH`, while GitHub CI
-  installs PHP 8.2 explicitly.
+  `proxy_daemon_py` lint/type/test, `hlstats_py` tests, `replay_baseline`
+  helper tests, PHP syntax lint for `web/`, and docs sanity checks. A
+  scheduled/manual nightly parity placeholder now runs lightweight replay
+  helper smoke while the full Docker-backed parity gate remains deferred to
+  Phase 7. Local Phase 1 validation passed for `scripts/replay_baseline/tests`,
+  `scripts/hlstats_py/tests`, and `scripts/proxy_daemon_py/tests`; local PHP
+  lint could not be run because the Windows workspace does not currently have
+  `php` on `PATH`, while GitHub CI installs PHP 8.2 explicitly.
 - Completed Phase 2 of `docs/autonomy-work-plan-20260601.md`: added regression
   coverage around the current `SyncDatabaseAdapter._ensure_connection()`
   behavior without changing production code or reopening the stale reconnect
@@ -292,14 +290,27 @@ Current parity state:
   `--coverage-threshold=0` because the proxy test harness has a global coverage
   gate that is not meaningful for a `-k` slice; the full
   `scripts/proxy_daemon_py/tests` suite passed with the normal coverage gate.
+- Completed Phase 3 of `docs/autonomy-work-plan-20260601.md`: introduced
+  `hlx_core` as the explicit shared infrastructure package for config, DB,
+  logging, UDP transport helpers, and the DB-config bootstrap helper. Focused
+  product consumers (`hlstats_py`, `hlstats_ftp_py`, `hlstats_awards_py`,
+  `hlstats_resolve_py`, and `import_bans_py`) now import shared infrastructure
+  from `hlx_core` instead of the daemon package, while `proxy_daemon_py` keeps
+  compatibility wrappers for its own public API and daemon-specific modules.
+  `hlstats_py` is now an installable package with a path dependency on
+  `hlx_core`; product CI installs it and runs an import smoke instead of using
+  the old `scripts:scripts/proxy_daemon_py` bridge. Local validation passed for
+  source imports, isolated venv install/import smoke, `hlstats_py` +
+  `hlstats_resolve_py` tests, and the full `proxy_daemon_py` suite with the
+  normal coverage gate.
 - Frontend i18n backlog (`P6a`/`P6b`/`P6c`) remains complete for the supported
   EN/RU product contour.
 
 ## Next
 
-1. Start Phase 3: inventory `hlstats_py` imports from `proxy_daemon_py`, define
-   the minimal shared package boundary, and remove the manual `PYTHONPATH`
-   dependency without moving replay/parity business logic.
+1. Start Phase 4: replace primary `kill -9` lifecycle behavior in
+   `scripts/run_proxy_py` and `scripts/run_hlstats_py` with graceful stop,
+   timeout wait, and forced kill fallback.
 2. Keep the stale reconnect-code fix out of scope unless fresh code or test
    evidence contradicts the current implementation.
 

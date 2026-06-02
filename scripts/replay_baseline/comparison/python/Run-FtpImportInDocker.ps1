@@ -18,7 +18,7 @@ $env:HLSTATS_FTP_PASSWORD = "hlxftp123"
 docker compose -f $compose run --rm --no-deps `
     -v "${scripts}:/app/scripts" `
     -v "${ftpWork}:/tmp/ftp_work" `
-    -e PYTHONPATH=/app/scripts:/app/scripts/proxy_daemon_py `
+    -e PYTHONPATH=/app/scripts `
     -e HLSTATS_FTP_PASSWORD `
     hlstats-worker `
     sh -c "python -m hlstats_ftp_py --gs-ip 172.19.0.1 --gs-port 27015 --ftp-ip log-ftp --ftp-port 21 --ftp-active --ftp-usr hlxslogs --ftp-dir / --configfile /app/hlstats.conf --cwd /tmp/ftp_work"

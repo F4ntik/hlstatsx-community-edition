@@ -12,7 +12,7 @@ For an isolated DB that does not touch the main Python comparison stack, see
 ``scripts/replay_baseline/bench_ephemeral/README.md`` and ``Run-WriteBenchEphemeral.ps1``.
 
 Run from repo root with:
-``PYTHONPATH=scripts;scripts/proxy_daemon_py`` (Windows: semicolon separator).
+``PYTHONPATH=scripts``.
 """
 from __future__ import annotations
 

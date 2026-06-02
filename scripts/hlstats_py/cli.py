@@ -8,8 +8,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from proxy_daemon_py.config import ConfigError, ProxyConfig, load_config
-from proxy_daemon_py.log import LogLevel, level_from_debug
+from hlx_core.config import ConfigError, ProxyConfig, load_config
+from hlx_core.log import LogLevel, level_from_debug
 
 
 @dataclass(frozen=True, slots=True)

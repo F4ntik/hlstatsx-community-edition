@@ -9,8 +9,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final, Mapping, Sequence
 
-from proxy_daemon_py.config import ConfigError, ProxyConfig, load_config
-from proxy_daemon_py.db import DatabaseError, SyncDatabaseAdapter
+from hlx_core.config import ConfigError, ProxyConfig, load_config
+from hlx_core.db import DatabaseError, SyncDatabaseAdapter
 
 from .resolver import HostResolver, ResolveError, build_database_config
 
