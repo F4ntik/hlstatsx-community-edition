@@ -15,6 +15,8 @@ Validate that the integrated product repository works as one coherent stack:
   [`docs/replay-fast-path.md`](replay-fast-path.md)
 - parity-debug workflow for narrow residuals:
   [`docs/parity-debug-pipeline.md`](parity-debug-pipeline.md)
+- parity acceptance layers, fixture identity, and Perl boundaries:
+  [`docs/parity-acceptance.md`](parity-acceptance.md)
 - audit flow, artifacts, and parity bug plan:
   [`docs/audits/legacy-python-parity-20260423/README.md`](audits/legacy-python-parity-20260423/README.md)
 
@@ -78,10 +80,14 @@ CI coverage:
   and pins lazy connect, disabled ping, successful `ping(reconnect=False)`, and
   failed-ping reconnect behavior. `scripts/hlstats_py/tests/test_storage.py`
   pins the stdin batch skip-ping bridge that currently consumes that adapter.
-- `.github/workflows/nightly-parity.yml` is the Phase 1 scheduled/manual
-  placeholder for parity automation. It runs lightweight replay helper smoke;
-  the full Docker-backed legacy-vs-Python replay gate remains a Phase 7
-  promotion target.
+- `.github/workflows/nightly-parity.yml` is the scheduled/manual Phase 7
+  parity acceptance workflow. It always runs lightweight replay helper smoke
+  and has an opt-in/manual plus scheduled heavy gate for the Docker-backed
+  legacy-vs-Python replay contour. The heavy job is bound to a self-hosted
+  Windows parity runner because the current contour scripts use Windows
+  PowerShell, Docker Compose, fixed local container names, and host bind paths.
+  The job runs dual replay, post-replay GeoIP backfill, compact DB compare,
+  and uploads parity state/audit artifacts.
 
 Boundary checks:
 
@@ -144,6 +150,21 @@ Current parity gates:
 
 No current parity gate should reopen `PlayerNames`, `Players_History`,
 `TeamBonuses`, `Entries`, or `ChangeTeam` without fresh focused evidence.
+
+Parity acceptance layers:
+
+- ordinary PR/local work uses the lightweight subset: relevant product CI jobs,
+  targeted Python tests for the changed surface, replay helper smoke, and
+  narrow Python replay/compare only when the change can affect parity.
+- scheduled or manual release-readiness work uses the heavy subset:
+  `Run-DualContour-1000.ps1 -UseDumpRestore -ReuseValidLegacy
+  -MaxImportFiles 1000`, post-replay `hlstats_awards_py --geoip`, and
+  `compare_stats_dbs.py --max-examples 20`, with artifacts retained from
+  `docs/audits/legacy-python-parity-20260423/` and
+  `scripts/replay_baseline/comparison/.parity-state/`.
+- Perl remains required for reference behavior, baseline regeneration, targeted
+  investigation, and the heavy acceptance replay. It is not required for every
+  routine PR when fixture inputs and the accepted legacy contour are unchanged.
 
 Minimum replay validation loop:
 

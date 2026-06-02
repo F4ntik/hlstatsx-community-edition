@@ -2,13 +2,14 @@
 
 ## Snapshot
 
-- Last updated: `2026-06-01`
+- Last updated: `2026-06-02`
 - `P6d` is no longer an active residual hunt for `Entries`, `ChangeTeam`,
   `PlayerNames`, `Players_History`, or `TeamBonuses`; those gates are closed
   for the supported narrow/default Python contour.
 - The active autonomy track is now release-readiness/product hardening:
   docs truth, repository-wide CI, package/runtime boundaries, lifecycle and
-  control-plane hardening, explicit DB modes, and parity acceptance automation.
+  control-plane hardening, explicit DB modes, parity acceptance automation, and
+  PHP EN/RU stabilization.
 - If a future parity-affecting change creates a new residual, restart from
   [`docs/parity-debug-pipeline.md`](parity-debug-pipeline.md) and
   [`docs/replay-fast-path.md`](replay-fast-path.md), then write evidence into
@@ -188,8 +189,9 @@ Current parity state:
 
 ## In Progress
 
-- [ ] Phase 7 of `docs/autonomy-work-plan-20260601.md`: turn parity acceptance
-  into a documented lightweight PR subset plus scheduled/heavy replay flow.
+- [ ] Phase 8 of `docs/autonomy-work-plan-20260601.md`: stabilize PHP
+  request/lang state, cache boundaries, and replay-backed EN/RU verification
+  without a big-bang frontend rewrite.
 
 ## Done
 
@@ -330,14 +332,25 @@ Current parity state:
   capability. Tests also pin the positive import-mode `client_flag` path and
   the `hlstats_py --stdin` / FTP batch importer wiring. `docs/python_migration_usage_guide.md`
   documents the split.
+- Completed Phase 7 of `docs/autonomy-work-plan-20260601.md`: parity
+  acceptance is now split into a lightweight PR/local subset and a
+  scheduled/manual heavy replay subset. `docs/parity-acceptance.md` documents
+  the accepted fixture identity, artifact expectations, promotion rules, and
+  where Perl remains required: reference behavior, baseline regeneration,
+  targeted investigation, and heavy acceptance replay. `.github/workflows/nightly-parity.yml`
+  now runs replay helper smoke plus a self-hosted Windows parity runner job for
+  `Run-DualContour-1000.ps1 -UseDumpRestore -ReuseValidLegacy`, post-replay
+  GeoIP backfill, compact DB compare, and artifact upload. `docs/test-plan.md`
+  records that routine PR work no longer requires live Perl when fixture inputs
+  and the accepted legacy contour are unchanged.
 - Frontend i18n backlog (`P6a`/`P6b`/`P6c`) remains complete for the supported
   EN/RU product contour.
 
 ## Next
 
-1. Start Phase 7: define the lightweight PR parity subset and promote
-   nightly-heavy parity/replay automation without making daily work depend on
-   live Perl runs.
+1. Start Phase 8: reduce PHP request/lang global-state coupling, maintain PHP
+   lint coverage, and add focused replay-backed EN/RU smoke for representative
+   routes.
 2. Keep the stale reconnect-code fix out of scope unless fresh code or test
    evidence contradicts the current implementation.
 
