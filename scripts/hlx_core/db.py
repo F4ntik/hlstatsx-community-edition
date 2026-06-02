@@ -140,6 +140,8 @@ class SyncDatabaseAdapter:
             raise ValueError("read_timeout must be positive")
         if executemany_chunk_size <= 0:
             raise ValueError("executemany_chunk_size must be positive")
+        if enable_multi_statements and not import_mode:
+            raise ValueError("enable_multi_statements requires import_mode=True")
 
         self._config = config
         self._connector = connector
@@ -323,10 +325,7 @@ class SyncDatabaseAdapter:
             "use_unicode": True,
             "connect_timeout": self._normalize_timeout(self._connect_timeout),
             "read_timeout": self._normalize_timeout(self._read_timeout),
-            # Note: innodb_flush_log_at_trx_commit is GLOBAL-only on MariaDB/MySQL and
-            # cannot appear in SESSION init_command (connection would fail). Bulk-import
-            # tuning belongs in server config or a privileged bootstrap path, not here.
-            "init_command": "SET NAMES 'utf8mb4', SESSION sql_mode = ''",
+            "init_command": self._connection_init_command(),
         }
         if self._write_timeout is not None:
             params["write_timeout"] = self._normalize_timeout(self._write_timeout)
@@ -436,6 +435,14 @@ class SyncDatabaseAdapter:
         except ImportError as exc:  # pragma: no cover - requires runtime environment
             raise DatabaseError("mysqlclient (MySQLdb) is required for database access") from exc
         return cast(Callable[..., SupportsConnection], MySQLdb.connect)
+
+    def _connection_init_command(self) -> str:
+        # Note: innodb_flush_log_at_trx_commit is GLOBAL-only on MariaDB/MySQL and
+        # cannot appear in SESSION init_command (connection would fail). Bulk-import
+        # tuning belongs in server config or a privileged bootstrap path, not here.
+        if self._import_mode:
+            return "SET NAMES 'utf8mb4', SESSION sql_mode = ''"
+        return "SET NAMES 'utf8mb4'"
 
     def _resolve_client_multi_statements_flag(self) -> int | None:
         try:

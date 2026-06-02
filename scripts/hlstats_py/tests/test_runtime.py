@@ -6,6 +6,9 @@ from dataclasses import dataclass
 from io import StringIO
 from unittest.mock import patch
 
+import pytest
+
+import hlstats_py.runtime as runtime_module
 from hlstats_py.runtime import HlstatsRuntime, build_dispatcher
 from hlstats_py.cli import load_settings
 from hlx_core.db import GameServer
@@ -412,6 +415,57 @@ def test_load_settings_accepts_stdin_verbose_and_native_parser(tmp_path) -> None
     assert settings.stdin_verbose_events is True
     assert settings.parser_backend == "native"
     assert settings.stdin_transaction_batch_size == 2500
+
+
+def test_serve_uses_import_db_mode_for_stdin(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config_path = tmp_path / "hlstats.conf"
+    config_path.write_text(
+        "\n".join(
+            [
+                "DBHost 127.0.0.1",
+                "DBName hlstatsxce",
+                "DBUsername hlstatsxce",
+                "DBPassword hlx123",
+                "BindIP 0.0.0.0",
+                "Port 27500",
+                "DebugLevel 0",
+                "ProxyKey secret",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    captured: dict[str, object] = {}
+
+    class StopAfterAdapter(Exception):
+        pass
+
+    class RecordingAdapter:
+        def __init__(self, config, **kwargs) -> None:
+            captured["config"] = config
+            captured["kwargs"] = kwargs
+            raise StopAfterAdapter
+
+    monkeypatch.setattr(runtime_module, "SyncDatabaseAdapter", RecordingAdapter)
+
+    with pytest.raises(StopAfterAdapter):
+        asyncio.run(
+            runtime_module._serve(
+                [
+                    "--configfile",
+                    str(config_path),
+                    "--stdin",
+                    "--server-ip",
+                    "127.0.0.1",
+                    "--server-port",
+                    "27015",
+                ]
+            )
+        )
+
+    assert captured["kwargs"] == {
+        "import_mode": True,
+        "enable_multi_statements": True,
+    }
 
 
 async def _run_records_proxied_event() -> None:

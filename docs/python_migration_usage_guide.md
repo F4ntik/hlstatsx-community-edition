@@ -143,7 +143,23 @@ cd scripts/hlstats_py
 poetry run pytest tests
 ```
 
-### 3.5 Lifecycle launcher-ы для deployment
+### 3.5 DB modes
+
+Python DB connections have two explicit modes:
+
+- **online strict mode** is the default for daemon/worker/maintenance commands.
+  It sets UTF-8 connection names but does not clear `SESSION sql_mode`; the
+  database server's strict policy remains active.
+- **replay/import compatibility mode** is used only when the runtime is launched
+  with `--stdin`, by the FTP batch importer, and by replay/comparison tooling.
+  This mode sets `SESSION sql_mode = ''` and may enable MySQL multi-statements
+  so legacy stdin/import SQL remains reproducible.
+
+Do not enable multi-statements for online services. If a deployment needs
+legacy-compatible import semantics, route that workload through the documented
+`--stdin`/FTP/replay paths instead of relaxing the online daemon connection.
+
+### 3.6 Lifecycle launcher-ы для deployment
 
 Python runtime-ы можно запускать через shell launcher-ы из `scripts/`:
 

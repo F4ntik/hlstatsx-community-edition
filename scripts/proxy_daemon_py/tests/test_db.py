@@ -122,7 +122,7 @@ def test_sync_connect_retries_until_success() -> None:
 
     assert len(attempts) == 3
     assert attempts[-1]["host"] == CONFIG.host
-    assert attempts[-1]["init_command"] == "SET NAMES 'utf8mb4', SESSION sql_mode = ''"
+    assert attempts[-1]["init_command"] == "SET NAMES 'utf8mb4'"
     assert connection.autocommit_value is True
     assert delays == [0.5, 1.0]
 
@@ -157,9 +157,55 @@ def test_sync_connect_normalizes_mysqlclient_timeout_parameters() -> None:
             "connect_timeout": 1,
             "read_timeout": 2,
             "write_timeout": 3,
-            "init_command": "SET NAMES 'utf8mb4', SESSION sql_mode = ''",
+            "init_command": "SET NAMES 'utf8mb4'",
         }
     ]
+
+
+def test_import_mode_uses_legacy_compatible_sql_mode() -> None:
+    connection = FakeConnection()
+    attempts: list[dict[str, object]] = []
+
+    def connector(**kwargs: object) -> db.SupportsConnection:
+        attempts.append(kwargs)
+        return connection
+
+    adapter = db.SyncDatabaseAdapter(CONFIG, connector=connector, import_mode=True)
+
+    adapter.connect()
+
+    assert attempts[-1]["init_command"] == "SET NAMES 'utf8mb4', SESSION sql_mode = ''"
+
+
+def test_multi_statements_require_import_mode() -> None:
+    with pytest.raises(ValueError, match="enable_multi_statements requires import_mode=True"):
+        db.SyncDatabaseAdapter(CONFIG, enable_multi_statements=True)
+
+
+def test_import_mode_multi_statements_sets_client_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+    connection = FakeConnection()
+    attempts: list[dict[str, object]] = []
+
+    def connector(**kwargs: object) -> db.SupportsConnection:
+        attempts.append(kwargs)
+        return connection
+
+    monkeypatch.setattr(
+        db.SyncDatabaseAdapter,
+        "_resolve_client_multi_statements_flag",
+        lambda self: 12345,
+    )
+    adapter = db.SyncDatabaseAdapter(
+        CONFIG,
+        connector=connector,
+        import_mode=True,
+        enable_multi_statements=True,
+    )
+
+    adapter.connect()
+
+    assert attempts[-1]["client_flag"] == 12345
+    assert attempts[-1]["init_command"] == "SET NAMES 'utf8mb4', SESSION sql_mode = ''"
 
 
 def test_connection_returns_existing_connection() -> None:

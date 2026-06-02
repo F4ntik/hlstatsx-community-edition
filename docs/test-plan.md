@@ -100,6 +100,12 @@ Boundary checks:
   `proxy_daemon_py` direct loopback `RELOAD` is rejected, proxied `RELOAD`
   remains allowed, and unsupported `proxy_daemon_py` `C;KILL;` is rejected
   without forwarding.
+- DB mode changes require adapter tests for both online and import modes:
+  online connections must keep strict/server `sql_mode` active, import mode may
+  set `SESSION sql_mode = ''`, and `enable_multi_statements` must be rejected
+  unless `import_mode=True`. Also pin positive import-mode multi-statement
+  `client_flag` behavior and wiring tests for `hlstats_py --stdin` plus FTP
+  batch import.
 
 ### Replay / runtime parity
 

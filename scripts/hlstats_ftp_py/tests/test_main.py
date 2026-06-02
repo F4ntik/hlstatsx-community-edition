@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import pytest
+
+import hlstats_ftp_py.main as ftp_main
 from hlstats_ftp_py.main import (
     _collect_log_entries,
     _parse_mdtm_response,
@@ -44,6 +48,55 @@ def test_order_by_name_requires_fresh_state(tmp_path: Path, capsys) -> None:
     captured = capsys.readouterr()
     assert result == 1
     assert "--order-by-name requires a fresh FTP state" in captured.err
+
+
+def test_batch_import_uses_import_db_mode(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config_path = tmp_path / "hlstats.conf"
+    config_path.write_text(
+        "\n".join(
+            [
+                "DBHost 127.0.0.1",
+                "DBName hlstatsxce",
+                "DBUsername hlstatsxce",
+                "DBPassword hlx123",
+                "BindIP 0.0.0.0",
+                "Port 27500",
+                "DebugLevel 0",
+                "ProxyKey secret",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    args = argparse.Namespace(
+        configfile=config_path,
+        gs_ip="127.0.0.1",
+        gs_port=27015,
+        parser_backend="native",
+        stdin_transaction_batch_size=1000,
+        stdin_verbose_events=False,
+        quiet=True,
+    )
+    settings = ftp_main._build_runtime_settings(args)
+    captured: dict[str, object] = {}
+
+    class StopAfterAdapter(Exception):
+        pass
+
+    class RecordingAdapter:
+        def __init__(self, config, **kwargs) -> None:
+            captured["config"] = config
+            captured["kwargs"] = kwargs
+            raise StopAfterAdapter
+
+    monkeypatch.setattr(ftp_main, "SyncDatabaseAdapter", RecordingAdapter)
+
+    with pytest.raises(StopAfterAdapter):
+        ftp_main._import_logs_batch([], tmp_path, args=args, settings=settings, last_path=tmp_path / ".last")
+
+    assert captured["kwargs"] == {
+        "import_mode": True,
+        "enable_multi_statements": True,
+    }
 
 
 def test_parse_mdtm_response() -> None:

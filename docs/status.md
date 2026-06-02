@@ -188,8 +188,8 @@ Current parity state:
 
 ## In Progress
 
-- [ ] Phase 6 of `docs/autonomy-work-plan-20260601.md`: explicitly separate
-  online strict DB mode from replay/import compatibility mode.
+- [ ] Phase 7 of `docs/autonomy-work-plan-20260601.md`: turn parity acceptance
+  into a documented lightweight PR subset plus scheduled/heavy replay flow.
 
 ## Done
 
@@ -321,14 +321,23 @@ Current parity state:
   `SERVERLIST`, `RELOAD`), rejects direct loopback `RELOAD` without a proxied
   key, and explicitly rejects unsupported `C;KILL;` without forwarding it as a
   game packet. Targeted control tests cover the allowed and forbidden scenarios.
+- Completed Phase 6 of `docs/autonomy-work-plan-20260601.md`: online
+  `SyncDatabaseAdapter` connections now keep the server/session `sql_mode`
+  active and only set `SET NAMES 'utf8mb4'`; legacy-compatible empty
+  `SESSION sql_mode` is explicit `import_mode=True` behavior used by
+  stdin/replay/import paths. `enable_multi_statements` now requires
+  `import_mode=True`, so online services cannot silently enable that importer
+  capability. Tests also pin the positive import-mode `client_flag` path and
+  the `hlstats_py --stdin` / FTP batch importer wiring. `docs/python_migration_usage_guide.md`
+  documents the split.
 - Frontend i18n backlog (`P6a`/`P6b`/`P6c`) remains complete for the supported
   EN/RU product contour.
 
 ## Next
 
-1. Start Phase 6: inventory DB mode toggles (`sql_mode`, `SET NAMES`,
-   `multi_statements`, `init_command`) and split online strict mode from
-   replay/import compatibility mode.
+1. Start Phase 7: define the lightweight PR parity subset and promote
+   nightly-heavy parity/replay automation without making daily work depend on
+   live Perl runs.
 2. Keep the stale reconnect-code fix out of scope unless fresh code or test
    evidence contradicts the current implementation.
 

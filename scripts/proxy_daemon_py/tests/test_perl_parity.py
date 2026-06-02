@@ -163,7 +163,7 @@ PERL_REPLAY = ReplayScenario(
             source=("198.51.100.10", 27015),
         ),
         ReplayDatagram(
-            description="local reload command",
+            description="local reload command rejected by product hardening",
             payload="C;RELOAD;",
             source=("127.0.0.1", 9999),
         ),
@@ -194,7 +194,7 @@ PERL_REPLAY = ReplayScenario(
         ),
         Message(
             destination=("127.0.0.1", 9999),
-            payload="Reload command acknowledged\n",
+            payload="FAILED CONTROL COMMAND: RELOAD requires PROXY Key\n",
         ),
         Message(
             destination=("198.51.100.10", 27015),
@@ -232,8 +232,10 @@ PERL_REPLAY = ReplayScenario(
             level="E403",
             message="Sending FAILED PROXY REQUEST to 198.51.100.10:27015",
         ),
-        LogRecord(level="CONTROL", message="Received reload command from 127.0.0.1:9999"),
-        LogRecord(level="CONTROL", message="Reloaded proxy daemon configuration: 2 entries"),
+        LogRecord(
+            level="CONTROL",
+            message="Rejected unauthenticated mutating control command from 127.0.0.1:9999: RELOAD",
+        ),
         LogRecord(level="CONTROL", message="Sending Serverlist to 198.51.100.10:27015"),
         LogRecord(
             level="CONTROL",
