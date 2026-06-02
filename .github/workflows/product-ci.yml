@@ -9,6 +9,7 @@ on:
       - 'scripts/hlstats_py/**'
       - 'scripts/proxy_daemon_py/**'
       - 'scripts/replay_baseline/**'
+      - 'scripts/web_i18n_smoke.php'
       - 'web/**'
   pull_request:
     paths:
@@ -18,6 +19,7 @@ on:
       - 'scripts/hlstats_py/**'
       - 'scripts/proxy_daemon_py/**'
       - 'scripts/replay_baseline/**'
+      - 'scripts/web_i18n_smoke.php'
       - 'web/**'
 
 permissions:
@@ -125,6 +127,9 @@ jobs:
           for file in "${files[@]}"; do
             php -l "$file"
           done
+
+      - name: Web i18n smoke
+        run: php scripts/web_i18n_smoke.php
 
   docs-check:
     name: Docs sanity check

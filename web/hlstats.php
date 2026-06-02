@@ -59,16 +59,12 @@ if (defined('HISTORICAL_CACHE'))
 
 if ($historical_cache == 1)
 {
-	$cacheRequest = $_REQUEST;
-	$cacheRequest['lang'] = current_lang();
+	$cacheRequest = $_GET + $_POST;
+	$cacheTarget = i18n_historical_cache_target($cacheRequest, current_lang());
+	$cachetarget = $cacheTarget['path'];
 
-	$rawmd5 = md5(http_build_query($cacheRequest));
-	$dir1 = substr($rawmd5, 0, 1);
-	$dir2 = substr($rawmd5, 1, 1);
-	$cachetarget = sprintf("cache/%s/%s/%s", $dir1, $dir2, $rawmd5);
-
-	@mkdir("cache/$dir1");
-	@mkdir("cache/$dir1/$dir2");
+	@mkdir("cache/{$cacheTarget['dir1']}");
+	@mkdir("cache/{$cacheTarget['dir1']}/{$cacheTarget['dir2']}");
 
 	if (file_exists($cachetarget))
 	{
@@ -175,6 +171,10 @@ if (!$game)
 }
 else
 {
+	if (isset($_SESSION['game']) && $_SESSION['game'] !== $game) {
+		unset($_SESSION['realgame']);
+		$realgame = null;
+	}
 	$_SESSION['game'] = $game;
 }
 

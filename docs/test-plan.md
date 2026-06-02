@@ -187,7 +187,29 @@ Run targeted checks when frontend-visible behavior changes:
 
 CI now runs `php -l` over all `web/**/*.php` files using PHP 8.2. Local Windows
 validation may require installing PHP or running the lint inside the web
-container.
+container. CI also runs `php scripts/web_i18n_smoke.php`, which pins the
+request/cookie/session language priority, language-aware URL generation,
+historical cache key language separation, and the no-mutation contract for the
+new request/cache helpers.
+The heavy nightly parity workflow additionally runs
+`python scripts/replay_baseline/web_route_smoke.py --base-url
+http://127.0.0.1:8281 --langs en ru` after replay and GeoIP backfill, so
+representative EN/RU routes are checked against replay-backed data without
+making ordinary PRs depend on the full Docker contour.
+
+Request/language/cache boundary checks:
+
+- `init_i18n()` must resolve language from request snapshots without mutating
+  `$_GET` or `$_REQUEST`; session/cookie persistence remains the compatibility
+  path.
+- historical page cache keys must include `current_lang()` without changing the
+  source request array; `hlstats.php` should pass an explicit request snapshot,
+  not raw `$_REQUEST`, into the cache helper.
+- `lang_url()` and the underlying URL helper must preserve unrelated query
+  parameters, drop explicitly excluded parameters, and avoid mutating their
+  input arrays.
+- `hlstats.php` may persist the selected `game` in session, but changing the
+  explicit game must clear stale `realgame` before lazy recomputation.
 
 Representative route groups:
 
@@ -213,6 +235,10 @@ Representative replay-backed routes:
 - `mode=players&game=cstrike&lang=ru`
 - `mode=playerinfo&lang=ru`
 - `status.php?lang=ru`
+
+The scripted route smoke covers the first three public routes plus
+`status.php` for both `en` and `ru`. Keep broader browser inspection for
+layout-specific or route-specific frontend work.
 
 ## Stop-and-fix rules
 

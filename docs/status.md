@@ -8,8 +8,8 @@
   for the supported narrow/default Python contour.
 - The active autonomy track is now release-readiness/product hardening:
   docs truth, repository-wide CI, package/runtime boundaries, lifecycle and
-  control-plane hardening, explicit DB modes, parity acceptance automation, and
-  PHP EN/RU stabilization.
+  control-plane hardening, explicit DB modes, parity acceptance automation,
+  PHP EN/RU stabilization, and release-readiness observability.
 - If a future parity-affecting change creates a new residual, restart from
   [`docs/parity-debug-pipeline.md`](parity-debug-pipeline.md) and
   [`docs/replay-fast-path.md`](replay-fast-path.md), then write evidence into
@@ -189,9 +189,9 @@ Current parity state:
 
 ## In Progress
 
-- [ ] Phase 8 of `docs/autonomy-work-plan-20260601.md`: stabilize PHP
-  request/lang state, cache boundaries, and replay-backed EN/RU verification
-  without a big-bang frontend rewrite.
+- [ ] Phase 9 of `docs/autonomy-work-plan-20260601.md`: add release-readiness
+  observability, benchmark/profiling guidance, deployment/config docs, and
+  artifact publishing where needed.
 
 ## Done
 
@@ -343,14 +343,27 @@ Current parity state:
   GeoIP backfill, compact DB compare, and artifact upload. `docs/test-plan.md`
   records that routine PR work no longer requires live Perl when fixture inputs
   and the accepted legacy contour are unchanged.
+- Completed Phase 8 of `docs/autonomy-work-plan-20260601.md`: PHP language
+  selection now has pure request-context helpers in `web/includes/i18n.php`.
+  `init_i18n()` resolves language from query/cookie/session snapshots without
+  mutating `$_GET` or `$_REQUEST`, while session/cookie persistence remains the
+  compatibility path. Historical page-cache keys now use an explicit GET/POST
+  request snapshot plus `i18n_historical_cache_target()`, so the active
+  language is part of the cache identity without mutating or depending on raw
+  `$_REQUEST`. `hlstats.php` also clears stale `realgame` session state when an
+  explicit `game` change arrives. Product CI runs `scripts/web_i18n_smoke.php`
+  after PHP syntax lint to pin EN/RU language priority, URL generation,
+  cache-key separation, and no-mutation behavior. The heavy nightly parity
+  workflow runs `scripts/replay_baseline/web_route_smoke.py` after replay,
+  GeoIP backfill, and DB compare to cover representative EN/RU web routes on
+  replay-backed data.
 - Frontend i18n backlog (`P6a`/`P6b`/`P6c`) remains complete for the supported
   EN/RU product contour.
 
 ## Next
 
-1. Start Phase 8: reduce PHP request/lang global-state coupling, maintain PHP
-   lint coverage, and add focused replay-backed EN/RU smoke for representative
-   routes.
+1. Start Phase 9: add runtime/release-readiness observability and profiling
+   documentation, then publish any CI artifacts needed for release handoff.
 2. Keep the stale reconnect-code fix out of scope unless fresh code or test
    evidence contradicts the current implementation.
 
