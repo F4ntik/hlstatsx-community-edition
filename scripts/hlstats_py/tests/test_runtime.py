@@ -144,6 +144,10 @@ def test_runtime_handles_control_commands_and_reload() -> None:
     asyncio.run(_run_handles_control_commands_and_reload())
 
 
+def test_runtime_rejects_direct_mutating_loopback_commands() -> None:
+    asyncio.run(_run_rejects_direct_mutating_loopback_commands())
+
+
 def test_runtime_drops_bad_proxy_key_without_response() -> None:
     asyncio.run(_run_drops_bad_proxy_key_without_response())
 
@@ -487,11 +491,45 @@ async def _run_handles_control_commands_and_reload() -> None:
             response = await _recv_text(sock)
             assert "127.0.0.1:27016 -> Inferno [csgo]" in response
 
-            sock.sendto(b"C;KILL;", address)
+            sock.sendto(b"PROXY Key=secret PROXY C;KILL;", address)
             assert await _recv_text(sock) == "OK, EXECUTING COMMAND: KILL"
             await _wait_for(runtime.shutdown_requested.is_set)
         finally:
             sock.close()
+    finally:
+        await runtime.stop()
+
+
+async def _run_rejects_direct_mutating_loopback_commands() -> None:
+    adapter = StubAdapter()
+    storage = StubStorage()
+    buffer = StringIO()
+    logger = ProxyLogger(LoggerConfig(stream=buffer))
+    server = ProxyUdpServer(logger)
+    runtime = HlstatsRuntime(adapter, server, logger, build_dispatcher(), storage)
+    await runtime.start("127.0.0.1", 0)
+
+    try:
+        address = server.address
+        assert address is not None
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.setblocking(False)
+        try:
+            sock.sendto(b"C;RELOAD;", address)
+            assert await _recv_text(sock) == "FAILED CONTROL COMMAND: RELOAD requires PROXY Key"
+            assert storage.reset_calls == 1
+
+            sock.sendto(b"C;KILL;", address)
+            assert await _recv_text(sock) == "FAILED CONTROL COMMAND: KILL requires PROXY Key"
+            assert not runtime.shutdown_requested.is_set()
+
+            sock.sendto(b"C;HEARTBEAT;", address)
+            assert await _recv_text(sock) == "Heartbeat OK"
+        finally:
+            sock.close()
+
+        assert "Rejected unauthenticated mutating control command from 127.0.0.1" in buffer.getvalue()
     finally:
         await runtime.stop()
 

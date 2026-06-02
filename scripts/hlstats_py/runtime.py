@@ -36,7 +36,7 @@ from . import (
     parse_log_event,
     parse_proxy_envelope,
 )
-from .protocol import LogEvent, LogEventType
+from .protocol import ControlCommand, ControlCommandType, LogEvent, LogEventType
 from .cli import load_settings
 from .goldsrc_physical_lines import iter_merged_goldsrc_physical_lines
 
@@ -169,6 +169,10 @@ _LOADING_MAP_INLINE_RE = re.compile(r'Loading map "(?P<map>[^"]+)"')
 _STARTED_MAP_INLINE_RE = re.compile(r'Started map "(?P<map>[^"]+)"')
 _STDIN_PROGRESS_EVERY = 10000
 _UDP_IDLE_FLUSH_SECONDS = 0.5
+_MUTATING_CONTROL_COMMANDS = {
+    ControlCommandType.RELOAD,
+    ControlCommandType.KILL,
+}
 _ROUND_WIN_ACTIONS = {
     "CTs_Win",
     "Bomb_Defused",
@@ -322,6 +326,10 @@ class HlstatsRuntime:
         if self._is_local_control_host(host):
             command = parse_control_command(payload)
             if command is not None:
+                if self._requires_authenticated_control(command):
+                    response = self._reject_unauthenticated_mutating_control(command, host, port)
+                    self._udp_server.send_text(response, datagram.address)
+                    return
                 response = self._handle_control_command(command.raw, host, port)
                 if response is not None:
                     self._udp_server.send_text(response, datagram.address)
@@ -373,6 +381,22 @@ class HlstatsRuntime:
             self.request_shutdown()
             return "OK, EXECUTING COMMAND: KILL"
         return None
+
+    @staticmethod
+    def _requires_authenticated_control(command: ControlCommand) -> bool:
+        return command.command_type in _MUTATING_CONTROL_COMMANDS
+
+    def _reject_unauthenticated_mutating_control(
+        self,
+        command: ControlCommand,
+        host: str,
+        port: int,
+    ) -> str:
+        normalized = command.raw.strip().strip(";").upper()
+        self._logger.control(
+            f"Rejected unauthenticated mutating control command from {host}:{port}: {normalized}"
+        )
+        return f"FAILED CONTROL COMMAND: {normalized} requires PROXY Key"
 
     def _reload_state(self) -> None:
         self._proxy_key = self._adapter.fetch_proxy_key()

@@ -94,6 +94,12 @@ Boundary checks:
   `scripts/lib/process_lifecycle.sh`, plus stop-path smoke tests against a
   short-lived PID-file process and a TERM-ignoring process to prove `SIGKILL`
   remains fallback-only.
+- Control-plane hardening requires targeted runtime tests for both command
+  surfaces: `hlstats_py` direct loopback `HEARTBEAT`/`SERVERLIST` stay
+  read-only, `hlstats_py` `RELOAD`/`KILL` require valid proxied `PROXY Key`,
+  `proxy_daemon_py` direct loopback `RELOAD` is rejected, proxied `RELOAD`
+  remains allowed, and unsupported `proxy_daemon_py` `C;KILL;` is rejected
+  without forwarding.
 
 ### Replay / runtime parity
 

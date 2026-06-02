@@ -188,8 +188,8 @@ Current parity state:
 
 ## In Progress
 
-- [ ] Phase 5 of `docs/autonomy-work-plan-20260601.md`: harden the real
-  control-plane surface without inventing a `proxy_daemon_py` KILL path.
+- [ ] Phase 6 of `docs/autonomy-work-plan-20260601.md`: explicitly separate
+  online strict DB mode from replay/import compatibility mode.
 
 ## Done
 
@@ -313,13 +313,22 @@ Current parity state:
   reads, and covered the runtime signal-adjacent Python slices. The selected
   proxy slice was run with `--coverage-threshold=0` because the package-level
   coverage gate is not meaningful for a tiny lifecycle-adjacent subset.
+- Completed Phase 5 of `docs/autonomy-work-plan-20260601.md`:
+  control-plane handling now separates read-only loopback commands from
+  mutating commands. `hlstats_py` still allows direct loopback `HEARTBEAT` and
+  `SERVERLIST`, but `RELOAD` and `KILL` require a valid proxied `PROXY Key`
+  envelope. `proxy_daemon_py` keeps its real command surface (`HEARTBEAT`,
+  `SERVERLIST`, `RELOAD`), rejects direct loopback `RELOAD` without a proxied
+  key, and explicitly rejects unsupported `C;KILL;` without forwarding it as a
+  game packet. Targeted control tests cover the allowed and forbidden scenarios.
 - Frontend i18n backlog (`P6a`/`P6b`/`P6c`) remains complete for the supported
   EN/RU product contour.
 
 ## Next
 
-1. Start Phase 5: inspect and harden only the real control-plane commands for
-   the proxy daemon; do not assume a KILL command exists.
+1. Start Phase 6: inventory DB mode toggles (`sql_mode`, `SET NAMES`,
+   `multi_statements`, `init_command`) and split online strict mode from
+   replay/import compatibility mode.
 2. Keep the stale reconnect-code fix out of scope unless fresh code or test
    evidence contradicts the current implementation.
 

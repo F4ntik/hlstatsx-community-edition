@@ -127,9 +127,15 @@ class ProxyDaemon:
         payload = datagram.text.strip()
 
         if self._is_local_control_host(host) and payload.startswith("C;"):
+            if self._requires_authenticated_control(payload):
+                response = self._reject_unauthenticated_mutating_control(payload, host, port)
+                self._udp_server.send_text(response, datagram.address)
+                return True
             response = await self._handle_control_payload(payload, host, port)
             if response is not None:
                 self._udp_server.send_text(response, datagram.address)
+            else:
+                self._udp_server.send_text(self._reject_unsupported_control(payload, host, port), datagram.address)
             return True
 
         proxy_command = self._parse_proxy_command(payload)
@@ -145,6 +151,12 @@ class ProxyDaemon:
 
         response = await self._handle_control_payload(command_payload.strip(), host, port)
         if response is None:
+            if command_payload.strip().startswith("C;"):
+                self._udp_server.send_text(
+                    self._reject_unsupported_control(command_payload, host, port),
+                    datagram.address,
+                )
+                return True
             return False
 
         self._udp_server.send_text(response, datagram.address)
@@ -246,6 +258,26 @@ class ProxyDaemon:
     @staticmethod
     def _is_local_control_host(host: str) -> bool:
         return host in {"127.0.0.1", "::1"}
+
+    @classmethod
+    def _requires_authenticated_control(cls, payload: str) -> bool:
+        return cls._normalize_control_payload(payload) == "RELOAD"
+
+    def _reject_unauthenticated_mutating_control(self, payload: str, host: str, port: int) -> str:
+        normalized = self._normalize_control_payload(payload)
+        self._logger.control(
+            f"Rejected unauthenticated mutating control command from {host}:{port}: {normalized}"
+        )
+        return f"FAILED CONTROL COMMAND: {normalized} requires PROXY Key\n"
+
+    def _reject_unsupported_control(self, payload: str, host: str, port: int) -> str:
+        normalized = self._normalize_control_payload(payload)
+        self._logger.control(f"Rejected unsupported control command from {host}:{port}: {normalized}")
+        return f"FAILED CONTROL COMMAND: {normalized} is not supported\n"
+
+    @staticmethod
+    def _normalize_control_payload(payload: str) -> str:
+        return payload.strip().removeprefix("C;").strip(";").upper()
 
     @staticmethod
     def _parse_proxy_command(payload: str) -> tuple[str, str] | None:

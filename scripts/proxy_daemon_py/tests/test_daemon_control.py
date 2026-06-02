@@ -57,6 +57,15 @@ class DummyHeartbeatManager:
         self.removed.append(target)
 
 
+class _RecordingUdpServer(ProxyUdpServer):
+    def __init__(self, logger: ProxyLogger) -> None:
+        super().__init__(logger)
+        self.sent_text: list[tuple[str, tuple[str, int]]] = []
+
+    def send_text(self, payload: str, address: tuple[str, int]) -> None:
+        self.sent_text.append((payload, address))
+
+
 def _make_idle_daemon() -> tuple[ProxyDaemon, StringIO, ProxyUdpServer]:
     buffer = StringIO()
     logger = ProxyLogger(LoggerConfig(stream=buffer))
@@ -179,6 +188,14 @@ def test_should_skip_payload_matches_commands() -> None:
 
 def test_proxy_daemon_reload_updates_daemon_pool() -> None:
     asyncio.run(_run_reload_updates_daemon_pool())
+
+
+def test_proxy_daemon_rejects_direct_mutating_loopback_reload() -> None:
+    asyncio.run(_run_rejects_direct_mutating_loopback_reload())
+
+
+def test_proxy_daemon_rejects_unsupported_control_without_forwarding() -> None:
+    asyncio.run(_run_rejects_unsupported_control_without_forwarding())
 
 
 async def _run_handles_local_commands() -> None:
@@ -329,42 +346,89 @@ async def _run_reload_updates_daemon_pool() -> None:
     initial_target = ProxyDaemonTarget(host="127.0.0.1", port=65001)
     db = FakeDatabaseAdapter("test", daemons=[initial_target])
     balancer = ServerBalancer()
-    server = ProxyUdpServer(logger)
+    server = _RecordingUdpServer(logger)
     config = _make_config()
 
     daemon = ProxyDaemon(config, db, balancer, heartbeat, server, logger)
-    await daemon.start()
+    daemon._proxy_key = "test"
+    daemon._reload_lock = asyncio.Lock()
+    await daemon._reload_daemons()
 
-    try:
-        address = server.address
-        assert address is not None
+    identifier_old = "127.0.0.1:65001"
+    assert identifier_old in balancer.manager.daemons
+    assignment = balancer.assign_server("1.2.3.4:27015")
+    assert assignment is not None and assignment.daemon_id == identifier_old
+    assert heartbeat.targets
 
-        identifier_old = "127.0.0.1:65001"
-        assert identifier_old in balancer.manager.daemons
-        assignment = balancer.assign_server("1.2.3.4:27015")
-        assert assignment is not None and assignment.daemon_id == identifier_old
-        assert heartbeat.started
+    db.daemons = [ProxyDaemonTarget(host="127.0.0.1", port=65002)]
 
-        db.daemons = [ProxyDaemonTarget(host="127.0.0.1", port=65002)]
+    handled = await daemon._handle_datagram(
+        InboundDatagram(
+            b"PROXY Key=test PROXY C;RELOAD;",
+            "PROXY Key=test PROXY C;RELOAD;",
+            ("127.0.0.1", 9999),
+        )
+    )
 
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.settimeout(1)
-        try:
-            sock.sendto(b"C;RELOAD;", address)
-            data, _ = await asyncio.wait_for(asyncio.to_thread(sock.recvfrom, 1024), timeout=1)
-        finally:
-            sock.close()
+    assert handled
+    assert server.sent_text == [("Reload command acknowledged\n", ("127.0.0.1", 9999))]
+    identifier_new = "127.0.0.1:65002"
+    assert identifier_new in balancer.manager.daemons
+    assert identifier_old not in balancer.manager.daemons
+    assert not balancer.assignments
+    heartbeat_ids = {getattr(target, "_identifier", None) for target in heartbeat.targets}
+    assert heartbeat_ids == {identifier_new}
 
-        assert data == b"Reload command acknowledged\n"
 
-        identifier_new = "127.0.0.1:65002"
-        assert identifier_new in balancer.manager.daemons
-        assert identifier_old not in balancer.manager.daemons
-        assert not balancer.assignments
-        heartbeat_ids = {getattr(target, "_identifier", None) for target in heartbeat.targets}
-        assert heartbeat_ids == {identifier_new}
-    finally:
-        await daemon.stop()
+async def _run_rejects_direct_mutating_loopback_reload() -> None:
+    buffer = StringIO()
+    logger = ProxyLogger(LoggerConfig(stream=buffer))
+    heartbeat = DummyHeartbeatManager()
+    db = FakeDatabaseAdapter(
+        "test",
+        daemons=[ProxyDaemonTarget(host="127.0.0.1", port=65001)],
+    )
+    balancer = ServerBalancer()
+    server = _RecordingUdpServer(logger)
+    daemon = ProxyDaemon(_make_config(), db, balancer, heartbeat, server, logger)
+    daemon._proxy_key = "test"
+    daemon._reload_lock = asyncio.Lock()
+    await daemon._reload_daemons()
+
+    assert "127.0.0.1:65001" in balancer.manager.daemons
+    db.daemons = [ProxyDaemonTarget(host="127.0.0.1", port=65002)]
+
+    handled = await daemon._handle_datagram(
+        InboundDatagram(b"C;RELOAD;", "C;RELOAD;", ("127.0.0.1", 9999))
+    )
+
+    assert handled
+    assert server.sent_text == [("FAILED CONTROL COMMAND: RELOAD requires PROXY Key\n", ("127.0.0.1", 9999))]
+    assert "127.0.0.1:65001" in balancer.manager.daemons
+    assert "127.0.0.1:65002" not in balancer.manager.daemons
+    assert "Rejected unauthenticated mutating control command from 127.0.0.1" in buffer.getvalue()
+
+
+async def _run_rejects_unsupported_control_without_forwarding() -> None:
+    daemon, buffer, server = _make_idle_daemon()
+    assert isinstance(server, ProxyUdpServer)
+
+    recording_server = _RecordingUdpServer(daemon._logger)
+    daemon._udp_server = recording_server
+    daemon._proxy_key = "test"
+
+    handled = await daemon._handle_datagram(
+        InboundDatagram(
+            b"PROXY Key=test PROXY C;KILL;",
+            "PROXY Key=test PROXY C;KILL;",
+            ("127.0.0.1", 9999),
+        )
+    )
+
+    assert handled
+    assert recording_server.sent_text == [("FAILED CONTROL COMMAND: KILL is not supported\n", ("127.0.0.1", 9999))]
+    assert daemon.game_packet_queue.empty()
+    assert "Rejected unsupported control command from 127.0.0.1" in buffer.getvalue()
 
 
 class _RecordingProtocol(asyncio.DatagramProtocol):
