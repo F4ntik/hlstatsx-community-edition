@@ -1050,7 +1050,7 @@ RewriteRule sig-(.*)-(.*).png$ sig.php?player_id=$1&background=$2 [L]</textarea>
         'show_graph.average_players_summary' => 'Среднее число игроков за 24ч: :day За 1ч: :hour',
         'sig.position' => 'Позиция ',
         'sig.of_players_with_skill' => 'из :count игроков, :skill (',
-        'sig.points_delta' => ') :points очков',
+        'sig.points_delta' => ':points) очков',
         'sig.frags_line' => 'Фраги: :kills убийств : :deaths смертей (:kpd), :headshots хедшотов (:hpk%)',
         'sig.activity_line' => 'Активность: :lastevent (:activity%), Время: :hours часов',
         'sig.statistics' => 'Статистика: ',

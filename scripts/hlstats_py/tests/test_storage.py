@@ -3250,7 +3250,8 @@ def test_reconnect_after_started_map_counts_alias_use_for_same_userid(event_cont
     storage.apply_server_map_transition(event_context.server_id, "started", "de_nuke", started_at)
 
     transition_entries = connection.executed[before_transition:]
-    assert (_UPDATE_SERVER_MAP_STARTED_QUERY, ("de_nuke", int(timegm(started_at.timetuple())), 7)) in transition_entries
+    expected_map_started = int(timegm(first_update.timestamp.timetuple()))
+    assert (_UPDATE_SERVER_MAP_STARTED_QUERY, ("de_nuke", expected_map_started, 7)) in transition_entries
     assert all(query != _UPDATE_PLAYER_NAME_QUERY for query, _params in transition_entries)
 
     storage.record(second_update, event_context)
@@ -3598,7 +3599,8 @@ def test_loading_map_removes_bot_from_legacy_live_roster() -> None:
 
 def test_apply_server_map_transition_started_query() -> None:
     connection = FakeConnection({})
-    storage = EventStorage(StubAdapter(connection))
+    wall_clock = datetime(2024, 1, 1, 0, 1, 3)
+    storage = EventStorage(StubAdapter(connection), clock=lambda: wall_clock)
     storage._server_active_players[7] = {101, 102}
     storage._server_connected_players[7] = {101, 102, 103}
     storage._server_reward_eligible_players[7] = {101, 103}
@@ -3607,9 +3609,9 @@ def test_apply_server_map_transition_started_query() -> None:
         103: datetime(2024, 1, 1, 0, 0, 30),
     }
     storage._player_teams.update({101: "CT", 102: "TERRORIST", 103: "CT"})
-    ts = datetime(2024, 1, 1, 0, 0, 31)
-    storage.apply_server_map_transition(7, "started", "de_nuke", ts)
-    expected_unix = int(timegm(ts.timetuple()))
+    event_ts = datetime(2024, 1, 1, 0, 0, 31)
+    storage.apply_server_map_transition(7, "started", "de_nuke", event_ts)
+    expected_unix = int(timegm(wall_clock.timetuple()))
     assert connection.executed == [
         (_UPDATE_SERVER_MAP_STARTED_QUERY, ("de_nuke", expected_unix, 7)),
     ]
@@ -3693,13 +3695,13 @@ def test_started_map_preserves_live_roster_activity_for_idle_prune() -> None:
     assert storage._server_player_last_activity[7] == {}
 
 
-def test_apply_server_map_transition_started_normalizes_aware_timestamp() -> None:
+def test_apply_server_map_transition_started_uses_wall_clock_for_aware_event_timestamp() -> None:
     connection = FakeConnection({})
-    storage = EventStorage(StubAdapter(connection))
-    ts = datetime(2024, 6, 15, 10, 15, 42, tzinfo=timezone.utc)
-    storage.apply_server_map_transition(3, "started", "de_dust2", ts)
-    expected_naive = datetime(2024, 6, 15, 10, 15, 42)
-    expected_unix = int(timegm(expected_naive.timetuple()))
+    wall_clock = datetime(2024, 6, 15, 10, 16, 5)
+    storage = EventStorage(StubAdapter(connection), clock=lambda: wall_clock)
+    event_ts = datetime(2024, 6, 15, 10, 15, 42, tzinfo=timezone.utc)
+    storage.apply_server_map_transition(3, "started", "de_dust2", event_ts)
+    expected_unix = int(timegm(wall_clock.timetuple()))
     assert connection.executed[-1][1] == ("de_dust2", expected_unix, 3)
 
 

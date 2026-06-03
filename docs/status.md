@@ -2,7 +2,7 @@
 
 ## Snapshot
 
-- Last updated: `2026-06-02`
+- Last updated: `2026-06-03`
 - `P6d` is no longer an active residual hunt for `Entries`, `ChangeTeam`,
   `PlayerNames`, `Players_History`, or `TeamBonuses`; those gates are closed
   for the supported narrow/default Python contour.
@@ -366,6 +366,13 @@ Current parity state:
   metrics limitation. `.github/workflows/nightly-parity.yml` now uploads a
   separate `release-readiness-artifacts` bundle for release handoff evidence
   alongside the parity audit artifact.
+- Completed player-card/runtime web parity hardening: `sig.php` now uses the
+  same EN/RU i18n bootstrap as the public web entrypoints with legacy English
+  fallback text, player-card signature preview/direct/BBCode links preserve the
+  active `lang`, `Started map` writes `hlstats_Servers.map_started` from the
+  runtime wall clock to match legacy `Played` semantics, RU player-card tabs no
+  longer rely on fixed 16/18px heights, and replay-backed web smoke now checks
+  `sig.php` as a PNG route for both EN and RU.
 - Frontend i18n backlog (`P6a`/`P6b`/`P6c`) remains complete for the supported
   EN/RU product contour.
 

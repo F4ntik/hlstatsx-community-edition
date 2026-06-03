@@ -801,8 +801,7 @@ class EventStorage:
                 self._refresh_server_player_totals(connection, server_id)
             return
         if phase == "started":
-            normalized = self._normalize_timestamp(event_timestamp)
-            started_unix = int(timegm(normalized.timetuple()))
+            started_unix = int(timegm(self._map_lifecycle_timestamp().timetuple()))
             self._execute(
                 connection,
                 _UPDATE_SERVER_MAP_STARTED_QUERY,
@@ -3508,6 +3507,9 @@ class EventStorage:
     def _connection_time_flush_timestamp(self) -> datetime:
         if self._use_event_timestamps_for_processing and self._last_recorded_event_timestamp is not None:
             return self._last_recorded_event_timestamp
+        return self._normalize_timestamp(self._clock())
+
+    def _map_lifecycle_timestamp(self) -> datetime:
         return self._normalize_timestamp(self._clock())
 
     # ------------------------------------------------------------------

@@ -668,14 +668,15 @@ For support and installation notes visit http://www.hlxcommunity.com
 					<td style="text-align:center;">
 						<br /><br />
 						<?php
+							$signatureLang = rawurlencode(current_lang());
 							if ($g_options['modrewrite'] == 0)
 							{
-								$imglink = $siteurlneo.'sig.php?player_id='.$player.'&amp;background='.$g_options['sigbackground'];
-								$jimglink = $siteurlneo.'sig.php?player_id='.$player.'&background='.$g_options['sigbackground'];
+								$imglink = $siteurlneo.'sig.php?player_id='.$player.'&amp;background='.$g_options['sigbackground'].'&amp;lang='.$signatureLang;
+								$jimglink = $siteurlneo.'sig.php?player_id='.$player.'&background='.$g_options['sigbackground'].'&lang='.$signatureLang;
 							}
 							else
 							{
-								$imglink = $siteurlneo.'sig-'.$player.'-'.$g_options['sigbackground'].'.png';
+								$imglink = $siteurlneo.'sig-'.$player.'-'.$g_options['sigbackground'].'.png?lang='.$signatureLang;
 								$jimglink = $imglink;
 							}
 							
@@ -684,6 +685,8 @@ For support and installation notes visit http://www.hlxcommunity.com
 							$script_path .= $_SERVER['HTTP_HOST'];
 							$script_path .= str_replace('\\','/',dirname($_SERVER['PHP_SELF']));
 							$script_path = preg_replace('/\/$/','',$script_path);
+							$playerInfoLink = "$script_path/hlstats.php?mode=playerinfo&player=$player&lang=$signatureLang";
+							$playerInfoLinkHtml = "$script_path/hlstats.php?mode=playerinfo&amp;player=$player&amp;lang=$signatureLang";
 						?>
 						<br /><br />
 						<script type="text/javascript">
@@ -694,13 +697,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 								switch(val)
 								{
 									case 0:
-										<?php echo "txtArea.value = '$jimglink'\n"; ?>
+										<?php echo "txtArea.value = " . json_encode($jimglink) . ";\n"; ?>
 										break;	
 									case 1:
-										<?php echo "txtArea.value = '[url=$script_path/hlstats.php?mode=playerinfo&player=$player"."][img]$jimglink"."[/img][/url]'\n"; ?>
+										<?php echo "txtArea.value = " . json_encode("[url=$playerInfoLink][img]$jimglink[/img][/url]") . ";\n"; ?>
 										break;
 									case 2:
-										<?php echo "txtArea.value = '[url=\"$script_path/hlstats.php?mode=playerinfo&player=$player\"][img]$jimglink"."[/img][/url]'\n"; ?>
+										<?php echo "txtArea.value = " . json_encode("[url=\"$playerInfoLink\"][img]$jimglink[/img][/url]") . ";\n"; ?>
 										break;
 								}
 							}
@@ -709,7 +712,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 						<a href="" onclick="setForumText(1);return false">
 							<?php echo eHtml(t('literal.bbcode_1')); ?></a>&nbsp;|&nbsp;<a href="" onclick="setForumText(2);return false"><?php echo eHtml(t('literal.bbcode_2')); ?></a>&nbsp;|&nbsp;<a href="" onclick="setForumText(0);return false"><?php echo eHtml(t('literal.direct_image')); ?>
 						</a>
-						<?php echo '<textarea style="width: 95%; height: 50px;" rows="2" cols="70" id="siglink" readonly="readonly" onclick="document.getElementById(\'siglink\').select();">[url='."$script_path/hlstats.php?mode=playerinfo&amp;player=$player"."][img]$imglink".'[/img][/url]</textarea>'; ?>
+						<?php echo '<textarea style="width: 95%; height: 50px;" rows="2" cols="70" id="siglink" readonly="readonly" onclick="document.getElementById(\'siglink\').select();">[url='.$playerInfoLinkHtml."][img]$imglink".'[/img][/url]</textarea>'; ?>
 					</td>
 				</tr>
 			</table>

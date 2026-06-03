@@ -264,11 +264,14 @@ Representative replay-backed routes:
 - `mode=servers&server_id=2&game=cstrike&lang=ru`
 - `mode=players&game=cstrike&lang=ru`
 - `mode=playerinfo&lang=ru`
+- `sig.php?player_id=<known>&lang=ru`
 - `status.php?lang=ru`
 
 The scripted route smoke covers the first three public routes plus
-`status.php` for both `en` and `ru`. Keep broader browser inspection for
-layout-specific or route-specific frontend work.
+`status.php` and `sig.php?player_id=<known>` for both `en` and `ru`; use
+`--sig-player-id` when the replay fixture's known player anchor differs from
+the default. Keep broader browser inspection for layout-specific or
+route-specific frontend work.
 
 ## Stop-and-fix rules
 
