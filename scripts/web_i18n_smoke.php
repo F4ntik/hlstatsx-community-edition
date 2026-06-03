@@ -1,0 +1,63 @@
+<?php
+
+declare(strict_types=1);
+
+define('IN_HLSTATS', true);
+define('ROOT_PATH', dirname(__DIR__) . '/web');
+
+require ROOT_PATH . '/includes/i18n.php';
+
+function assert_same($expected, $actual, string $message): void
+{
+    if ($expected !== $actual) {
+        fwrite(STDERR, $message . PHP_EOL);
+        fwrite(STDERR, 'Expected: ' . var_export($expected, true) . PHP_EOL);
+        fwrite(STDERR, 'Actual: ' . var_export($actual, true) . PHP_EOL);
+        exit(1);
+    }
+}
+
+$available = array(
+    'en' => array('code' => 'en', 'label' => 'English'),
+    'ru' => array('code' => 'ru', 'label' => 'Russian'),
+);
+
+assert_same('ru', i18n_normalize_lang(' RU '), 'language normalization lowercases valid codes');
+assert_same('', i18n_normalize_lang('../ru'), 'language normalization rejects path-ish input');
+assert_same('', i18n_normalize_lang('ru.php'), 'language normalization rejects punctuation');
+
+assert_same(
+    'ru',
+    i18n_resolve_request_lang(array('lang' => 'ru'), array('lang' => 'en'), array('lang' => 'en'), $available),
+    'GET lang should win over cookie and session'
+);
+assert_same(
+    'ru',
+    i18n_resolve_request_lang(array('lang' => '../ru'), array('lang' => 'ru'), array('lang' => 'en'), $available),
+    'invalid GET lang should fall back to cookie'
+);
+assert_same(
+    'ru',
+    i18n_resolve_request_lang(array('lang' => 'ru.php'), array('lang' => 'missing'), array('lang' => 'ru'), $available),
+    'invalid GET and cookie langs should fall back to session'
+);
+assert_same(
+    'en',
+    i18n_resolve_request_lang(array('lang' => '../ru'), array('lang' => 'missing'), array('lang' => 'also-missing'), $available),
+    'invalid request languages should fall back to default'
+);
+
+$params = array('mode' => 'players', 'game' => 'cstrike', 'lang' => 'en', 'logout' => '1');
+$url = i18n_build_lang_url('ru', $params, 'hlstats.php', array('logout'));
+assert_same('hlstats.php?mode=players&game=cstrike&lang=ru', $url, 'lang URL should preserve params and exclude logout');
+assert_same('en', $params['lang'], 'lang URL should not mutate source params');
+assert_same('1', $params['logout'], 'lang URL should not mutate excluded source params');
+
+$request = array('mode' => 'players', 'game' => 'cstrike', 'lang' => 'en');
+$enCache = i18n_historical_cache_target($request, 'en');
+$ruCache = i18n_historical_cache_target($request, 'ru');
+assert_same(true, $enCache['key'] !== $ruCache['key'], 'historical cache key should include language');
+assert_same(true, $enCache['path'] !== $ruCache['path'], 'historical cache path should include language');
+assert_same('en', $request['lang'], 'historical cache helper should not mutate source request');
+
+echo "web i18n smoke ok\n";

@@ -1,0 +1,35 @@
+Found logical replay differences in 4 table(s).
+
+hlstats_Events_TeamBonuses:
+  absent from compare_stats_dbs.py output
+  direct stable-key SQL: legacy=4753, python=4753
+  legacy-only stable keys: 0
+  python-only stable keys: 0
+
+hlstats_Players:
+  legacy rows: 323
+  python rows: 323
+  legacy-only normalized rows: 250
+  python-only normalized rows: 250
+  dominant visible difference: legacy GeoIP country/flag values vs empty Python country/flag values, with remaining player stat drift to triage after GeoIP separation.
+
+hlstats_PlayerNames:
+  legacy rows: 415
+  python rows: 416
+  legacy-only normalized rows: 2
+  python-only normalized rows: 3
+  visible examples: Dim$0n / Player21 attribution and Python-only unnamed alias for XYU.
+
+hlstats_Players_History:
+  legacy rows: 659
+  python rows: 659
+  legacy-only normalized rows: 50
+  python-only normalized rows: 50
+  visible examples: kill_streak/death_streak attribution differences across daily history rows.
+
+hlstats_Events_Entries:
+  legacy rows: 0
+  python rows: 1017
+  legacy-only normalized rows: 0
+  python-only normalized rows: 1017
+  status: accepted visible policy difference unless the acceptance policy changes.

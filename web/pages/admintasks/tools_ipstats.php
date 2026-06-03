@@ -37,11 +37,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+die(localized_direct_access_message());
     }
 
 	if ($auth->userdata["acclevel"] < 80) {
-        die ("Access denied!");
+        die(localized_access_denied_message());
 	}
 ?>
 
@@ -56,7 +56,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 		echo "</a>";
 	}
 
-?></b> (Last <?php echo $g_options["DeleteDays"]; ?> Days)<?php
+?></b> <?php echo eHtml(t('admin.last_days', array('days' => $g_options["DeleteDays"]))); ?><?php
     if (isset($_GET['hostgroup']))
 	{
 ?><br>
@@ -76,17 +76,17 @@ For support and installation notes visit http://www.hlxcommunity.com
 			array(
 				new TableColumn(
 					"host",
-					"Host",
+					t('literal.host'),
 					"width=41"
 				),
 				new TableColumn(
 					"freq",
-					"Connects",
+					t('literal.connects'),
 					"width=12&align=right"
 				),
 				new TableColumn(
 					"percent",
-					"Percentage of Connects",
+					t('literal.percentage_of_connects'),
 					"width=30&sort=no&type=bargraph"
 				),
 				new TableColumn(
@@ -102,7 +102,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			50				// numperpage
 		);
 		
-		if ($hostgroup == "(Unresolved IP Addresses)")
+		if ($hostgroup == t('admin.task.tools_ipstats.unresolved_ip_addresses'))
 			$hostgroup = "";
 		
 		$result = $db->query("
@@ -143,17 +143,17 @@ For support and installation notes visit http://www.hlxcommunity.com
 			array(
 				new TableColumn(
 					"hostgroup",
-					"Host",
+					t('literal.host'),
 					"width=41&icon=server&link=" . urlencode("mode=admin&task=tools_ipstats&hostgroup=%k")
 				),
 				new TableColumn(
 					"freq",
-					"Connects",
+					t('literal.connects'),
 					"width=12&align=right"
 				),
 				new TableColumn(
 					"percent",
-					"Percentage of Connects",
+					t('literal.percentage_of_connects'),
 					"width=30&sort=no&type=bargraph"
 				),
 				new TableColumn(
@@ -181,7 +181,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 		
 		$result = $db->query("
 			SELECT
-				IF(hostgroup='', '(Unresolved IP Addresses)', hostgroup) AS hostgroup,
+				IF(hostgroup='', '" . $db->escape(t('admin.task.tools_ipstats.unresolved_ip_addresses')) . "', hostgroup) AS hostgroup,
 				COUNT(hostgroup) AS freq,
 				(COUNT(hostgroup) / $totalconnects) * 100 AS percent
 			FROM

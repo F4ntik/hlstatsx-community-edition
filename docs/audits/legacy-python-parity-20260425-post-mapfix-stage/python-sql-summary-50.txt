@@ -1,0 +1,56 @@
+﻿stack=python
+container=hlstatsx-python-db
+timestamp=2026-04-25T09:56:25
+
+[counts]
+players=129
+frags=3251
+frags_empty_map=0
+maps_counts_rows=26
+awards_rows=0
+ribbons_rows=0
+
+[event_time_range]
+frags_minmax=2024-01-01 19:02:46|2026-01-01 23:18:09
+
+[top_frag_maps]
+$2000$	873
+de_dust2	577
+aim_map	540
+cs_mansion	393
+aim_ulbc_picolo	391
+de_mirage	151
+de_spay	61
+de_nuke_winter	55
+cs_deathmatch	44
+de_inferno	39
+de_jeepathon2k	37
+fy_pool_day	34
+de_dust	22
+de_nuke	15
+cs_assault	9
+de_tuscan	6
+cs_militia	3
+cs_assault_1337	1
+
+[top_maps_counts]
+$2000$	873
+de_dust2	577
+aim_map	540
+cs_mansion	393
+aim_ulbc_picolo	391
+de_mirage	151
+de_spay	61
+de_nuke_winter	55
+cs_deathmatch	44
+de_inferno	39
+de_jeepathon2k	37
+fy_pool_day	34
+de_dust	22
+de_nuke	15
+cs_assault	9
+de_tuscan	6
+cs_militia	3
+cs_assault_1337	1
+de_train_2x2	0
+de_train	0

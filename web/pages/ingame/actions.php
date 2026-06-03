@@ -37,7 +37,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
 	if (!defined('IN_HLSTATS')) {
-		die('Do not access this file directly.');
+		die(localized_direct_access_message());
 	}
 	
 	// Action Statistics
@@ -46,7 +46,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	$uniqueid  = valid_request(strval($_GET['uniqueid']), false);
 
 	$db->query("SELECT name FROM hlstats_Games WHERE code='$game'");
-	if ($db->num_rows() < 1) error("No such game '$game'.");
+	if ($db->num_rows() < 1) error(localized_no_such_game_message($game));
 	
 	list($gamename) = $db->fetch_row();
 	$db->free_result();

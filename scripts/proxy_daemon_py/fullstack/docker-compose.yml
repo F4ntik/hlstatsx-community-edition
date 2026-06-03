@@ -1,0 +1,58 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: hlstatsx-python-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: hlstatsx
+      MYSQL_USER: hlstats
+      MYSQL_PASSWORD: hlstats
+    ports:
+      - "33080:3306"
+    volumes:
+      - ../../../sql/install.sql:/docker-entrypoint-initdb.d/00_install.sql:ro
+      - ../sql/02_set_hlstats_auth_plugin.sh:/docker-entrypoint-initdb.d/00b_set_hlstats_auth_plugin.sh:ro
+      - ./mysql/01_create_proxy_daemons.sql:/docker-entrypoint-initdb.d/01_create_proxy_daemons.sql:ro
+      - ./mysql/02_seed_runtime.sql:/docker-entrypoint-initdb.d/02_seed_runtime.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  proxy-daemon:
+    build:
+      context: ../../..
+      dockerfile: scripts/proxy_daemon_py/fullstack/Dockerfile.proxy
+    container_name: hlstatsx-python-proxy
+    depends_on:
+      mysql:
+        condition: service_healthy
+      hlstats-worker:
+        condition: service_started
+    ports:
+      - "27500:27500/udp"
+    restart: unless-stopped
+
+  hlstats-worker:
+    build:
+      context: ../../..
+      dockerfile: scripts/proxy_daemon_py/fullstack/Dockerfile.worker
+    container_name: hlstatsx-python-worker
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ../../..
+      dockerfile: scripts/proxy_daemon_py/fullstack/Dockerfile.web
+    container_name: hlstatsx-python-web
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    restart: unless-stopped

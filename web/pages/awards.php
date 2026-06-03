@@ -73,8 +73,8 @@
     }
 
     pageHeader(
-            array($gameName, 'Awards Info'),
-            array($gameName => "%s?game=$game", 'Awards Info' => '')
+            array($gameName, t('literal.awards_info')),
+            array($gameName => "%s?game=$game", t('literal.awards_info') => '')
     );
 
     $defaultTab = 'daily';
@@ -89,16 +89,16 @@
         <div id="main">
             <ul class="subsection_tabs" id="tabs_submenu">
                 <li>
-                    <a href="#" id="tab_daily">Daily&nbsp;Awards</a>
+                    <a href="#" id="tab_daily"><?php echo eHtml(t('literal.daily_awards')); ?></a>
                 </li>
                 <li>
-                    <a href="#" id="tab_global">Global&nbsp;Awards</a>
+                    <a href="#" id="tab_global"><?php echo eHtml(t('literal.global_awards')); ?></a>
                 </li>
                 <li>
-                    <a href="#" id="tab_ranks">Ranks</a>
+                    <a href="#" id="tab_ranks"><?php echo eHtml(t('literal.ranks')); ?></a>
                 </li>
                 <li>
-                    <a href="#" id="tab_ribbons">Ribbons</a>
+                    <a href="#" id="tab_ribbons"><?php echo eHtml(t('literal.ribbons')); ?></a>
                 </li>
             </ul>
             <br>

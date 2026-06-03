@@ -1,0 +1,5 @@
+ftp_work/*
+!ftp_work/.gitkeep
+
+# Local override for FTP bind-mount path (may contain machine-specific paths)
+env.ftp-logs

@@ -20,17 +20,17 @@
         ");
   
 	if ($db->num_rows($result) >= 1) {
-		printSectionTitle('Voice Server');
+		printSectionTitle(t('literal.voice_server'));
 ?>
 	<div class="subblock">
 		<table class="data-table">
 			<tr class="data-table-head">
-				<td class="fSmall">Server Name</td>
-				<td class="fSmall">Server Address</td>
-				<td class="fSmall">Password</td>
-				<td class="fSmall" style="text-align:right;">Channels</td>
-				<td class="fSmall" style="text-align:right;">Slots&nbsp;used</td>
-				<td class="fSmall">Notes</td>
+				<td class="fSmall"><?php echo eHtml(t('voice.server_name')); ?></td>
+				<td class="fSmall"><?php echo eHtml(t('voice.server_address')); ?></td>
+				<td class="fSmall"><?php echo eHtml(t('voice.password')); ?></td>
+				<td class="fSmall" style="text-align:right;"><?php echo eHtml(t('voice.channels')); ?></td>
+				<td class="fSmall" style="text-align:right;"><?php echo eHtml(t('voice.slots_used')); ?></td>
+				<td class="fSmall"><?php echo eHtml(t('voice.notes')); ?></td>
 			</tr> 
 <?php
 		$i = 0;

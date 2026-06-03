@@ -74,16 +74,16 @@ For support and installation notes visit http://www.hlxcommunity.com
 	
 	$db->query("SELECT name FROM hlstats_Games WHERE code='{$game_escaped}'");
 	if ($db->num_rows() != 1)
-		error('Invalid or no game specified.');
+error(t('literal.invalid_game'));
 	else
 		list($gamename) = $db->fetch_row();
 		
 	pageHeader(
-		array($gamename, 'Action Details', $act_name),
+		array($gamename, t('literal.action_details'), $act_name),
 		array(
 			$gamename=>$g_options['scripturl'] . "?game=$game",
-			'Action Statistics'=>$g_options['scripturl'] . "?mode=actions&game=$game",
-			'Action Details'=>''
+			t('literal.action_statistics')=>$g_options['scripturl'] . "?mode=actions&game=$game",
+			t('literal.action_details')=>''
 		),
 		$act_name
 	);
@@ -93,17 +93,17 @@ For support and installation notes visit http://www.hlxcommunity.com
 		array(
 			new TableColumn(
 				'playerName',
-				'Player',
+				t('literal.player'),
 				'width=45&align=left&flag=1&link=' . urlencode('mode=playerinfo&amp;player=%k') 
 			),
 			new TableColumn(
 				'obj_count',
-				'Achieved',
+				t('literal.achieved'),
 				'width=25&align=right'
 			),
 			new TableColumn(
 				'obj_bonus',
-				'Skill Bonus Total',
+				t('literal.skill_bonus_total'),
 				'width=25&align=right&sort=no'
 			)
 		),
@@ -237,14 +237,14 @@ For support and installation notes visit http://www.hlxcommunity.com
 	}
 ?>
 <div class="block">
-	<?php printSectionTitle('Action Details'); ?>
+	<?php printSectionTitle(t('literal.action_details')); ?>
 
 	<div class="subblock">
 		<div style="float:left;">
-			<strong><?php echo $act_name; ?></strong> from a total of <strong><?php echo number_format(intval($totalact)); ?></strong> achievements (Last <?php echo $g_options['DeleteDays']; ?> Days)
+			<strong><?php echo eHtml($act_name); ?></strong> <?php echo t('literal.from_total_achievements_last_days', array('total' => number_format(intval($totalact)), 'days' => $g_options['DeleteDays'])); ?>
 		</div>
 		<div style="float:right;">
-			Back to <a href="<?php echo $g_options['scripturl'] . "?mode=actions&amp;game=$game"; ?>">Action Statistics</a>
+			<?php echo eHtml(t('literal.back_to')); ?> <a href="<?php echo $g_options['scripturl'] . "?mode=actions&amp;game=$game"; ?>"><?php echo eHtml(t('literal.action_statistics')); ?></a>
 		</div>
 	</div>
 	<div style="clear:both;padding:2px;"></div>
@@ -258,17 +258,17 @@ For support and installation notes visit http://www.hlxcommunity.com
 		array(
 			new TableColumn(
 				'playerName',
-				'Player',
+				t('literal.player'),
 				'width=45&align=left&flag=1&link=' . urlencode('mode=playerinfo&amp;player=%k') 
 			),
 			new TableColumn(
 				'obj_count',
-				'Times Victimized',
+				t('literal.times_victimized'),
 				'width=25&align=right'
 			),
 			new TableColumn(
 				'obj_bonus',
-				'Skill Bonus Total',
+				t('literal.skill_bonus_total'),
 				'width=25&align=right&sort=no'
 			)
 		),
@@ -320,10 +320,10 @@ For support and installation notes visit http://www.hlxcommunity.com
 		list($numitems, $totalact) = $db->fetch_row($resultCount);
 ?>
 <div class="block">
-	<a name="victims"><?php printSectionTitle("Action Victim Details"); ?></a>
+	<a name="victims"><?php printSectionTitle(t('literal.action_victim_details')); ?></a>
 	<div class="subblock">
 		<div style="float:left;">
-			<strong>Victims of <?php echo $act_name; ?></strong> (Last <?php echo $g_options['DeleteDays']; ?> Days)
+			<?php echo t('literal.victims_of_last_days', array('item' => eHtml($act_name), 'days' => $g_options['DeleteDays'])); ?>
 		</div>
 	</div>
 	<div style="clear:both;padding:2px;"></div>

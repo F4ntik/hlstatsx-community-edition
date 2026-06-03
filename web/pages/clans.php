@@ -52,7 +52,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	");
 
 	if ($db->num_rows() < 1) {
-        error("No such game '$game'.");
+	error(localized_no_such_game_message($game));
 	}
 
     list($gamename) = $db->fetch_row();
@@ -66,8 +66,8 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 	pageHeader
 	(
-		array ($gamename, 'Clan Rankings'),
-		array ($gamename=>"%s?game=$game", 'Clan Rankings' => '')
+		array($gamename, t('literal.clan_rankings')),
+		array($gamename => "%s?game=$game", t('literal.clan_rankings') => '')
 	);
 
 	$table = new Table
@@ -83,13 +83,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'tag',
-				'Tag',
+				t('literal.tag'),
 				'width=15&align=center'
 			),
 			new TableColumn
 			(
 				'skill',
-				'Avg. Points',
+				t('literal.avg_points'),
 				'width=8&align=right&skill_change=1'
 			),
 			new TableColumn
@@ -193,16 +193,16 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 
 <div class="block">
-	<?php printSectionTitle('Clan Rankings');	?>
+	<?php printSectionTitle(t('literal.clan_rankings'));	?>
 	<div class="subblock">
 		<div style="float:left;">
 			<form method="get" action="<?php echo $g_options['scripturl']; ?>">
 				<input type="hidden" name="mode" value="search" />
 				<input type="hidden" name="game" value="<?php echo $game; ?>" />
 				<input type="hidden" name="st" value="clan" />
-				<strong>&#8226;</strong> Find a clan:
+				<strong>&#8226;</strong> <?php echo eHtml(t('clans.find_clan')); ?>:
 				<input type="text" name="q" size="20" maxlength="64" class="textbox" />
-				<input type="submit" value="Search" class="smallsubmit" />
+				<input type="submit" value="<?php echo eHtml(t('ui.search')); ?>" class="smallsubmit" />
 			</form>
 		</div>
 		<div style="clear:both;"></div>
@@ -233,13 +233,18 @@ For support and installation notes visit http://www.hlxcommunity.com
 						}
 					}
 				?>
-				<strong>&#8226;</strong> Show only clans with
-					<input type="text" name="minmembers" size="4" maxlength="2" value="<?php echo $minmembers; ?>" class="textbox" /> or more members from a total of <strong><?php echo number_format($total_clans); ?></strong> clans
-					<input type="submit" value="Apply" class="smallsubmit" />
+				<strong>&#8226;</strong>
+				<?php
+					echo t('clans.min_members_filter', array(
+						'input' => '<input type="text" name="minmembers" size="4" maxlength="2" value="' . eHtml($minmembers) . '" class="textbox" />',
+						'total' => number_format($total_clans),
+					));
+				?>
+					<input type="submit" value="<?php echo eHtml(t('ui.apply')); ?>" class="smallsubmit" />
 			</form>
 		</div>
 		<div style="float:right;">
-			Go to: <a href="<?php echo $g_options["scripturl"] . "?mode=players&amp;game=$game"; ?>">Player Rankings</a>
+			<?php echo eHtml(t('literal.go_to')); ?>: <a href="<?php echo $g_options["scripturl"] . "?mode=players&amp;game=$game"; ?>"><?php echo eHtml(t('literal.player_rankings')); ?></a>
 		</div>
 	</div>
 </div>

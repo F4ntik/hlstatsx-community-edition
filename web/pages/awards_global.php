@@ -63,7 +63,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 
 <div class="block">
-	<?php printSectionTitle('Global Awards'); ?>
+	<?php printSectionTitle(t('awards.global_title')); ?>
 	<div class="subblock">
 		<table class="data-table">
 <?php
@@ -109,7 +109,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			$achvd = "{$imagestring} <a href=\"hlstats.php?mode=playerinfo&amp;player={$r['g_winner_id']}&amp;game={$game}\">{$winnerstring}</a>";
 			$wincount = $r['g_winner_count'];			
 		} else {
-			$achvd = "<em>No Award Winner</em>";
+			$achvd = '<em>' . eHtml(t('awards.no_winner')) . '</em>';
 			$wincount= "0";
 		}			
    

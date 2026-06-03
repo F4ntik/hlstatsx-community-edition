@@ -1,29 +1,80 @@
-## HLstatsX Community Edition
+# HLstatsX Community Edition: Python + i18n
 
-### 📌 Requirements
+This repository is the standalone product lane for HLstatsX Community Edition
+with:
 
-- **PHP:** version 7.4 or higher required (recommended 8.0 – 8.4).
-- **MySQL / MariaDB:** version 5.7 or higher required (recommended 8.0).
----
-HLstatsX Community Edition is an open-source project licensed
-under GNU General Public License v2 and is a real-time stats
-and ranking for Source engine based games. HLstatsX Community
-Edition uses a Perl daemon to parse the log streamed from the
-game server. The data is stored in a MySQL Database and has
-a PHP frontend.
+- Python as the default runtime path for log ingestion and operational tooling
+- PHP as the web frontend
+- explicit multilingual frontend support with English and Russian catalogs
 
+The intended production topology is:
 
-#### :loudspeaker: Important changes
-| Date  | Description | Additional information |
-| ------------- | ------------- | ------------- |
-| 07.01.2020  | [#45](https://github.com/NomisCZ/hlstatsx-community-edition/issues/45) GeoIP2 Linux script updated, GeoLite2 MaxMind database (GDPR and CCPA) | https://blog.maxmind.com/2019/12/18/significant-changes-to-accessing-and-using-geolite2-databases/ |
+`game server -> proxy_daemon_py -> hlstats_py -> MySQL -> PHP web`
 
-> Date format: DD.MM.YYYY
----
+This release line is published as `hlstatsx_py`. Perl runtime scripts are no
+longer shipped in the production path; legacy behavior is retained through the
+external replay/parity reference layer and sibling donor checkout, not as local
+runtime entrypoints.
 
-### :book: Documentation
-* https://github.com/NomisCZ/hlstatsx-community-edition/wiki 🚧 Wiki - work in progress 🚧
-### :speech_balloon: Help
-*  https://forums.alliedmods.net/forumdisplay.php?f=156
----
+## Repository role
 
+**Where we work:** day-to-day implementation, tests, and product documentation
+live **in this repository** (`hlstatsx-community-edition-python-i18n`). Treat
+sibling checkouts in the same workspace as **read-only reference** (parity,
+legacy semantics, donor web i18n) unless a task explicitly says to change them.
+
+This repo is intentionally separate from the two donor lanes used to assemble
+it:
+
+- `hlstatsx-community-edition/` — reference for migration, replay baseline, and
+  legacy behavior (do not use as the default target for new product commits).
+- `hlstatsx-community-edition-web-ru-i18n/` — reference for upstream-friendly RU
+  web i18n patterns.
+
+The product repo integrates those two lines without forcing either donor lane
+to become the final product branch.
+
+**Fast bulk log replay** (stdin batch / direct import, not slow UDP line relay):
+see [`docs/replay-fast-path.md`](docs/replay-fast-path.md).
+
+### Git: `hlstatsx_py` release line
+
+The final Python+i18n product is released from `main` under the
+`hlstatsx_py` label. The Python import path remains `hlstats_py`; the release
+label is not an import-path rename.
+
+## Product contracts
+
+- Default runtime:
+  - `scripts/run_proxy_py`
+  - `scripts/run_hlstats_py`
+  - `python -m hlstats_py.runtime`
+- Frontend i18n:
+  - language selection is explicit
+  - `lang=en|ru`
+  - fallback order is `GET -> cookie -> session -> en`
+  - frontend copy is rendered through direct dictionary-backed lookups instead
+    of whole-document post-processing
+- Locale scope for v1:
+  - English and Russian are first-class supported locales
+  - the runtime and dictionaries should stay extensible for additional locales
+
+## Key docs
+
+- Product plan: `docs/plans.md`
+- Product status: `docs/status.md`
+- Product validation plan: `docs/test-plan.md`
+- Python migration details: `docs/proxy_daemon_python_migration.md`
+- Imported RU i18n donor context: `docs/web_frontend_i18n_plan.md`
+
+## Current state
+
+- Python replay parity is already documented and integrated from the migration
+  donor lane.
+- Explicit RU web i18n runtime cleanup and broad page coverage are integrated
+  from the RU donor lane.
+- The remaining work is product hardening:
+  - finish exact Python `--stdin` boundaries
+  - keep Python maintenance utilities release-ready
+  - run targeted product validation on the integrated Python+i18n stack
+  - prepare release-ready docs and handoff

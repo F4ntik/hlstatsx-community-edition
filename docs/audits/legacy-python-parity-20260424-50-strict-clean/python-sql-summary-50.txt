@@ -1,0 +1,6 @@
+﻿m	v
+players	109
+frags	851
+actions_events	1339
+maps_counts	26
+bot_unique_ids	105

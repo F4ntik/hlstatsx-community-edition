@@ -1,8 +1,8 @@
 <?php
 
 	pageHeader(
-		array('Ventrilo viewer'),
-		array('Ventrilo viewer'=>'')
+		array(t('ventrilo.viewer')),
+		array(t('ventrilo.viewer')=>'')
 	);
 
 	require_once(PAGE_PATH . '/ventrilostatus.php');
@@ -137,13 +137,13 @@ function show($tpl, $array)
 {
     $template = PAGE_PATH."/templates/ventrilo/".$tpl;
   
-    if($fp = @fopen($template.".".html, "r"))
+    if($fp = @fopen($template . '.html', "r"))
 	{
-		$tpl = @fread($fp, filesize($template.".".html));
+		$tpl = @fread($fp, filesize($template . '.html'));
 	}
 	else
 	{
-		die('no template');
+		die(localized_template_missing_message($template . '.html'));
 	}
     
     foreach($array as $value => $code)
@@ -160,7 +160,7 @@ function show($tpl, $array)
     $uip 	= $s['addr'];
     $port 	= $s['queryPort'];
 	$password = $s['password'];
-	if (strlen($password < 1)){
+	if (strlen($password) < 1){
 		$password = '';
 	}
 
@@ -174,8 +174,11 @@ function show($tpl, $array)
 	
 	if ( $rc )
 	{
-		error("No Ventrilo", 1);
-		echo "CVentriloStatus->Request() failed. <strong>$stat->m_error</strong><br><br>\n";
+		error(localized_text(
+			'error.ventrilo_request_failed',
+			'Ventrilo status request failed: :error',
+			array('error' => $stat->m_error)
+		));
 	}
 	else
 	{
@@ -194,22 +197,22 @@ function show($tpl, $array)
 		"os" => $os,
 		"uptime" => time_convert($uptime),
 		"user" => $user,
-		"t_name" => "Server name",
-		"t_os" => "Operating system",
+		"t_name" => t('voice.server_name'),
+		"t_os" => t('voice.operating_system'),
 		"uchannels" => $chan,
 		"info" => $info,
-		"t_uptime" => "Uptime",
-		"t_channels" => "Channels",
-		"t_user" => "Users",
-		"head" => "Ventrilo Overview",
-		"users_head" => "User Information",
-		"player" => "User",
-		"channel" => "Channel",
-		"channel_head" => "Channel Information",
+		"t_uptime" => t('voice.uptime'),
+		"t_channels" => t('voice.channels'),
+		"t_user" => t('voice.users'),
+		"head" => t('voice.ventrilo_overview'),
+		"users_head" => t('voice.user_information'),
+		"player" => t('voice.user'),
+		"channel" => t('voice.channel'),
+		"channel_head" => t('voice.channel_information'),
 		"max" => $max,
 		"channels" => $cAmount,
-		"logintime" => "Login time",
-		"idletime" => "Idle time",
+		"logintime" => t('voice.login_time'),
+		"idletime" => t('voice.idle_time'),
 		"channelstats" => $channelstats,
 		"userstats" => $userstats
 	));

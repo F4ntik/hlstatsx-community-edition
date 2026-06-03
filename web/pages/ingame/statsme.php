@@ -4,7 +4,7 @@ HLstatsX Community Edition - Real-time player and clan rankings and statistics
 Copyleft (L) 2008-20XX Nicholas Hastings (nshastings@gmail.com)
 http://www.hlxcommunity.com
 
-HLstatsX Community Edition is a continuation of 
+HLstatsX Community Edition is a continuation of
 ELstatsNEO - Real-time player and clan rankings and statistics
 Copyleft (L) 2008-20XX Malte Bayer (steam@neo-soft.org)
 http://ovrsized.neo-soft.org/
@@ -18,7 +18,7 @@ HLstatsX is an enhanced version of HLstats made by Simon Garner
 HLstats - Real-time player and clan rankings and statistics for Half-Life
 http://sourceforge.net/projects/hlstats/
 Copyright (C) 2001  Simon Garner
-            
+
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
 as published by the Free Software Foundation; either version 2
@@ -38,7 +38,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 
     // Player Details
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+        die(localized_direct_access_message());
     }
 
     $container = require ROOT_PATH . '/bootstrap.php';
@@ -64,20 +64,20 @@ For support and installation notes visit http://www.hlxcommunity.com
 				uniqueId='$uniqueid'
 				AND game='$game'
 		");
-		
+
 		if ($db->num_rows() > 1) {
 			header('Location: ' . $g_options['scripturl'] . "&mode=search&st=uniqueid&q=$uniqueid&game=$game");
 			exit;
 		} elseif ($db->num_rows() < 1) {
-			error("No players found matching uniqueId '$uniqueid'");
+			error(localized_no_players_matching_uniqueid_message($uniqueid));
 		} else {
 			list($player) = $db->fetch_row();
 			$player = intval($player);
 		}
 	} elseif (!$player && !$uniqueid) {
-		error('No player ID specified.');
+		error(t('literal.no_player_id'));
 	}
-	
+
 	$db->query("
 		SELECT
 			hlstats_Players.playerId,
@@ -115,12 +115,12 @@ For support and installation notes visit http://www.hlxcommunity.com
 	");
 
 	if ($db->num_rows() != 1) {
-		error("No such player '$player'.");
+		error(localized_no_such_player_message($player));
 	}
 
 	$playerdata = $db->fetch_array();
 	$db->free_result();
-	
+
 	$pl_name = $playerdata['lastName'];
 	if (strlen($pl_name) > 10) {
 		$pl_shortname = substr($pl_name, 0, 8) . '...';
@@ -131,7 +131,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	$pl_name = htmlspecialchars($pl_name, ENT_COMPAT);
 	$pl_shortname = htmlspecialchars($pl_shortname, ENT_COMPAT);
 	$pl_urlname = urlencode($playerdata['lastName']);
-	
+
 	$game = $playerdata['game'];
 	$db->query("SELECT name FROM hlstats_Games WHERE code='$game'");
 
@@ -144,18 +144,18 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 	<table class="data-table">
 		<tr class="data-table-head">
-			<td colspan="3" class="fSmall">Statistics Summary</td>
+			<td colspan="3" class="fSmall"><?php echo eHtml(translate_ui_literal('Statistics Summary')); ?></td>
         </tr>
         <tr class="bg1">
-            <td class="fSmall">Name:</td>
+            <td class="fSmall"><?php echo eHtml(translate_ui_literal('Name')); ?>:</td>
             <td colspan="2" class="fSmall"><?php
                 if ($g_options['countrydata'] == 1)
-					echo '<img src="'.getFlag($playerdata['flag']).'" alt="'.strtolower($playerdata['country']).'" title="'.strtolower($playerdata['country']).'">&nbsp;';   
+					echo '<img src="'.getFlag($playerdata['flag']).'" alt="'.strtolower($playerdata['country']).'" title="'.strtolower($playerdata['country']).'">&nbsp;';
 				echo '<strong>' . htmlspecialchars($playerdata['lastName'], ENT_COMPAT) . '</strong>';
             ?></td>
         </tr>
         <tr class="bg2">
-			<td class="fSmall">Member of Clan:</td>
+			<td class="fSmall"><?php echo eHtml(t('literal.member_of_clan')); ?>:</td>
 			<td colspan="2" class="fSmall"><?php
 				if ($playerdata['clan']) {
 					echo '&nbsp;<a href="' . $g_options['scripturl']
@@ -163,14 +163,14 @@ For support and installation notes visit http://www.hlxcommunity.com
 					. '">'
 					. htmlspecialchars($playerdata['clan_name'], ENT_COMPAT) . '</a>';
 				} else
-					echo '(None)';
+					echo eHtml(t('literal.none'));
 			?></td>
 		</tr>
 		<tr class="bg1">
-			<td style="width:45%;" class="fSmall">Rank:</td>
+			<td style="width:45%;" class="fSmall"><?php echo eHtml(translate_ui_literal('Rank')); ?>:</td>
 			<td colspan="2" style="width:55%;" class="fSmall">
                 <?php
-                    $rank = 'Unknown';
+                    $rank = t('literal.unknown');
 
                     if ($playerdata['activity'] > 0) {
                         $plGame = $playerdata['game'];
@@ -182,10 +182,10 @@ For support and installation notes visit http://www.hlxcommunity.com
                         $rank = $playerRepo->getPlayerRank($plGame, $rankType, $plValue, $plKills, $playerDeaths);
 
                         if (is_null($rank)) {
-                            $rank = 'Unknown';
+                            $rank = t('literal.unknown');
                         }
                     } else {
-                        $rank = 'Not active';
+                        $rank = t('literal.not_active');
                     }
 
                     if (is_numeric($rank))
@@ -196,13 +196,13 @@ For support and installation notes visit http://www.hlxcommunity.com
             </td>
 		</tr>
 		<tr class="bg2">
-			<td class="fSmall">Points:</td>
+			<td class="fSmall"><?php echo eHtml(translate_ui_literal('Points')); ?>:</td>
 			<td colspan="2" class="fSmall"><?php
 				echo '<strong>' . number_format($playerdata['skill']) . '</strong>';
 			?></td>
 		</tr>
         <tr class="bg1">
-			<td style="width:45%;" class="fSmall">Activity:*</td>
+			<td style="width:45%;" class="fSmall"><?php echo eHtml(translate_ui_literal('Activity')); ?>:*</td>
 			<td style="width:45%;" class="fSmall">
 				<meter min="0" max="100" low="25" high="50" optimum="75"
 				value="<?php echo $playerdata['activity'] ?>"></meter>
@@ -212,7 +212,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			?></td>
 		</tr>
 		<tr class="bg2">
-			<td style="width:45%;" class="fSmall">Kills:</td>
+			<td style="width:45%;" class="fSmall"><?php echo eHtml(translate_ui_literal('Kills')); ?>:</td>
 			<td colspan="2" style="width:55%;" class="fSmall"><?php
 				echo number_format($playerdata['kills']);
 				$db->query("
@@ -230,19 +230,19 @@ For support and installation notes visit http://www.hlxcommunity.com
 			?></td>
 		</tr>
 		<tr class="bg1">
-			<td class="fSmall">Deaths:</td>
+			<td class="fSmall"><?php echo eHtml(translate_ui_literal('Deaths')); ?>:</td>
 			<td colspan="2" class="fSmall"><?php
 				echo number_format($playerdata['deaths']);
 			?></td>
 		</tr>
 		<tr class="bg2">
-			<td class="fSmall">Suicides:</td>
+			<td class="fSmall"><?php echo eHtml(translate_ui_literal('Suicides')); ?>:</td>
 			<td colspan="2" class="fSmall"><?php
 				echo number_format($playerdata['suicides']);
 			?></td>
 		</tr>
 		<tr class="bg1">
-			<td class="fSmall">Kills per Death:</td>
+			<td class="fSmall"><?php echo eHtml(translate_ui_literal('Kills per Death')); ?>:</td>
 			<td colspan="2" class="fSmall"><?php
 				$db->query("
 						SELECT
@@ -261,7 +261,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			?></td>
 		</tr>
 		<tr class="bg2">
-			<td class="fSmall">Headshots:</td>
+			<td class="fSmall"><?php echo eHtml(translate_ui_literal('Headshots')); ?>:</td>
 			<td colspan="2" class="fSmall"><?php
 				$db->query("
 					SELECT
@@ -272,10 +272,10 @@ For support and installation notes visit http://www.hlxcommunity.com
 						hlstats_Servers.serverId=hlstats_Events_Frags.serverId
 					WHERE
 						hlstats_Servers.game='$game' AND killerId='$player'
-						AND headshot=1		
+						AND headshot=1
 				");
 				list($realheadshots) = $db->fetch_row();
-				if ($playerdata['headshots'] == 0) 
+				if ($playerdata['headshots'] == 0)
 					echo number_format($realheadshots);
 				else
 					echo number_format($playerdata['headshots']);
@@ -283,9 +283,9 @@ For support and installation notes visit http://www.hlxcommunity.com
 			?></td>
 		</tr>
 		<tr class="bg1">
-			<td class="fSmall">Headshots per Kill:</td>
+			<td class="fSmall"><?php echo eHtml(translate_ui_literal('Headshots per Kill')); ?>:</td>
 			<td colspan="2" class="fSmall"><?php
-   				$db->query("
+				$db->query("
 						SELECT
 							IFNULL(SUM(headshot=1)/COUNT(*), '-') AS hpk
 						FROM
@@ -301,7 +301,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			?></td>
 		</tr>
 		<tr class="bg2">
-			<td class="fSmall">Weapon Accuracy:</td>
+			<td class="fSmall"><?php echo eHtml(translate_ui_literal('Weapon Accuracy')); ?>:</td>
 			<td colspan="2" class="fSmall"><?php
 				$db->query("
 					SELECT
@@ -321,7 +321,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			?></td>
 		</tr>
 		<tr class="bg1">
-			<td style="width:45%;" class="fSmall">Teammate Kills:</td>
+			<td style="width:45%;" class="fSmall"><?php echo eHtml(translate_ui_literal('Teammate Kills')); ?>:</td>
 			<td colspan="2" style="width:55%;" class="fSmall"><?php
 				echo number_format($playerdata['teamkills']);
 				$db->query("
@@ -339,17 +339,17 @@ For support and installation notes visit http://www.hlxcommunity.com
 			?></td>
 		</tr>
 		<tr class="bg2">
-			<td class="fSmall">Longest Kill Streak:</td>
+			<td class="fSmall"><?php echo eHtml(translate_ui_literal('Longest Kill Streak')); ?>:</td>
 			<td colspan="2" class="fSmall"><?php
 				echo number_format($playerdata['kill_streak']);
 			?></td>
 		<tr class="bg1">
-			<td class="fSmall">Longest Death Streak:</td>
+			<td class="fSmall"><?php echo eHtml(translate_ui_literal('Longest Death Streak')); ?>:</td>
 			<td colspan="2" class="fSmall"><?php
 				echo number_format($playerdata['death_streak']);
 			?></td>
 		<tr class="bg2">
-			<td class="fSmall">Total Connection Time:</td>
+			<td class="fSmall"><?php echo eHtml(translate_ui_literal('Total Connection Time')); ?>:</td>
 			<td colspan="2" class="fSmall"><?php
 				echo timestamp_to_str($playerdata['connection_time']);
 			?></td>

@@ -37,11 +37,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+        die(localized_direct_access_message());
     }
 
 	if ($auth->userdata['acclevel'] < 80) {
-		die ('Access denied!');
+		die(localized_access_denied_message());
 	}
 ?>
 
@@ -54,12 +54,12 @@ function check_writable() {
 	$ok = '';
 	$f = IMAGE_PATH."/games/";
 	if (!is_writable($f)) 
-		$ok .= "<li>I have no permission to write to '$f'";
+		$ok .= '<li>' . t('admin.task.tools_settings_copy.error.write_permission', array('path' => eHtml($f))) . '</li>';
 	
 	if ($ok != '') {
-		echo 'FATAL:<br><UL>';
+		echo '<strong>' . eHtml(t('ui.error')) . ":</strong><br><ul>";
 		echo $ok;
-		echo '</UL><br>Correct this before continuing';
+		echo '</ul><br>' . eHtml(t('admin.task.tools_settings_copy.error.correct_before_continuing'));
 		die();
 	}
 	return true; 
@@ -90,14 +90,14 @@ function copySettings($table,$game1,$game2) {
 	
 	$db->query("SELECT game FROM $table WHERE game='$game2' LIMIT 1;");
 	if ($db->num_rows()!=0)
-		$ret = 'Target gametype exists, nothing done!';
+		$ret = t('admin.task.tools_settings_copy.progress.target_gametype_exists');
 	else {
 		$db->query("SELECT count(game) AS cnt FROM $table WHERE game='$game1';");
 		$r = $db->fetch_array();
 		if ($r['cnt']==0)
-			$ret = 'No data existent for source gametype.';
+			$ret = t('admin.task.tools_settings_copy.progress.no_source_data');
 		else {
-			$ret = $r['cnt'].' entries copied!';
+			$ret = t('admin.task.tools_settings_copy.progress.entries_copied', array('count' => $r['cnt']));
 			$fields = '';
 			$ignoreFields = array('game','id','d_winner_id','d_winner_count','g_winner_id','g_winner_count','count','picked','kills','deaths','headshots');
 			foreach (getTableFields($table,0) AS $field) {
@@ -125,22 +125,40 @@ function copyFile($source,$dest) {
 		$dest = IMAGE_PATH."/games/$dest";
 		
 		if (!is_file($source))
-			$ret = "File not found $source (dest: $dest)<br>";
+			$ret = t(
+                'admin.task.tools_settings_copy.progress.file_not_found',
+                array(
+                    'source' => eHtml($source),
+                    'dest' => eHtml($dest),
+                )
+            );
 		else {
 			mkdir_recursive(dirname($dest));
 			if (!copy($source,$dest))
-				$ret = 'FAILED';
+				$status = t('admin.tools_reset.status.error');
 			else
-				$ret = 'OK';
+				$status = t('admin.tools_reset.status.ok');
+			$ret = t(
+                'admin.task.tools_settings_copy.progress.copy_file',
+                array(
+                    'source' => eHtml($source),
+                    'dest' => eHtml($dest),
+                    'status' => eHtml($status),
+                )
+            );
 		}
-		return "Copying '$source' to '$dest': $ret</li>";
+		return $ret . '</li>';
 	}
 	return '';
 }
 
 function scanCopyFiles($source,$dest) {
 	global $files;
-	$d = dir(IMAGE_PATH.'/games/'.$source);
+	$sourcePath = IMAGE_PATH.'/games/'.$source;
+	if (!is_dir($sourcePath)) {
+		return;
+	}
+	$d = dir($sourcePath);
 
 	if ($d !== false) {
 		while (($entry=$d->read()) !== false) {
@@ -171,16 +189,17 @@ function scanCopyFiles($source,$dest) {
 		
 		echo '<ul><br />';
 		check_writable();
+		$game1 = valid_request($game1, false);
 		$game2 = valid_request($game2, false);
 		$game2name = valid_request($game2name, false);
-		echo '<li>hlstats_Games ...';
+		echo '<li>' . t('admin.task.tools_settings_copy.progress.copy_table', array('table' => eHtml('hlstats_Games'))) . ' ';
 		$db->query("SELECT code FROM hlstats_Games WHERE code='$game2' LIMIT 1;");
 		if ($db->num_rows()!=0) {
 			echo '</ul><br /><br /><br />';
-			echo '<b>Target gametype exists, nothing done!</b><br /><br />';
+			echo '<b>' . eHtml(t('admin.task.tools_settings_copy.progress.target_gametype_exists')) . '</b><br /><br />';
 		} else {
 			$db->query("INSERT INTO hlstats_Games (code,name,hidden,realgame) SELECT '$game2', '$game2name', '0', realgame FROM hlstats_Games WHERE code='$game1'");
-			echo 'OK</li>';
+			echo eHtml(t('admin.tools_reset.status.ok')) . '</li>';
 			
 			$dbtables = array();
 			array_push($dbtables,
@@ -194,19 +213,14 @@ function scanCopyFiles($source,$dest) {
 				);
 
 			foreach ($dbtables as $dbt) {
-				echo "<li>$dbt ... ";
+				echo '<li>' . t('admin.task.tools_settings_copy.progress.copy_table', array('table' => eHtml($dbt))) . ' ';
 				echo copySettings($dbt,$game1,$game2);
 			}
 
 			echo '</ul><br /><br /><br />';	
 			echo '<ul>';
 				
-			$files = array(
-				array(
-				'',
-				''
-				)
-			);
+			$files = array();
 
 			scanCopyFiles("$game1/","$game2/");
 
@@ -215,15 +229,17 @@ function scanCopyFiles($source,$dest) {
 				echo copyFile($f[0],$f[1]);
 			}
 			echo '</ul><br /><br /><br />';
-			echo 'Done.<br /><br />';
+			echo eHtml(t('admin.tools_reset.done')) . '<br /><br />';
 		}
 	} else {
 		$result = $db->query("SELECT code, name FROM hlstats_Games ORDER BY code;");
 		unset($games);
-		$games[] = '<option value="" selected="selected">Please select</option>';
+		$games[] = '<option value="" selected="selected">' . eHtml(t('admin.please_select')) . '</option>';
 		while ($rowdata = $db->fetch_row($result))
 		{
-			$games[] = "<option value=\"$rowdata[0]\">$rowdata[0] - $rowdata[1]</option>";
+			$gameCode = eHtml($rowdata[0]);
+			$gameName = eHtml($rowdata[1]);
+			$games[] = '<option value="' . $gameCode . '">' . $gameCode . ' - ' . $gameName . '</option>';
 		}
 
 ?>
@@ -238,19 +254,19 @@ function scanCopyFiles($source,$dest) {
 		<tr class="bg1">
 			<td class="fNormal" style="text-align:center;">
 
-Are you sure to copy all settings from the selected gametype to the new gametype name?<br>
-All existing images will be copied also to the new gametype!<p>
+<?php echo eHtml(t('admin.task.tools_settings_copy.intro')); ?><br>
+<?php echo eHtml(t('admin.task.tools_settings_copy.images_notice')); ?><p>
 
 <input type="hidden" name="confirm" value="1" />
- Existing gametype: 
+ <?php echo eHtml(t('admin.task.tools_settings_copy.field.existing_gametype')); ?>: 
  <select Name="game1">
  <?php foreach ($games as $g) echo $g; ?>
  </select><br />
- New gametype code: 
- <input type="text" size="10" value="newcode" name="game2"><br />
- New gametype name: 
- <input type="text" size="26" value="New Game" name="game2name"><br />
- <input type="submit" value="  Copy selected gametype to the new name " />
+ <?php echo eHtml(t('admin.task.tools_settings_copy.field.new_gametype_code')); ?>: 
+ <input type="text" size="10" value="<?php echo eHtml(t('admin.task.tools_settings_copy.default_game_code')); ?>" name="game2"><br />
+ <?php echo eHtml(t('admin.task.tools_settings_copy.field.new_gametype_name')); ?>: 
+ <input type="text" size="26" value="<?php echo eHtml(t('admin.task.tools_settings_copy.default_game_name')); ?>" name="game2name"><br />
+ <input type="submit" value="  <?php echo eHtml(t('admin.task.tools_settings_copy.submit_button')); ?> " />
 </td>
 		</tr>
 		</table></td>

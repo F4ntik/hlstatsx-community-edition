@@ -41,7 +41,7 @@ For support and installation notes visit http://www.hlxcommunity.com
     }
 	// Weapon Details
 	
-	$weapon = valid_request($_GET['weapon'], false) or error('No weapon ID specified.');
+	$weapon = valid_request($_GET['weapon'], false) or error(t('literal.no_weapon_id'));
 	
 	$db->query("
 		SELECT
@@ -67,7 +67,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	$db->query("SELECT name FROM hlstats_Games WHERE code='$game'");
 	if ($db->num_rows() != 1)
 	{
-		error('Invalid or no game specified.');
+error(t('literal.invalid_game'));
 	}
 	else
 	{
@@ -75,11 +75,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 	}
 		
 	pageHeader(
-		array($gamename, 'Weapon Details', htmlspecialchars($wep_name)),
+		array($gamename, t('literal.weapon_details'), htmlspecialchars($wep_name)),
 		array(
 			$gamename=>$g_options['scripturl']."?game=$game",
-			'Weapon Statistics' => $g_options['scripturl']."?mode=weapons&game=$game",
-			'Weapon Details' => ''
+			t('literal.weapon_statistics') => $g_options['scripturl']."?mode=weapons&game=$game",
+			t('literal.weapon_details') => ''
 		),
 		$wep_name
 	);
@@ -88,22 +88,22 @@ For support and installation notes visit http://www.hlxcommunity.com
 		array(
 			new TableColumn(
 				'killerName',
-				'Player',
+				t('literal.player'),
 				'width=60&align=left&flag=1&link=' . urlencode('mode=playerinfo&amp;player=%k') 
 			),
 			new TableColumn(
 				'frags',
-				ucfirst($weapon) . ' kills',
+				t('literal.weapon_kills_label', array('weapon' => ucfirst($weapon))),
 				'width=15&align=right'
 			),
 			new TableColumn(
 				'headshots',
-				'Headshots',
+				t('literal.headshots'),
 				'width=15&align=right'
 			),
 			new TableColumn(
 				'hpk',
-				'Hpk',
+				t('literal.hpk_cap'),
 				'width=5&align=right'
 			),
 		),
@@ -156,7 +156,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 
 <div class="block">
-	<?php printSectionTitle('Weapon Details'); ?>
+	<?php printSectionTitle(t('literal.weapon_details')); ?>
     <div class="subblock">
 	<?php // figure out URL and absolute path of image
 		$image = getImage("/games/$game/weapons/$weapon");
@@ -170,10 +170,10 @@ For support and installation notes visit http://www.hlxcommunity.com
 		}
 ?>
 		<div style="float:left;">
-			<?php echo $wep_content ?>&nbsp;From a total of <b><?php echo number_format(intval($totalkills)); ?></b> kills with <b><?php echo number_format($totalheadshots); ?></b> headshots (Last <?php echo $g_options['DeleteDays']; ?> Days)
+			<?php echo $wep_content; ?>&nbsp;<?php echo t('literal.from_total_kills_headshots_last_days', array('kills' => number_format(intval($totalkills)), 'headshots' => number_format($totalheadshots), 'days' => $g_options['DeleteDays'])); ?>
 		</div>
 		<div style="float:right;">
-			Back to <a href="<?php echo $g_options['scripturl']. "?mode=weapons&amp;game=$game"; ?>">Weapon Statistics</a>
+			<?php echo eHtml(t('literal.back_to')); ?> <a href="<?php echo $g_options['scripturl']. "?mode=weapons&amp;game=$game"; ?>"><?php echo eHtml(t('literal.weapon_statistics')); ?></a>
 		</div>
 		<div style="clear:both;padding:2px;"></div>
 	</div>

@@ -37,7 +37,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+        die(localized_direct_access_message());
     }
 
 	$server_id = 1;
@@ -72,14 +72,23 @@ For support and installation notes visit http://www.hlxcommunity.com
 	list($total_kills, $total_headshots, $total_servers) = $db->fetch_row($result);
 ?>
 		
-    <table class="data-table">
+	<table class="data-table">
 		<tr class="data-table-head">
 			<td class="fSmall"><?php
 				if ($total_kills>0)
 					$hpk = sprintf('%.2f', ($total_headshots/$total_kills)*100);
 				else
 					$hpk = sprintf('%.2f', 0);
-				echo 'Tracking <strong>'.number_format($total_players).'</strong> players with <strong>'.number_format($total_kills).'</strong> kills and <strong>'.number_format($total_headshots)."</strong> headshots (<strong>$hpk%</strong>) on <strong>$total_servers</strong> servers"; ?>
+				echo t(
+					'ingame.load.summary',
+					array(
+						'players' => number_format($total_players),
+						'kills' => number_format($total_kills),
+						'headshots' => number_format($total_headshots),
+						'hpk' => $hpk,
+						'servers' => number_format($total_servers),
+					)
+				); ?>
 			</td>
 		</tr>	
 	</table>

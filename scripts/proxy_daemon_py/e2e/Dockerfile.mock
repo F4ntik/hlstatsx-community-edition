@@ -1,0 +1,8 @@
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+COPY scripts/proxy_daemon_py/e2e/mock_daemon.py /app/mock_daemon.py
+
+CMD ["python", "/app/mock_daemon.py"]

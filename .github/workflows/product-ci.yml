@@ -1,0 +1,160 @@
+name: Product CI
+
+on:
+  push:
+    paths:
+      - '.github/workflows/product-ci.yml'
+      - '.github/workflows/nightly-parity.yml'
+      - 'docs/**'
+      - 'scripts/hlstats_py/**'
+      - 'scripts/proxy_daemon_py/**'
+      - 'scripts/replay_baseline/**'
+      - 'scripts/web_i18n_smoke.php'
+      - 'web/**'
+  pull_request:
+    paths:
+      - '.github/workflows/product-ci.yml'
+      - '.github/workflows/nightly-parity.yml'
+      - 'docs/**'
+      - 'scripts/hlstats_py/**'
+      - 'scripts/proxy_daemon_py/**'
+      - 'scripts/replay_baseline/**'
+      - 'scripts/web_i18n_smoke.php'
+      - 'web/**'
+
+permissions:
+  contents: read
+
+jobs:
+  proxy-daemon-python:
+    name: proxy_daemon_py lint and tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: scripts/proxy_daemon_py
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Poetry
+        run: pipx install poetry==1.6.1
+
+      - name: Install dependencies
+        run: poetry install --no-root
+
+      - name: Ruff lint
+        run: poetry run ruff check .
+
+      - name: Black format check
+        run: poetry run black --check .
+
+      - name: Mypy type check
+        run: poetry run mypy .
+
+      - name: Pytest
+        run: poetry run pytest
+
+  hlstats-python:
+    name: hlstats_py tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install package and test dependencies
+        run: |
+          python -m pip install pytest==7.4.3
+          python -m pip install -e scripts/hlstats_py
+
+      - name: Import smoke
+        run: python -c "import hlstats_py.runtime, hlstats_py.storage, hlx_core.db, hlx_core.transport"
+
+      - name: Pytest
+        run: python -m pytest scripts/hlstats_py/tests
+
+  replay-baseline:
+    name: replay_baseline helper tests
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: scripts:scripts/replay_baseline
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install test dependencies
+        run: python -m pip install pytest==7.4.3
+
+      - name: Pytest
+        run: python -m pytest scripts/replay_baseline/tests
+
+  php-lint:
+    name: PHP syntax lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+
+      - name: Lint web PHP files
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -d '' files < <(find web -type f -name '*.php' -print0)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No PHP files found under web/."
+            exit 0
+          fi
+          for file in "${files[@]}"; do
+            php -l "$file"
+          done
+
+      - name: Web i18n smoke
+        run: php scripts/web_i18n_smoke.php
+
+  docs-check:
+    name: Docs sanity check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Required docs are present and current
+        shell: bash
+        run: |
+          set -euo pipefail
+          required_docs=(
+            docs/status.md
+            docs/plans.md
+            docs/test-plan.md
+            docs/autonomy-review-20260601.md
+            docs/autonomy-work-plan-20260601.md
+            docs/next-chat-task.md
+            docs/release-readiness.md
+          )
+          for doc in "${required_docs[@]}"; do
+            test -s "$doc"
+          done
+          grep -q "repository-wide CI" docs/status.md
+          grep -q "Current parity gates" docs/test-plan.md
+          grep -q "GeoIP" docs/test-plan.md
+          grep -q "HLstats metrics" docs/release-readiness.md

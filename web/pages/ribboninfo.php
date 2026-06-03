@@ -42,7 +42,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 	// Ribbon Statistics
 
-	$ribbon =  valid_request($_GET['ribbon'], true) or error('No ribbon ID specified.');
+	$ribbon =  valid_request($_GET['ribbon'], true) or error(t('literal.no_ribbon_id'));
 
 	$db->query("
 		SELECT
@@ -65,18 +65,18 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 	$db->query("SELECT name FROM hlstats_Games WHERE code='$game'");
 	if ($db->num_rows() < 1) {
-		error("No such game '$game'.");
+	error(localized_no_such_game_message($game));
 	}
 	
 	list($gamename) = $db->fetch_row();
 	$db->free_result();
 	
 	pageHeader(
-		array($gamename, 'Ribbon Details', $act_name),
+		array($gamename, t('literal.ribbon_details'), $act_name),
 		array(
 			$gamename => $g_options['scripturl']."?game=$game",
-			'Ribbons' => $g_options['scripturl']."mode=awards&game=$game&tab=ribbons",
-			'Ribbon Details' => ''
+			t('literal.ribbons') => $g_options['scripturl']."mode=awards&game=$game&tab=ribbons",
+			t('literal.ribbon_details') => ''
 		),
 		$act_name
 	);
@@ -86,13 +86,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'playerName',
-				'Player',
+				t('literal.player'),
 				'width=45&align=left&flag=1&link=' . urlencode('mode=playerinfo&amp;player=%k')
 			),
 			new TableColumn
 			(
 				'numawards',
-				'Daily awards',
+				t('literal.daily_awards_count'),
 				'width=10&align=right&append=' . urlencode(' times')
 			),
 			new TableColumn
@@ -183,10 +183,10 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 
 <div class="block">
-	<?php printSectionTitle('Ribbon Details'); ?>
+	<?php printSectionTitle(t('literal.ribbon_details')); ?>
 	<div class="subblock">
 		<div style="float:right;">
-			Back to <a href="<?php echo $g_options['scripturl'] . "?mode=awards&amp;game=$game&tab=ribbons"; ?>">Ribbons</a>
+			<?php echo eHtml(t('literal.back_to')); ?> <a href="<?php echo $g_options['scripturl'] . "?mode=awards&amp;game=$game&tab=ribbons"; ?>"><?php echo eHtml(t('literal.ribbons')); ?></a>
 		</div>
 		<div style="clear:both;"></div>
 	</div>

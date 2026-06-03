@@ -37,12 +37,15 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+die(localized_direct_access_message());
     }
 
 	if ($auth->userdata['acclevel'] < 80) {
-		die ('Access denied!');
+		die(t('admin.access_denied'));
 	}
+
+	$resetOk = eHtml(t('admin.tools_reset.status.ok', array(), 'OK'));
+	$resetError = eHtml(t('admin.tools_reset.status.error', array(), 'ERROR'));
 ?>
 
 &nbsp;&nbsp;&nbsp;&nbsp;<img src="<?php echo IMAGE_PATH; ?>/downarrow.gif" width="9" height="6" class="imageformat" alt="" /><strong>&nbsp;<?php echo $task->title; ?></strong><br /><br />
@@ -65,7 +68,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 		
 		if (isset($_POST['clear_awards']) || $clearAll || $clearAllDelete)
 		{
-			echo "<li>Clearing awards ... ";
+			echo '<li>' . eHtml(t('admin.tools_reset.progress.clear_awards', array(), 'Clearing awards ... '));
 			$db->query("UPDATE hlstats_Awards SET d_winner_id=NULL, d_winner_count=NULL, g_winner_id=NULL, g_winner_count=NULL $gamefilter");
 			if ($gamefilter == '')
 			{
@@ -78,11 +81,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 				$db->query("DELETE FROM `hlstats_Players_Awards` $gamefilter");
 				$db->query("DELETE FROM `hlstats_Players_Ribbons` $gamefilter");
 			}
-			echo "OK</li>\n";
+			echo $resetOk . "</li>\n";
 		}
 		if (isset($_POST['clear_sessions']) || $clearAll || $clearAllDelete)
 		{
-			echo "<li>Removing players' session history ... ";
+			echo '<li>' . eHtml(t('admin.tools_reset.progress.clear_sessions', array(), "Removing players' session history ... "));
 			if ($gamefilter == '')
 			{
 				$SQL = "TRUNCATE TABLE `hlstats_Players_History`";
@@ -93,16 +96,16 @@ For support and installation notes visit http://www.hlxcommunity.com
 			}
 			if ($db->query($SQL))
 			{
-				echo "OK</li>\n";
+				echo $resetOk . "</li>\n";
 			}
 			else
 			{
-				echo "ERROR</li>\n";
+				echo $resetError . "</li>\n";
 			}	
 		}
 		if (isset($_POST['clear_names']) || $clearAll || $clearAllDelete)
 		{
-			echo "<li>Removing players' names history ... ";
+			echo '<li>' . eHtml(t('admin.tools_reset.progress.clear_names', array(), "Removing players' names history ... "));
 			if ($gamefilter == '')
 			{
 				$SQL = "TRUNCATE TABLE `hlstats_PlayerNames`";
@@ -113,118 +116,118 @@ For support and installation notes visit http://www.hlxcommunity.com
 			}
 			if ($db->query($SQL))
 			{
-				echo "OK</li>\n";
+				echo $resetOk . "</li>\n";
 			}
 			else
 			{
-				echo "ERROR</li>\n";
+				echo $resetError . "</li>\n";
 			}
 		}
 		if (isset($_POST['clear_names_counts']) || $clearAll || $clearAllDelete)
 		{
-			echo "<li>Resetting players' names' counts ... ";
+			echo '<li>' . eHtml(t('admin.tools_reset.progress.clear_names_counts', array(), "Resetting players' names' counts ... "));
 			$SQL = "UPDATE `hlstats_PlayerNames` SET connection_time=0, numuses=0, kills=0, deaths=0, suicides=0, headshots=0, shots=0, hits=0 WHERE playerId IN (SELECT playerId FROM hlstats_Players $gamefilter)";
 			if ($db->query($SQL))
 			{
-				echo "OK</li>\n";
+				echo $resetOk . "</li>\n";
 			}
 			else
 			{
-				echo "ERROR</li>\n";
+				echo $resetError . "</li>\n";
 			}
 		}
 		if (isset($_POST['clear_skill']) || $clearAll || $clearAllDelete)
 		{
-			echo "<li>Resetting all Players' Skill ... ";
+			echo '<li>' . eHtml(t('admin.tools_reset.progress.clear_skill', array(), "Resetting all Players' Skill ... "));
 			$SQL = "UPDATE hlstats_Players SET skill=1000 $gamefilter";
 			if ($db->query($SQL))
 			{
-				echo "OK</li>\n";
+				echo $resetOk . "</li>\n";
 			}
 			else
 			{
-				echo "ERROR</li>\n";
+				echo $resetError . "</li>\n";
 			}
 		}
 		if (isset($_POST['clear_pcounts']) || $clearAll || $clearAllDelete)
 		{
-			echo "<li>Resetting all Players' Counts ... ";
+			echo '<li>' . eHtml(t('admin.tools_reset.progress.clear_pcounts', array(), "Resetting all Players' Counts ... "));
 			$SQL = "UPDATE hlstats_Players SET connection_time=0, kills=0, deaths=0, suicides=0, shots=0, hits=0, headshots=0, last_skill_change=0, kill_streak=0, death_streak=0 $gamefilter";
 			if ($db->query($SQL))
 			{
-				echo "OK</li>\n";
+				echo $resetOk . "</li>\n";
 			}
 			else
 			{
-				echo "ERROR</li>\n";
+				echo $resetError . "</li>\n";
 			}
 		}
 		if (isset($_POST['clear_scounts']) || $clearAll || $clearAllDelete)
 		{
-			echo "<li>Resetting Servers' Counts ... ";
+			echo '<li>' . eHtml(t('admin.tools_reset.progress.clear_scounts', array(), "Resetting Servers' Counts ... "));
 			$db->query("UPDATE hlstats_Servers SET kills=0, players=0, rounds=0, suicides=0, ".
 						"headshots=0, bombs_planted=0, bombs_defused=0, ct_wins=0, ts_wins=0, ".
 						"ct_shots=0, ct_hits=0, ts_shots=0, ts_hits=0, ".
 						"map_ct_shots=0, map_ct_hits=0, map_ts_shots=0, map_ts_hits=0, ".
 						"map_rounds=0, map_ct_wins=0, map_ts_wins=0, map_started=0, map_changes=0, ".
 						"act_map='', act_players=0 $gamefilter");
-			echo "OK</li>\n";
+			echo $resetOk . "</li>\n";
 		}
 		if (isset($_POST['clear_wcounts']) || $clearAll || $clearAllDelete)
 		{
-			echo "<li>Resetting Weapons' Counts ... ";
+			echo '<li>' . eHtml(t('admin.tools_reset.progress.clear_wcounts', array(), "Resetting Weapons' Counts ... "));
 			$SQL = "UPDATE hlstats_Weapons SET kills=0, headshots=0 $gamefilter";
 			if ($db->query($SQL))
 			{
-				echo "OK</li>\n";
+				echo $resetOk . "</li>\n";
 			}
 			else
 			{
-				echo "ERROR</li>\n";
+				echo $resetError . "</li>\n";
 			}
 		}
 		if (isset($_POST['clear_acounts']) || $clearAll || $clearAllDelete)
 		{
-			echo "<li>Resetting Actions' Counts ... ";
+			echo '<li>' . eHtml(t('admin.tools_reset.progress.clear_acounts', array(), "Resetting Actions' Counts ... "));
 			$SQL = "UPDATE hlstats_Actions SET `count`=0 $gamefilter";
 			if ($db->query($SQL))
 			{
-				echo "OK</li>\n";
+				echo $resetOk . "</li>\n";
 			}
 			else
 			{
-				echo "ERROR</li>\n";
+				echo $resetError . "</li>\n";
 			}
 		}
 		if (isset($_POST['clear_mcounts']) || $clearAll || $clearAllDelete)
 		{
-			echo "<li>Resetting Maps' Counts ... ";
+			echo '<li>' . eHtml(t('admin.tools_reset.progress.clear_mcounts', array(), "Resetting Maps' Counts ... "));
 			$SQL = "UPDATE hlstats_Maps_Counts SET `kills`=0, `headshots`=0 $gamefilter";
 			if ($db->query($SQL))
 			{
-				echo "OK</li>\n";
+				echo $resetOk . "</li>\n";
 			}
 			else
 			{
-				echo "ERROR</li>\n";
+				echo $resetError . "</li>\n";
 			}
 		}
 		if (isset($_POST['clear_rcounts']) || $clearAll || $clearAllDelete)
 		{
-			echo "<li>Resetting Roles' Counts ... ";
+			echo '<li>' . eHtml(t('admin.tools_reset.progress.clear_rcounts', array(), "Resetting Roles' Counts ... "));
 			$SQL = "UPDATE hlstats_Roles SET picked=0, kills=0, deaths=0 $gamefilter";
 			if ($db->query($SQL))
 			{
-				echo "OK</li>\n";
+				echo $resetOk . "</li>\n";
 			}
 			else
 			{
-				echo "ERROR</li>\n";
+				echo $resetError . "</li>\n";
 			}
 		}
 		if (isset($_POST['clear_events_admin']) || $clearAll || $clearAllDelete)
 		{
-			echo "<li>Deleting Admin Events ... ";
+			echo '<li>' . eHtml(t('admin.tools_reset.progress.clear_events_admin', array(), 'Deleting Admin Events ... '));
 			if ($gamefilter == '')
 			{
 				$SQL = "TRUNCATE TABLE `hlstats_Events_Admin`";
@@ -235,16 +238,16 @@ For support and installation notes visit http://www.hlxcommunity.com
 			}
 			if ($db->query($SQL))
 			{
-				echo "OK</li>\n";
+				echo $resetOk . "</li>\n";
 			}
 			else
 			{
-				echo "ERROR</li>\n";
+				echo $resetError . "</li>\n";
 			}
 		}
 		if (isset($_POST['clear_events_changename']) || $clearAll || $clearAllDelete)
 		{
-			echo "<li>Deleting Name Change Events ... ";
+			echo '<li>' . eHtml(t('admin.tools_reset.progress.clear_events_changename', array(), 'Deleting Name Change Events ... '));
 			if ($gamefilter == '')
 			{
 				$SQL = "TRUNCATE TABLE `hlstats_Events_ChangeName`";
@@ -255,16 +258,16 @@ For support and installation notes visit http://www.hlxcommunity.com
 			}
 			if ($db->query($SQL))
 			{
-				echo "OK</li>\n";
+				echo $resetOk . "</li>\n";
 			}
 			else
 			{
-				echo "ERROR</li>\n";
+				echo $resetError . "</li>\n";
 			}
 		}
 		if (isset($_POST['clear_events_changerole']) || $clearAll || $clearAllDelete || $clearAllEvents)
 		{
-			echo "<li>Deleting Role Change Events ... ";
+			echo '<li>' . eHtml(t('admin.tools_reset.progress.clear_events_changerole', array(), 'Deleting Role Change Events ... '));
 			if ($gamefilter == '')
 			{
 				$SQL = "TRUNCATE TABLE `hlstats_Events_ChangeRole`";
@@ -275,16 +278,16 @@ For support and installation notes visit http://www.hlxcommunity.com
 			}
 			if ($db->query($SQL))
 			{
-				echo "OK</li>\n";
+				echo $resetOk . "</li>\n";
 			}
 			else
 			{
-				echo "ERROR</li>\n";
+				echo $resetError . "</li>\n";
 			}
 		}
 		if (isset($_POST['clear_events_changeteam']) || $clearAll || $clearAllDelete || $clearAllEvents)
 		{
-			echo "<li>Deleting Team Change Events ... ";
+			echo '<li>' . eHtml(t('admin.tools_reset.progress.clear_events_changeteam', array(), 'Deleting Team Change Events ... '));
 			if ($gamefilter == '')
 			{
 				$SQL = "TRUNCATE TABLE `hlstats_Events_ChangeTeam`";
@@ -295,16 +298,16 @@ For support and installation notes visit http://www.hlxcommunity.com
 			}
 			if ($db->query($SQL))
 			{
-				echo "OK</li>\n";
+				echo $resetOk . "</li>\n";
 			}
 			else
 			{
-				echo "ERROR</li>\n";
+				echo $resetError . "</li>\n";
 			}
 		}
 		if (isset($_POST['clear_events_chat']) || $clearAll || $clearAllDelete || $clearAllEvents)
 		{
-			echo "<li>Deleting Chat Events ... ";
+			echo '<li>' . eHtml(t('admin.tools_reset.progress.clear_events_chat', array(), 'Deleting Chat Events ... '));
 			if ($gamefilter == '')
 			{
 				$SQL = "TRUNCATE TABLE `hlstats_Events_Chat`";
@@ -315,16 +318,16 @@ For support and installation notes visit http://www.hlxcommunity.com
 			}
 			if ($db->query($SQL))
 			{
-				echo "OK</li>\n";
+				echo $resetOk . "</li>\n";
 			}
 			else
 			{
-				echo "ERROR</li>\n";
+				echo $resetError . "</li>\n";
 			}
 		}
 		if (isset($_POST['clear_events_connects']) || $clearAll || $clearAllDelete || $clearAllEvents)
 		{
-			echo "<li>Deleting Connect Events ... ";
+			echo '<li>' . eHtml(t('admin.tools_reset.progress.clear_events_connects', array(), 'Deleting Connect Events ... '));
 			if ($gamefilter == '')
 			{
 				$SQL = "TRUNCATE TABLE `hlstats_Events_Connects`";
@@ -335,16 +338,16 @@ For support and installation notes visit http://www.hlxcommunity.com
 			}
 			if ($db->query($SQL))
 			{
-				echo "OK</li>\n";
+				echo $resetOk . "</li>\n";
 			}
 			else
 			{
-				echo "ERROR</li>\n";
+				echo $resetError . "</li>\n";
 			}
 		}
 		if (isset($_POST['clear_events_disconnects']) || $clearAll || $clearAllDelete || $clearAllEvents)
 		{
-			echo "<li>Deleting Disconnect Events ... ";
+			echo '<li>' . eHtml(t('admin.tools_reset.progress.clear_events_disconnects', array(), 'Deleting Disconnect Events ... '));
 			if ($gamefilter == '')
 			{
 				$SQL = "TRUNCATE TABLE `hlstats_Events_Disconnects`";
@@ -355,16 +358,16 @@ For support and installation notes visit http://www.hlxcommunity.com
 			}
 			if ($db->query($SQL))
 			{
-				echo "OK</li>\n";
+				echo $resetOk . "</li>\n";
 			}
 			else
 			{
-				echo "ERROR</li>\n";
+				echo $resetError . "</li>\n";
 			}
 		}
 		if (isset($_POST['clear_events_entries']) || $clearAll || $clearAllDelete || $clearAllEvents)
 		{
-			echo "<li>Deleting Entry Events ... ";
+			echo '<li>' . eHtml(t('admin.tools_reset.progress.clear_events_entries', array(), 'Deleting Entry Events ... '));
 			if ($gamefilter == '')
 			{
 				$SQL = "TRUNCATE TABLE `hlstats_Events_Entries`";
@@ -375,16 +378,16 @@ For support and installation notes visit http://www.hlxcommunity.com
 			}
 			if ($db->query($SQL))
 			{
-				echo "OK</li>\n";
+				echo $resetOk . "</li>\n";
 			}
 			else
 			{
-				echo "ERROR</li>\n";
+				echo $resetError . "</li>\n";
 			}
 		}
 		if (isset($_POST['clear_events_frags']) || $clearAll || $clearAllDelete || $clearAllEvents)
 		{
-			echo "<li>Deleting Frag Events ... ";
+			echo '<li>' . eHtml(t('admin.tools_reset.progress.clear_events_frags', array(), 'Deleting Frag Events ... '));
 			if ($gamefilter == '')
 			{
 				$SQL = "TRUNCATE TABLE `hlstats_Events_Frags`";
@@ -395,16 +398,16 @@ For support and installation notes visit http://www.hlxcommunity.com
 			}
 			if ($db->query($SQL))
 			{
-				echo "OK</li>\n";
+				echo $resetOk . "</li>\n";
 			}
 			else
 			{
-				echo "ERROR</li>\n";
+				echo $resetError . "</li>\n";
 			}
 		}
 		if (isset($_POST['clear_events_latency']) || $clearAll || $clearAllDelete || $clearAllEvents)
 		{
-			echo "<li>Deleting Latency Events ... ";
+			echo '<li>' . eHtml(t('admin.tools_reset.progress.clear_events_latency', array(), 'Deleting Latency Events ... '));
 			if ($gamefilter == '')
 			{
 				$SQL = "TRUNCATE TABLE `hlstats_Events_Latency`";
@@ -417,16 +420,16 @@ For support and installation notes visit http://www.hlxcommunity.com
 			}
 			if ($db->query($SQL) && $db->query($SQL2))
 			{
-				echo "OK</li>\n";
+				echo $resetOk . "</li>\n";
 			}
 			else
 			{
-				echo "ERROR</li>\n";
+				echo $resetError . "</li>\n";
 			}
 		}
 		if (isset($_POST['clear_events_actions']) || $clearAll || $clearAllDelete || $clearAllEvents)
 		{
-			echo "<li>Deleting Action Events ... ";
+			echo '<li>' . eHtml(t('admin.tools_reset.progress.clear_events_actions', array(), 'Deleting Action Events ... '));
 			if ($gamefilter == '')
 			{
 				$SQL = "TRUNCATE TABLE `hlstats_Events_PlayerActions`";
@@ -441,16 +444,16 @@ For support and installation notes visit http://www.hlxcommunity.com
 			}
 			if ($db->query($SQL) && $db->query($SQL2) && $db->query($SQL3))
 			{
-				echo "OK</li>\n";
+				echo $resetOk . "</li>\n";
 			}
 			else
 			{
-				echo "ERROR</li>\n";
+				echo $resetError . "</li>\n";
 			}
 		}
 		if (isset($_POST['clear_events_rcon']) || $clearAll || $clearAllDelete || $clearAllEvents)
 		{
-			echo "<li>Deleting Rcon Events ... ";
+			echo '<li>' . eHtml(t('admin.tools_reset.progress.clear_events_rcon', array(), 'Deleting Rcon Events ... '));
 			if ($gamefilter == '')
 			{
 				$SQL = "TRUNCATE TABLE `hlstats_Events_Rcon`";
@@ -461,16 +464,16 @@ For support and installation notes visit http://www.hlxcommunity.com
 			}
 			if ($db->query($SQL))
 			{
-				echo "OK</li>\n";
+				echo $resetOk . "</li>\n";
 			}
 			else
 			{
-				echo "ERROR</li>\n";
+				echo $resetError . "</li>\n";
 			}
 		}
 		if (isset($_POST['clear_events_statsme']) || $clearAll || $clearAllDelete || $clearAllEvents)
 		{
-			echo "<li>Deleting Weapon Stats Events ... ";
+			echo '<li>' . eHtml(t('admin.tools_reset.progress.clear_events_statsme', array(), 'Deleting Weapon Stats Events ... '));
 			if ($gamefilter == '')
 			{
 				$SQL = "TRUNCATE TABLE `hlstats_Events_Statsme`";
@@ -483,16 +486,16 @@ For support and installation notes visit http://www.hlxcommunity.com
 			}
 			if ($db->query($SQL) && $db->query($SQL2))
 			{
-				echo "OK</li>\n";
+				echo $resetOk . "</li>\n";
 			}
 			else
 			{
-				echo "ERROR</li>\n";
+				echo $resetError . "</li>\n";
 			}
 		}
 		if (isset($_POST['clear_events_statsmetime']) || $clearAll || $clearAllDelete || $clearAllEvents)
 		{
-			echo "<li>Deleting Statsme Time Events ... ";
+			echo '<li>' . eHtml(t('admin.tools_reset.progress.clear_events_statsmetime', array(), 'Deleting Statsme Time Events ... '));
 			if ($gamefilter == '')
 			{
 				$SQL = "TRUNCATE TABLE `hlstats_Events_StatsmeTime`";
@@ -503,16 +506,16 @@ For support and installation notes visit http://www.hlxcommunity.com
 			}
 			if ($db->query($SQL))
 			{
-				echo "OK</li>\n";
+				echo $resetOk . "</li>\n";
 			}
 			else
 			{
-				echo "ERROR</li>\n";
+				echo $resetError . "</li>\n";
 			}
 		}
 		if (isset($_POST['clear_events_suicides']) || $clearAll || $clearAllDelete || $clearAllEvents)
 		{
-			echo "<li>Deleting Suicide Events ... ";
+			echo '<li>' . eHtml(t('admin.tools_reset.progress.clear_events_suicides', array(), 'Deleting Suicide Events ... '));
 			if ($gamefilter == '')
 			{
 				$SQL = "TRUNCATE TABLE `hlstats_Events_Suicides`";
@@ -523,16 +526,16 @@ For support and installation notes visit http://www.hlxcommunity.com
 			}
 			if ($db->query($SQL))
 			{
-				echo "OK</li>\n";
+				echo $resetOk . "</li>\n";
 			}
 			else
 			{
-				echo "ERROR</li>\n";
+				echo $resetError . "</li>\n";
 			}
 		}
 		if (isset($_POST['clear_events_teamkills']) || $clearAll || $clearAllDelete || $clearAllEvents)
 		{
-			echo "<li>Deleting Teamkill Events ... ";
+			echo '<li>' . eHtml(t('admin.tools_reset.progress.clear_events_teamkills', array(), 'Deleting Teamkill Events ... '));
 			if ($gamefilter == '')
 			{
 				$SQL = "TRUNCATE TABLE `hlstats_Events_Teamkills`";
@@ -543,11 +546,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 			}
 			if ($db->query($SQL))
 			{
-				echo "OK</li>\n";
+				echo $resetOk . "</li>\n";
 			}
 			else
 			{
-				echo "ERROR</li>\n";
+				echo $resetError . "</li>\n";
 			}
 		}
 		if ($clearAllDelete)
@@ -560,7 +563,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			
 			foreach ($dbtables as $dbt)
 			{
-				echo "<li>Clearing $dbt ... ";
+				echo '<li>' . eHtml(t('admin.tools_reset.progress.clear_table', array('table' => $dbt), 'Clearing {table} ... '));
 				if ($gamefilter == '')
 				{
 					$db->query("TRUNCATE TABLE $dbt");
@@ -569,18 +572,18 @@ For support and installation notes visit http://www.hlxcommunity.com
 				{
 					$db->query("DELETE FROM $dbt $gamefilter");
 				}
-				echo "OK</li>\n";
+				echo $resetOk . "</li>\n";
 			}
 		}
 
 		echo "</ul>\n";		
-		echo "Done.<br /><br />";
+		echo eHtml(t('admin.tools_reset.done', array(), 'Done.')) . "<br /><br />";
 	}
 	else
 	{
 		$result = $db->query("SELECT code, name, hidden FROM `hlstats_Games` ORDER BY hidden, name, code;");
 		unset($games);
-		$games[] = '<option value="" selected="selected" />All games';
+		$games[] = '<option value="" selected="selected" />' . eHtml(t('admin.tools_reset.all_games', array(), 'All games'));
 		while (list($code, $name, $hidden) = $db->fetch_row($result))
 		{
 			$disabled_flag = "";
@@ -937,51 +940,58 @@ function name_history_checked()
 <select name="game">
 <?php foreach ($games as $g) echo $g; ?>
 </select><br />
-<em>* indicates game is currently disabled</em>
+<em><?php echo eHtml(t('admin.tools_reset.disabled_game_note', array(), '* indicates game is currently disabled')); ?></em>
 <table width="350" align="middle" border="0"><tr class="bg1"><td class="fNormal" align="left">
 <ul style="list-style-type:none;">
-	<li style="font-weight:bold;"><input type="checkbox" name="clear_all_delete" onclick="clear_all_delete_checked()" /> Reset/Clear All and Delete Players and Clans</li><br />
-	<li style="font-weight:bold;"><input type="checkbox" name="clear_all" onclick="clear_all_checked()" /> Reset/Clear All</li>
-	<li><input type="checkbox" name="clear_awards" /> Clear Players' Awards History and Ribbons</li>
-	<li><input type="checkbox" name="clear_sessions" /> Clear Players' Session History</li>
-	<li><input type="checkbox" name="clear_names" onclick="name_history_checked()" /> Clear Players' Name History</li>
-	<li><input type="checkbox" name="clear_names_counts" /> Reset Players' Names' Counts</li>
-	<li><input type="checkbox" name="clear_skill" /> Reset Players' Skill</li>
-	<li><input type="checkbox" name="clear_pcounts" /> Reset Players' Counts</li>
-	<li><input type="checkbox" name="clear_scounts" /> Reset Servers' Counts</li>
-	<li><input type="checkbox" name="clear_wcounts" /> Reset Weapons' Counts</li>
-	<li><input type="checkbox" name="clear_acounts" /> Reset Actions' Counts</li>
-	<li><input type="checkbox" name="clear_mcounts" /> Reset Maps' Counts</li>
-	<li><input type="checkbox" name="clear_rcounts" /> Reset Roles' Counts</li>
+	<li style="font-weight:bold;"><input type="checkbox" name="clear_all_delete" onclick="clear_all_delete_checked()" /> <?php echo eHtml(t('admin.tools_reset.option.clear_all_delete', array(), 'Reset/Clear All and Delete Players and Clans')); ?></li><br />
+	<li style="font-weight:bold;"><input type="checkbox" name="clear_all" onclick="clear_all_checked()" /> <?php echo eHtml(t('admin.tools_reset.option.clear_all', array(), 'Reset/Clear All')); ?></li>
+	<li><input type="checkbox" name="clear_awards" /> <?php echo eHtml(t('admin.tools_reset.option.clear_awards', array(), "Clear Players' Awards History and Ribbons")); ?></li>
+	<li><input type="checkbox" name="clear_sessions" /> <?php echo eHtml(t('admin.tools_reset.option.clear_sessions', array(), "Clear Players' Session History")); ?></li>
+	<li><input type="checkbox" name="clear_names" onclick="name_history_checked()" /> <?php echo eHtml(t('admin.tools_reset.option.clear_names', array(), "Clear Players' Name History")); ?></li>
+	<li><input type="checkbox" name="clear_names_counts" /> <?php echo eHtml(t('admin.tools_reset.option.clear_names_counts', array(), "Reset Players' Names' Counts")); ?></li>
+	<li><input type="checkbox" name="clear_skill" /> <?php echo eHtml(t('admin.tools_reset.option.clear_skill', array(), "Reset Players' Skill")); ?></li>
+	<li><input type="checkbox" name="clear_pcounts" /> <?php echo eHtml(t('admin.tools_reset.option.clear_pcounts', array(), "Reset Players' Counts")); ?></li>
+	<li><input type="checkbox" name="clear_scounts" /> <?php echo eHtml(t('admin.tools_reset.option.clear_scounts', array(), "Reset Servers' Counts")); ?></li>
+	<li><input type="checkbox" name="clear_wcounts" /> <?php echo eHtml(t('admin.tools_reset.option.clear_wcounts', array(), "Reset Weapons' Counts")); ?></li>
+	<li><input type="checkbox" name="clear_acounts" /> <?php echo eHtml(t('admin.tools_reset.option.clear_acounts', array(), "Reset Actions' Counts")); ?></li>
+	<li><input type="checkbox" name="clear_mcounts" /> <?php echo eHtml(t('admin.tools_reset.option.clear_mcounts', array(), "Reset Maps' Counts")); ?></li>
+	<li><input type="checkbox" name="clear_rcounts" /> <?php echo eHtml(t('admin.tools_reset.option.clear_rcounts', array(), "Reset Roles' Counts")); ?></li>
 	<br />
-	<li style="font-weight:bold;"><input type="checkbox" name="clear_all_events" onclick="clear_all_events_checked()" /> Delete All Events</li>
-	<li><input type="checkbox" name="clear_events_admin" /> Delete Admin Events</li>
-	<li><input type="checkbox" name="clear_events_rcon" /> Delete Rcon Events</li>
-	<li><input type="checkbox" name="clear_events_connects" /> Delete Connect Events</li>
-	<li><input type="checkbox" name="clear_events_disconnects" /> Delete Disconnect Events</li>
-	<li><input type="checkbox" name="clear_events_entries" /> Delete Entry Events</li>
-	<li><input type="checkbox" name="clear_events_chat" /> Delete Chat Events</li>
-	<li><input type="checkbox" name="clear_events_changename" /> Delete Name Change Events</li>
-	<li><input type="checkbox" name="clear_events_changerole" /> Delete Role Change Events</li>
-	<li><input type="checkbox" name="clear_events_changeteam" /> Delete Team Change Events</li>
-	<li><input type="checkbox" name="clear_events_frags" /> Delete Frags Events</li>
-	<li><input type="checkbox" name="clear_events_suicides" /> Delete Suicide Events</li>
-	<li><input type="checkbox" name="clear_events_teamkills" /> Delete Teamkill Events</li>
-	<li><input type="checkbox" name="clear_events_statsme" /> Delete Weapon Stats Events</li>
-	<li><input type="checkbox" name="clear_events_actions" /> Delete Action Events</li>
-	<li><input type="checkbox" name="clear_events_latency" /> Delete Latency Events</li>
-	<li><input type="checkbox" name="clear_events_statsmetime" /> Delete Statsme Time Events</li>
+	<li style="font-weight:bold;"><input type="checkbox" name="clear_all_events" onclick="clear_all_events_checked()" /> <?php echo eHtml(t('admin.tools_reset.option.clear_all_events', array(), 'Delete All Events')); ?></li>
+	<li><input type="checkbox" name="clear_events_admin" /> <?php echo eHtml(t('admin.tools_reset.option.clear_events_admin', array(), 'Delete Admin Events')); ?></li>
+	<li><input type="checkbox" name="clear_events_rcon" /> <?php echo eHtml(t('admin.tools_reset.option.clear_events_rcon', array(), 'Delete Rcon Events')); ?></li>
+	<li><input type="checkbox" name="clear_events_connects" /> <?php echo eHtml(t('admin.tools_reset.option.clear_events_connects', array(), 'Delete Connect Events')); ?></li>
+	<li><input type="checkbox" name="clear_events_disconnects" /> <?php echo eHtml(t('admin.tools_reset.option.clear_events_disconnects', array(), 'Delete Disconnect Events')); ?></li>
+	<li><input type="checkbox" name="clear_events_entries" /> <?php echo eHtml(t('admin.tools_reset.option.clear_events_entries', array(), 'Delete Entry Events')); ?></li>
+	<li><input type="checkbox" name="clear_events_chat" /> <?php echo eHtml(t('admin.tools_reset.option.clear_events_chat', array(), 'Delete Chat Events')); ?></li>
+	<li><input type="checkbox" name="clear_events_changename" /> <?php echo eHtml(t('admin.tools_reset.option.clear_events_changename', array(), 'Delete Name Change Events')); ?></li>
+	<li><input type="checkbox" name="clear_events_changerole" /> <?php echo eHtml(t('admin.tools_reset.option.clear_events_changerole', array(), 'Delete Role Change Events')); ?></li>
+	<li><input type="checkbox" name="clear_events_changeteam" /> <?php echo eHtml(t('admin.tools_reset.option.clear_events_changeteam', array(), 'Delete Team Change Events')); ?></li>
+	<li><input type="checkbox" name="clear_events_frags" /> <?php echo eHtml(t('admin.tools_reset.option.clear_events_frags', array(), 'Delete Frags Events')); ?></li>
+	<li><input type="checkbox" name="clear_events_suicides" /> <?php echo eHtml(t('admin.tools_reset.option.clear_events_suicides', array(), 'Delete Suicide Events')); ?></li>
+	<li><input type="checkbox" name="clear_events_teamkills" /> <?php echo eHtml(t('admin.tools_reset.option.clear_events_teamkills', array(), 'Delete Teamkill Events')); ?></li>
+	<li><input type="checkbox" name="clear_events_statsme" /> <?php echo eHtml(t('admin.tools_reset.option.clear_events_statsme', array(), 'Delete Weapon Stats Events')); ?></li>
+	<li><input type="checkbox" name="clear_events_actions" /> <?php echo eHtml(t('admin.tools_reset.option.clear_events_actions', array(), 'Delete Action Events')); ?></li>
+	<li><input type="checkbox" name="clear_events_latency" /> <?php echo eHtml(t('admin.tools_reset.option.clear_events_latency', array(), 'Delete Latency Events')); ?></li>
+	<li><input type="checkbox" name="clear_events_statsmetime" /> <?php echo eHtml(t('admin.tools_reset.option.clear_events_statsmetime', array(), 'Delete Statsme Time Events')); ?></li>
 </ul>
 <br />
 </td></tr></table>
 <p align="middle" />
-		Are you sure you want to reset the above? (All other admin settings will be retained.)<br /><br />
+		<?php echo eHtml(t('admin.tools_reset.confirmation', array(), 'Are you sure you want to reset the above? (All other admin settings will be retained.)')); ?><br /><br />
 
-<strong>Note</strong> You should <a href="<?php echo $g_options['scripturl'] . "?mode=admin&amp;task=tools_perlcontrol"; ?>" style="text-decoration:underline;font-weight:bold">stop the HLX:CE daemon</a> before resetting the stats. You can restart it after the reset completes.<br /><br />
+<strong><?php echo eHtml(t('admin.tools_reset.note_label', array(), 'Note')); ?></strong>
+<?php echo t(
+	'admin.tools_reset.daemon_notice',
+	array(
+		'link' => '<a href="' . $g_options['scripturl'] . '?mode=admin&amp;task=tools_runtimecontrol" style="text-decoration:underline;font-weight:bold">' . eHtml(t('admin.tools_reset.stop_daemon', array(), 'stop the HLX:CE runtime')) . '</a>'
+	),
+	'You should {link} before resetting the stats. You can restart it after the reset completes.'
+); ?><br /><br />
 
 <input type="hidden" name="confirm" value="1" />
 
- <input type="submit" value="  Click here to confirm Reset  " />
+ <input type="submit" value="  <?php echo eHtml(t('admin.tools_reset.confirm_button', array(), 'Click here to confirm Reset')); ?>  " />
 </td>
 		</tr>
 		

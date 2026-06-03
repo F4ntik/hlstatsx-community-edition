@@ -41,7 +41,7 @@ For support and installation notes visit http://www.hlxcommunity.com
     }
 
     // Player History -> Sessions & Skill change
-	$player = valid_request(intval($_GET["player"]), true) or error("No player ID specified.");
+	$player = valid_request(intval($_GET["player"]), true) or error(t('literal.no_player_id'));
 
 	$db->query("
 		SELECT
@@ -54,7 +54,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	");
 
 	if ($db->num_rows() != 1) {
-		error("No such player '$player'.");
+	error(localized_no_such_player_message($player));
 	}
 
 	$playerdata = $db->fetch_array();
@@ -87,13 +87,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 	pageHeader
 	(
-		array ($gamename, 'Session History', $pl_name),
+		array ($gamename, t('literal.session_history'), $pl_name),
 		array
 		(
 			$gamename => $g_options['scripturl']."?game=$game",
-			'Player Rankings' => $g_options['scripturl']."?mode=players&game=$game",
-			'Player Details' => $g_options['scripturl']."?mode=playerinfo&player=$player",
-			'Session History' => ''
+			t('literal.player_rankings') => $g_options['scripturl']."?mode=players&game=$game",
+			t('literal.player_details') => $g_options['scripturl']."?mode=playerinfo&player=$player",
+			t('literal.session_history') => ''
 		),
 		$playername = ""
 	);
@@ -105,73 +105,73 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'eventTime',
-				'Date',
+				t('literal.date'),
 				'width=11'
 			),
 			new TableColumn
 			(
 				'skill_change',
-				'Skill Change',
+				t('literal.skill_change'),
 				'width=10&align=right&skill_change=1'
 			),
 			new TableColumn
 			(
 				'skill',
-				'Points',
+				t('literal.points'),
 				'width=10&align=right'
 			),
 			new TableColumn
 			(
 				'connection_time',
-				'Time',
+				t('literal.time_label'),
 				'width=13&align=right&type=timestamp'
 			),
 			new TableColumn
 			(
 				'kills',
-				'Kills',
+				t('literal.kills'),
 				'width=7&align=right'
 			),
 			new TableColumn
 			(
 				'deaths',
-				'Deaths',
+				t('literal.deaths'),
 				'width=7&align=right'
 			),
 			new TableColumn
 			(
 				'kpd',
-				'K:D',
+				t('literal.kpd_cap'),
 				'width=7&align=right'
 			),
 			new TableColumn
 			(
 				'headshots',
-				'HS',
+				t('literal.headshots_short'),
 				'width=7&align=right'
 			),
 			new TableColumn
 			(
 				'hpk',
-				'HS:K',
+				t('literal.hpk_cap'),
 				'width=7&align=right'
 			),
 			new TableColumn
 			(
 				'suicides',
-				'Suicides',
+				t('literal.suicides'),
 				'width=7&align=right'
 			),
 			new TableColumn
 			(
 				'teamkills',
-				'TKs',
+				t('literal.teamkills_short'),
 				'width=7&align=right'
 			),
 			new TableColumn
 			(
 				'kill_streak',
-				'Kill Strk',
+				t('literal.kill_streak_short'),
 				'width=7&align=right'
 			),
 		),
@@ -227,7 +227,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 <div class="block">
 <?php
-	printSectionTitle('Player Session History');
+	printSectionTitle(t('literal.player_session_history'));
 	if ($numitems > 0)
 	{
 		$table->draw($result, $numitems, 95);
@@ -235,7 +235,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?><br /><br />
 	<div class="subblock">
 		<div style="float:left;">
-			Items above are generated from the last <?php echo $g_options['DeleteDays']; ?> days.
+			<?php echo t('literal.generated_last_days', array('days' => $g_options['DeleteDays'])); ?>
 		</div>
 		<div style="float:right;">
 <?php 
@@ -250,7 +250,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	");
 	list($lastName) = $db->fetch_row();
 ?>
-			Go to: <a href="<?php echo $g_options['scripturl'] . "?mode=playerinfo&amp;player=$player"; ?>"><?php echo $lastName; ?>'s Statistics</a>
+			<?php echo eHtml(t('literal.go_to')); ?>: <a href="<?php echo $g_options['scripturl'] . "?mode=playerinfo&amp;player=$player"; ?>"><?php echo t('literal.player_statistics_link', array('player' => eHtml($lastName))); ?></a>
 		</div>
 	</div>
 </div>

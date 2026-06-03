@@ -1,0 +1,81 @@
+version: "3.8"
+
+services:
+  db:
+    image: mariadb:10.11
+    container_name: hlstatsx-local-db
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --max-allowed-packet=256M
+    environment:
+      MARIADB_ROOT_PASSWORD: root123
+      MARIADB_DATABASE: hlstatsxce
+      MARIADB_USER: hlstatsxce
+      MARIADB_PASSWORD: hlx123
+    ports:
+      - "3307:3306"
+    volumes:
+      - hlstatsx_local_db:/var/lib/mysql
+    networks:
+      - hlstatsx_local_net
+
+  web:
+    image: startersclan/hlstatsx-community-edition:1.11.4-web
+    container_name: hlstatsx-local-web
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      DB_ADDR: db
+      DB_NAME: hlstatsxce
+      DB_USER: hlstatsxce
+      DB_PASS: hlx123
+    ports:
+      - "8081:80"
+    networks:
+      - hlstatsx_local_net
+
+  daemon:
+    image: startersclan/hlstatsx-community-edition:1.11.4-daemon
+    container_name: hlstatsx-local-daemon
+    restart: unless-stopped
+    depends_on:
+      - db
+    command:
+      - --ip=0.0.0.0
+      - --port=27500
+      - --db-host=db:3306
+      - --db-name=hlstatsxce
+      - --db-username=hlstatsxce
+      - --db-password=hlx123
+      - --nodns-resolveip
+    ports:
+      - "27500:27500/udp"
+    networks:
+      - hlstatsx_local_net
+
+  phpmyadmin:
+    image: phpmyadmin:5-apache
+    container_name: hlstatsx-local-phpmyadmin
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      PMA_USER: root
+      PMA_PASSWORD: root123
+      UPLOAD_LIMIT: 256M
+    ports:
+      - "8083:80"
+    networks:
+      - hlstatsx_local_net
+
+networks:
+  hlstatsx_local_net:
+    driver: bridge
+
+volumes:
+  hlstatsx_local_db:

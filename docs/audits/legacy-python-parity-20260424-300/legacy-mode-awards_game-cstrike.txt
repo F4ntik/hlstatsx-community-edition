@@ -1,0 +1,448 @@
+HLstatsX Community Edition - Counter-Strike - Awards Info	 
+ 
+  
+
+			 
+			 
+			 
+			 
+			 
+			 
+			  
+	
+	 
+		 
+			   
+		 
+
+		 
+			 
+				     
+				     
+								
+				     
+			 
+
+		 
+	 
+	 
+		 
+  HLstatsX Community Edition   &raquo;    HLstatsX   &raquo;    Counter-Strike   &raquo;    Awards Info 			 
+		 
+
+	 
+	  
+ 
+
+ 
+      
+ 
+        
+
+    
+		 
+		 
+			  Servers  
+
+			  Chat  
+			  Players  
+			  Clans  
+
+			  Countries  
+			  Awards  
+ 
+			  Actions  
+			  Weapons  
+			  Maps  
+	  
+  
+
+
+ 
+ 
+	 &nbsp; &nbsp;Daily Awards (Saturday 30 Aug)   
+	 
+		 
+
+  
+			 AK47         No Award Winner   0 kills with ak47 
+			  
+			 AWP         No Award Winner   0 snipings with awp 
+			  
+			 Best Latency         No Award Winner   0 ms average connection 
+			  
+			 Colt M4A1 Carbine         No Award Winner   0 kills with m4a1 
+			  
+			 Desert Eagle         No Award Winner   0 kills with deagle 
+			    
+			 Dual Berretta Elites         No Award Winner   0 kills with elite 
+			  
+			 Fusil Automatique         No Award Winner   0 kills with famas 
+			  
+			 Galil         No Award Winner   0 kills with galil 
+			  
+			 Glock         No Award Winner   0 kills with glock18 
+			  
+			 Grenadier         No Award Winner   0 kills with grenade 
+			    
+			 Headshot King         No Award Winner   0 headshots 
+			  
+			 Knife Maniac         No Award Winner   0 knifings 
+			  
+			 P90         No Award Winner   0 kills with p90 
+			  
+			 Shotgun         No Award Winner   0 kills with m3 shotgun 
+			  
+			 Top Assassin         No Award Winner   0 assassinations 
+			    
+			 Top Defuser         No Award Winner   0 bomb defusions 
+			  
+			 Top Demolitionist         No Award Winner   0 bomb plantings 
+			  
+			 Top Hostage Rescuer         No Award Winner   0 hostages rescued 
+			  
+			 USP Master         No Award Winner   0 kills with usp 
+			  &nbsp;  		 
+	 
+ 
+ 
+
+ 
+
+ 
+	 &nbsp; &nbsp;Global Awards   
+	 
+		 
+  
+			 AK47       No Award Winner   0 kills with ak47 
+			  
+			 AWP       No Award Winner   0 snipings with awp 
+			  
+			 Best Latency       No Award Winner   0 ms average connection 
+			  
+			 Colt M4A1 Carbine       No Award Winner   0 kills with m4a1 
+			  
+			 Desert Eagle       No Award Winner   0 kills with deagle 
+			    
+			 Dual Berretta Elites       No Award Winner   0 kills with elite 
+			  
+			 Fusil Automatique       No Award Winner   0 kills with famas 
+			  
+			 Galil       No Award Winner   0 kills with galil 
+			  
+			 Glock       No Award Winner   0 kills with glock18 
+			  
+			 Grenadier       No Award Winner   0 kills with grenade 
+			    
+			 Headshot King       No Award Winner   0 headshots 
+			  
+			 Knife Maniac       No Award Winner   0 knifings 
+			  
+			 P90       No Award Winner   0 kills with p90 
+			  
+			 Shotgun       No Award Winner   0 kills with m3 shotgun 
+			  
+			 Top Assassin       No Award Winner   0 assassinations 
+			    
+			 Top Defuser       No Award Winner   0 bomb defusions 
+			  
+			 Top Demolitionist       No Award Winner   0 bomb plantings 
+			  
+			 Top Hostage Rescuer       No Award Winner   0 hostages rescued 
+			  
+			 USP Master       No Award Winner   0 kills with usp 
+			  &nbsp;  
+		 
+	 
+ 
+ 
+
+ 
+
+ 
+	 &nbsp; &nbsp;Ranks   
+	 
+		 
+   Recruit   (0-49&nbsp;kills) Achieved by 120 Players     
+			   Private   (50-99&nbsp;kills) Achieved by 2 Players     
+			   Private First Class   (100-199&nbsp;kills) Achieved by 5 Players     
+			   Lance Corporal   (200-299&nbsp;kills)    
+			   Corporal   (300-399&nbsp;kills)    
+			     Sergeant   (400-499&nbsp;kills)    
+			   Staff Sergeant   (500-599&nbsp;kills)    
+			   Gunnery Sergeant   (600-699&nbsp;kills)    
+			   Master Sergeant   (700-799&nbsp;kills)    
+			   First Sergeant   (800-899&nbsp;kills)    
+			     Master Chief   (900-999&nbsp;kills)    
+			   Sergeant Major   (1000-1199&nbsp;kills)    
+			   Ensign   (1200-1399&nbsp;kills)    
+			   Third Lieutenant   (1400-1599&nbsp;kills)    
+			   Second Lieutenant   (1600-1799&nbsp;kills)    
+			     First Lieutenant   (1800-1999&nbsp;kills)    
+			   Captain   (2000-2249&nbsp;kills)    
+			   Group Captain   (2250-2499&nbsp;kills)    
+			   Senior Captain   (2500-2749&nbsp;kills)    
+			   Lieutenant Major   (2750-2999&nbsp;kills)    
+			     Major   (3000-3499&nbsp;kills)    
+			   Group Major   (3500-3999&nbsp;kills)    
+			   Lieutenant Commander   (4000-4499&nbsp;kills)    
+			   Commander   (4500-4999&nbsp;kills)    
+			   Group Commander   (5000-5749&nbsp;kills)    
+			     Lieutenant Colonel   (5750-6499&nbsp;kills)    
+			   Colonel   (6500-7249&nbsp;kills)    
+			   Brigadier   (7250-7999&nbsp;kills)    
+			   Brigadier General   (8000-8999&nbsp;kills)    
+			   Major General   (9000-9999&nbsp;kills)    
+			     Lieutenant General   (10000-12499&nbsp;kills)    
+			   General   (12500-14999&nbsp;kills)    
+			   Commander General   (15000-17499&nbsp;kills)    
+			   Field Vice Marshal   (17500-19999&nbsp;kills)    
+			   Field Marshal   (20000-22499&nbsp;kills)    
+			     Vice Commander of the Army   (22500-24999&nbsp;kills)    
+			   Commander of the Army   (25000-27499&nbsp;kills)    
+			   High Commander   (27500-29999&nbsp;kills)    
+			   Supreme Commander   (30000-34999&nbsp;kills)    
+			   Terminator   (35000-9999999&nbsp;kills)    
+			  		 
+	 
+ 
+ 
+
+ 
+
+ 
+	 &nbsp; &nbsp;Ribbons   
+	 
+		 
+   Ribbon Class #1 (1 awards required)     
+			 Award of AK47       
+			  
+			 Award of AWP Sniper       
+			  
+			 Award of Bomb Defuser       
+			  
+			 Award of Bomb Planter       
+			  
+			 Award of Colt M4A1       
+			    
+			 Award of Combat Knife       
+			  
+			 Award of Desert Eagle       
+			  
+			 Award of Dual Beretta Elites       
+			  
+			 Award of Fusil Automatique       
+			  
+			 Award of Galil       
+			    
+			 Award of Glock       
+			  
+			 Award of Grenade       
+			  
+			 Award of Hostage Rescuer       
+			  
+			 Award of Lowpinger       
+			  
+			 Award of M3 Super       
+			    
+			 Award of P90       
+			  
+			 Award of Top Assassin       
+			  
+			 Award of USP       
+			    Ribbon Class #2 (5 awards required)     
+			 Bronze AColt M4A1       
+			  
+			 Bronze AK47       
+			  
+			 Bronze Award M3 Super       
+			  
+			 Bronze AWP Sniper       
+			  
+			 Bronze Bomb Defuser       
+			    
+			 Bronze Bomb Planter       
+			  
+			 Bronze Combat Knife       
+			  
+			 Bronze Desert Eagle       
+			  
+			 Bronze Dual Beretta Elites       
+			  
+			 Bronze Fusil Automatique       
+			    
+			 Bronze Galil       
+			  
+			 Bronze Glock       
+			  
+			 Bronze Grenade       
+			  
+			 Bronze Hostage Rescuer       
+			  
+			 Bronze Lowpinger       
+			    
+			 Bronze P90       
+			  
+			 Bronze Top Assassin       
+			  
+			 Bronze USP       
+			    Ribbon Class #3 (12 awards required)     
+			 Silver AK47       
+			  
+			 Silver Bomb Defuser       
+			  
+			 Silver Bomb Planter       
+			  
+			 Silver Colt M4A1       
+			  
+			 Silver Combat Knife       
+			    
+			 Silver Desert Eagle       
+			  
+			 Silver Dual Beretta Elites       
+			  
+			 Silver Fusil Automatique       
+			  
+			 Silver Galil       
+			  
+			 Silver Glock       
+			    
+			 Silver Grenade       
+			  
+			 Silver Hostage Rescuer       
+			  
+			 Silver Lowpinger       
+			  
+			 Silver M3 Super       
+			  
+			 Silver P90       
+			    
+			 Silver Sniper       
+			  
+			 Silver Top Assassin       
+			  
+			 Silver USP       
+			    Ribbon Class #4 (20 awards required)     
+			 Gold AK47       
+			  
+			 Gold AWP Sniper       
+			  
+			 Gold Bomb Defuser       
+			  
+			 Gold Bomb Planter       
+			  
+			 Gold Colt M4A1       
+			    
+			 Gold Combat Knife       
+			  
+			 Gold Desert Eagle       
+			  
+			 Gold Dual Beretta Elites       
+			  
+			 Gold Fusil Automatique       
+			  
+			 Gold Glock       
+			    
+			 Gold Grenade       
+			  
+			 Gold Hostage Rescuer       
+			  
+			 Gold Lowpinger       
+			  
+			 Gold M3 Super       
+			  
+			 Gold P90       
+			    
+			 Gold Top Assassin       
+			  
+			 Gold USP       
+			  
+			 GoldGalil       
+			    Ribbon Class #5 (30 awards required)     
+			 Platinum AK47       
+			  
+			 Platinum AWP Sniper       
+			  
+			 Platinum Bomb Defuser       
+			  
+			 Platinum Bomb Planter       
+			  
+			 Platinum Colt M4A1       
+			    
+			 Platinum Desert Eagle       
+			  
+			 Platinum Dual Beretta Elites       
+			  
+			 Platinum Fusil Automatique       
+			  
+			 Platinum Galil       
+			  
+			 Platinum Glock       
+			    
+			 Platinum Grenade       
+			  
+			 Platinum Hostage Rescuer       
+			  
+			 Platinum M3 Super       
+			  
+			 Platinum P90       
+			  
+			 Platinum Top Assassin       
+			    
+			 Platinum USP       
+			  
+			 PlatinumCombat Knife       
+			  
+			 PlatinumLowpinger       
+			    Ribbon Class #6 (50 awards required)     
+			 Supreme AK47       
+			  
+			 Supreme AWP Sniper       
+			  
+			 Supreme Bomb Defuser       
+			  
+			 Supreme Bomb Planter       
+			  
+			 Supreme Colt M4A1       
+			    
+			 Supreme Combat Knife       
+			  
+			 Supreme Dual Beretta Elites       
+			  
+			 Supreme Fusil Automatique       
+			  
+			 Supreme Galil       
+			  
+			 Supreme Glock       
+			    
+			 Supreme Grenade       
+			  
+			 Supreme Hostage Rescuer       
+			  
+			 Supreme Lowpinger       
+			  
+			 Supreme M3 Super       
+			  
+			 Supreme Top Assassin       
+			    
+			 Supreme USP       
+			  
+			 Supremef Desert Eagle       
+			  
+			 Supremef P90       
+			  &nbsp;  &nbsp;  		 
+	 
+ 
+ 
+  
+ 
+ 
+	 
+			   
+	 
+ 
+ 
+You are currently viewing the basic version of this page, please enable JavaScript and reload the page to access full functionality. Generated in real-time by  HLstatsX Community Edition 1.11.4  
+All images are copyrighted by their respective owners.
+
+  [ Admin ]

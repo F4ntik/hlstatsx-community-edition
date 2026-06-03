@@ -48,14 +48,14 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'name',
-				'Team',
+				t('literal.team'),
 				'width=35'
 			),
 			new TableColumn
 			(
 				'teamcount',
-				'Joined',
-				'width=10&align=right&append=+times'
+				t('literal.joined'),
+				'width=10&align=right&append=' . urlencode(t('ui.times_suffix'))
 			),
 			new TableColumn
 			(
@@ -66,7 +66,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'percent',
-				'Ratio',
+				t('literal.ratio'),
 				'width=40&sort=no&type=bargraph'
 			)
 		),
@@ -127,7 +127,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	$numitems = $db->num_rows($result);
 	if ($numitems > 0)
 	{
-		printSectionTitle('Team Selection *');
+		printSectionTitle(t('literal.team_selection'));
 		$tblTeams->draw($result, $numitems, 95);
 ?>
 	<br /><br />
@@ -156,15 +156,15 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'code',
-				'Role',
+				t('literal.role'),
 				'width=25&type=roleimg&align=left&link=' . urlencode("mode=rolesinfo&amp;role=%k&amp;game=$game"),
 				$fname
 			),
 			new TableColumn
 			(
 				'rolecount',
-				'Joined',
-				'width=10&align=right&append=+times'
+				t('literal.joined'),
+				'width=10&align=right&append=' . urlencode(t('ui.times_suffix'))
 			),
 			new TableColumn
 			(
@@ -175,25 +175,25 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'percent',
-				'Ratio',
+				t('literal.ratio'),
 				'width=20&sort=no&type=bargraph'
 			),
 			new TableColumn
 			(
 				'killsTotal',
-				'Kills',
+				t('literal.kills'),
 				'width=10&align=right'
 			),
 			new TableColumn
 			(
 				'deathsTotal',
-				'Deaths',
+				t('literal.deaths'),
 				'width=10&align=right'
 			),
 			new TableColumn
 			(
 				'kpd',
-				'K:D',
+				t('literal.kpd_cap'),
 				'width=10&align=right'
 			)
 		),
@@ -339,7 +339,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	$numitems = $db->num_rows($result);
 	if ($numitems > 0)
 	{
-		printSectionTitle('Role Selection *');
+		printSectionTitle(t('literal.role_selection'));
 		$tblRoles->draw($result, $numitems, 95);
 ?>
 	<br /><br />

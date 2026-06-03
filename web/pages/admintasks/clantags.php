@@ -37,93 +37,102 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+die(localized_direct_access_message());
     }
 
 	if ($auth->userdata["acclevel"] < 80) {
-        die ("Access denied!");
+        die(localized_access_denied_message());
 	}
 
 	$edlist = new EditList("id", "hlstats_ClanTags", "clan", false);
-	$edlist->columns[] = new EditListColumn("pattern", "Pattern", 40, true, "text", "", 64);
-	$edlist->columns[] = new EditListColumn("position", "Match Position", 0, true, "select", "EITHER/EITHER;START/START only;END/END only");
+	$edlist->columns[] = new EditListColumn("pattern", t('admin.task.clantags.column.pattern'), 40, true, "text", "", 64);
+	$edlist->columns[] = new EditListColumn(
+		"position",
+		t('admin.task.clantags.column.match_position'),
+		0,
+		true,
+		"select",
+		"EITHER/" . t('admin.task.clantags.match_position.either') .
+		";START/" . t('admin.task.clantags.match_position.start_only') .
+		";END/" . t('admin.task.clantags.match_position.end_only')
+	);
 	
 	if ($_POST)
 	{
 		if ($edlist->update())
-			message("success", "Operation successful.");
+			message("success", t('admin.operation_successful'));
 		else
 			message("warning", $edlist->error());
 	}
 	
 ?>
 
-Here you can define the patterns used to determine what clan a player is in. These patterns are applied to players' names when they connect or change name.<p>
+<?php echo t('admin.task.clantags.intro'); ?><p>
 
-Special characters in the pattern:<p>
+<?php echo t('admin.task.clantags.special_characters'); ?><p>
 
 <table border=0 cellspacing=0 cellpadding=4>
 
 <tr class="head">
-	<td class="fSmall">Character</td>
-	<td class="fSmall">Description</td>
+	<td class="fSmall"><?php echo eHtml(t('admin.task.clantags.table.character')); ?></td>
+	<td class="fSmall"><?php echo eHtml(t('admin.task.clantags.table.description')); ?></td>
 </tr>
 
 <tr>
 	<td class="fNormal"><tt>A</tt></td>
-	<td class="fNormal">Matches one character  (i.e. a character is required)</td>
+	<td class="fNormal"><?php echo eHtml(t('admin.task.clantags.pattern.required_character')); ?></td>
 </tr>
 
 <tr>
 	<td class="fNormal"><tt>X</tt></td>
-	<td class="fNormal">Matches zero or one characters  (i.e. a character is optional)</td>
+	<td class="fNormal"><?php echo eHtml(t('admin.task.clantags.pattern.optional_character')); ?></td>
 </tr>
 
 <tr>
 	<td class="fNormal"><tt>a</tt></td>
-	<td class="fNormal">Matches literal A or a</td>
+	<td class="fNormal"><?php echo eHtml(t('admin.task.clantags.pattern.literal_a')); ?></td>
 </tr>
 
 <tr>
 	<td class="fNormal"><tt>x</tt></td>
-	<td class="fNormal">Matches literal X or x</td>
+	<td class="fNormal"><?php echo eHtml(t('admin.task.clantags.pattern.literal_x')); ?></td>
 </tr>
 
 </table><p>
 
-Example patterns:<p>
+<?php echo t('admin.task.clantags.example_patterns'); ?><p>
 
 <table border=0 cellspacing=0 cellpadding=4>
 
 <tr class="head">
-	<td class="fSmall">Pattern</td>
-	<td class="fSmall">Description</td>
-	<td class="fSmall">Example</td>
+	<td class="fSmall"><?php echo eHtml(t('admin.task.clantags.table.pattern')); ?></td>
+	<td class="fSmall"><?php echo eHtml(t('admin.task.clantags.table.description')); ?></td>
+	<td class="fSmall"><?php echo eHtml(t('admin.task.clantags.table.example')); ?></td>
 </tr>
 
 <tr>
 	<td class="fNormal"><tt>[AXXXXX]</tt></td>
-	<td class="fNormal">Matches 1 to 6 characters inside square braces</td>
+	<td class="fNormal"><?php echo eHtml(t('admin.task.clantags.example.square_brackets')); ?></td>
 	<td class="fNormal"><tt>[ZOOM]Player</tt></td>
 </tr>
 
 <tr>
 	<td class="fNormal"><tt>{AAXX}</tt></td>
-	<td class="fNormal">Matches 2 to 4 characters inside curly braces</td>
+	<td class="fNormal"><?php echo eHtml(t('admin.task.clantags.example.curly_braces')); ?></td>
 	<td class="fNormal"><tt>{S3G}Player</tt></td>
 </tr>
 
 <tr>
 	<td class="fNormal"><tt>rex>></tt></td>
-	<td class="fNormal">Matches the string "rex>>", "REX>>", etc.</td>
+	<td class="fNormal"><?php echo eHtml(t('admin.task.clantags.example.rex')); ?></td>
 	<td class="fNormal"><tt>REX>>Tyranno</tt></td>
 </tr>
 
 </table><p>
 
-Avoid adding patterns to the database that are too generic. Always ensure you have at least one literal (non-special) character in the pattern -- for example if you were to add the pattern "AXXA", it would match any player with 2 or more letters in their name!<p>
+<?php echo t('admin.task.clantags.warning_generic_patterns'); ?><p>
 
-The Match Position field sets which end of the player's name the clan tag is allowed to appear.<p>
+<?php echo t('admin.task.clantags.match_position_help'); ?><p>
 
 <?php
 	
@@ -143,7 +152,7 @@ The Match Position field sets which end of the player's name the clan tag is all
 
 <table width="75%" border=0 cellspacing=0 cellpadding=0>
 <tr>
-	<td align="center"><input type="submit" value="  Apply  " class="submit"></td>
+	<td align="center"><input type="submit" value="  <?php echo eHtml(t('ui.apply')); ?>  " class="submit"></td>
 </tr>
 </table>
 

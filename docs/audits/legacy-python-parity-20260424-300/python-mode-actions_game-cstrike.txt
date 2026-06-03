@@ -1,0 +1,245 @@
+HLstatsX Community Edition - Counter-Strike - Action Statistics	 
+ 
+  
+
+			 
+			 
+			 
+			 
+			 
+			 
+			  
+	
+	 
+		 
+			   
+		 
+
+		 
+			 
+				     
+				     
+								
+				     
+			 
+
+		 
+	 
+	 
+		 
+  HLstatsX Community Edition   &raquo;    HLstatsX   &raquo;    Counter-Strike   &raquo;    Action Statistics 			 
+		 
+
+		 
+			 
+									 
+									 
+								Language:
+				 
+											 English 
+											 Русский 
+									 
+			 
+		 
+	 
+	  
+ 
+
+ 
+      
+ 
+        
+
+    
+		 
+		 
+			  Servers  
+
+			  Chat  
+			  Players  
+			  Clans  
+
+			  Countries  
+			  Awards  
+ 
+			  Actions  
+			  Weapons  
+				  Maps  
+	  
+  
+
+
+ 
+	 &nbsp; &nbsp;Action Statistics   	 
+		From a total of  1,698  earned actions	   
+	
+ 
+
+ 
+
+		 
+ Rank 
+  Action  
+  Earned &nbsp;  
+  Reward  
+		 
+
+ 
+ 1 
+   Headshot   
+ 554 times 
+ 1 
+ 
+
+ 
+ 2 
+  Double Kill (2 kills)  
+ 244 times 
+ 1 
+ 
+
+ 
+ 3 
+  All Counter-Terrorists eliminated  
+ 243 times 
+ 0 
+ 
+
+ 
+ 4 
+  All Terrorists eliminated  
+ 216 times 
+ 0 
+ 
+
+ 
+ 5 
+  Spawn with the Bomb  
+ 101 times 
+ 2 
+ 
+
+ 
+ 6 
+  time  
+ 85 times 
+ 0 
+ 
+
+ 
+ 7 
+  latency  
+ 85 times 
+ 0 
+ 
+
+ 
+ 8 
+  Drop the Bomb  
+ 44 times 
+ -2 
+ 
+
+ 
+ 9 
+  Triple Kill (3 kills)  
+ 36 times 
+ 2 
+ 
+
+ 
+ 10 
+  amx_chat  
+ 33 times 
+ 0 
+ 
+
+ 
+ 11 
+  Pick up the Bomb  
+ 19 times 
+ 2 
+ 
+
+ 
+ 12 
+  Touch a Hostage  
+ 17 times 
+ 2 
+ 
+
+ 
+ 13 
+  Plant the Bomb  
+ 10 times 
+ 15 
+ 
+
+ 
+ 14 
+  Terrorists bombed the target  
+ 3 times 
+ 0 
+ 
+
+ 
+ 15 
+  Rescue a Hostage  
+ 3 times 
+ 5 
+ 
+
+ 
+ 16 
+  Domination (4 kills)  
+ 3 times 
+ 3 
+ 
+
+ 
+ 17 
+  Start Defusing the Bomb Without a Defuse Kit  
+ 1 times 
+ 0 
+ 
+
+ 
+ 18 
+  Kill a Hostage  
+ 1 times 
+ -25 
+ 
+
+		 
+   
+  
+	 
+		 
+			Go to:  Counter-Strike 
+		 
+	 
+ 
+
+ 
+	 
+		 
+		
+			  
+			  
+
+			 
+				 
+					 
+				 
+			 
+			 
+
+			 
+											You are currently viewing the basic version of this page, please enable JavaScript and reload the page to access full functionality.						 
+										
+					Generated in real-time by					 
+						HLstatsX Community Edition 1.11.4					 
+
+									 
+				All images are copyrighted by their respective owners.				  
+				[ Admin ]

@@ -1,0 +1,9 @@
+route	legacy_http	python_http	legacy_tr	python_tr	text_similarity	status
+mode=contents	200	200	0	0	0.6858	DIFF
+mode=players&game=cstrike	200	200	0	0	0.4367	DIFF
+mode=clans&game=cstrike	200	200	0	0	0.6789	DIFF
+mode=maps&game=cstrike	200	200	0	0	0.6868	DIFF
+mode=weapons&game=cstrike	200	200	0	0	0.2856	DIFF
+mode=actions&game=cstrike	200	200	0	0	0.6615	DIFF
+mode=awards&game=cstrike	200	200	0	0	0.0784	DIFF
+mode=servers&game=cstrike	200	200	0	0	0.5957	DIFF

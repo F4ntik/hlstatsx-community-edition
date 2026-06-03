@@ -141,7 +141,7 @@ class Table
 		if ($this->showranking)
 		{
 			$totalwidth += 5;
-			echo "<td style=\"width:5%;text-align:right;\" class=\"fSmall\">Rank</td>\n";
+			echo "<td style=\"width:5%;text-align:right;\" class=\"fSmall\">" . eHtml(t('ui.rank')) . "</td>\n";
 		}
 
 		foreach ($this->columns as $col)
@@ -156,7 +156,7 @@ class Table
 			}
 			else
 			{
-				echo $col->title;
+				echo eHtml(translate_ui_literal($col->title));
 			}
 			echo "</td>\n";
 		}
@@ -166,7 +166,7 @@ class Table
 <?php
 		if ($totalwidth != 100)
 		{
-			error("Warning: Column widths do not add to 100%! (=$totalwidth%)", false);
+			error(t('ui.warning') . ": Column widths do not add to 100%! (=$totalwidth%)", false);
 		}
 
 		$rank = ($this->page - 1) * $this->numperpage + 1;
@@ -190,7 +190,7 @@ class Table
 		if ($this->showranking)
 		{
 			$totalwidth += 5;
-			echo "<td style=\"width:5%;text-align=:right;\" class=\"fSmall\">Rank</td>\n";
+			echo "<td style=\"width:5%;text-align:right;\" class=\"fSmall\">" . eHtml(t('ui.rank')) . "</td>\n";
 		}
 
 		foreach ($this->columns as $col)
@@ -205,7 +205,7 @@ class Table
 			}
 			else
 			{
-				echo $col->title;
+				echo eHtml(translate_ui_literal($col->title));
 			}
 			echo "</td>\n";
 		}
@@ -215,7 +215,7 @@ class Table
 <?php
 		if ($totalwidth != 100)
 		{
-			error("Warning: Column widths do not add to 100%! (=$totalwidth%)", false);
+			error(t('ui.warning') . ": Column widths do not add to 100%! (=$totalwidth%)", false);
 		}
 
 		$rank = ($this->page - 1) * $this->numperpage + 1;
@@ -285,7 +285,7 @@ class Table
 					if ($g_options['countrydata'] == 1) { 
 						if ($rowdata['flag'] == '') {
 							$rowdata['flag'] = '0';
-							$alt_text        = 'No Country';
+							$alt_text        = t('ui.no_country');
 						} else {
 							$alt_text        = ucfirst(strtolower($rowdata['country']));
 						}
@@ -369,7 +369,10 @@ class Table
 							$cellbody .= '<b>';
 						if ((is_numeric($colval)) && ($colval >= 1000))
 							$colval = number_format($colval);
-						$colval = nl2br(htmlspecialchars($colval, ENT_COMPAT));
+						if (is_string($colval)) {
+							$colval = localized_render_text($colval);
+						}
+						$colval = nl2br(htmlspecialchars($colval, ENT_COMPAT | ENT_SUBSTITUTE, 'UTF-8'));
 
 						if ($col->embedlink == 'yes')
 							{
@@ -389,7 +392,11 @@ class Table
 
 				if ($col->append)
 				{
-					$cellbody .= $col->append;
+					if ($col->append === ' times') {
+						$cellbody .= eHtml(t('ui.times_suffix'));
+					} else {
+						$cellbody .= $col->append;
+					}
 				}
 				
 				if ($col->skill_change) {
@@ -397,13 +404,13 @@ class Table
 						$rowdata['last_skill_change'] = 0;
 					if ($rowdata['last_skill_change'] == 0)
 						$cellbody .= "&nbsp;<img src=\"" . IMAGE_PATH
-							. "/t1.gif\" alt=\"".$rowdata['last_skill_change']." Points\" />";
+							. "/t1.gif\" alt=\"".$rowdata['last_skill_change']." " . eHtml(t('ui.points')) . "\" />";
 					elseif ($rowdata['last_skill_change'] > 0)
 						$cellbody .= "&nbsp;<img src=\"" . IMAGE_PATH
-							. "/t0.gif\" alt=\"".$rowdata['last_skill_change']." Points\" />";
+							. "/t0.gif\" alt=\"".$rowdata['last_skill_change']." " . eHtml(t('ui.points')) . "\" />";
 					elseif ($rowdata['last_skill_change'] < 0)
 						$cellbody .= "&nbsp;<img src=\"" . IMAGE_PATH
-							. "/t2.gif\" alt=\"".$rowdata['last_skill_change']." Points\" />";
+							. "/t2.gif\" alt=\"".$rowdata['last_skill_change']." " . eHtml(t('ui.points')) . "\" />";
 				}
 				
 				echo "<td$colalign class=\"$class\">"
@@ -426,7 +433,7 @@ class Table
 <div class="subblock" style="text-align:right;">
 	<span style="text-align:right;">
 <?php
-			echo 'Page: ';
+			echo eHtml(t('ui.page')) . ': ';
 
 			$start = $this->page - intval($this->maxpagenumbers / 2);
 			if ($start < 1) $start=1;
@@ -443,7 +450,7 @@ class Table
 			if ($start > 1)
 			{
 				if ($start > 2)
-					$this->_echoPageNumber(1, "First page", "", " ...");
+					$this->_echoPageNumber(1, t('ui.first_page'), "", " ...");
 				else
 					$this->_echoPageNumber(1, 1);
 			}
@@ -462,7 +469,7 @@ class Table
 				if ($i == $end && $i < $numpages)
 				{
 					if ($i < $numpages - 1)
-						$this->_echoPageNumber($numpages, "Last page", "... ");
+						$this->_echoPageNumber($numpages, t('ui.last_page'), "... ");
 					else
 						$this->_echoPageNumber($numpages, 10);
 				}

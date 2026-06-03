@@ -39,6 +39,16 @@ For support and installation notes visit http://www.hlxcommunity.com
 function printMap($type = 'main')
 {
 	global $db, $game, $g_options, $clandata, $clan;
+
+	$jsOptions = JSON_UNESCAPED_SLASHES;
+	if (defined('JSON_UNESCAPED_UNICODE')) {
+		$jsOptions |= JSON_UNESCAPED_UNICODE;
+	}
+
+	$killsDeathsLabel = json_encode(localized_text('literal.kills_deaths', 'Kills/Deaths'), $jsOptions);
+	$timeLabel = json_encode(localized_text('literal.time_label', 'Time'), $jsOptions);
+	$connectLabel = json_encode(localized_text('literal.connect', 'connect'), $jsOptions);
+	$killsLabel = json_encode(localized_text('literal.kills', 'Kills'), $jsOptions);
 	
 	if ($type == 'main') {
 		echo ('<script src="http://maps.google.com/maps/api/js?callback=Function.prototype&key=' . GOOGLE_MAPS_API_KEY . '" type="text/javascript"></script>');
@@ -59,6 +69,10 @@ function printMap($type = 'main')
 
 			var point_icon = "<?php echo IMAGE_PATH; ?>/mm_20_blue.png";
 			var point_icon_red = "<?php echo IMAGE_PATH; ?>/mm_20_red.png";
+			var killsDeathsLabel = <?php echo $killsDeathsLabel; ?>;
+			var timeLabel = <?php echo $timeLabel; ?>;
+			var connectLabel = <?php echo $connectLabel; ?>;
+			var killsLabel = <?php echo $killsLabel; ?>;
 
 <?php
 		if ($type == 'main') {
@@ -87,10 +101,10 @@ function printMap($type = 'main')
 				var html_text = '<table class="gmapstab"><tr><td colspan="2" class="gmapstabtitle" style="border-bottom:1px solid black;">'+city+', '+country+'</td></tr>';
 				for ( i=0; i<player_info.length; i++) {
 					html_text += '<tr><td><a href="hlstats.php?mode=playerinfo&amp;player='+player_info[i][0]+'">'+player_info[i][1]+'</a></td></tr>';
-					html_text += '<tr><td>Kills/Deaths</td><td>'+player_info[i][2]+':'+player_info[i][3]+'</td></tr>';
+					html_text += '<tr><td>'+killsDeathsLabel+'</td><td>'+player_info[i][2]+':'+player_info[i][3]+'</td></tr>';
 <?php
 					if ($type == 'main') {
-						echo "html_text += '<tr><td>Time</td><td>'+player_info[i][4]+'</td></tr>';";
+						echo "html_text += '<tr><td>'+timeLabel+'</td><td>'+player_info[i][4]+'</td></tr>';";
 					} 
 ?>
 				}
@@ -114,9 +128,9 @@ function printMap($type = 'main')
 				var html_text =   '<table class="gmapstab"><tr><td colspan="2" class="gmapstabtitle" style="border-bottom:1px solid black;">'+city+', '+country+'</td></tr>';
 				for ( i=0; i<servers.length; i++) {
 					html_text += '<tr><td><a href=\"hlstats.php?mode=servers&server_id=' + servers[i][0] + '&amp;game=<?php echo $game; ?>\">' + servers[i][2] + '</a></td></tr>';
-					html_text += '<tr><td>' + servers[i][1] + ' (<a href=\"steam://connect/' + servers[i][1] + '\">connect</a>)</td></tr>';
+					html_text += '<tr><td>' + servers[i][1] + ' (<a href=\"steam://connect/' + servers[i][1] + '\">' + connectLabel + '</a>)</td></tr>';
 				}
-				html_text += '<tr><td>'+kills+' kills</td></tr></table>';
+				html_text += '<tr><td>'+kills+' '+killsLabel+'</td></tr></table>';
 				var infowindow = new google.maps.InfoWindow({
 					content: html_text
 				})

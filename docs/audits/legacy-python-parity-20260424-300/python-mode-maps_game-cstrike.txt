@@ -1,0 +1,364 @@
+HLstatsX Community Edition - Counter-Strike - Map Statistics	 
+ 
+  
+
+			 
+			 
+			 
+			 
+			 
+			 
+			  
+	
+	 
+		 
+			   
+		 
+
+		 
+			 
+				     
+				     
+								
+				     
+			 
+
+		 
+	 
+	 
+		 
+  HLstatsX Community Edition   &raquo;    HLstatsX   &raquo;    Counter-Strike   &raquo;    Map Statistics 			 
+		 
+
+		 
+			 
+									 
+									 
+								Language:
+				 
+											 English 
+											 Русский 
+									 
+			 
+		 
+	 
+	  
+ 
+
+ 
+      
+ 
+        
+
+    
+		 
+		 
+			  Servers  
+
+			  Chat  
+			  Players  
+			  Clans  
+
+			  Countries  
+			  Awards  
+ 
+			  Actions  
+			  Weapons  
+				  Maps  
+	  
+  
+
+
+
+ 
+	 &nbsp; &nbsp;Map Statistics   	 
+		 
+		From a total of  1,235  kills with  554  headshots		 
+		  
+	 
+	  
+	
+ 
+
+ 
+
+		 
+ Rank 
+  Map  
+  Kills &nbsp;  
+ % 
+ Ratio 
+  Headshots  
+ % 
+ Ratio 
+  Hpk  
+  HeatMap  
+		 
+
+ 
+ 1 
+   $2000$   
+ 475 
+ 38.46% 
+    
+ 201 
+ 36.28% 
+    
+ 0.42 
+ &nbsp; 
+ 
+
+ 
+ 2 
+  aim_ulbc_picolo  
+ 233 
+ 18.87% 
+    
+ 116 
+ 20.94% 
+    
+ 0.50 
+ &nbsp; 
+ 
+
+ 
+ 3 
+  de_dust2  
+ 216 
+ 17.49% 
+    
+ 85 
+ 15.34% 
+    
+ 0.39 
+ &nbsp; 
+ 
+
+ 
+ 4 
+  cs_mansion  
+ 142 
+ 11.50% 
+    
+ 62 
+ 11.19% 
+    
+ 0.44 
+ &nbsp; 
+ 
+
+ 
+ 5 
+  de_mirage  
+ 79 
+ 6.40% 
+    
+ 36 
+ 6.50% 
+    
+ 0.46 
+ &nbsp; 
+ 
+
+ 
+ 6 
+  aim_map  
+ 52 
+ 4.21% 
+    
+ 30 
+ 5.42% 
+    
+ 0.58 
+ &nbsp; 
+ 
+
+ 
+ 7 
+  de_spay  
+ 27 
+ 2.19% 
+    
+ 17 
+ 3.07% 
+    
+ 0.63 
+ &nbsp; 
+ 
+
+ 
+ 8 
+  de_jeepathon2k  
+ 11 
+ 0.89% 
+    
+ 7 
+ 1.26% 
+    
+ 0.64 
+ &nbsp; 
+ 
+
+ 
+ 9 
+  de_tuscan_2x2  
+ 0 
+ 0.00% 
+    
+ 0 
+ 0.00% 
+    
+ 0.00 
+ &nbsp; 
+ 
+
+ 
+ 10 
+  de_train_2x2  
+ 0 
+ 0.00% 
+    
+ 0 
+ 0.00% 
+    
+ 0.00 
+ &nbsp; 
+ 
+
+ 
+ 11 
+  de_train  
+ 0 
+ 0.00% 
+    
+ 0 
+ 0.00% 
+    
+ 0.00 
+ &nbsp; 
+ 
+
+ 
+ 12 
+  de_nuke_2x2  
+ 0 
+ 0.00% 
+    
+ 0 
+ 0.00% 
+    
+ 0.00 
+ &nbsp; 
+ 
+
+ 
+ 13 
+  de_nuke  
+ 0 
+ 0.00% 
+    
+ 0 
+ 0.00% 
+    
+ 0.00 
+ &nbsp; 
+ 
+
+ 
+ 14 
+  de_mirage_2x2  
+ 0 
+ 0.00% 
+    
+ 0 
+ 0.00% 
+    
+ 0.00 
+ &nbsp; 
+ 
+
+ 
+ 15 
+  de_inferno_2x2  
+ 0 
+ 0.00% 
+    
+ 0 
+ 0.00% 
+    
+ 0.00 
+ &nbsp; 
+ 
+
+ 
+ 16 
+  de_inferno  
+ 0 
+ 0.00% 
+    
+ 0 
+ 0.00% 
+    
+ 0.00 
+ &nbsp; 
+ 
+
+ 
+ 17 
+  de_dust2_2x2  
+ 0 
+ 0.00% 
+    
+ 0 
+ 0.00% 
+    
+ 0.00 
+ &nbsp; 
+ 
+
+ 
+ 18 
+  de_cbble_2x2  
+ 0 
+ 0.00% 
+    
+ 0 
+ 0.00% 
+    
+ 0.00 
+ &nbsp; 
+ 
+
+		 
+   
+  
+	 
+		 
+			Go to:  Counter-Strike 
+		 
+	 
+ 
+
+ 
+	 
+		 
+		
+			  
+			  
+
+			 
+				 
+					 
+				 
+			 
+			 
+
+			 
+											You are currently viewing the basic version of this page, please enable JavaScript and reload the page to access full functionality.						 
+										
+					Generated in real-time by					 
+						HLstatsX Community Edition 1.11.4					 
+
+									 
+				All images are copyrighted by their respective owners.				  
+				[ Admin ]

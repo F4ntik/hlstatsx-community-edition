@@ -1,0 +1,19 @@
+FROM python:3.11-slim AS base
+
+ENV PYTHONUNBUFFERED=1
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential default-libmysqlclient-dev pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app/scripts/proxy_daemon_py
+
+COPY scripts/proxy_daemon_py /app/scripts/proxy_daemon_py
+
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir .
+
+WORKDIR /app
+COPY scripts/proxy_daemon_py/e2e/hlstats.conf /app/hlstats.conf
+
+CMD ["python", "-m", "proxy_daemon_py.e2e.run_proxy_daemon", "--configfile", "/app/hlstats.conf", "--foreground"]

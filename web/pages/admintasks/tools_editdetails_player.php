@@ -36,12 +36,12 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 For support and installation notes visit http://www.hlxcommunity.com
 */
 
-    if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+	if (!defined('IN_HLSTATS')) {
+        die(t('admin.direct_access'));
     }
 
 	if ($auth->userdata["acclevel"] < 80) {
-		die ("Access denied!");
+		die(t('admin.access_denied'));
 	}
 	
 	$id = -1;
@@ -50,10 +50,10 @@ For support and installation notes visit http://www.hlxcommunity.com
 	}
 ?>
 
-&nbsp;&nbsp;&nbsp;&nbsp;<img src="<?php echo IMAGE_PATH; ?>/downarrow.gif" width="9" height="6" class="imageformat" alt="" /><b>&nbsp;<a href="<?php echo $g_options['scripturl']; ?>?mode=admin&amp;task=tools_editdetails">Edit Player or Clan Details</a></b><br />
+&nbsp;&nbsp;&nbsp;&nbsp;<img src="<?php echo IMAGE_PATH; ?>/downarrow.gif" width="9" height="6" class="imageformat" alt="" /><b>&nbsp;<a href="<?php echo $g_options['scripturl']; ?>?mode=admin&amp;task=tools_editdetails"><?php echo eHtml(t('admin.edit_player_or_clan_details')); ?></a></b><br />
 
 <img src="<?php echo IMAGE_PATH; ?>/spacer.gif" width="1" height="8" border="0" alt=""><br />
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<img src="<?php echo IMAGE_PATH; ?>/downarrow.gif" width="9" height="6" class="imageformat" alt="" /><b>&nbsp;<?php echo "Edit Player #$id"; ?></b><br /><br />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<img src="<?php echo IMAGE_PATH; ?>/downarrow.gif" width="9" height="6" class="imageformat" alt="" /><b>&nbsp;<?php echo eHtml(t('admin.edit_player_number', array('id' => $id))); ?></b><br /><br />
 
 <form method="post" action="<?php echo $g_options['scripturl'] . "?mode=admin&amp;task=$selTask&amp;id=$id&amp;" . strip_tags(SID); ?>">
 <?php
@@ -67,25 +67,25 @@ For support and installation notes visit http://www.hlxcommunity.com
 	$flagselect.=";";
 
 	$proppage = new PropertyPage("hlstats_Players", "playerId", $id, array(
-		new PropertyPage_Group("Profile", array(
-			new PropertyPage_Property("fullName", "Real Name", "text"),
-			new PropertyPage_Property("email", "E-mail Address", "text"),
-			new PropertyPage_Property("homepage", "Homepage URL", "text"),
-			new PropertyPage_Property("flag", "Country Flag", "select",$flagselect),
-			new PropertyPage_Property("skill", "Points", "text"),
-			new PropertyPage_Property("kills", "Kills", "text"),
-			new PropertyPage_Property("deaths", "Deaths", "text"),
-			new PropertyPage_Property("headshots", "Headshots", "text"),
-			new PropertyPage_Property("suicides", "Suicides", "text"),
-			new PropertyPage_Property("hideranking", "Hide Ranking", "select", "0/No;1/Yes;2/Flag as Banned;3/Inactive (Automatic);"),
-			new PropertyPage_Property("blockavatar", "Force Default Avatar Image (note that this overrides images in hlstatsimg/avatars)", "select", "0/No;1/Yes;"),
+		new PropertyPage_Group(t('admin.profile'), array(
+			new PropertyPage_Property("fullName", t('literal.real_name'), "text"),
+			new PropertyPage_Property("email", t('literal.email_address'), "text"),
+			new PropertyPage_Property("homepage", t('admin.homepage_url'), "text"),
+			new PropertyPage_Property("flag", t('admin.country_flag'), "select",$flagselect),
+			new PropertyPage_Property("skill", t('literal.points'), "text"),
+			new PropertyPage_Property("kills", t('literal.kills'), "text"),
+			new PropertyPage_Property("deaths", t('literal.deaths'), "text"),
+			new PropertyPage_Property("headshots", t('literal.headshots'), "text"),
+			new PropertyPage_Property("suicides", t('literal.suicides'), "text"),
+			new PropertyPage_Property("hideranking", t('admin.hide_ranking'), "select", "0/" . t('literal.no') . ";1/" . t('literal.yes') . ";2/" . t('admin.flag_as_banned') . ";3/" . t('admin.inactive_automatic') . ";"),
+			new PropertyPage_Property("blockavatar", t('admin.force_default_avatar'), "select", "0/" . t('literal.no') . ";1/" . t('literal.yes') . ";"),
 		))
 	));
 	
 	if (isset($_POST['fullName']))
 	{
 		$proppage->update();
-		message("success", "Profile updated successfully.");
+		message("success", t('admin.profile_updated'));
 	}
 	$playerId = $db->escape($id);
 	$result = $db->query("
@@ -96,7 +96,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 		WHERE
 			playerId='$playerId'
 	");
-	if ($db->num_rows() < 1) die("No player exists with ID #$id");
+	if ($db->num_rows() < 1) die(t('admin.no_player_exists', array('id' => $id)));
 	
 	$data = $db->fetch_array($result);
 	
@@ -106,7 +106,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	
 	echo '<span class="fNormal">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'
 		. '<a href="' . $g_options['scripturl'] . "?mode=playerinfo&amp;player=$id&amp;" . strip_tags(SID) . '">'
-		. '(View Player Details)</a></span>';
+		. '(' . eHtml(t('admin.view_player_details')) . ')</a></span>';
 ?><br /><br />
 
 <table width="60%" align="center" border="0" cellspacing="0" cellpadding="0">
@@ -114,7 +114,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	<td class="fNormal"><?php
 		$proppage->draw($data);
 ?>
-	<center><input type="submit" value="  Apply  " class="submit" /></center></td>
+	<center><input type="submit" value="  <?php echo eHtml(t('ui.apply')); ?>  " class="submit" /></center></td>
 </tr>
 </table>
 </form>
@@ -127,13 +127,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'ipAddress',
-				'IP Address',
+				t('search.ip_address'),
 				'width=40'
 			),
 			new TableColumn
 			(
 				'eventTime',
-				'Last Used',
+				t('literal.last_use'),
 				'width=60'
 			)
 		),
@@ -158,7 +158,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 <div class="block">
 <?php
-	printSectionTitle('Player IP Addresses');
+	printSectionTitle(t('admin.player_ip_addresses'));
 	$tblIps->draw($result, 50, 50);
 ?>
 </div><br /><br />

@@ -37,11 +37,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+        die(localized_direct_access_message());
     }
 	 
 	if ($auth->userdata["acclevel"] < 80) {
-        die ("Access denied!");
+        die(localized_access_denied_message());
 	}
 ?>
 
@@ -49,12 +49,12 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 <?php
 
-   $servers[0]["name"] = "ELstatsNEO Masterserver";
+   $servers[0]["name"] = t('admin.task.tools_synchronize.masterserver.elstatsneo');
    $servers[0]["host"] = "master.elstatsneo.de"; 
    $servers[0]["port"] = 27801;
    $servers[0]["packet"] = chr(255).chr(255)."Z".chr(255)."1.00".chr(255).chr(255).chr(255);
 
-   $servers[1]["name"] = "HLstatsX Masterserver (doesn't work anymore)";
+   $servers[1]["name"] = t('admin.task.tools_synchronize.masterserver.hlstatsx_legacy');
    $servers[1]["host"] = "master.hlstatsx.com"; 
    $servers[1]["port"] = 27501;
    $servers[1]["packet"] = chr(255).chr(255)."Z".chr(255);
@@ -76,11 +76,11 @@ For support and installation notes visit http://www.hlxcommunity.com
         $first++;  
      }
      if ($first > 0) {
-       echo "<li>Updating <b>$first</b> cheaters...";
+       echo '<li>' . eHtml(t('admin.task.tools_synchronize.progress.update_cheaters', array('count' => $first)));
        $insert_part .= ")";
        $update_query = $query.$insert_part;
        $db->query($update_query);
-       echo "<b>OK</b></li>";
+       echo '<b>' . eHtml(t('admin.tools_reset.status.ok')) . "</b></li>";
      }  
    }  
 
@@ -92,22 +92,22 @@ For support and installation notes visit http://www.hlxcommunity.com
       $host = $servers[$s_id]["host"];
       $port = $servers[$s_id]["port"];
       
-      echo "<li>Requesting cheaterlist from <b>$host:$port</b>...";
+      echo '<li>' . eHtml(t('admin.task.tools_synchronize.progress.request_list', array('host' => $host . ':' . $port)));
       $host = gethostbyname($host);
       $socket = socket_create(AF_INET, SOCK_DGRAM, SOL_UDP);
       $packet = $servers[$s_id]["packet"];
       $bytes_sent = socket_sendto($socket, $packet, strlen($packet), 0, $host, $port);
-      echo "<b>".$bytes_sent."</b> bytes <b>OK</b></li>";
+      echo '<b>' . $bytes_sent . '</b> ' . eHtml(t('admin.task.tools_synchronize.progress.bytes_suffix')) . ' <b>' . eHtml(t('admin.tools_reset.status.ok')) . "</b></li>";
 
-      echo "<li>Retrieving data from masterserver...";
+      echo '<li>' . eHtml(t('admin.task.tools_synchronize.progress.retrieve_data'));
       $recv_bytes = 0;
       $buffer     = "";
       $timeout    = 30;
       $answer     = "";
       $packets    = 0;
       $read       = array($socket);
-      while (socket_select($read, $write = NULL, $except = NULL, &$timeout) > 0) {
-        $recv_bytes += socket_recvfrom($socket, &$buffer, 2000, 0, &$host, &$port);
+      while (socket_select($read, $write = NULL, $except = NULL, $timeout) > 0) {
+        $recv_bytes += socket_recvfrom($socket, $buffer, 2000, 0, $host, $port);
         if (($buffer[0] == chr(255)) && ($buffer[1] == chr(255)) && ($buffer[2] == "Z") && ($buffer[3] == chr(255)) && 
             ($buffer[4] == "1") && ($buffer[5] == ".") && ($buffer[6] == "0") && ($buffer[7] == "0") && ($buffer[8] == chr(255))) { 
           $answer     .= substr($buffer, 9, strlen($buffer));
@@ -118,7 +118,7 @@ For support and installation notes visit http://www.hlxcommunity.com
       }   
       $steam_ids = explode(chr(255), $answer);
       array_pop($steam_ids);
-      echo "recieving <b>$recv_bytes</b> bytes in <b>$packets</b> packets...<b>".count($steam_ids)."</b> cheaters...<b>OK</b></li>";
+      echo eHtml(t('admin.task.tools_synchronize.progress.receive_data', array('bytes' => $recv_bytes, 'packets' => $packets, 'count' => count($steam_ids)))) . '<b>' . eHtml(t('admin.tools_reset.status.ok')) . "</b></li>";
       $query       = "SELECT playerId FROM hlstats_PlayerUniqueIds WHERE uniqueId in ";
       $insert_part = "";
       $first       = 0; 
@@ -144,11 +144,11 @@ For support and installation notes visit http://www.hlxcommunity.com
         hide_cheaters($select_query);
       }
       
-      echo "<li>Closing connection to masterserver...";
+      echo '<li>' . eHtml(t('admin.task.tools_synchronize.progress.close_connection'));
       
       
       socket_close($socket);
-      echo "<b>OK</b></li>";
+      echo '<b>' . eHtml(t('admin.tools_reset.status.ok')) . "</b></li>";
       echo "</ul>\n";
     } else {
         
@@ -164,8 +164,8 @@ For support and installation notes visit http://www.hlxcommunity.com
         <tr class="bg1">
             <td class="fNormal">
 
-If you synchronize with one of the selected master servers, some players may be marked as cheater. You will see them on your VAC Cheater list!<br>
-Choose preferred masterserver: 
+<?php echo eHtml(t('admin.task.tools_synchronize.intro')); ?><br>
+<?php echo eHtml(t('admin.task.tools_synchronize.choose_masterserver')); ?> 
 <SELECT NAME="masterserver">
 
 <?php
@@ -181,7 +181,7 @@ Choose preferred masterserver:
 <p>
 
 <input type="hidden" name="confirm" value="1">
-<center><input type="submit" value="  Synchronize Stats  "></center>
+<center><input type="submit" value="  <?php echo eHtml(t('admin.task.tools_synchronize.button')); ?>  "></center>
 </td>
         </tr>
         

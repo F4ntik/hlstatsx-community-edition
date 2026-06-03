@@ -50,13 +50,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 		WHERE
 			hlstats_Games.code = '$game'
 	");
-	if ($db->num_rows() < 1) error("No such game '$game'.");
+	if ($db->num_rows() < 1) error(localized_no_such_game_message($game));
 	list($gamename) = $db->fetch_row();
 	$db->free_result();
 	pageHeader
 	(
-		array ($gamename, 'Weapon Statistics'),
-		array ($gamename => "%s?game=$game", 'Weapon Statistics' => '')
+		array($gamename, t('literal.weapon_statistics')),
+		array($gamename => "%s?game=$game", t('literal.weapon_statistics') => '')
 	);
 	$result = $db->query
 	("
@@ -80,20 +80,20 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'weapon',
-				'Weapon',
+				t('literal.weapon'),
 				'width=20&type=weaponimg&align=center&link=' . urlencode("mode=weaponinfo&amp;weapon=%k&amp;game=$game"),
 				$fname
 			),
 			new TableColumn
 			(
 				'modifier',
-				'Modifier',
+				t('literal.modifier'),
 				'width=8&align=right'
 			),
 			new TableColumn
 			(
 				'kills',
-				'Kills',
+				t('literal.kills'),
 				'width=8&align=right'
 			),
 			new TableColumn
@@ -105,13 +105,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'kpercent',
-				'Ratio',
+				t('literal.ratio'),
 				'width=18&sort=no&type=bargraph'
 			),
 			new TableColumn
 			(
 				'headshots',
-				'Headshots',
+				t('literal.headshots'),
 				'width=8&align=right'
 			),
 			new TableColumn
@@ -123,13 +123,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 			new TableColumn
 			(
 				'hpercent',
-				'Ratio',
+				t('literal.ratio'),
 				'width=18&sort=no&type=bargraph'
 			),
 			new TableColumn
 			(
 				'hpk',
-				'HS:K',
+				t('literal.hpk_cap'),
 				'width=5&align=right'
 			)
 			
@@ -178,15 +178,15 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 
 <div class="block">
-	<?php printSectionTitle('Weapon Statistics'); ?>
+	<?php printSectionTitle(t('literal.weapon_statistics')); ?>
 	<div class="subblock">
-		From a total of <strong><?php echo number_format($realkills); ?></strong> kills with <strong><?php echo number_format($realheadshots); ?></strong> headshots
+		<?php echo t('literal.from_total_kills_headshots', array('kills' => number_format($realkills), 'headshots' => number_format($realheadshots))); ?>
 	</div>
 	<br /><br />
 	<?php $tblWeapons->draw($result, $db->num_rows($result), 95); ?><br /><br />
 	<div class="subblock">
 		<div style="float:right;">
-			Go to: <a href="<?php echo $g_options["scripturl"] . "?game=$game"; ?>"><?php echo $gamename; ?></a>
+			<?php echo eHtml(t('literal.go_to')); ?>: <a href="<?php echo $g_options["scripturl"] . "?game=$game"; ?>"><?php echo $gamename; ?></a>
 		</div>
 	</div>
 </div>

@@ -41,7 +41,7 @@ For support and installation notes visit http://www.hlxcommunity.com
     }
 	// Action Details
 
-	$rank = valid_request($_GET['rank'], true) or error('No rank ID specified.');
+	$rank = valid_request($_GET['rank'], true) or error(t('literal.no_rank_id'));
 	
 	$db->query("
 		SELECT
@@ -62,17 +62,17 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 	$db->query("SELECT name FROM hlstats_Games WHERE code='$game'");
 	if ($db->num_rows() != 1) {
-		error('Invalid or no game specified.');
+error(t('literal.invalid_game'));
 	} else {
 		list($gamename) = $db->fetch_row();
 	}
 		
 	pageHeader(
-		array($gamename, 'Rank Details', $act_name),
+		array($gamename, t('literal.rank_details'), $act_name),
 		array(
 			$gamename => $g_options['scripturl']."?game=$game",
-			'Ranks' => $g_options['scripturl']."?mode=awards&game=$game&tab=ranks",
-			'Rank Details'=>''
+			t('literal.ranks') => $g_options['scripturl']."?mode=awards&game=$game&tab=ranks",
+			t('literal.rank_details')=>''
 		),
 		$act_name
 	);
@@ -81,17 +81,17 @@ For support and installation notes visit http://www.hlxcommunity.com
 		array(
 			new TableColumn(
 				'playerName',
-				'Player',
+				t('literal.player'),
 				'width=45&align=left&flag=1&link=' . urlencode('mode=playerinfo&amp;player=%k') 
 			),
 			new TableColumn(
 				'kills',
-				'Kills',
+				t('literal.kills'),
 				'width=25&align=right'
 			),
 			new TableColumn(
 				'skill',
-				'Skill',
+				t('literal.skill_label'),
 				'width=25&align=right'
 			)
 		),
@@ -155,10 +155,10 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 
 <div class="block">
-    <?php printSectionTitle('Rank Details'); ?>
+    <?php printSectionTitle(t('literal.rank_details')); ?>
 	<div class="subblock">
 		<div style="float:right;">
-			Back to <a href="<?php echo $g_options['scripturl'] . "?mode=awards&amp;game=$game&tab=ranks"; ?>">Ranks</a>
+			<?php echo eHtml(t('literal.back_to')); ?> <a href="<?php echo $g_options['scripturl'] . "?mode=awards&amp;game=$game&tab=ranks"; ?>"><?php echo eHtml(t('literal.ranks')); ?></a>
 		</div>
 		<div style="clear:both;"></div>
 	</div>

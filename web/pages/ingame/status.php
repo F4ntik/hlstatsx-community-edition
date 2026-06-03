@@ -37,7 +37,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+        die(localized_direct_access_message());
     }
 
 	require(PAGE_PATH.'/livestats.php');
@@ -120,14 +120,14 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 	<table class="data-table">
 		<tr class="data-table-head">
-			<td style="width:37%;" class="fSmall">&nbsp;Server</td>
-			<td style="width:23%;" class="fSmall">&nbsp;Address</td>
-			<td style="width:6%;text-align:center;" class="fSmall">&nbsp;Map</td>
-			<td style="width:6%;text-align:center;" class="fSmall">&nbsp;Played</td>
-			<td style="width:10%;text-align:center;" class="fSmall">&nbsp;Players</td>
-			<td style="width:6%;text-align:center;" class="fSmall">&nbsp;Kills</td>
-			<td style="width:6%;text-align:center;" class="fSmall">&nbsp;Headshots</td>
-			<td style="width:6%;text-align:center;" class="fSmall">&nbsp;Hpk</td>
+			<td style="width:37%;" class="fSmall">&nbsp;<?php echo eHtml(t('literal.server')); ?></td>
+			<td style="width:23%;" class="fSmall">&nbsp;<?php echo eHtml(t('literal.address')); ?></td>
+			<td style="width:6%;text-align:center;" class="fSmall">&nbsp;<?php echo eHtml(t('literal.map')); ?></td>
+			<td style="width:6%;text-align:center;" class="fSmall">&nbsp;<?php echo eHtml(t('literal.played')); ?></td>
+			<td style="width:10%;text-align:center;" class="fSmall">&nbsp;<?php echo eHtml(t('literal.players')); ?></td>
+			<td style="width:6%;text-align:center;" class="fSmall">&nbsp;<?php echo eHtml(t('literal.kills')); ?></td>
+			<td style="width:6%;text-align:center;" class="fSmall">&nbsp;<?php echo eHtml(t('literal.headshots')); ?></td>
+			<td style="width:6%;text-align:center;" class="fSmall">&nbsp;<?php echo eHtml(t('literal.hpk_cap')); ?></td>
 		</tr>
 		<tr class="bg1" valign="middle">
 			<td class="fSmall"><?php

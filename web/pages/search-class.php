@@ -39,11 +39,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 // Search Class
 	class Search
 	{
-		var $query;
-		var $type;
-		var $game;
-		var $uniqueid_string = 'Unique ID';
-		var $uniqueid_string_plural = 'Unique IDs';
+	var $query;
+	var $type;
+	var $game;
+	var $uniqueid_string = '';
+	var $uniqueid_string_plural = '';
 
 		function __construct($query, $type, $game)
 		{
@@ -52,11 +52,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 			$this->query = trim($query);
 			$this->type = $type;
 			$this->game = $game;
+			$this->uniqueid_string = t('search.unique_id');
+			$this->uniqueid_string_plural = t('search.unique_ids');
 
 			if ($g_options['Mode'] == 'LAN')
 			{
-				$this->uniqueid_string = 'IP Address';
-				$this->uniqueid_string_plural = 'IP Addresses';
+				$this->uniqueid_string = t('search.ip_address');
+				$this->uniqueid_string_plural = t('search.ip_addresses');
 			}
 		}
 
@@ -67,18 +69,18 @@ For support and installation notes visit http://www.hlxcommunity.com
 			if (!is_array($searchtypes))
 			{
 				$searchtypes = array(
-					'player' => 'Player Names',
-					'uniqueid' => 'Player' . $this->uniqueid_string_plural
+					'player' => t('search.player_names'),
+					'uniqueid' => ($g_options['Mode'] == 'LAN') ? t('search.player_ip_addresses') : t('search.player_unique_ids')
 				);
 				if ($g_options['Mode'] != 'LAN' && isset($_SESSION['loggedin']) && $_SESSION['acclevel'] >= 80) {
-					$searchtypes['ip'] = 'Player IP Addresses';
+					$searchtypes['ip'] = t('search.player_ip_addresses');
 				}
-				$searchtypes['clan'] = 'Clan Names';
+				$searchtypes['clan'] = t('search.clan_names');
 			}
 ?>
 
 <div class="block">
-	<?php printSectionTitle('Find a Player or Clan'); ?>
+	<?php printSectionTitle(t('search.find_player_or_clan')); ?>
 	<div class="subblock">
 		<form method="get" action="<?php echo $g_options['scripturl']; ?>">
 			<?php
@@ -89,13 +91,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 			?>
 					<table class="data-table" style="width:30%;">
 						<tr valign="middle" class="bg1">
-							<td nowrap="nowrap" style="width:30%;">Search For:</td>
+							<td nowrap="nowrap" style="width:30%;"><?php echo eHtml(t('search.search_for')); ?></td>
 							<td style="width:70%;">
 								<input type="text" name="q" size="20" maxlength="128" value="<?php echo htmlspecialchars($this->query, ENT_QUOTES); ?>" style="width:300px;" />
 							</td>
 						</tr>
 						<tr valign="middle" class="bg1">
-							<td nowrap="nowrap" style="width:30%;">In:</td>
+							<td nowrap="nowrap" style="width:30%;"><?php echo eHtml(t('search.in')); ?></td>
 							<td style="width:70%;">
 								<?php
 									echo getSelect('st', $searchtypes, $this->type);
@@ -103,11 +105,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 							</td>
 						</tr>
 						<tr valign="middle" class="bg1">
-							<td nowrap="nowrap" style="width:30%;">Game:</td>
+							<td nowrap="nowrap" style="width:30%;"><?php echo eHtml(t('search.game')); ?></td>
 							<td style="width:70%;">
 								<?php
 									$games = array ();
-									$games[''] = '(All)';
+									$games[''] = t('search.all');
 									$result = $db->query("
 										SELECT
 											hlstats_Games.code,
@@ -129,7 +131,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 						</tr>
 						<tr class="bg1">
 							<td colspan="3" style="text-align:center;">
-								<input type="submit" value=" Find Now " class="submit" />
+								<input type="submit" value=" <?php echo eHtml(t('search.find_now')); ?> " class="submit" />
 							</td> 
 						</tr>
 					</table>
@@ -149,9 +151,9 @@ For support and installation notes visit http://www.hlxcommunity.com
 			if ($link_clan == -1) $link_clan = "mode=claninfo&amp;clan=%k";
 ?>
 
-</div class="block">
+<div class="block">
 	<a name="results"></a>
-	<?php printSectionTitle('Search Results'); ?>
+	<?php printSectionTitle(t('ui.search_results')); ?>
 	<br /><br />
 
 <?php
@@ -167,19 +169,19 @@ For support and installation notes visit http://www.hlxcommunity.com
 						new TableColumn
 						(
 							'player_id',
-							'ID',
+							t('search.id'),
 							'width=5&align=right'
 						),
 						new TableColumn
 						(
 							'name',
-							'Player',
+							t('literal.player'),
 							'width=65&flag=1&link=' . urlencode($link_player)
 						),
 						new TableColumn
 						(
 							'gamename',
-							'Game',
+							t('ui.game'),
 							'width=30'
 						)
 					),
@@ -264,19 +266,19 @@ For support and installation notes visit http://www.hlxcommunity.com
 						new TableColumn
 						(
 							'lastName',
-							'Player',
+							t('literal.player'),
 							'width=50&flag=1&link=' . urlencode($link_player)
 						),
 						new TableColumn
 						(
 							'gamename',
-							'Game',
+							t('ui.game'),
 							'width=30'
 						),
 						new TableColumn
 						(
 							'playerId',
-							'ID',
+							t('search.id'),
 							'width=5&align=right'
 						)
 					),
@@ -345,7 +347,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			elseif ($this->type == 'ip')
 			{
 				if (!isset($_SESSION['loggedin']) || $_SESSION['acclevel'] < 80) {
-					die ("Access denied!");
+					die(t('admin.access_denied'));
 				}
 				$table = new Table
 				(
@@ -354,19 +356,19 @@ For support and installation notes visit http://www.hlxcommunity.com
 						new TableColumn
 						(
 							'player_id',
-							'ID',
+							t('search.id'),
 							'width=5&align=right'
 						),
 						new TableColumn
 						(
 							'name',
-							'Player',
+							t('literal.player'),
 							'width=65&flag=1&link=' . urlencode($link_player)
 						),
 						new TableColumn
 						(
 							'gamename',
-							'Game',
+							t('ui.game'),
 							'width=30'
 						)
 					),
@@ -463,25 +465,25 @@ For support and installation notes visit http://www.hlxcommunity.com
 						new TableColumn
 						(
 							'tag',
-							'Tag',
+							t('literal.tag'),
 							'width=15'
 						),
 						new TableColumn
 						(
 							'name',
-							'Name',
+							t('literal.name'),
 							'width=50&icon=clan&link=' . urlencode($link_clan)
 						),
 						new TableColumn
 						(
 							'gamename',
-							'Game',
+							t('ui.game'),
 							'width=30'
 						),
 						new TableColumn
 						(
 							'clanId',
-							'ID',
+							t('search.id'),
 							'width=5&align=right'
 						)
 					),
@@ -542,10 +544,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 	<br /><br />
 	<div class="subblock" style="text-align:center;">
-		Search results: <strong><?php echo $numitems; ?></strong> items matching
+		<?php echo t('search.results_count', array('count' => $numitems)); ?>
 	</div>
 </div>
 <?php
 		}
 	}
 ?>
+

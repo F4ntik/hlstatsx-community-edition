@@ -1,0 +1,30 @@
+# Files excluded from both legacy and Python full-corpus replay because the
+# pinned legacy Perl daemon crashes on them before a clean reference DB can be
+# produced. Keep this list as filenames only so both helpers can apply it.
+L0107045.log
+L0112040.log
+L0112041.log
+L0112042.log
+L0112043.log
+L0112044.log
+L0112045.log
+L0112046.log
+L0112047.log
+L0112048.log
+L0112049.log
+L0112050.log
+L0112051.log
+L0112052.log
+L0112053.log
+L0112054.log
+L0112055.log
+L0112056.log
+L0112057.log
+L0112058.log
+L0112059.log
+L0112060.log
+L0112061.log
+L0112062.log
+L0112063.log
+L0112064.log
+L0112065.log

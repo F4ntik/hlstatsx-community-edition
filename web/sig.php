@@ -40,9 +40,13 @@ Originally idea for sig.php by Tankster
 
 foreach ($_SERVER as $key => $entry) {
 	if ($key !== 'HTTP_COOKIE') {
-		$search_pattern  = array('/<script>/', '/<\/script>/', '/[^A-Za-z0-9.\-\/=:;_?#&~]/');
-		$replace_pattern = array('', '', '');
-		$entry = preg_replace($search_pattern, $replace_pattern, $entry);
+		if (is_array($entry) || is_object($entry)) {
+			$_SERVER[$key] = '';
+			continue;
+		}
+
+		$entry = preg_replace('/<script\b[^>]*>.*?<\/script>/isu', '', (string) $entry);
+		$entry = preg_replace('/[^\p{L}\p{N}.\-\/=:;_?#&~]/u', '', $entry);
   
 		if ($key == 'PHP_SELF') {
 			if ((strrchr($entry, '/') !== '/hlstats.php') &&
@@ -64,10 +68,16 @@ foreach ($_SERVER as $key => $entry) {
 }
   
 define('IN_HLSTATS', true);
-header("Content-Type: image/png");
 
 // Load database classes
 require ('config.php');
+require (INCLUDE_PATH . '/i18n.php');
+
+session_start();
+init_i18n();
+
+header("Content-Type: image/png");
+
 require (INCLUDE_PATH . '/class_db.php');
 require (INCLUDE_PATH . '/functions.php');
 
@@ -452,7 +462,7 @@ if ($player_id > 0) {
 		imagestring($image, 9, $start_header_name, 2, $playerdata['lastName'], $caption_color);
 	}
 
-	imagestring($image, 2, 15, 22, 'Position ', $font_color);
+	imagestring($image, 2, 15, 22, localized_text('sig.position', 'Position '), $font_color);
 	if (is_numeric($rank)) {
 		imagestring($image, 3, 70, 22, number_format($rank), $font_color);
 		$start_pos_x = 71 + (imagefontwidth(3) * strlen(number_format($rank))) + 7;
@@ -460,7 +470,7 @@ if ($player_id > 0) {
 		imagestring($image, 3, 70, 22, $rank, $font_color);
 		$start_pos_x = 71 + (imagefontwidth(3) * strlen($rank)) + 7;
 	}
-	$ranktext = 'of '.$pl_count['count'].' players with '.$playerdata['skill'].' (';
+	$ranktext = localized_text('sig.of_players_with_skill', 'of {count} players with {skill} (', array('count' => $pl_count['count'], 'skill' => $playerdata['skill']));
 	imagestring($image, 2, $start_pos_x, 22, $ranktext, $font_color);
 	
 	$start_pos_x += (imagefontwidth(2) * strlen($ranktext));
@@ -471,10 +481,10 @@ if ($player_id > 0) {
 		imagedestroy($trend);
 		$start_pos_x += 10;
 	}
-	imagestring($image, 2, $start_pos_x, 22, $skill_change.') points', $font_color);
-	imagestring($image, 2,  15, 34, 'Frags: '.$playerdata['kills'].' kills : '.$playerdata['deaths'].' deaths ('.$playerdata['kpd'].'), '.$playerdata['headshots'].' headshots ('.$playerdata['hpk'].'%)', $font_color);
-	imagestring($image, 2,  15, 45, 'Activity: '.$playerdata['lastevent'].' ('.$playerdata['activity'].'%), Time: '.$con_time.' hours', $font_color);
-	imagestring($image, 2,  15, 56, 'Statistics: ', $font_color);imagestring($image, 2,  85, 56, $g_options['siteurl'], $link_color);
+	imagestring($image, 2, $start_pos_x, 22, localized_text('sig.points_delta', '{points}) points', array('points' => $skill_change)), $font_color);
+	imagestring($image, 2,  15, 34, localized_text('sig.frags_line', 'Frags: {kills} kills : {deaths} deaths ({kpd}), {headshots} headshots ({hpk}%)', array('kills' => $playerdata['kills'], 'deaths' => $playerdata['deaths'], 'kpd' => $playerdata['kpd'], 'headshots' => $playerdata['headshots'], 'hpk' => $playerdata['hpk'])), $font_color);
+	imagestring($image, 2,  15, 45, localized_text('sig.activity_line', 'Activity: {lastevent} ({activity}%), Time: {hours} hours', array('lastevent' => $playerdata['lastevent'], 'activity' => $playerdata['activity'], 'hours' => $con_time)), $font_color);
+	imagestring($image, 2,  15, 56, localized_text('sig.statistics', 'Statistics: '), $font_color);imagestring($image, 2,  85, 56, $g_options['siteurl'], $link_color);
 
 	$watermark = imagecreatefrompng(IMAGE_PATH.'/watermark.png');
 	imagecopymerge_alpha($image, $watermark, 334, 58, 0, 0, 60, 12, 50);

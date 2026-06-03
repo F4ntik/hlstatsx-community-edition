@@ -1,0 +1,4 @@
+Python worker replay of strict window-300 (same flags as strict-300 parity) after map-lifecycle fix.
+Replay summary: processed=300, skipped=0, errors=0, dropped_lines=509.
+Manifests: python-input-manifest-300-control.txt, python-dropped-lines-300-control.txt.
+Post-replay hlstats_Servers (37.230.137.48:27015): act_map non-empty, map_changes=347 (cumulative on this DB volume).

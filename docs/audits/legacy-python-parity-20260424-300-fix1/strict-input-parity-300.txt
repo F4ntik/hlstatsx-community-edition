@@ -1,0 +1,6 @@
+﻿legacy-input-manifest-300.txt	lines=300	sha256=60b1dafd9d13504ab35bcd7e600197e81117736fe104ffb452bf32e42f272271
+python-input-manifest-300.txt	lines=300	sha256=60b1dafd9d13504ab35bcd7e600197e81117736fe104ffb452bf32e42f272271
+PAIR_MATCH	legacy-input-manifest-300.txt vs python-input-manifest-300.txt	True
+legacy-dropped-lines-300.txt	lines=509	sha256=35847e5d58e2204c360ce57fe784d26065e8e692269076e5fe7314660c0ef65c
+python-dropped-lines-300.txt	lines=509	sha256=35847e5d58e2204c360ce57fe784d26065e8e692269076e5fe7314660c0ef65c
+PAIR_MATCH	legacy-dropped-lines-300.txt vs python-dropped-lines-300.txt	True

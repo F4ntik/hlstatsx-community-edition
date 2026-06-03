@@ -38,39 +38,40 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 define('IN_HLSTATS', true);
 require('config.php');
+require(INCLUDE_PATH . '/i18n.php');
 
 define('TITLE_IMAGE', IMAGE_PATH . "/downarrow.gif");
 
-$historical_cache=0;
-if(defined('HISTORICAL_CACHE'))
-{
-	$historical_cache=constant('HISTORICAL_CACHE');
-}
-
-if($historical_cache==1)
-{
-	$rawmd5=md5(http_build_query($_REQUEST));
-	$dir1=substr($rawmd5,0,1);
-	$dir2=substr($rawmd5,1,1);
-	$cachetarget=sprintf("cache/%s/%s/%s", $dir1, $dir2, $rawmd5);
-
-	@mkdir("cache/$dir1");
-	@mkdir("cache/$dir1/$dir2");
-
-	if(file_exists($cachetarget))
-	{
-		file_put_contents("cache/cachehit",$cachetarget . "\n", FILE_APPEND);
-		echo file_get_contents($cachetarget);
-		die;
-	}
-}
-
 session_start();
+init_i18n();
 
 if (!empty($_GET['logout']) && $_GET['logout'] == '1') {
 	unset($_SESSION['loggedin']);
-	header("Location: http://".$_SERVER['HTTP_HOST'].$_SERVER['SCRIPT_NAME']);
+	header('Location: ' . lang_url(current_lang(), array('logout', '_smoke')));
 	die;
+}
+
+$historical_cache = 0;
+if (defined('HISTORICAL_CACHE'))
+{
+	$historical_cache = constant('HISTORICAL_CACHE');
+}
+
+if ($historical_cache == 1)
+{
+	$cacheRequest = $_GET + $_POST;
+	$cacheTarget = i18n_historical_cache_target($cacheRequest, current_lang());
+	$cachetarget = $cacheTarget['path'];
+
+	@mkdir("cache/{$cacheTarget['dir1']}");
+	@mkdir("cache/{$cacheTarget['dir1']}/{$cacheTarget['dir2']}");
+
+	if (file_exists($cachetarget))
+	{
+		file_put_contents("cache/cachehit", $cachetarget . "\n", FILE_APPEND);
+		echo file_get_contents($cachetarget);
+		die;
+	}
 }
 
 // Several stuff added by Malte Bayer
@@ -83,9 +84,13 @@ $siteurlneo=str_replace('\\','/',$siteurlneo);
 
 foreach ($_SERVER as $key => $entry) {
 	if ($key !== 'HTTP_COOKIE') {
-		$search_pattern  = array('/<script>/', '/<\/script>/', '/[^A-Za-z0-9.\-\/=:;_?#&~]/');
-		$replace_pattern = array('', '', '');
-		$entry = preg_replace($search_pattern, $replace_pattern, $entry);
+		if (is_array($entry) || is_object($entry)) {
+			$_SERVER[$key] = '';
+			continue;
+		}
+
+		$entry = preg_replace('/<script\b[^>]*>.*?<\/script>/isu', '', (string) $entry);
+		$entry = preg_replace('/[^\p{L}\p{N}.\-\/=:;_?#&~]/u', '', $entry);
   
 		if ($key == "PHP_SELF") {
 			if ((strrchr($entry, '/') !== '/hlstats.php') &&
@@ -166,6 +171,10 @@ if (!$game)
 }
 else
 {
+	if (isset($_SESSION['game']) && $_SESSION['game'] !== $game) {
+		unset($_SESSION['realgame']);
+		$realgame = null;
+	}
 	$_SESSION['game'] = $game;
 }
 
@@ -219,12 +228,12 @@ $valid_modes = array(
    
 if (file_exists('./updater') && $mode != 'updater')
 {
-	pageHeader(array('Update Notice'), array('Update Notice' => ''));
+	pageHeader(array(t('ui.updater.notice_title')), array(t('ui.updater.notice_title') => ''));
 	echo "<div class=\"warning\">\n" . 
-	"<span class=\"warning-heading\"><img src=\"".IMAGE_PATH."/warning.gif\" alt=\"Warning\"> Warning:</span><br />\n" .
-	"<span class=\"warning-text\">The updater folder was detected in your web directory.<br />
-	To perform a Database Update, please go to <strong><a href=\"{$g_options['scripturl']}?mode=updater\">HLX:CE Database Updater</a></strong> to perform the database update.<br /><br />
-	<strong>If you have already performed the database update, <strong>you must delete the \"updater\" folder from your web folder.</span>\n</div>";
+	"<span class=\"warning-heading\"><img src=\"".IMAGE_PATH."/warning.gif\" alt=\"".eHtml(t('ui.warning'))."\"> " . eHtml(t('ui.warning')) . ":</span><br />\n" .
+	"<span class=\"warning-text\">" . eHtml(t('ui.updater.detected')) . "<br />" .
+	eHtml(t('ui.updater.perform')) . " <strong><a href=\"{$g_options['scripturl']}?mode=updater\">" . eHtml(t('ui.updater.link')) . "</a></strong>.<br /><br />" .
+	"<strong>" . eHtml(t('ui.updater.cleanup')) . "</strong></span>\n</div>";
 	pageFooter();
 	die();
 }
@@ -247,3 +256,5 @@ else
 }
 
 ?>
+
+

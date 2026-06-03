@@ -1,0 +1,2 @@
+﻿legacy_players	0
+legacy_frags	0

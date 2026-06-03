@@ -1,0 +1,115 @@
+name: Nightly Parity Acceptance
+
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+    inputs:
+      max_import_files:
+        description: Maximum import files for the heavy parity replay
+        required: false
+        default: '1000'
+      run_heavy_parity_gate:
+        description: Run the Docker-backed parity gate
+        type: boolean
+        required: false
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  replay-helper-smoke:
+    name: Replay helper smoke
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: scripts:scripts/replay_baseline
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install test dependencies
+        run: python -m pip install pytest==7.4.3
+
+      - name: Run lightweight replay helper tests
+        run: python -m pytest scripts/replay_baseline/tests
+
+  heavy-parity-gate:
+    name: Heavy parity replay
+    needs: replay-helper-smoke
+    runs-on: [self-hosted, Windows, parity]
+    if: ${{ github.event_name == 'schedule' || github.event.inputs.run_heavy_parity_gate == 'true' }}
+    env:
+      PYTHONPATH: scripts;scripts/replay_baseline
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Run Docker-backed dual replay
+        shell: powershell
+        run: |
+          $maxImportFiles = [int] "${{ github.event.inputs.max_import_files || '1000' }}"
+          & scripts/replay_baseline/comparison/Run-DualContour-1000.ps1 `
+            -UseDumpRestore `
+            -ReuseValidLegacy `
+            -MaxImportFiles $maxImportFiles
+
+      - name: Run post-replay GeoIP backfill
+        shell: powershell
+        run: |
+          docker exec hlstatsx-python-worker `
+            python -m hlstats_awards_py `
+            --configfile /app/hlstats.conf `
+            --geoip
+
+      - name: Compare replay databases
+        shell: powershell
+        run: |
+          python scripts/replay_baseline/compare_stats_dbs.py --max-examples 20
+
+      - name: Smoke replay-backed EN/RU web routes
+        shell: powershell
+        run: |
+          python scripts/replay_baseline/web_route_smoke.py `
+            --base-url http://127.0.0.1:8281 `
+            --langs en ru
+
+      - name: Upload parity artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-audit-artifacts
+          retention-days: 7
+          if-no-files-found: ignore
+          path: |
+            docs/audits/legacy-python-parity-20260423/**
+            scripts/replay_baseline/artifacts/parity-traces/**
+            scripts/replay_baseline/comparison/.parity-state/**
+            scripts/replay_baseline/artifacts/**/*.json
+            scripts/replay_baseline/artifacts/**/*.txt
+
+      - name: Upload release-readiness artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-readiness-artifacts
+          retention-days: 14
+          if-no-files-found: ignore
+          path: |
+            docs/release-readiness.md
+            docs/status.md
+            docs/test-plan.md
+            scripts/replay_baseline/artifacts/**/perf-profile.txt
+            scripts/replay_baseline/artifacts/**/*benchmark*.txt
+            scripts/replay_baseline/artifacts/**/*metrics*.txt
+            scripts/replay_baseline/artifacts/**/*summary.json

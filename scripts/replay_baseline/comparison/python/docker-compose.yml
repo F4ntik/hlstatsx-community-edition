@@ -1,0 +1,104 @@
+services:
+  db:
+    image: mariadb:10.11
+    container_name: hlstatsx-python-db
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --max-allowed-packet=256M
+      - --sql-mode=NO_ENGINE_SUBSTITUTION
+    environment:
+      MARIADB_ROOT_PASSWORD: root123
+      MARIADB_DATABASE: hlstatsxce
+      MARIADB_USER: hlstatsxce
+      MARIADB_PASSWORD: hlx123
+    ports:
+      - "3327:3306"
+    volumes:
+      - hlstatsx_python_db:/var/lib/mysql
+    networks:
+      - hlstatsx_python_net
+
+  web:
+    build:
+      context: ../../../..
+      dockerfile: scripts/replay_baseline/comparison/python/Dockerfile.web
+    container_name: hlstatsx-python-web
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_started
+    ports:
+      - "8281:80"
+    networks:
+      - hlstatsx_python_net
+
+  proxy-daemon:
+    build:
+      context: ../../../..
+      dockerfile: scripts/replay_baseline/comparison/python/Dockerfile.proxy
+    container_name: hlstatsx-python-proxy
+    depends_on:
+      db:
+        condition: service_started
+      hlstats-worker:
+        condition: service_started
+    restart: unless-stopped
+    ports:
+      - "27601:27500/udp"
+    networks:
+      - hlstatsx_python_net
+
+  hlstats-worker:
+    build:
+      context: ../../../..
+      dockerfile: scripts/replay_baseline/comparison/python/Dockerfile.worker
+    container_name: hlstatsx-python-worker
+    depends_on:
+      db:
+        condition: service_started
+      log-ftp:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - ${HLSTATS_GEOIP_DIR_HOST_PATH:-../../../../scripts/GeoLiteCity}:/app/GeoLiteCity:ro
+    networks:
+      - hlstatsx_python_net
+
+  # Local FTP with game logs (for hlstats_ftp_py smoke / dev). Passive ports must match PASV_*.
+  # Mount host logs without copying: set HLSTATS_FTP_LOGS_HOST_PATH to an absolute path (e.g. replay artifacts).
+  # Default: ./ftp_logs next to this compose file. See FTP_CONTOUR.md and env.ftp-logs.example.
+  log-ftp:
+    image: fauria/vsftpd
+    container_name: hlstatsx-python-log-ftp
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "ss -tlnp | grep -q ':21 ' || exit 1"]
+      interval: 2s
+      timeout: 3s
+      retries: 45
+      start_period: 5s
+    environment:
+      FTP_USER: hlxslogs
+      FTP_PASS: hlxftp123
+      PASV_ADDRESS: 127.0.0.1
+      PASV_MIN_PORT: 21100
+      PASV_MAX_PORT: 21110
+      FILE_OPEN_MODE: "0666"
+      LOCAL_UMASK: "022"
+      LOG_STDOUT: "YES"
+    ports:
+      - "2121:21"
+      - "21100-21110:21100-21110"
+    volumes:
+      - ${HLSTATS_FTP_LOGS_HOST_PATH:-./ftp_logs}:/home/vsftpd/hlxslogs
+    networks:
+      - hlstatsx_python_net
+
+networks:
+  hlstatsx_python_net:
+    driver: bridge
+
+volumes:
+  hlstatsx_python_db:

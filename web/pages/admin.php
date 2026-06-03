@@ -37,7 +37,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
 if (!defined('IN_HLSTATS')) {
-    die('Do not access this file directly.');
+    die(t('admin.direct_access'));
 }
 
 global $db;
@@ -166,7 +166,7 @@ class Auth
 					else
 					{
 						$this->ok = false;
-						$this->error = 'Your session has expired. Please try again.';
+						$this->error = t('admin.session_expired');
 						$this->password = '';
 
 						$this->printAuth();
@@ -199,7 +199,7 @@ class Auth
 				}
 				else
 				{
-					$this->error = 'The password you supplied is incorrect.';
+					$this->error = t('admin.password_incorrect');
 				}
 				$this->password = '';
 				$this->printAuth();
@@ -209,7 +209,7 @@ class Auth
 		{
 			// The username is wrong
 			$this->ok = false;
-			$this->error = 'The username you supplied is not valid.';
+			$this->error = t('admin.username_invalid');
 			$this->printAuth();
 		}
 	}
@@ -318,7 +318,7 @@ class EditList
 			$returnstr .= "}\n";
 			$returnstr .= "</script>\n";
 
-			$returnstr .= '<div class="helpwindow" ID="' . $this->helpDIV . '">No help text available</div>';
+			$returnstr .= '<div class="helpwindow" ID="' . $this->helpDIV . '">' . eHtml(t('admin.no_help_text')) . '</div>';
 
 		}
 		return $returnstr;
@@ -346,7 +346,7 @@ class EditList
 			{
 				if ($col->type == 'ipaddress' && !preg_match('/^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$/', $value))
 				{
-					$this->errors[] = "Column '$col->title' requires a valid IP address for new row";
+					$this->errors[] = t('admin.editlist.error.invalid_ip_new_row', array('column' => translate_ui_literal($col->title)));
 					$this->newerror = true;
 					$okcols++;
 				}
@@ -377,7 +377,7 @@ class EditList
 			}
 			elseif ($col->required)
 			{
-				$this->errors[] = "Required column '$col->title' must have a value for new row";
+				$this->errors[] = t('admin.editlist.error.required_new_row', array('column' => translate_ui_literal($col->title)));
 				$this->newerror = true;
 			}
 		}
@@ -451,19 +451,19 @@ class EditList
 						$value = '0';
 					}
 
-					if ($col->type == 'password' && $value == '(encrypted)')
+					if ($col->type == 'password' && ($value == '(encrypted)' || $value == t('admin.editlist.password_encrypted')))
 					{
 						continue;
 					}
 
 					if ($value == '' && $col->required)
 					{
-						$this->errors[] = "Required column '$col->title' must have a value for row '$row'";
+						$this->errors[] = t('admin.editlist.error.required_row', array('column' => translate_ui_literal($col->title), 'row' => $row));
 						$rowerror = true;
 					}
 					elseif ($col->type == "ipaddress" && !preg_match("/^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$/", $value))
 					{
-						$this->errors[] = "Column '$col->title' requires a valid IP address for row '$row'";
+						$this->errors[] = t('admin.editlist.error.invalid_ip_row', array('column' => translate_ui_literal($col->title), 'row' => $row));
 						$rowerror = true;
 					}
 
@@ -517,7 +517,7 @@ class EditList
 		{
 ?>
 			<td align="right" class="fSmall"><?php
-			echo 'ID';
+			echo eHtml(t('search.id'));
 ?></td>
 <?php
 		}
@@ -528,7 +528,7 @@ class EditList
 			{
 				continue;
 			}
-			echo '<td class="fSmall">' . $col->title . "</td>\n";
+			echo '<td class="fSmall">' . eHtml(translate_ui_literal($col->title)) . "</td>\n";
 		}
 
 		if ($this->drawDetailsLink)
@@ -543,7 +543,7 @@ class EditList
 
 ?>
 			<td align="center" class="fSmall"><?php
-		echo 'Delete';
+		echo eHtml(t('admin.editlist.delete'));
 ?></td>
 		</tr>
 
@@ -574,7 +574,7 @@ class EditList
 				global $gamecode;
 ?>
 			<td align="center" class="bg2 fSmall"><?php
-				echo "<a href='" . $g_options["scripturl"] . "?mode=admin&amp;game=$gamecode&amp;task=" . $this->DetailsLink . "&amp;key=" . $rowdata[$this->keycol] . "'><b>CONFIGURE</b></a>";
+				echo "<a href='" . $g_options["scripturl"] . "?mode=admin&amp;game=$gamecode&amp;task=" . $this->DetailsLink . "&amp;key=" . $rowdata[$this->keycol] . "'><b>" . eHtml(t('admin.editlist.configure')) . "</b></a>";
 ?></td>
 <?php
 			}
@@ -589,7 +589,7 @@ class EditList
 <?php
 		if ( $draw_new )
 		{
-			echo "<td class=\"bg1 fSmall\" align=\"center\">" . "new</td>\n";
+			echo "<td class=\"bg1 fSmall\" align=\"center\">" . eHtml(t('admin.editlist.new')) . "</td>\n";
 
 			if ($this->showid)
 				echo "<td class=\"bg2 fSmall\" align=\"right\">" . "&nbsp;</td>\n";
@@ -760,7 +760,7 @@ class EditList
 				default:
 					$onclick = '';
 					if ($col->type == 'password') {
-						$onclick = " onclick=\"if (this.value == '(encrypted)') this.value='';\"";
+						$onclick = " onclick=\"if (this.value == '" . addslashes(t('admin.editlist.password_encrypted')) . "') this.value='';\"";
 					}
 
 					if ($col->datasource != '' && !isset($rowdata[$col->name]))
@@ -775,6 +775,10 @@ class EditList
 					$onClick = '';
 					if (!empty($this->helpKey) && !empty($rowdata[$this->helpKey])) {
 						$onClick = "onmouseover=\"javascript:showHelp('" . strtolower($rowdata[$this->helpKey]) . "')\" onmouseout=\"javascript:hideHelp()\"";
+					}
+
+					if ($col->type == 'password' && $value == '(encrypted)') {
+						$value = t('admin.editlist.password_encrypted');
 					}
 
 					$input_value = (!empty($value)) ? htmlentities(html_entity_decode($value), ENT_COMPAT, 'UTF-8') : "";
@@ -901,7 +905,7 @@ class PropertyPage_Group
 	{
 		global $g_options;
 ?>
-<b><?php echo $this->title; ?></b><br />
+<b><?php echo eHtml(translate_ui_literal($this->title)); ?></b><br />
 <table width="100%" border="0" cellspacing="0" cellpadding="0">
 
 <tr valign="top">
@@ -940,7 +944,7 @@ class PropertyPage_Property
 ?>
 <tr style="vertical-align:middle;">
 	<td class="bg1" style="width:45%;"><?php
-		echo $this->title . ':';
+		echo eHtml(translate_ui_literal($this->title)) . ':';
 ?></td>
 	<td class="bg1" style="width:55%;"><?php
 		switch ($this->type)
@@ -981,6 +985,7 @@ class PropertyPage_Property
 function message($icon, $msg)
 {
 	global $g_options;
+	$msg = translate_ui_literal($msg);
 ?>
 		<table width="60%" border="0" cellspacing="0" cellpadding="0">
 
@@ -1000,7 +1005,7 @@ if ($auth->ok === false) {
 	return;
 }
 
-pageHeader(array('Admin'), array('Admin' => ''));
+pageHeader(array(t('ui.admin')), array(t('ui.admin') => ''));
 
 $selTask = isset($_GET['task']) ? valid_request($_GET['task'], false) : '';
 $selGame = isset($_GET['game']) ? valid_request($_GET['game'], false) : '';
@@ -1012,47 +1017,47 @@ $selGame = isset($_GET['game']) ? valid_request($_GET['game'], false) : '';
 	<td><?php
 
 // General Settings
-$admintasks['options'] = new AdminTask('HLstatsX:CE Settings', 80);
-$admintasks['adminusers'] = new AdminTask('Admin Users', 100);
-$admintasks['games'] = new AdminTask('Games', 80);
-$admintasks['hostgroups'] = new AdminTask('Host Groups', 100);
-$admintasks['clantags'] = new AdminTask('Clan Tag Patterns', 80);
-$admintasks['voicecomm'] = new AdminTask('Manage Voice Servers', 80);
+$admintasks['options'] = new AdminTask(t('admin.task.options.title'), 80);
+$admintasks['adminusers'] = new AdminTask(t('admin.task.adminusers.title'), 100);
+$admintasks['games'] = new AdminTask(t('admin.task.games.title'), 80);
+$admintasks['hostgroups'] = new AdminTask(t('admin.task.hostgroups.title'), 100);
+$admintasks['clantags'] = new AdminTask(t('admin.task.clantags.title'), 80);
+$admintasks['voicecomm'] = new AdminTask(t('admin.task.voicecomm.title'), 80);
 
 // Game Settings
-$admintasks['newserver'] = new AdminTask('Add Server', 80, 'game');
-$admintasks['servers'] = new AdminTask('Edit Servers', 80, 'game');
-$admintasks['serversettings'] = new AdminTask('&nbsp;&nbsp;&nbsp;&gt;&gt;&nbsp;Server Details', 80, 'game');
-$admintasks['actions'] = new AdminTask('Actions', 80, 'game');
-$admintasks['teams'] = new AdminTask('Teams', 80, 'game');
-$admintasks['roles'] = new AdminTask('Roles', 80, 'game');
-$admintasks['weapons'] = new AdminTask('Weapons', 80, 'game');
-$admintasks['awards_weapons'] = new AdminTask('Weapon Awards', 80, 'game');
-$admintasks['awards_plyractions'] = new AdminTask('Plyr Action Awards', 80, 'game');
-$admintasks['awards_plyrplyractions'] = new AdminTask('PlyrPlyr Action Awards', 80, 'game');
-$admintasks['awards_plyrplyractions_victim'] = new AdminTask('PlyrPlyr Action Awards (Victim)', 80, 'game');
-$admintasks['ranks'] = new AdminTask('Ranks (triggered by Kills)', 80, 'game');
-$admintasks['ribbons'] = new AdminTask('Ribbons (triggered by Awards)', 80, 'game');
+$admintasks['newserver'] = new AdminTask(t('admin.task.newserver.title'), 80, 'game');
+$admintasks['servers'] = new AdminTask(t('admin.task.servers.title'), 80, 'game');
+$admintasks['serversettings'] = new AdminTask('&nbsp;&nbsp;&nbsp;&gt;&gt;&nbsp;' . t('admin.task.serversettings.title'), 80, 'game');
+$admintasks['actions'] = new AdminTask(t('literal.actions'), 80, 'game');
+$admintasks['teams'] = new AdminTask(t('admin.task.teams.title'), 80, 'game');
+$admintasks['roles'] = new AdminTask(t('literal.roles'), 80, 'game');
+$admintasks['weapons'] = new AdminTask(t('literal.weapons'), 80, 'game');
+$admintasks['awards_weapons'] = new AdminTask(t('admin.task.awards_weapons.title'), 80, 'game');
+$admintasks['awards_plyractions'] = new AdminTask(t('admin.task.awards_plyractions.title'), 80, 'game');
+$admintasks['awards_plyrplyractions'] = new AdminTask(t('admin.task.awards_plyrplyractions.title'), 80, 'game');
+$admintasks['awards_plyrplyractions_victim'] = new AdminTask(t('admin.task.awards_plyrplyractions_victim.title'), 80, 'game');
+$admintasks['ranks'] = new AdminTask(t('admin.task.ranks.title'), 80, 'game');
+$admintasks['ribbons'] = new AdminTask(t('admin.task.ribbons.title'), 80, 'game');
 
 // Tools
-$admintasks['tools_perlcontrol'] = new AdminTask('HLstatsX: CE Daemon Control', 80, 'tool', 'Reload or stop your HLX: CE Daemons');
-$admintasks['tools_editdetails'] = new AdminTask('Edit Player or Clan Details', 80, 'tool', 'Edit a player or clan\'s profile information.');
-$admintasks['tools_adminevents'] = new AdminTask('Admin-Event History', 80, 'tool', 'View event history of logged Rcon commands and Admin Mod messages.');
-$admintasks['tools_ipstats'] = new AdminTask('Host Statistics', 80, 'tool', 'See which ISPs your players are using.');
-$admintasks['tools_optimize'] = new AdminTask('Optimize Database', 100, 'tool', 'This operation tells the MySQL server to clean up the database tables, optimizing them for better performance. It is recommended that you run this at least once a month.');
+$admintasks['tools_runtimecontrol'] = new AdminTask(t('admin.task.tools_runtimecontrol.title'), 80, 'tool', t('admin.task.tools_runtimecontrol.description'));
+$admintasks['tools_editdetails'] = new AdminTask(t('admin.task.tools_editdetails.title'), 80, 'tool', t('admin.task.tools_editdetails.description'));
+$admintasks['tools_adminevents'] = new AdminTask(t('admin.task.tools_adminevents.title'), 80, 'tool', t('admin.task.tools_adminevents.description'));
+$admintasks['tools_ipstats'] = new AdminTask(t('admin.task.tools_ipstats.title'), 80, 'tool', t('admin.task.tools_ipstats.description'));
+$admintasks['tools_optimize'] = new AdminTask(t('admin.task.tools_optimize.title'), 100, 'tool', t('admin.task.tools_optimize.description'));
 //$admintasks['tools_synchronize'] = new AdminTask('Synchronize Statistics', 80, 'tool', 'Sychronize all players with the offical global ELstatsNEO banlist with catched VAC cheaters.');
-$admintasks['tools_resetdbcollations'] = new AdminTask('Reset All DB Collations to UTF8', 100, 'tool', 'Reset DB Collations to UTF-8 if you receive collation errors after an upgrade from another HLstats(X)-based system.');
+$admintasks['tools_resetdbcollations'] = new AdminTask(t('admin.task.tools_resetdbcollations.title'), 100, 'tool', t('admin.task.tools_resetdbcollations.description'));
 
 // Sub-Tools
-$admintasks['tools_editdetails_player'] = new AdminTask('Edit Player Details', 80, 'subtool', 'Edit a player\'s profile information.');
-$admintasks['tools_editdetails_clan'] = new AdminTask('Edit Clan Details', 80, 'subtool', 'Edit a clan\'s profile information.');
+$admintasks['tools_editdetails_player'] = new AdminTask(t('admin.task.tools_editdetails_player.title'), 80, 'subtool', t('admin.task.tools_editdetails_player.description'));
+$admintasks['tools_editdetails_clan'] = new AdminTask(t('admin.task.tools_editdetails_clan.title'), 80, 'subtool', t('admin.task.tools_editdetails_clan.description'));
 
 // Reset Tools
-$admintasks['tools_reset'] = new AdminTask('Full or Partial Reset', 100, 'tool', 'Resets chosen data globally or for selected game', 'reset');
-$admintasks['tools_reset_2'] = new AdminTask('Clean up Statistics', 100, 'tool', 'Delete all inactive players, clans and corresponding events from the database.', 'reset');
+$admintasks['tools_reset'] = new AdminTask(t('admin.task.tools_reset.title'), 100, 'tool', t('admin.task.tools_reset.description'), 'reset');
+$admintasks['tools_reset_2'] = new AdminTask(t('admin.task.tools_reset_2.title'), 100, 'tool', t('admin.task.tools_reset_2.description'), 'reset');
 
 // Game Settings Tools
-$admintasks['tools_settings_copy'] = new AdminTask('Duplicate Game settings', 80, 'tool', 'Duplicate a whole game settings tree to split servers of same gametype', 'settingstool');
+$admintasks['tools_settings_copy'] = new AdminTask(t('admin.task.tools_settings_copy.title'), 80, 'tool', t('admin.task.tools_settings_copy.description'), 'settingstool');
 
 
 // Show Tool
@@ -1062,7 +1067,7 @@ if (!empty($admintasks[$selTask]) && ($admintasks[$selTask]->type == 'tool' || $
 
 	$code = $selTask;
 ?>
-&nbsp;<img src="<?php echo IMAGE_PATH; ?>/downarrow.gif" width="9" height="6" alt="" /><b>&nbsp;<a href="<?php echo $g_options['scripturl']; ?>?mode=admin">Tools</a></b><br />
+&nbsp;<img src="<?php echo IMAGE_PATH; ?>/downarrow.gif" width="9" height="6" alt="" /><b>&nbsp;<a href="<?php echo $g_options['scripturl']; ?>?mode=admin"><?php echo eHtml(t('admin.heading.tools')); ?></a></b><br />
 <img src="<?php echo IMAGE_PATH; ?>/spacer.gif" width="1" height="8" border="0" alt="" /><br />
 
 <?php
@@ -1073,7 +1078,7 @@ else
 	// General Settings
 
 ?>
-&nbsp;<img src="<?php echo IMAGE_PATH; ?>/downarrow.gif" width="9" height="6" alt="" /><b>&nbsp;General Settings</b><br /><br />
+&nbsp;<img src="<?php echo IMAGE_PATH; ?>/downarrow.gif" width="9" height="6" alt="" /><b>&nbsp;<?php echo eHtml(t('admin.heading.general_settings')); ?></b><br /><br />
 <?php
 	foreach ($admintasks as $code => $task)
 	{
@@ -1109,7 +1114,7 @@ else
 	}
 ?>
 	
-&nbsp;<img src="<?php echo IMAGE_PATH; ?>/downarrow.gif" width="9" height="6" alt="" /><b>&nbsp;Game Settings</b><br /><br />
+&nbsp;<img src="<?php echo IMAGE_PATH; ?>/downarrow.gif" width="9" height="6" alt="" /><b>&nbsp;<?php echo eHtml(t('admin.heading.game_settings')); ?></b><br /><br />
 <?php
 	$gamesresult = $db->query("
 			SELECT
@@ -1178,7 +1183,7 @@ if (!$selTask || !$admintasks[$selTask])
 {
 	echo '<td width="50%">';
 ?>
-&nbsp;<img src="<?php echo IMAGE_PATH; ?>/downarrow.gif" width="9" height="6" alt="" /><b>&nbsp;Tools</b>
+&nbsp;<img src="<?php echo IMAGE_PATH; ?>/downarrow.gif" width="9" height="6" alt="" /><b>&nbsp;<?php echo eHtml(t('admin.heading.tools')); ?></b>
 
 <ul>
 <?php

@@ -37,33 +37,36 @@ For support and installation notes visit http://www.hlxcommunity.com
 */
 
     if (!defined('IN_HLSTATS')) {
-        die('Do not access this file directly.');
+die(localized_direct_access_message());
     }
 
 	if ($auth->userdata["acclevel"] < 100) {
-        die ("Access denied!");
+        die(localized_access_denied_message());
 	}
 	
 	$edlist = new EditList("id", "hlstats_HostGroups", "server", false);
-	$edlist->columns[] = new EditListColumn("pattern", "Host Pattern", 30, true, "text", "", 128);
-	$edlist->columns[] = new EditListColumn("name", "Group Name", 30, true, "text", "", 128);
+	$edlist->columns[] = new EditListColumn("pattern", t('admin.task.hostgroups.column.host_pattern'), 30, true, "text", "", 128);
+	$edlist->columns[] = new EditListColumn("name", t('admin.task.hostgroups.column.group_name'), 30, true, "text", "", 128);
 	
 	if ($_POST)
 	{
 		if ($edlist->update())
-			message("success", "Operation successful.");
+			message("success", t('admin.operation_successful'));
 		else
 			message("warning", $edlist->error());
 	}
 	
 ?>
-Host Groups allow you to group, for example, all players from "...adsl.someisp.net" as "SomeISP ADSL", in the Host Statistics admin tool.<p>
+<?php echo t('admin.task.hostgroups.intro'); ?><p>
 
-The Host Pattern should look like the <b>end</b> of the hostname. For example a pattern ".adsl.someisp.net" will match "1234.ny.adsl.someisp.net". You can use asterisks "*" in the pattern, e.g. ".ny.*.someisp.net". The asterisk matches zero or more of any character except a dot ".".<p>
+<?php echo t('admin.task.hostgroups.pattern_help'); ?><p>
 
-The patterns are sorted below in the order they will be applied. A more specific pattern should match before a less specific pattern.<p>
+<?php echo t('admin.task.hostgroups.ordering_help'); ?><p>
 
-<b>Note</b> Run <b>hlstats-resolve.pl --regroup</b> to apply grouping changes to existing data.<p>
+<?php
+	$regroupCommand = '<code>python -m hlstats_resolve_py.cli --configfile /path/to/hlstats.conf --regroup</code>';
+	echo t('admin.task.hostgroups.regroup_note', array('command' => $regroupCommand));
+?><p>
 <?php $result = $db->query("
 		SELECT
 			id,
@@ -82,7 +85,7 @@ The patterns are sorted below in the order they will be applied. A more specific
 
 <table width="75%" border=0 cellspacing=0 cellpadding=0>
 <tr>
-	<td align="center"><input type="submit" value="  Apply  " class="submit"></td>
+	<td align="center"><input type="submit" value="  <?php echo eHtml(t('ui.apply')); ?>  " class="submit"></td>
 </tr>
 </table>
 
