@@ -7,8 +7,9 @@ import contextlib
 import sys
 import signal
 import re
+import time
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import MappingProxyType
 from datetime import datetime
 from typing import Literal, Protocol
@@ -130,6 +131,57 @@ class TrackedServer:
         self.state.pending_map = value
 
 
+@dataclass(slots=True)
+class RuntimeMetrics:
+    """In-memory runtime counters emitted through structured summary logs."""
+
+    started_at: float = field(default_factory=time.perf_counter)
+    events_processed: int = 0
+    stdin_records: int = 0
+    udp_datagrams: int = 0
+    packets_dropped: int = 0
+    flush_attempts: int = 0
+    flush_failures: int = 0
+    control_commands_total: int = 0
+    control_commands_rejected: int = 0
+    events_by_category: dict[str, int] = field(default_factory=dict)
+    control_commands_by_type: dict[str, int] = field(default_factory=dict)
+
+    def record_event(self, category: str) -> None:
+        self.events_processed += 1
+        self.events_by_category[category] = self.events_by_category.get(category, 0) + 1
+
+    def record_control(self, command: str, *, rejected: bool = False) -> None:
+        normalized = command.strip().strip(";").upper()
+        self.control_commands_total += 1
+        self.control_commands_by_type[normalized] = self.control_commands_by_type.get(normalized, 0) + 1
+        if rejected:
+            self.control_commands_rejected += 1
+
+    def record_flush(self, *, failed: bool = False) -> None:
+        self.flush_attempts += 1
+        if failed:
+            self.flush_failures += 1
+
+    def snapshot(self) -> dict[str, object]:
+        elapsed = time.perf_counter() - self.started_at
+        throughput = self.events_processed / elapsed if elapsed > 0 else 0.0
+        return {
+            "elapsed_seconds": round(elapsed, 3),
+            "events_processed": self.events_processed,
+            "events_per_second": round(throughput, 1),
+            "stdin_records": self.stdin_records,
+            "udp_datagrams": self.udp_datagrams,
+            "packets_dropped": self.packets_dropped,
+            "flush_attempts": self.flush_attempts,
+            "flush_failures": self.flush_failures,
+            "control_commands_total": self.control_commands_total,
+            "control_commands_rejected": self.control_commands_rejected,
+            "events_by_category": dict(sorted(self.events_by_category.items())),
+            "control_commands_by_type": dict(sorted(self.control_commands_by_type.items())),
+        }
+
+
 class ServerRegistry:
     """In-memory lookup of tracked servers keyed by ``address:port``."""
 
@@ -185,6 +237,14 @@ _ROUND_WIN_ACTIONS = {
 }
 
 MapLifecyclePhase = Literal["loading", "started"]
+
+
+def _format_metric_mapping(value: object) -> str:
+    if not isinstance(value, Mapping):
+        return "none"
+    if not value:
+        return "none"
+    return ",".join(f"{key}:{value[key]}" for key in sorted(value))
 
 
 def _last_regex_match(pattern: re.Pattern[str], text: str) -> re.Match[str] | None:
@@ -263,10 +323,15 @@ class HlstatsRuntime:
         self._servers = ServerRegistry()
         self._consumer_task: asyncio.Task[None] | None = None
         self._shutdown_requested = asyncio.Event()
+        self._metrics = RuntimeMetrics()
 
     @property
     def shutdown_requested(self) -> asyncio.Event:
         return self._shutdown_requested
+
+    @property
+    def metrics(self) -> RuntimeMetrics:
+        return self._metrics
 
     async def start(self, host: str | None, port: int) -> None:
         """Connect to MySQL, load server state, and start the UDP listener."""
@@ -291,15 +356,44 @@ class HlstatsRuntime:
                 await self._consumer_task
             self._consumer_task = None
         await self._udp_server.stop()
-        with contextlib.suppress(Exception):
-            self._storage.flush_pending()
+        self._flush_pending()
         self._adapter.close()
+        self.log_metrics_summary("runtime stop")
         self._logger.notice("HLstats worker stopped")
 
     def request_shutdown(self) -> None:
         """Signal that the main loop should exit."""
 
         self._shutdown_requested.set()
+
+    def log_metrics_summary(self, reason: str) -> None:
+        """Emit a stable one-line runtime metrics summary for operators and CI logs."""
+
+        snapshot = self._metrics.snapshot()
+        self._logger.notice(
+            "HLstats metrics: "
+            f"reason={reason!r} "
+            f"elapsed_seconds={snapshot['elapsed_seconds']} "
+            f"events_processed={snapshot['events_processed']} "
+            f"events_per_second={snapshot['events_per_second']} "
+            f"stdin_records={snapshot['stdin_records']} "
+            f"udp_datagrams={snapshot['udp_datagrams']} "
+            f"packets_dropped={snapshot['packets_dropped']} "
+            f"flush_attempts={snapshot['flush_attempts']} "
+            f"flush_failures={snapshot['flush_failures']} "
+            f"control_commands_total={snapshot['control_commands_total']} "
+            f"control_commands_rejected={snapshot['control_commands_rejected']} "
+            f"events_by_category={_format_metric_mapping(snapshot['events_by_category'])} "
+            f"control_commands_by_type={_format_metric_mapping(snapshot['control_commands_by_type'])}"
+        )
+
+    def _flush_pending(self) -> None:
+        try:
+            self._storage.flush_pending()
+        except Exception:
+            self._metrics.record_flush(failed=True)
+        else:
+            self._metrics.record_flush()
 
     async def _consume_datagrams(self) -> None:
         while True:
@@ -309,8 +403,7 @@ class HlstatsRuntime:
                     timeout=_UDP_IDLE_FLUSH_SECONDS,
                 )
             except asyncio.TimeoutError:
-                with contextlib.suppress(Exception):
-                    self._storage.flush_pending()
+                self._flush_pending()
                 continue
             try:
                 await self._handle_datagram(datagram)
@@ -320,6 +413,7 @@ class HlstatsRuntime:
                 self._udp_server.queue.task_done()
 
     async def _handle_datagram(self, datagram: InboundDatagram) -> None:
+        self._metrics.udp_datagrams += 1
         payload = datagram.text.strip()
         host, port = datagram.address
 
@@ -338,10 +432,12 @@ class HlstatsRuntime:
         try:
             envelope = parse_proxy_envelope(payload)
         except ValueError:
+            self._metrics.packets_dropped += 1
             self._logger.control(f"Ignoring non-proxied payload from {host}:{port}")
             return
 
         if envelope.proxy_key != self._proxy_key:
+            self._metrics.packets_dropped += 1
             self._logger.e403(f"Proxy key mismatch from {host}:{port}; dropping packet")
             return
 
@@ -354,6 +450,7 @@ class HlstatsRuntime:
 
         server = self._servers.get(envelope.server_address)
         if server is None:
+            self._metrics.packets_dropped += 1
             self._logger.e403(
                 f"Unknown source server '{envelope.server_address or '<missing>'}'; dropping packet"
             )
@@ -367,6 +464,7 @@ class HlstatsRuntime:
 
     def _handle_control_command(self, command: str, host: str, port: int) -> str | None:
         normalized = command.strip().strip(";").upper()
+        self._metrics.record_control(normalized)
         self._logger.control(f"Command received from {host}:{port}: {normalized}")
 
         if normalized == "HEARTBEAT":
@@ -393,6 +491,7 @@ class HlstatsRuntime:
         port: int,
     ) -> str:
         normalized = command.raw.strip().strip(";").upper()
+        self._metrics.record_control(normalized, rejected=True)
         self._logger.control(
             f"Rejected unauthenticated mutating control command from {host}:{port}: {normalized}"
         )
@@ -415,8 +514,10 @@ class HlstatsRuntime:
 
         server = self._servers.get(server_address)
         if server is None:
+            self._metrics.packets_dropped += 1
             self._logger.e403(f"Unknown source server '{server_address}'; dropping stdin line")
             return
+        self._metrics.stdin_records += 1
         self._process_event_payload(payload=line, server=server, source_label=server_address)
 
     def finalize_stdin_import(self) -> None:
@@ -451,6 +552,7 @@ class HlstatsRuntime:
         )
         update = self._dispatcher.dispatch(event, context)
         self._storage.record(update, context)
+        self._metrics.record_event(update.category.value)
         self._finalize_round_status(event, server, round_status_for_event)
         if self._stdin_verbose_events:
             self._logger.notice(
@@ -540,6 +642,7 @@ async def _serve(argv: Sequence[str] | None = None) -> int:
             runtime.finalize_stdin_import()
             storage.end_stdin_batch()
             logger.notice(f"Import of log file complete. Scanned {record_count} log records.")
+            runtime.log_metrics_summary("stdin import complete")
             runtime._adapter.close()
             return 0
         except Exception as exc:  # pragma: no cover - defensive startup logging

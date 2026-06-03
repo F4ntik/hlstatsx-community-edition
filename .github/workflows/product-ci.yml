@@ -149,6 +149,7 @@ jobs:
             docs/autonomy-review-20260601.md
             docs/autonomy-work-plan-20260601.md
             docs/next-chat-task.md
+            docs/release-readiness.md
           )
           for doc in "${required_docs[@]}"; do
             test -s "$doc"
@@ -156,3 +157,4 @@ jobs:
           grep -q "repository-wide CI" docs/status.md
           grep -q "Current parity gates" docs/test-plan.md
           grep -q "GeoIP" docs/test-plan.md
+          grep -q "HLstats metrics" docs/release-readiness.md

@@ -352,6 +352,78 @@ def test_runtime_stdin_verbose_emits_per_event_notice() -> None:
     assert "Recorded connection event 'connect'" in stream.getvalue()
 
 
+def test_runtime_metrics_track_processed_events_and_summary() -> None:
+    adapter = StubAdapter()
+    storage = StubStorage()
+    stream = StringIO()
+    logger = ProxyLogger(LoggerConfig(stream=stream))
+    server = ProxyUdpServer(logger)
+    runtime = HlstatsRuntime(adapter, server, logger, build_dispatcher(), storage)
+    adapter.connect()
+    runtime._reload_state()
+
+    runtime.process_stdin_line(
+        'L 01/02/2024 - 03:00:00: "Alice<2><STEAM_1:1:111><CT>" connected, address "1.2.3.4:27005"',
+        "127.0.0.1:27015",
+    )
+    runtime.process_stdin_line(
+        'L 01/02/2024 - 03:00:01: Team "CT" triggered "SFUI_Notice_CTs_Win"',
+        "127.0.0.1:27015",
+    )
+    runtime.process_stdin_line(
+        'L 01/02/2024 - 03:00:02: "Alice<2><STEAM_1:1:111><CT>" said "hello"',
+        "127.0.0.1:27015",
+    )
+
+    snapshot = runtime.metrics.snapshot()
+    assert snapshot["events_processed"] == 3
+    assert snapshot["events_by_category"] == {
+        "connection": 1,
+        "generic": 1,
+        "team_bonus": 1,
+    }
+    assert snapshot["stdin_records"] == 3
+
+    runtime.log_metrics_summary("stdin import complete")
+
+    log_contents = stream.getvalue()
+    assert "HLstats metrics: reason='stdin import complete'" in log_contents
+    assert "events_processed=3" in log_contents
+    assert "events_by_category=connection:1,generic:1,team_bonus:1" in log_contents
+
+
+def test_runtime_metrics_track_control_and_dropped_packets() -> None:
+    adapter = StubAdapter()
+    storage = StubStorage()
+    logger = ProxyLogger(LoggerConfig(stream=StringIO()))
+    server = ProxyUdpServer(logger)
+    runtime = HlstatsRuntime(adapter, server, logger, build_dispatcher(), storage)
+    adapter.connect()
+    runtime._reload_state()
+
+    assert runtime._handle_control_command("HEARTBEAT", "127.0.0.1", 12345) == "Heartbeat OK"
+    reload_command = runtime_module.parse_control_command("C;RELOAD;")
+    assert reload_command is not None
+    assert (
+        runtime._reject_unauthenticated_mutating_control(
+            reload_command,
+            "127.0.0.1",
+            12345,
+        )
+        == "FAILED CONTROL COMMAND: RELOAD requires PROXY Key"
+    )
+    runtime.process_stdin_line(
+        'L 01/02/2024 - 03:00:00: "Alice<2><STEAM_1:1:111><CT>" connected, address "1.2.3.4:27005"',
+        "192.0.2.1:27015",
+    )
+
+    snapshot = runtime.metrics.snapshot()
+    assert snapshot["control_commands_total"] == 2
+    assert snapshot["control_commands_by_type"] == {"HEARTBEAT": 1, "RELOAD": 1}
+    assert snapshot["control_commands_rejected"] == 1
+    assert snapshot["packets_dropped"] == 1
+
+
 def test_load_settings_requires_server_identity_for_stdin(tmp_path) -> None:
     config_path = tmp_path / "hlstats.conf"
     config_path.write_text(

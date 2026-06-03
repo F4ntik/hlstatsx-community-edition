@@ -189,9 +189,8 @@ Current parity state:
 
 ## In Progress
 
-- [ ] Phase 9 of `docs/autonomy-work-plan-20260601.md`: add release-readiness
-  observability, benchmark/profiling guidance, deployment/config docs, and
-  artifact publishing where needed.
+- [ ] No active implementation phase. Next work should be scoped from the
+  release checklist or a fresh product requirement.
 
 ## Done
 
@@ -357,13 +356,23 @@ Current parity state:
   workflow runs `scripts/replay_baseline/web_route_smoke.py` after replay,
   GeoIP backfill, and DB compare to cover representative EN/RU web routes on
   replay-backed data.
+- Completed Phase 9 of `docs/autonomy-work-plan-20260601.md`: `hlstats_py`
+  now emits a stable structured metrics summary on runtime stop and finite
+  stdin import completion, including processed events, event throughput, stdin
+  and UDP counters, dropped packets, flush attempts/failures, and control-plane
+  command/rejection counts. `docs/release-readiness.md` now defines the
+  observability contract, profiling/benchmark commands, release candidate
+  checklist, deployment/config handoff notes, and the current log-based
+  metrics limitation. `.github/workflows/nightly-parity.yml` now uploads a
+  separate `release-readiness-artifacts` bundle for release handoff evidence
+  alongside the parity audit artifact.
 - Frontend i18n backlog (`P6a`/`P6b`/`P6c`) remains complete for the supported
   EN/RU product contour.
 
 ## Next
 
-1. Start Phase 9: add runtime/release-readiness observability and profiling
-   documentation, then publish any CI artifacts needed for release handoff.
+1. Use `docs/release-readiness.md` as the release-candidate checklist and
+   evidence handoff runbook.
 2. Keep the stale reconnect-code fix out of scope unless fresh code or test
    evidence contradicts the current implementation.
 

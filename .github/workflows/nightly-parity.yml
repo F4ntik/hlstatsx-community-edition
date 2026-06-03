@@ -97,3 +97,19 @@ jobs:
             scripts/replay_baseline/comparison/.parity-state/**
             scripts/replay_baseline/artifacts/**/*.json
             scripts/replay_baseline/artifacts/**/*.txt
+
+      - name: Upload release-readiness artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-readiness-artifacts
+          retention-days: 14
+          if-no-files-found: ignore
+          path: |
+            docs/release-readiness.md
+            docs/status.md
+            docs/test-plan.md
+            scripts/replay_baseline/artifacts/**/perf-profile.txt
+            scripts/replay_baseline/artifacts/**/*benchmark*.txt
+            scripts/replay_baseline/artifacts/**/*metrics*.txt
+            scripts/replay_baseline/artifacts/**/*summary.json

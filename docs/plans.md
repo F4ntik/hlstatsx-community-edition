@@ -24,6 +24,8 @@ Canonical runbooks:
   [`docs/parity-debug-pipeline.md`](parity-debug-pipeline.md)
 - audit evidence and bug triage:
   [`docs/audits/legacy-python-parity-20260423/README.md`](audits/legacy-python-parity-20260423/README.md)
+- release-readiness metrics, profiling, artifact, and deployment handoff:
+  [`docs/release-readiness.md`](release-readiness.md)
 
 Current autonomy follow-up entrypoint:
 
@@ -57,9 +59,10 @@ Current autonomy follow-up entrypoint:
   `TeamBonuses` residuals.
 - Keep replay, compare, and representative EN/RU smoke checks runnable without
   duplicating their runbooks across multiple docs.
-- For autonomy/release-readiness continuation, treat
-  [`docs/autonomy-work-plan-20260601.md`](autonomy-work-plan-20260601.md) as the
-  phased execution plan and start with its `Phase 0`.
+- The autonomy/release-readiness follow-up through Phase 9 is complete for the
+  current scope. For release-candidate preparation, use
+  [`docs/release-readiness.md`](release-readiness.md) and update
+  `docs/status.md` with fresh evidence.
 - Use a legacy-first, subagent-assisted debug loop for parity changes: inspect
   the Perl algorithm before changing Python, reduce each residual to a
   single-log/window case, add a regression test, rerun the same replay, and
@@ -172,6 +175,8 @@ Definition of done:
 - the repo can be described as a standalone Python+i18n product lane
 - validation evidence exists for runtime, replay, frontend behavior, and the
   remaining accepted parity differences
+- release-readiness has an explicit metrics/profiling/checklist handoff and
+  CI artifact path for retained evidence
 
 ### [x] P6a. Retire the reviewed frontend i18n backlog
 

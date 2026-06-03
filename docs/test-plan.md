@@ -17,6 +17,8 @@ Validate that the integrated product repository works as one coherent stack:
   [`docs/parity-debug-pipeline.md`](parity-debug-pipeline.md)
 - parity acceptance layers, fixture identity, and Perl boundaries:
   [`docs/parity-acceptance.md`](parity-acceptance.md)
+- release-readiness metrics, profiling, artifact, and deployment handoff:
+  [`docs/release-readiness.md`](release-readiness.md)
 - audit flow, artifacts, and parity bug plan:
   [`docs/audits/legacy-python-parity-20260423/README.md`](audits/legacy-python-parity-20260423/README.md)
 
@@ -81,13 +83,14 @@ CI coverage:
   failed-ping reconnect behavior. `scripts/hlstats_py/tests/test_storage.py`
   pins the stdin batch skip-ping bridge that currently consumes that adapter.
 - `.github/workflows/nightly-parity.yml` is the scheduled/manual Phase 7
-  parity acceptance workflow. It always runs lightweight replay helper smoke
-  and has an opt-in/manual plus scheduled heavy gate for the Docker-backed
-  legacy-vs-Python replay contour. The heavy job is bound to a self-hosted
-  Windows parity runner because the current contour scripts use Windows
-  PowerShell, Docker Compose, fixed local container names, and host bind paths.
-  The job runs dual replay, post-replay GeoIP backfill, compact DB compare,
-  and uploads parity state/audit artifacts.
+  parity acceptance workflow and Phase 9 release artifact handoff. It always
+  runs lightweight replay helper smoke and has an opt-in/manual plus scheduled
+  heavy gate for the Docker-backed legacy-vs-Python replay contour. The heavy
+  job is bound to a self-hosted Windows parity runner because the current
+  contour scripts use Windows PowerShell, Docker Compose, fixed local container
+  names, and host bind paths. The job runs dual replay, post-replay GeoIP
+  backfill, compact DB compare, replay-backed EN/RU smoke, and uploads both
+  parity state/audit artifacts and `release-readiness-artifacts`.
 
 Boundary checks:
 
@@ -112,6 +115,33 @@ Boundary checks:
   unless `import_mode=True`. Also pin positive import-mode multi-statement
   `client_flag` behavior and wiring tests for `hlstats_py --stdin` plus FTP
   batch import.
+- Runtime metrics changes require focused `hlstats_py` runtime tests for
+  processed-event counters, category grouping, stdin/UDP/drop counters,
+  flush-attempt counters, control command/rejection counters, and the stable
+  `HLstats metrics:` summary log line.
+
+### Observability / profiling / release handoff
+
+Use [`docs/release-readiness.md`](release-readiness.md) as the canonical
+Phase 9 validation runbook.
+
+Required checks when observability or release-handoff behavior changes:
+
+- targeted `hlstats_py` runtime tests for metrics counters and summary logs;
+- docs sanity check that `docs/release-readiness.md`, `docs/status.md`, and
+  `docs/test-plan.md` stay aligned;
+- workflow syntax/review for `.github/workflows/nightly-parity.yml` artifact
+  paths when release bundles change.
+
+Release candidate evidence should include:
+
+- product CI results;
+- heavy parity replay plus post-replay GeoIP backfill and compact compare;
+- replay-backed EN/RU web smoke;
+- at least one `HLstats metrics:` summary from stdin import or runtime stop;
+- benchmark/profile output when parser, storage, replay, DB mode, reconnect,
+  lifecycle, or control-plane behavior changed;
+- `release-readiness-artifacts` from nightly/manual parity when available.
 
 ### Replay / runtime parity
 
