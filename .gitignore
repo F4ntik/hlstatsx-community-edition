@@ -11,8 +11,16 @@ scripts/GeoLiteCity/*.mmdb
 /scripts/hlstats_py/.mypy_cache/
 /scripts/hlstats_py/.ruff_cache/
 /scripts/hlstats_py/.pytest_cache/
+/scripts/hlstats_py/.pytest-cache-local/
+/scripts/hlstats_py/pytest-cache-files-*/
+/scripts/hlstats_py/scripts/**/pytest-cache-files-*/
 /scripts/hlstats_py/tests/__pycache__/
 __pycache__/
+**/__pycache__/
+/.pytest_cache/
+/.pytest-basetemp*/
+/.tmp-pytest*/
+/pytest-basetemp*/
 
 # Generated replay/audit logs
 *.log

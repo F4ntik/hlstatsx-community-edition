@@ -85,7 +85,7 @@ For support and installation notes visit http://www.hlxcommunity.com
         <tr bgcolor="#FF0000">
             <td class="fNormal" style="color: #FFF; font-weight: bold; font-size: medium;" align="center">
 				<?php
-				$reloadLink = '<a href="' . $g_options['scripturl'] . '?mode=admin&amp;task=tools_perlcontrol">' . eHtml(t('admin.task.serversettings.reload')) . '</a>';
+				$reloadLink = '<a href="' . $g_options['scripturl'] . '?mode=admin&amp;task=tools_runtimecontrol">' . eHtml(t('admin.task.serversettings.reload')) . '</a>';
 				echo t('admin.task.serversettings.runtime_notice', array('reload_link' => $reloadLink));
 				?>
 			</td>

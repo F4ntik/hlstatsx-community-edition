@@ -111,7 +111,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 		
 		<tr class="bg1">
 			<td class="fNormal"><?php
-$stopDaemonLink = '<a href="' . $g_options['scripturl'] . '?mode=admin&amp;task=tools_perlcontrol">' . eHtml(t('admin.tools_reset.stop_daemon')) . '</a>';
+$stopDaemonLink = '<a href="' . $g_options['scripturl'] . '?mode=admin&amp;task=tools_runtimecontrol">' . eHtml(t('admin.tools_reset.stop_daemon')) . '</a>';
 echo eHtml(t('admin.task.tools_reset_2.confirmation'));
 ?><p>
 

@@ -194,6 +194,12 @@ Current parity state:
 
 ## Done
 
+- Prepared the `hlstatsx_py` release-line cleanup: obsolete local Perl
+  production/runtime and maintenance entrypoints were removed from the active
+  product lane, while replay/parity harnesses, retained evidence, tests, logs,
+  and Python runtime/maintenance replacements remain in place. The admin
+  runtime control page now uses a runtime-oriented route/key instead of the old
+  Perl-control naming. The Python import path remains `hlstats_py`.
 - Restored legacy-style daily `last_skill_change` persistence for the Python
   runtime so the existing player/clan/country ranking arrows render from live
   replay data again. The web layer already consumed `hlstats_Players.last_skill_change`;
@@ -387,7 +393,8 @@ Current parity state:
 
 - This repo is the product integration lane, not the upstream PR lane.
 - Python is the default runtime path for the product lane.
-- Perl remains legacy-only for validation and parity reference behavior.
+- Perl remains legacy-only for validation and parity reference behavior through
+  replay/reference tooling, not as a local production runtime surface.
 - The integrated Python web contour is the EN/RU product UI reference.
 - Codex should use English internally for technical analysis but answer the
   user in Russian unless explicitly asked otherwise.

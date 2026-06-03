@@ -184,7 +184,7 @@
   - Реализовать обработку `Proxy_Key`, control-команд и загрузку server context из БД.
   - Обеспечить запись событий в существующую MySQL-схему без изменения PHP web.
 - [x] **Задача 9.6. Убрать Perl из runtime-обвязки**
-  - Комментарий: Добавлены `scripts/run_proxy_py`, `scripts/run_hlstats_py`, full-stack Docker в `scripts/proxy_daemon_py/fullstack/` и обновлены тексты PHP-админки под Python runtime; Perl остаётся только как reference/fallback.
+  - Комментарий: Добавлены `scripts/run_proxy_py`, `scripts/run_hlstats_py`, full-stack Docker в `scripts/proxy_daemon_py/fullstack/`, обновлены тексты PHP-админки под Python runtime, а локальные Perl production/runtime entrypoints удалены; legacy остаётся только как reference/acceptance контур.
   - Добавить Python launcher-ы вместо Perl-ориентированных operational-скриптов.
   - Собрать контейнерный сценарий `mysql + proxy daemon + hlstats worker + php web`.
   - Синхронизировать admin/docs-терминологию с новым runtime-контуром.

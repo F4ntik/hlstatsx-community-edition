@@ -6,7 +6,9 @@
 - Для локальной и интеграционной проверки доступны два контейнерных сценария:
   - `scripts/proxy_daemon_py/e2e/` для прокси-контура с моками downstream-демонов;
   - `scripts/proxy_daemon_py/fullstack/` для полной Python runtime-цепочки `mysql + proxy daemon + hlstats worker + php web`.
-- Perl-файлы остаются в репозитории как reference и fallback, но новый runtime-контур может работать без Perl-процессов.
+- Локальные Perl runtime-файлы больше не входят в production-поверхность
+  репозитория. Legacy-поведение сохраняется через replay/parity reference
+  tooling и sibling donor checkout.
 
 ## 1. Цели и ограничения
 - Сохранить существующие форматы входящих UDP-пакетов и команд управления (`PROXY Key=... PROXY ...`, `C;HEARTBEAT;`, `C;SERVERLIST;`, `C;RELOAD;`).
@@ -40,7 +42,8 @@
 
 ## 4. Компоненты будущего решения
 1. **Загрузка конфигурации**
-   - Python-обёртка, совместимая с форматом `hlstats.conf` (ini). Можно использовать `configparser` и адаптировать парсер Perl, либо временно вызывать Perl для генерации? Предпочтительно — реализовать небольшой парсер с учётом текущей структуры.
+   - Python-обёртка, совместимая с форматом `hlstats.conf` (ini). Использовать
+     встроенный Python-парсер с учётом текущей структуры.
    - Обеспечить опцию CLI (`argparse`) для `--configfile`, `--debug`.
 
 2. **Логирование**
@@ -112,9 +115,9 @@
    - Full-stack smoke test для цепочки `proxy_daemon_py -> hlstats_py -> MySQL -> PHP web`.
 
 10. **План внедрения**
-    - Развернуть Python-версию параллельно Perl (порт +1) для теста.
-    - После успешных тестов переключить production.
-    - Оставить Perl как fallback до подтверждения стабильности.
+    - Проверить Python-версию на staging и replay/parity контуре.
+    - После успешных тестов переключить production на Python runtime.
+    - Использовать legacy только как reference/acceptance контур.
 
 ## 5.1. Текущее фактическое состояние
 
@@ -129,13 +132,15 @@
   и записью игровых событий в MySQL.
 - Добавлены shell launcher-ы `scripts/run_proxy_py` и `scripts/run_hlstats_py`,
   заменяющие Perl-ориентированную operational-обвязку.
-- Обновлена PHP-админка: пользовательские тексты больше не привязаны к
-  `hlstats.pl` / `proxy-daemon.pl`, при этом UDP-механика управления сохранена.
+- Обновлена PHP-админка: runtime control больше не использует Perl-oriented
+  task/file naming, при этом UDP-механика управления сохранена.
 
 Открытые хвосты за пределами runtime-миграции:
 
-- `HLStatsFTP` перенесён: см. `scripts/hlstats_ftp_py` (FTP → `hlstats_py.runtime --stdin`); многострочные GoldSrc-записи склеиваются в stdin-ветке воркера. Legacy `hlstats-ftp.pl` оставлен с предупреждением о deprecation.
-- `ImportBans` по-прежнему legacy Perl-утилита.
+- `HLStatsFTP` перенесён: см. `scripts/hlstats_ftp_py` (FTP →
+  `hlstats_py.runtime --stdin`); многострочные GoldSrc-записи склеиваются в
+  stdin-ветке воркера.
+- `ImportBans` перенесён: см. `scripts/import_bans_py`.
 - `hlstats_py.runtime --stdin` уже реализован как runnable offline-import path, но exact parity
   с `hlstats.pl --stdin` для import-tail metadata (`connection_time`, `lastuse`, `numuses`)
   ещё не закрыт и должен измеряться отдельным direct legacy-vs-Python diff.
@@ -153,10 +158,10 @@
 ## 6. Оценка оставшегося объёма работ
 - Exact `--stdin` parity и явная фиксация import-tail non-goals: 1-2 дня.
 - Python-порт `HLStatsFTP`: **сделан** (`scripts/hlstats_ftp_py`).
-- Python-порт `ImportBans` как отдельной maintenance-утилиты: 1 день.
+- Python-порт `ImportBans`: **сделан** (`scripts/import_bans_py`).
 - Опциональный Prometheus `/metrics` для runtime observability: 0.5-1 день.
 - Реальная heatmap parity-проверка на установленном production map-pack: 0.5-1 день.
-- Всего по post-runtime backlog: ~4-7 рабочих дней для одного разработчика после
+- Всего по post-runtime backlog: ~3-6 рабочих дней для одного разработчика после
   подтверждения, что import-tail metadata либо не нужна продукту, либо вынесена
   в отдельный parity target.
 

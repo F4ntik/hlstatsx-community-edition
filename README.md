@@ -11,8 +11,10 @@ The intended production topology is:
 
 `game server -> proxy_daemon_py -> hlstats_py -> MySQL -> PHP web`
 
-Perl remains in this repository only as a legacy compatibility and validation
-surface. It is not the default runtime contract for this product lane.
+This release line is published as `hlstatsx_py`. Perl runtime scripts are no
+longer shipped in the production path; legacy behavior is retained through the
+external replay/parity reference layer and sibling donor checkout, not as local
+runtime entrypoints.
 
 ## Repository role
 
@@ -35,15 +37,11 @@ to become the final product branch.
 **Fast bulk log replay** (stdin batch / direct import, not slow UDP line relay):
 see [`docs/replay-fast-path.md`](docs/replay-fast-path.md).
 
-### Git: `hlstatsx-community-edition` fork used for Python migration
+### Git: `hlstatsx_py` release line
 
-On a fork of the Python migration repo (same tree as
-`hlstatsx-community-edition/`, remote often named `origin`), branch **`test`**
-is the **integration tip** for the Python stack, including stdin import
-performance work. The GitHub **default branch** may still be `main`; use
-**`test`** when you need that integration line. Ref
-`perf/hlstats-stdin-batch-speedup` may still exist at the same commit until
-removed for housekeeping.
+The final Python+i18n product is released from `main` under the
+`hlstatsx_py` label. The Python import path remains `hlstats_py`; the release
+label is not an import-path rename.
 
 ## Product contracts
 
@@ -77,6 +75,6 @@ removed for housekeeping.
   from the RU donor lane.
 - The remaining work is product hardening:
   - finish exact Python `--stdin` boundaries
-  - port the remaining Perl-only operational utilities
+  - keep Python maintenance utilities release-ready
   - run targeted product validation on the integrated Python+i18n stack
   - prepare release-ready docs and handoff

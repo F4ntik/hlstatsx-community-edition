@@ -51,11 +51,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 
     $commands = array(
         array(
-            'name' => t('admin.task.tools_perlcontrol.command.reload_configuration'),
+            'name' => t('admin.task.tools_runtimecontrol.command.reload_configuration'),
             'cmd' => 'RELOAD',
         ),
         array(
-            'name' => t('admin.task.tools_perlcontrol.command.stop_runtime'),
+            'name' => t('admin.task.tools_runtimecontrol.command.stop_runtime'),
             'cmd' => 'KILL',
         ),
     );
@@ -65,7 +65,7 @@ For support and installation notes visit http://www.hlxcommunity.com
         $port = isset($_POST['port']) ? trim((string) $_POST['port']) : '';
         $commandIndex = isset($_POST['command']) ? (int) $_POST['command'] : -1;
         if (!isset($commands[$commandIndex])) {
-            die(eHtml(t('admin.task.tools_perlcontrol.error.invalid_command')));
+            die(eHtml(t('admin.task.tools_runtimecontrol.error.invalid_command')));
         }
         $command = $commands[$commandIndex]['cmd'];
         if ($port === '' || !ctype_digit($port) || (int) $port === 0) {
@@ -79,16 +79,16 @@ For support and installation notes visit http://www.hlxcommunity.com
 		{
 			if ($g_options['Proxy_Key'] == "") 
 			{
-                $settingsLink = '<a href="' . $g_options['scripturl'] . '?mode=admin&amp;task=options#options">' . eHtml(t('admin.task.tools_perlcontrol.proxy_key_settings_link')) . '</a>';
-                echo '<p><strong>' . eHtml(t('ui.warning')) . ':</strong> ' . eHtml(t('admin.task.tools_perlcontrol.proxy_key_warning')) . '</p>';
-                echo '<p>' . t('admin.task.tools_perlcontrol.proxy_key_notice', array('link' => $settingsLink)) . '</p>';
+                $settingsLink = '<a href="' . $g_options['scripturl'] . '?mode=admin&amp;task=options#options">' . eHtml(t('admin.task.tools_runtimecontrol.proxy_key_settings_link')) . '</a>';
+                echo '<p><strong>' . eHtml(t('ui.warning')) . ':</strong> ' . eHtml(t('admin.task.tools_runtimecontrol.proxy_key_warning')) . '</p>';
+                echo '<p>' . t('admin.task.tools_runtimecontrol.proxy_key_notice', array('link' => $settingsLink)) . '</p>';
 				die();
 			}
 		}
 		
 		echo "<div style=\"margin-left: 50px;\"><ul>\n";      
         echo '<li>' . t(
-            'admin.task.tools_perlcontrol.progress.send_command',
+            'admin.task.tools_runtimecontrol.progress.send_command',
             array(
                 'host' => eHtml($host),
                 'port' => eHtml($port),
@@ -108,7 +108,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 		$bytes_sent = socket_sendto($socket, $packet, strlen($packet), 0, $resolvedHost, (int) $port);
         echo '<strong>' . eHtml((string) $bytes_sent) . '</strong> ' . eHtml(t('admin.task.tools_synchronize.progress.bytes_suffix')) . ' <strong>' . eHtml(t('admin.tools_reset.status.ok')) . '</strong></li>';
 
-        echo '<li>' . eHtml(t('admin.task.tools_perlcontrol.progress.waiting_for_backend_answer'));
+        echo '<li>' . eHtml(t('admin.task.tools_runtimecontrol.progress.waiting_for_backend_answer'));
 		$recv_bytes = 0;
 		$buffer     = "";
 		$timeout    = 5;
@@ -125,7 +125,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 
         echo ' ' . t(
-            'admin.task.tools_perlcontrol.progress.receiving_response',
+            'admin.task.tools_runtimecontrol.progress.receiving_response',
             array(
                 'bytes' => eHtml((string) $recv_bytes),
                 'packets' => eHtml((string) $packets),
@@ -133,12 +133,12 @@ For support and installation notes visit http://www.hlxcommunity.com
         ) . ' <strong>' . eHtml(t('admin.tools_reset.status.ok')) . '</strong></li>';
       
 		if ($packets>0) {
-            echo '<li>' . t('admin.task.tools_perlcontrol.progress.backend_answer', array('answer' => eHtml($answer))) . '</li>';
+            echo '<li>' . t('admin.task.tools_runtimecontrol.progress.backend_answer', array('answer' => eHtml($answer))) . '</li>';
 		} 
 		else 
 		{
             echo '<li><em>' . t(
-                'admin.task.tools_perlcontrol.progress.no_packets_received',
+                'admin.task.tools_runtimecontrol.progress.no_packets_received',
                 array(
                     'host' => eHtml($host),
                     'port' => eHtml($port),
@@ -146,33 +146,33 @@ For support and installation notes visit http://www.hlxcommunity.com
             ) . '</em></li>';
 		}
       
-        echo '<li>' . eHtml(t('admin.task.tools_perlcontrol.progress.close_connection'));
+        echo '<li>' . eHtml(t('admin.task.tools_runtimecontrol.progress.close_connection'));
 		socket_close($socket);
         echo '<strong>' . eHtml(t('admin.tools_reset.status.ok')) . '</strong></li>';
 		echo "</ul></div>\n";
 		
-        echo '<img src="' . IMAGE_PATH . '/rightarrow.gif" /> <a href="' . $g_options['scripturl'] . '?mode=admin">' . eHtml(t('admin.task.tools_perlcontrol.return_to_admin_center')) . '</a>';
+        echo '<img src="' . IMAGE_PATH . '/rightarrow.gif" /> <a href="' . $g_options['scripturl'] . '?mode=admin">' . eHtml(t('admin.task.tools_runtimecontrol.return_to_admin_center')) . '</a>';
 		}
 		else
 		{
         
 ?>        
 
-<p><?php echo eHtml(t('admin.task.tools_perlcontrol.intro')); ?></p>
+<p><?php echo eHtml(t('admin.task.tools_runtimecontrol.intro')); ?></p>
 
 <form method="POST">
 
 	<table class="data-table">
 		<tr class="bg1">
-            <td width="40%"><label for="masterserver"><?php echo eHtml(t('admin.task.tools_perlcontrol.field.runtime_host')); ?></label><p><?php echo eHtml(t('admin.task.tools_perlcontrol.help.runtime_host')); ?></p></td>
+            <td width="40%"><label for="masterserver"><?php echo eHtml(t('admin.task.tools_runtimecontrol.field.runtime_host')); ?></label><p><?php echo eHtml(t('admin.task.tools_runtimecontrol.help.runtime_host')); ?></p></td>
 			<td><input type="text" name="masterserver" value="localhost"></td>
 		</tr>
 		<tr class="bg2">
-            <td><label for="port"><?php echo eHtml(t('admin.task.tools_perlcontrol.field.runtime_port')); ?></label><p><?php echo eHtml(t('admin.task.tools_perlcontrol.help.runtime_port')); ?></p></td>
+            <td><label for="port"><?php echo eHtml(t('admin.task.tools_runtimecontrol.field.runtime_port')); ?></label><p><?php echo eHtml(t('admin.task.tools_runtimecontrol.help.runtime_port')); ?></p></td>
 			<td><input type="text" name="port" value="27500" size="6"></td>
 		</tr>
 		<tr class="bg1">
-            <td><label for="command"><?php echo eHtml(t('admin.task.tools_perlcontrol.field.command')); ?></label><p><?php echo eHtml(t('admin.task.tools_perlcontrol.help.command')); ?></p></td>
+            <td><label for="command"><?php echo eHtml(t('admin.task.tools_runtimecontrol.field.command')); ?></label><p><?php echo eHtml(t('admin.task.tools_runtimecontrol.help.command')); ?></p></td>
 			<td><SELECT NAME="command"><?php
   $i = 0;
   foreach ($commands as $cmd) {
@@ -185,7 +185,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	
 	<input type="hidden" name="confirm" value="1">
 	<div style="text-align: center; margin-top: 20px;">
-        <input type="submit" value="  <?php echo eHtml(t('admin.task.tools_perlcontrol.submit_button')); ?>  ">
+        <input type="submit" value="  <?php echo eHtml(t('admin.task.tools_runtimecontrol.submit_button')); ?>  ">
 	</div>
 </form>
 

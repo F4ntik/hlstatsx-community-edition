@@ -984,7 +984,7 @@ function name_history_checked()
 <?php echo t(
 	'admin.tools_reset.daemon_notice',
 	array(
-		'link' => '<a href="' . $g_options['scripturl'] . '?mode=admin&amp;task=tools_perlcontrol" style="text-decoration:underline;font-weight:bold">' . eHtml(t('admin.tools_reset.stop_daemon', array(), 'stop the HLX:CE daemon')) . '</a>'
+		'link' => '<a href="' . $g_options['scripturl'] . '?mode=admin&amp;task=tools_runtimecontrol" style="text-decoration:underline;font-weight:bold">' . eHtml(t('admin.tools_reset.stop_daemon', array(), 'stop the HLX:CE runtime')) . '</a>'
 	),
 	'You should {link} before resetting the stats. You can restart it after the reset completes.'
 ); ?><br /><br />

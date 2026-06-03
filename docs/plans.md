@@ -42,9 +42,13 @@ Current autonomy follow-up entrypoint:
 
 - Default runtime path:
   `proxy_daemon_py -> hlstats_py -> MySQL -> PHP web`
-- Legacy Perl path:
-  keep only for compatibility checks, baseline replay comparison, and
-  transition tooling
+- Release identity:
+  publish the product line as `hlstatsx_py` while keeping the Python import
+  path as `hlstats_py`
+- Legacy reference path:
+  Perl runtime scripts are no longer part of the local production runtime.
+  Legacy behavior is retained through replay/parity reference tooling and
+  sibling donor checkout context.
 - Frontend contract:
   - explicit dictionary-backed i18n
   - `lang=en|ru`

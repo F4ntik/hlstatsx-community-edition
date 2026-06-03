@@ -1040,7 +1040,7 @@ $admintasks['ranks'] = new AdminTask(t('admin.task.ranks.title'), 80, 'game');
 $admintasks['ribbons'] = new AdminTask(t('admin.task.ribbons.title'), 80, 'game');
 
 // Tools
-$admintasks['tools_perlcontrol'] = new AdminTask(t('admin.task.tools_perlcontrol.title'), 80, 'tool', t('admin.task.tools_perlcontrol.description'));
+$admintasks['tools_runtimecontrol'] = new AdminTask(t('admin.task.tools_runtimecontrol.title'), 80, 'tool', t('admin.task.tools_runtimecontrol.description'));
 $admintasks['tools_editdetails'] = new AdminTask(t('admin.task.tools_editdetails.title'), 80, 'tool', t('admin.task.tools_editdetails.description'));
 $admintasks['tools_adminevents'] = new AdminTask(t('admin.task.tools_adminevents.title'), 80, 'tool', t('admin.task.tools_adminevents.description'));
 $admintasks['tools_ipstats'] = new AdminTask(t('admin.task.tools_ipstats.title'), 80, 'tool', t('admin.task.tools_ipstats.description'));

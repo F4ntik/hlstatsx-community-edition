@@ -1,6 +1,7 @@
 # import_bans_py
 
-Python standalone maintenance replacement for `scripts/ImportBans/importbans.pl`.
+Python standalone maintenance replacement for the historical
+`ImportBans/importbans.pl` utility.
 
 It mirrors the legacy behavior:
 

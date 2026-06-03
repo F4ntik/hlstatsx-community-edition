@@ -1,6 +1,8 @@
 # hlstats_ftp_py
 
-Python replacement for [`HLStatsFTP/hlstats-ftp.pl`](../HLStatsFTP/hlstats-ftp.pl): incremental `*.log` fetch over FTP and import via `python -m hlstats_py.runtime --stdin` (no Perl).
+Python replacement for the historical `HLStatsFTP/hlstats-ftp.pl` utility:
+incremental `*.log` fetch over FTP and import via
+`python -m hlstats_py.runtime --stdin` (no Perl).
 
 ## Requirements
 

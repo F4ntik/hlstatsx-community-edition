@@ -700,10 +700,10 @@ For support and installation notes visit http://www.hlxcommunity.com
 										<?php echo "txtArea.value = " . json_encode($jimglink) . ";\n"; ?>
 										break;	
 									case 1:
-										<?php echo "txtArea.value = " . json_encode("[url=$playerInfoLink][img]$jimglink[/img][/url]") . ";\n"; ?>
+										<?php echo "txtArea.value = " . json_encode('[url=' . $playerInfoLink . '][img]' . $jimglink . '[/img][/url]') . ";\n"; ?>
 										break;
 									case 2:
-										<?php echo "txtArea.value = " . json_encode("[url=\"$playerInfoLink\"][img]$jimglink[/img][/url]") . ";\n"; ?>
+										<?php echo "txtArea.value = " . json_encode('[url="' . $playerInfoLink . '"][img]' . $jimglink . '[/img][/url]') . ";\n"; ?>
 										break;
 								}
 							}

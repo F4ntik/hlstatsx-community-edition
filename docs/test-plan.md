@@ -91,6 +91,9 @@ CI coverage:
   names, and host bind paths. The job runs dual replay, post-replay GeoIP
   backfill, compact DB compare, replay-backed EN/RU smoke, and uploads both
   parity state/audit artifacts and `release-readiness-artifacts`.
+- The `hlstatsx_py` release line does not ship local Perl production
+  entrypoints. Legacy behavior remains a replay/reference acceptance layer, not
+  a production runtime dependency.
 
 Boundary checks:
 
@@ -192,9 +195,10 @@ Parity acceptance layers:
   `compare_stats_dbs.py --max-examples 20`, with artifacts retained from
   `docs/audits/legacy-python-parity-20260423/` and
   `scripts/replay_baseline/comparison/.parity-state/`.
-- Perl remains required for reference behavior, baseline regeneration, targeted
-  investigation, and the heavy acceptance replay. It is not required for every
-  routine PR when fixture inputs and the accepted legacy contour are unchanged.
+- Legacy reference behavior remains required for baseline regeneration,
+  targeted investigation, and the heavy acceptance replay. It is not a local
+  production runtime dependency and is not required for every routine PR when
+  fixture inputs and the accepted legacy contour are unchanged.
 
 Minimum replay validation loop:
 
