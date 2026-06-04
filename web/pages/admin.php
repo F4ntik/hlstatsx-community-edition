@@ -1032,6 +1032,7 @@ $admintasks['actions'] = new AdminTask(t('literal.actions'), 80, 'game');
 $admintasks['teams'] = new AdminTask(t('admin.task.teams.title'), 80, 'game');
 $admintasks['roles'] = new AdminTask(t('literal.roles'), 80, 'game');
 $admintasks['weapons'] = new AdminTask(t('literal.weapons'), 80, 'game');
+$admintasks['heatmaps'] = new AdminTask(t('admin.task.heatmaps.title'), 80, 'game');
 $admintasks['awards_weapons'] = new AdminTask(t('admin.task.awards_weapons.title'), 80, 'game');
 $admintasks['awards_plyractions'] = new AdminTask(t('admin.task.awards_plyractions.title'), 80, 'game');
 $admintasks['awards_plyrplyractions'] = new AdminTask(t('admin.task.awards_plyrplyractions.title'), 80, 'game');

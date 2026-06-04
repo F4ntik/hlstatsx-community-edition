@@ -271,6 +271,10 @@ nav{
 	max-width: 520px;
 }
 
+.heatmap-viewer-admin {
+	max-width: 640px;
+}
+
 .heatmap-canvas-wrap {
 	position: relative;
 	display: inline-block;
@@ -403,4 +407,73 @@ nav{
 
 .heatmap-legend-deaths {
 	background: #005cff;
+}
+
+.heatmap-admin-wizard {
+	margin: 6px 0 16px;
+}
+
+.heatmap-admin-controls,
+.heatmap-admin-buttons {
+	margin: 8px 0;
+	font: 11px Arial, sans-serif;
+}
+
+.heatmap-admin-controls label,
+.heatmap-admin-panel label {
+	display: block;
+	margin-bottom: 7px;
+}
+
+.heatmap-admin-controls input,
+.heatmap-admin-controls select {
+	margin-left: 6px;
+}
+
+.heatmap-admin-grid {
+	display: grid;
+	grid-template-columns: minmax(280px, 640px) minmax(260px, 1fr);
+	gap: 14px;
+	align-items: start;
+}
+
+.heatmap-admin-panel {
+	font: 11px Arial, sans-serif;
+}
+
+.heatmap-admin-panel input[type=number] {
+	width: 76px;
+	margin-left: 6px;
+}
+
+.heatmap-admin-panel input[type=range] {
+	width: 160px;
+	vertical-align: middle;
+}
+
+.heatmap-admin-panel textarea {
+	width: 100%;
+	min-height: 90px;
+	font: 11px Consolas, monospace;
+	box-sizing: border-box;
+}
+
+.heatmap-admin-buttons button {
+	margin: 4px 4px 0 0;
+}
+
+.heatmap-admin-log {
+	max-height: 180px;
+	overflow: auto;
+	padding: 8px;
+	background: #111;
+	color: #d6ffd6;
+	font: 11px Consolas, monospace;
+	white-space: pre-wrap;
+}
+
+@media (max-width: 800px) {
+	.heatmap-admin-grid {
+		grid-template-columns: 1fr;
+	}
 }

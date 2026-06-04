@@ -15,15 +15,17 @@ function HeatmapCanvas(canvas) {
 	this.ctx = canvas.getContext('2d', {willReadFrequently: true});
 	this.points = [];
 	this.max = 1;
+	this.options = {mode: 'thermal', normalization: 'sqrt', alpha: {min: 0.05, max: 0.82}};
 	this.radiusValue = 34;
 	this.blurValue = 18;
 	this.circle = null;
 	this.gradients = {};
 }
 
-HeatmapCanvas.prototype.data = function(points, max) {
+HeatmapCanvas.prototype.data = function(points, max, options) {
 	this.points = points || [];
 	this.max = Math.max(1, max || 1);
+	this.options = options || this.options;
 	return this;
 };
 
@@ -70,7 +72,16 @@ HeatmapCanvas.prototype._gradient = function(palette) {
 	canvas.width = 1;
 	canvas.height = 256;
 	gradient = ctx.createLinearGradient(0, 0, 0, 256);
-	stops = key === 'deaths'
+	stops = key === 'thermal'
+		? [
+			[0.00, 'rgba(0, 0, 0, 0)'],
+			[0.12, 'rgba(0, 24, 190, 1)'],
+			[0.32, 'rgba(0, 210, 255, 1)'],
+			[0.55, 'rgba(245, 255, 0, 1)'],
+			[0.78, 'rgba(255, 120, 0, 1)'],
+			[1.00, 'rgba(255, 20, 0, 1)']
+		]
+		: key === 'deaths'
 		? [
 			[0.00, 'rgba(220, 255, 255, 1)'],
 			[0.35, 'rgba(0, 220, 255, 1)'],
@@ -93,6 +104,26 @@ HeatmapCanvas.prototype._gradient = function(palette) {
 	return pixels;
 };
 
+HeatmapCanvas.prototype._normalized = function(value, max) {
+	var raw = Math.max(0, value || 0);
+	var ceiling = Math.max(1, max || 1);
+	var mode = this.options && this.options.normalization ? this.options.normalization : 'sqrt';
+	if (mode === 'linear') {
+		return Math.min(1, raw / ceiling);
+	}
+	if (mode === 'log') {
+		return Math.log(1 + raw) / Math.log(1 + ceiling);
+	}
+	return Math.sqrt(raw / ceiling);
+};
+
+HeatmapCanvas.prototype._alpha = function(value, max) {
+	var alpha = this.options && this.options.alpha ? this.options.alpha : {};
+	var min = typeof alpha.min === 'number' ? alpha.min : 0.05;
+	var maxAlpha = typeof alpha.max === 'number' ? alpha.max : 0.82;
+	return Math.max(0, Math.min(1, min + ((maxAlpha - min) * this._normalized(value, max))));
+};
+
 HeatmapCanvas.prototype._drawLayer = function(points, max, palette) {
 	var layer = document.createElement('canvas');
 	var ctx = layer.getContext('2d', {willReadFrequently: true});
@@ -111,7 +142,7 @@ HeatmapCanvas.prototype._drawLayer = function(points, max, palette) {
 	ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 	for (i = 0; i < points.length; i++) {
 		point = points[i];
-		alpha = Math.max(0.18, Math.min(1, (point.value || 1) / Math.max(1, max)));
+		alpha = this._alpha(point.value || 1, max);
 		ctx.globalAlpha = alpha;
 		ctx.drawImage(circle, Math.round(point.x - size), Math.round(point.y - size));
 	}
@@ -129,7 +160,7 @@ HeatmapCanvas.prototype._drawLayer = function(points, max, palette) {
 		data[i] = gradient[offset];
 		data[i + 1] = gradient[offset + 1];
 		data[i + 2] = gradient[offset + 2];
-		data[i + 3] = Math.max(90, data[i + 3]);
+		data[i + 3] = Math.max(1, data[i + 3]);
 	}
 	ctx.putImageData(image, 0, 0);
 
@@ -143,6 +174,7 @@ HeatmapCanvas.prototype.draw = function() {
 	var maxKill = 0;
 	var maxDeath = 0;
 	var hasChannels = false;
+	var mode = this.options && this.options.mode ? this.options.mode : 'thermal';
 	var i;
 	var point;
 
@@ -162,7 +194,7 @@ HeatmapCanvas.prototype.draw = function() {
 	}
 
 	ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-	if (hasChannels) {
+	if (mode === 'semantic' && hasChannels) {
 		if (deathPoints.length) {
 			ctx.drawImage(this._drawLayer(deathPoints, maxDeath, 'deaths'), 0, 0);
 		}
@@ -174,14 +206,14 @@ HeatmapCanvas.prototype.draw = function() {
 		return;
 	}
 
-	ctx.drawImage(this._drawLayer(this.points, this.max, 'kills'), 0, 0);
+	ctx.drawImage(this._drawLayer(this.points, this.max, 'thermal'), 0, 0);
 };
 
 function setupInlineHeatmaps() {
-	var viewers = document.querySelectorAll('.heatmap-viewer[data-heatmap-endpoint]');
+	var viewers = document.querySelectorAll('.heatmap-viewer[data-heatmap-endpoint]:not(.heatmap-viewer-admin)');
 	var i;
 
-	if (!viewers.length || !window.fetch) {
+	if (!window.fetch) {
 		return;
 	}
 
@@ -191,6 +223,7 @@ function setupInlineHeatmaps() {
 		}
 	}
 	setupPlayerHeatmapControls();
+	setupHeatmapAdminWizards();
 }
 
 function setupInlineHeatmap(viewer) {
@@ -299,7 +332,7 @@ function setupInlineHeatmap(viewer) {
 		var radius = payload.points.length <= 5 ? 46 : Math.max(24, Math.min(54, Math.round(side / 38)));
 		lastPayload = payload;
 		hitRadius = radius;
-		renderer.radius(radius, Math.round(radius * 0.55)).data(payload.points, payload.max).draw();
+		renderer.radius(radius, Math.round(radius * 0.55)).data(payload.points, payload.max, payload.renderer).draw();
 		canvas.style.display = overlayVisible ? 'block' : 'none';
 		if (payload.diagnostics && payload.diagnostics.queried > 0) {
 			var ratio = payload.diagnostics.inBoundsRatio;
@@ -409,7 +442,8 @@ function setupPlayerHeatmapControl(panel) {
 		return 'heatmap_points.php?game=' + encodeURIComponent(game) +
 			'&map=' + encodeURIComponent(mapName) +
 			'&player=' + encodeURIComponent(player) +
-			'&event=' + encodeURIComponent(eventName);
+			'&event=' + encodeURIComponent(eventName) +
+			'&renderer=' + encodeURIComponent(eventName === 'both' ? 'semantic' : 'thermal');
 	}
 
 	function activateButtons() {
@@ -445,4 +479,232 @@ function setupPlayerHeatmapControl(panel) {
 		};
 	}
 	activateButtons();
+}
+
+function setupHeatmapAdminWizards() {
+	var wizards = document.querySelectorAll('.heatmap-admin-wizard[data-heatmap-admin]');
+	var i;
+	for (i = 0; i < wizards.length; i++) {
+		if (!wizards[i].getAttribute('data-heatmap-admin-ready')) {
+			setupHeatmapAdminWizard(wizards[i]);
+		}
+	}
+}
+
+function setupHeatmapAdminWizard(wizard) {
+	var viewer = wizard.querySelector('.heatmap-viewer');
+	var image = wizard.querySelector('.heatmap-map-base');
+	var canvas = wizard.querySelector('.heatmap-overlay');
+	var status = wizard.querySelector('.heatmap-status');
+	var renderer = new HeatmapCanvas(canvas);
+	var mapSelect = wizard.querySelector('[data-heatmap-admin-map]');
+	var newMap = wizard.querySelector('[data-heatmap-admin-new-map]');
+	var log = wizard.querySelector('[data-heatmap-admin-log]');
+	var mapImage = wizard.querySelector('[data-heatmap-map-image]');
+	var overviewFile = wizard.querySelector('[data-heatmap-overview-file]');
+	var overviewText = wizard.querySelector('[data-heatmap-overview]');
+	var lastPayload = null;
+	var currentConfig = {
+		xoffset: 0,
+		yoffset: 0,
+		scale: 1,
+		flipx: 0,
+		flipy: 1,
+		rotate: 0,
+		cropx1: 0,
+		cropy1: 0,
+		cropx2: 0,
+		cropy2: 0,
+		renderer: 'thermal',
+		normalization: 'sqrt'
+	};
+	wizard.setAttribute('data-heatmap-admin-ready', '1');
+
+	function setLog(text) {
+		if (log) {
+			log.textContent = text || '';
+		}
+	}
+
+	function activeMap() {
+		var typed = newMap && newMap.value ? newMap.value : '';
+		return typed || (mapSelect ? mapSelect.value : wizard.getAttribute('data-heatmap-map'));
+	}
+
+	function syncFieldsFromConfig(config) {
+		var fields = wizard.querySelectorAll('[data-heatmap-number]');
+		var checks = wizard.querySelectorAll('[data-heatmap-check]');
+		var ranges = wizard.querySelectorAll('[data-heatmap-field]');
+		var i;
+		currentConfig = config || currentConfig;
+		for (i = 0; i < fields.length; i++) {
+			if (currentConfig[fields[i].getAttribute('data-heatmap-number')] !== undefined) {
+				fields[i].value = currentConfig[fields[i].getAttribute('data-heatmap-number')];
+			}
+		}
+		for (i = 0; i < checks.length; i++) {
+			checks[i].checked = Boolean(Number(currentConfig[checks[i].getAttribute('data-heatmap-check')]));
+		}
+		for (i = 0; i < ranges.length; i++) {
+			if (currentConfig[ranges[i].getAttribute('data-heatmap-field')] !== undefined) {
+				ranges[i].value = currentConfig[ranges[i].getAttribute('data-heatmap-field')];
+			}
+		}
+	}
+
+	function collectConfig(action) {
+		var payload = {
+			action: action || 'preview',
+			game: wizard.getAttribute('data-heatmap-game'),
+			map: activeMap(),
+			overviewText: overviewText ? overviewText.value : ''
+		};
+		var fields = wizard.querySelectorAll('[data-heatmap-number]');
+		var checks = wizard.querySelectorAll('[data-heatmap-check]');
+		var i;
+		for (i = 0; i < fields.length; i++) {
+			payload[fields[i].getAttribute('data-heatmap-number')] = fields[i].value;
+		}
+		for (i = 0; i < checks.length; i++) {
+			payload[checks[i].getAttribute('data-heatmap-check')] = checks[i].checked ? 1 : 0;
+		}
+		return payload;
+	}
+
+	function render(payload) {
+		var side;
+		var radius;
+		lastPayload = payload;
+		if (payload.projection) {
+			currentConfig = payload.projection;
+			currentConfig.renderer = payload.renderer ? payload.renderer.mode : 'thermal';
+			currentConfig.normalization = payload.renderer ? payload.renderer.normalization : 'sqrt';
+			syncFieldsFromConfig(currentConfig);
+		}
+		if (payload.image && payload.image.url) {
+			image.onload = function() {
+				canvas.width = payload.image.width || image.naturalWidth;
+				canvas.height = payload.image.height || image.naturalHeight;
+				side = Math.sqrt(canvas.width * canvas.height);
+				radius = payload.points.length <= 5 ? 46 : Math.max(24, Math.min(54, Math.round(side / 38)));
+				renderer.radius(radius, Math.round(radius * 0.55)).data(payload.points || [], payload.max || 1, payload.renderer).draw();
+			};
+			image.src = payload.image.url;
+			if (image.complete) {
+				image.onload();
+			}
+		}
+		if (status && payload.diagnostics) {
+			status.textContent = payload.diagnostics.inBounds + '/' + payload.diagnostics.queried + ' in bounds';
+			status.className = payload.diagnostics.manualRequired ? 'heatmap-status is-warning' : 'heatmap-status';
+		}
+		setLog(JSON.stringify({
+			saved: Boolean(payload.saved),
+			configHash: payload.configHash,
+			diagnostics: payload.diagnostics
+		}, null, 2));
+	}
+
+	function request(action) {
+		var payload = collectConfig(action);
+		setLog('Loading...');
+		return fetch('heatmap_admin.php', {
+			method: 'POST',
+			credentials: 'same-origin',
+			headers: {'Content-Type': 'application/json'},
+			body: JSON.stringify(payload)
+		})
+		.then(function(response) {
+			return response.json().then(function(data) {
+				if (!response.ok) {
+					throw data;
+				}
+				return data;
+			});
+		})
+		.then(function(data) {
+			if (action === 'regenerate') {
+				setLog(JSON.stringify(data, null, 2));
+				return data;
+			}
+			render(data);
+			return data;
+		})
+		.catch(function(error) {
+			setLog(JSON.stringify(error, null, 2));
+		});
+	}
+
+	function upload() {
+		var form = new FormData();
+		form.append('action', 'upload');
+		form.append('game', wizard.getAttribute('data-heatmap-game'));
+		form.append('map', activeMap());
+		if (mapImage && mapImage.files && mapImage.files[0]) {
+			form.append('mapImage', mapImage.files[0]);
+		}
+		if (overviewFile && overviewFile.files && overviewFile.files[0]) {
+			form.append('overviewFile', overviewFile.files[0]);
+		}
+		if (overviewText && overviewText.value) {
+			form.append('overviewText', overviewText.value);
+		}
+		setLog('Uploading...');
+		fetch('heatmap_admin.php', {
+			method: 'POST',
+			credentials: 'same-origin',
+			body: form
+		})
+		.then(function(response) {
+			return response.json().then(function(data) {
+				if (!response.ok) {
+					throw data;
+				}
+				return data;
+			});
+		})
+		.then(function(data) {
+			if (data.projection) {
+				syncFieldsFromConfig(data.projection);
+			}
+			setLog(JSON.stringify(data, null, 2));
+			request('preview');
+		})
+		.catch(function(error) {
+			setLog(JSON.stringify(error, null, 2));
+		});
+	}
+
+	function bindClick(selector, fn) {
+		var button = wizard.querySelector(selector);
+		if (button) {
+			button.onclick = fn;
+		}
+	}
+
+	bindClick('[data-heatmap-admin-load]', function() { request('preview'); });
+	bindClick('[data-heatmap-admin-preview]', function() { request('preview'); });
+	bindClick('[data-heatmap-admin-save]', function() { request('save'); });
+	bindClick('[data-heatmap-admin-upload]', upload);
+	bindClick('[data-heatmap-admin-regenerate]', function() {
+		request('regenerate');
+	});
+
+	var ranges = wizard.querySelectorAll('[data-heatmap-field]');
+	for (var i = 0; i < ranges.length; i++) {
+		ranges[i].oninput = function() {
+			var number = wizard.querySelector('[data-heatmap-number="' + this.getAttribute('data-heatmap-field') + '"]');
+			if (number) {
+				number.value = this.value;
+			}
+			request('preview');
+		};
+	}
+	if (mapSelect) {
+		mapSelect.onchange = function() { request('preview'); };
+	}
+	syncFieldsFromConfig(currentConfig);
+	if (activeMap()) {
+		request('preview');
+	}
 }

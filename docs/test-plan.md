@@ -223,8 +223,9 @@ overlay behavior changes:
   same script inside the web container.
 - PHP syntax lint for touched heatmap web files:
   `web/includes/heatmap_points.php`, `web/heatmap_points.php`,
-  `web/heatmap_map.php`, `web/pages/mapinfo.php`, and any touched
-  `playerinfo_*` include.
+  `web/heatmap_map.php`, `web/heatmap_admin.php`,
+  `web/pages/admintasks/heatmaps.php`, `web/pages/mapinfo.php`, and any
+  touched `playerinfo_*` include.
 - DB-first projection diagnostics before expensive replay/regeneration:
   `cd scripts && python -m hlstats_py.heatmaps --configfile hlstats.conf --game cstrike --map de_dust2 --heatmaps-root ../heatmaps --diagnose-projection`
 - Browser verification for `mode=mapinfo&game=<code>&map=<map>`: canvas overlay
@@ -235,6 +236,10 @@ overlay behavior changes:
   `Deaths`, and `Kills/Deaths` redraw the same canvas, warm/cool colors are
   distinguishable, and hover tooltip shows event counts plus top
   killers/victims/players.
+- Browser verification for `mode=admin&task=heatmaps&game=<code>`: upload JPG
+  and overview, preview changes offset/scale/flip/rotate/crop without saving,
+  save updates DB config and invalidates payload cache, regenerate returns the
+  Python heatmap command result.
 
 Full replay and `--disablecache` heatmap regeneration are promotion checks.
 Use the already populated DB for visual/projection iteration first.

@@ -34,6 +34,13 @@ $point = heatmap_transform_point(array('pos_x' => 12, 'pos_y' => 20), $config);
 assert_same(10, $point['x'], 'x transform should apply flip, offset, and scale');
 assert_same(42, $point['y'], 'y transform should apply offset and scale');
 
+$rotated = heatmap_transform_point(
+    array('pos_x' => 10, 'pos_y' => 20),
+    array('xoffset' => 0, 'yoffset' => 0, 'flipx' => 0, 'flipy' => 0, 'scale' => 1, 'rotate' => 1, 'cropx1' => 5, 'cropy1' => 7, 'cropx2' => 200, 'cropy2' => 200)
+);
+assert_same(15, $rotated['x'], 'x transform should rotate before crop');
+assert_same(3, $rotated['y'], 'y transform should rotate before crop');
+
 $payload = heatmap_build_payload(
     'cstrike',
     'de_dust2',
@@ -76,5 +83,27 @@ assert_same(2 / 3, $payload['diagnostics']['inBoundsRatio'], 'payload diagnostic
 assert_same(true, $payload['diagnostics']['manualRequired'], 'payload diagnostics should mark weak projection');
 assert_same(32, $payload['diagnostics']['config']['xoffset'], 'payload diagnostics should include config xoffset');
 assert_same(1280, $payload['diagnostics']['image']['width'], 'payload diagnostics should include image width');
+assert_same('thermal', $payload['renderer']['mode'], 'payload renderer should default to thermal');
+assert_same('sqrt', $payload['renderer']['normalization'], 'payload normalization should default to sqrt');
+assert_same(16, strlen($payload['configHash']), 'payload should include compact config hash');
+
+$semanticPayload = heatmap_build_payload(
+    'cstrike',
+    'de_dust2',
+    array('url' => './hlstatsimg/games/cstrike/maps/de_dust2.jpg', 'width' => 1280, 'height' => 1024),
+    array(),
+    array('xoffset' => 0, 'yoffset' => 0, 'scale' => 1),
+    array('renderer' => 'semantic', 'normalization' => 'log')
+);
+assert_same('semantic', $semanticPayload['renderer']['mode'], 'payload should accept semantic renderer');
+assert_same('log', $semanticPayload['renderer']['normalization'], 'payload should accept log normalization');
+
+$overviewConfig = heatmap_parse_overview(
+    '"pos_x" "-1200"' . "\n" . '"pos_y" "2400"' . "\n" . '"scale" "4"' . "\n" . '"rotate" "1"',
+    array('xoffset' => 0, 'yoffset' => 0, 'scale' => 1, 'flipx' => 0, 'flipy' => 0, 'rotate' => 0)
+);
+assert_same(1200, $overviewConfig['xoffset'], 'source overview should seed xoffset');
+assert_same(2400, $overviewConfig['yoffset'], 'source overview should seed yoffset');
+assert_same(1, $overviewConfig['rotate'], 'source overview should seed rotate');
 
 echo "web heatmap smoke ok\n";

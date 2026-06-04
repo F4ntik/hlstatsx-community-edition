@@ -397,18 +397,26 @@ log replay и `--disablecache` регенерацию стоит запуска�
 - `mode=mapinfo&game=<code>&map=<map>` показывает глобальную теплокарту поверх
   изображения карты и оставляет старую thumbnail/lightbox ссылку.
 - `web/heatmap_points.php?game=<code>&map=<map>` возвращает JSON-точки,
-  image metadata и diagnostics.
+  image metadata, projection, config hash, renderer settings, cache status и
+  diagnostics. По умолчанию используется thermal renderer с `sqrt`
+  нормализацией.
 - `web/heatmap_points.php?game=<code>&map=<map>&player=<id>&event=kills`
   возвращает точки убийств конкретного игрока.
 - `event=deaths` показывает места смерти игрока по victim-координатам.
-- `event=both` возвращает оба канала в одном payload.
+- `event=both` возвращает оба канала в одном payload; player widget включает
+  semantic renderer для раздельных warm/cool каналов.
+- `mode=admin&task=heatmaps&game=<code>` открывает мастер настройки карт:
+  загрузка JPG/overview, live preview без записи, сохранение
+  `hlstats_Heatmap_Config`, invalidation payload cache и web-trigger для
+  `python -m hlstats_py.heatmaps --disablecache`.
 
 В карточке игрока персональный виджет находится во вкладке Maps & Servers.
 Селект карт строится только из карт, где у игрока есть события и для карты
-существуют heatmap config плюс изображение. Цвета семантические: убийства
-рисуются теплой палитрой yellow/orange/red, смерти - холодной
-cyan/blue/violet. Tooltip по ближайшей точке показывает количество событий,
-раздельные `Kills`/`Deaths`, top killers, top victims и involved players.
+существуют heatmap config плюс изображение. Основной renderer использует
+тепловизорную палитру blue/cyan/yellow/orange/red с alpha channel; semantic
+mode сохраняет warm/cool split для сравнения убийств и смертей. Tooltip по
+ближайшей точке показывает количество событий, раздельные `Kills`/`Deaths`,
+top killers, top victims и involved players.
 
 Открытое ограничение: реальная parity-проверка legacy PHP vs Python на
 production map-pack картах требует установленного набора
