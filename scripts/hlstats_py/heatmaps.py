@@ -31,6 +31,7 @@ LEGACY_OUTPUT_SIZES: dict[str, tuple[int, int] | None] = {
 }
 LEGACY_CACHE_MAX_AGE_DAYS = 30
 _CACHE_PATTERN = re.compile(r"^(?P<map>.+)_(?P<timestamp>\d+)\.png$", re.IGNORECASE)
+_SOURCE_OVERVIEW_PAIR = re.compile(r'"(?P<key>[^"]+)"\s+"(?P<value>[^"]*)"')
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,6 +52,9 @@ class HeatmapCliOptions:
     output_size: str
     kill_limit: int
     debug_level: int
+    diagnose: bool
+    diagnose_projection: bool
+    legacy_visuals: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,6 +73,9 @@ class HeatmapSettings:
     output_size: str
     kill_limit: int
     debug_level: int
+    diagnose: bool
+    diagnose_projection: bool
+    legacy_visuals: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,6 +112,72 @@ class HeatmapPoint:
 
 
 @dataclass(frozen=True, slots=True)
+class ImportedOverview:
+    """Map overview metadata converted into the legacy projection shape."""
+
+    projection: str
+    code: str
+    game: str
+    map_name: str
+    xoffset: int
+    yoffset: int
+    scale: float
+    flipx: bool
+    flipy: bool
+    rotate: bool
+    image: str | None = None
+    height: int | None = None
+    material: str | None = None
+    manual_required: bool = False
+
+    def to_legacy_config(self) -> HeatmapConfig:
+        return HeatmapConfig(
+            code=self.code,
+            game=self.game,
+            map_name=self.map_name,
+            xoffset=self.xoffset,
+            yoffset=self.yoffset,
+            flipx=self.flipx,
+            flipy=self.flipy,
+            rotate=self.rotate,
+            days=30,
+            brush="small",
+            scale=self.scale,
+            font=10,
+            thumbw=0.170312,
+            thumbh=0.170312,
+            cropx1=0,
+            cropx2=0,
+            cropy1=0,
+            cropy2=0,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectionStats:
+    """Diagnostic summary for one map's transformed heatmap coordinates."""
+
+    queried: int
+    in_bounds: int
+    out_of_bounds: int
+    min_x: int | None
+    max_x: int | None
+    min_y: int | None
+    max_y: int | None
+    cache_status: str
+    raw_min_x: int | None = None
+    raw_max_x: int | None = None
+    raw_min_y: int | None = None
+    raw_max_y: int | None = None
+
+    @property
+    def in_bounds_ratio(self) -> float:
+        if self.queried <= 0:
+            return 0.0
+        return self.in_bounds / self.queried
+
+
+@dataclass(frozen=True, slots=True)
 class CacheEntry:
     """Cached overlay state reused across generator runs."""
 
@@ -121,6 +194,7 @@ class GenerationResult:
     generated: bool
     points: int
     output_file: Path | None = None
+    diagnostics: ProjectionStats | None = None
 
 
 class SupportsCursor(Protocol):
@@ -317,22 +391,55 @@ class HeatmapGenerator:
             kill_limit=self._settings.kill_limit,
             start_timestamp=None if cache_entry is None else cache_entry.timestamp,
         )
+        cache_status = "none" if cache_entry is None else "reused"
         if not points:
+            diagnostics = ProjectionStats(
+                queried=0,
+                in_bounds=0,
+                out_of_bounds=0,
+                min_x=None,
+                max_x=None,
+                min_y=None,
+                max_y=None,
+                cache_status=cache_status,
+            )
+            self._log_projection_stats(code, map_name, diagnostics)
             self._logger.event(
                 "IGNORE",
                 f"Game: {code}, Map: {map_name}, Kills: 0, (to few kills)",
                 1,
             )
-            return GenerationResult(code=code, map_name=map_name, generated=False, points=0)
+            return GenerationResult(
+                code=code,
+                map_name=map_name,
+                generated=False,
+                points=0,
+                diagnostics=diagnostics,
+            )
 
         self._logger.event("CREATE", f"Game: {code}, Map: {map_name}, Kills: {len(points)}", 1)
         base_image = Image.open(source_path).convert("RGBA")
         overlay_path = None if cache_entry is None else cache_entry.path
         overlay = load_overlay(base_image.size, overlay_path)
         first_event = min(point.event_time for point in points)
+        diagnostics = collect_projection_stats(
+            points,
+            config,
+            image_size=overlay.size,
+            cache_status=cache_status,
+        )
+        self._log_projection_stats(code, map_name, diagnostics)
 
         brush_image = load_brush(self._settings.assets_root, config.brush)
-        brush = apply_brush_opacity(brush_image, compute_opacity(len(points)))
+        brush = prepare_brush_for_visibility(
+            brush_image,
+            len(points),
+            legacy_visuals=self._settings.legacy_visuals,
+        )
+        brush = apply_brush_opacity(
+            brush,
+            compute_opacity(len(points), legacy_visuals=self._settings.legacy_visuals),
+        )
 
         for point in points:
             draw_brush_point(overlay, brush, point, config)
@@ -370,7 +477,99 @@ class HeatmapGenerator:
             generated=True,
             points=len(points),
             output_file=output_file,
+            diagnostics=diagnostics,
         )
+
+    def _log_projection_stats(
+        self,
+        code: str,
+        map_name: str,
+        diagnostics: ProjectionStats,
+    ) -> None:
+        if not self._settings.diagnose and self._settings.debug_level < 2:
+            return
+        self._logger.event(
+            "DIAG",
+            (
+                f"Game: {code}, Map: {map_name}, Points: {diagnostics.queried}, "
+                f"InBounds: {diagnostics.in_bounds}, OutOfBounds: {diagnostics.out_of_bounds}, "
+                f"Ratio: {diagnostics.in_bounds_ratio:.3f}, "
+                f"RawX: {diagnostics.raw_min_x}..{diagnostics.raw_max_x}, "
+                f"RawY: {diagnostics.raw_min_y}..{diagnostics.raw_max_y}, "
+                f"X: {diagnostics.min_x}..{diagnostics.max_x}, "
+                f"Y: {diagnostics.min_y}..{diagnostics.max_y}, "
+                f"Cache: {diagnostics.cache_status}"
+            ),
+            1,
+        )
+
+
+class HeatmapProjectionDiagnoser:
+    """DB-first projection report that does not write heatmap artifacts."""
+
+    def __init__(self, settings: HeatmapSettings, repository: HeatmapRepository) -> None:
+        self._settings = settings
+        self._repository = repository
+        self._logger = HeatmapLogger(max(1, settings.debug_level))
+
+    def run(self) -> list[GenerationResult]:
+        self._repository.connect()
+        try:
+            map_configs = self._repository.fetch_map_configs()
+            targets = select_target_maps(
+                map_configs,
+                visible_games=self._repository.fetch_visible_games(),
+                game=self._settings.cli.game,
+                map_name=self._settings.cli.map_name,
+            )
+            results: list[GenerationResult] = []
+            for code, game_configs in targets.items():
+                for map_name, config in game_configs.items():
+                    results.append(self._diagnose_one(code, map_name, config))
+            return results
+        finally:
+            self._repository.close()
+
+    def _diagnose_one(self, code: str, map_name: str, config: HeatmapConfig) -> GenerationResult:
+        image_size = self._image_size(config, map_name)
+        points = self._repository.fetch_points(
+            config,
+            ignore_infected=self._settings.cli.ignore_infected,
+            kill_limit=self._settings.kill_limit,
+            start_timestamp=None,
+        )
+        diagnostics = collect_projection_stats(points, config, image_size=image_size)
+        self._logger.event(
+            "PROJECTION",
+            (
+                f"Game: {code}, Map: {map_name}, Image: {image_size[0]}x{image_size[1]}, "
+                f"Points: {diagnostics.queried}, InBounds: {diagnostics.in_bounds}, "
+                f"OutOfBounds: {diagnostics.out_of_bounds}, Ratio: {diagnostics.in_bounds_ratio:.3f}, "
+                f"RawX: {diagnostics.raw_min_x}..{diagnostics.raw_max_x}, "
+                f"RawY: {diagnostics.raw_min_y}..{diagnostics.raw_max_y}, "
+                f"X: {diagnostics.min_x}..{diagnostics.max_x}, "
+                f"Y: {diagnostics.min_y}..{diagnostics.max_y}, "
+                f"Config: xoffset={config.xoffset}, yoffset={config.yoffset}, "
+                f"scale={config.scale}, flipx={int(config.flipx)}, flipy={int(config.flipy)}, "
+                f"rotate={int(config.rotate)}"
+            ),
+            1,
+        )
+        return GenerationResult(
+            code=code,
+            map_name=map_name,
+            generated=False,
+            points=len(points),
+            diagnostics=diagnostics,
+        )
+
+    def _image_size(self, config: HeatmapConfig, map_name: str) -> tuple[int, int]:
+        source_path = self._settings.assets_root / config.game / f"{map_name}.jpg"
+        if not source_path.exists():
+            self._logger.event("FILE", f"{source_path} doesn't exist", 1)
+            return (0, 0)
+        with Image.open(source_path) as image:
+            return image.size
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -422,6 +621,21 @@ def build_parser() -> argparse.ArgumentParser:
         default=1,
         help="Legacy-style logging verbosity (1-3)",
     )
+    parser.add_argument(
+        "--diagnose",
+        action="store_true",
+        help="Print projection diagnostics for each generated map",
+    )
+    parser.add_argument(
+        "--diagnose-projection",
+        action="store_true",
+        help="Print DB-first projection diagnostics without generating image outputs",
+    )
+    parser.add_argument(
+        "--legacy-visuals",
+        action="store_true",
+        help="Use legacy opacity and brush sizing without sparse-map visibility boosts",
+    )
     return parser
 
 
@@ -444,6 +658,9 @@ def parse_args(argv: Sequence[str] | None = None) -> HeatmapCliOptions:
         output_size=parsed.output_size,
         kill_limit=parsed.kill_limit,
         debug_level=parsed.debug_level,
+        diagnose=parsed.diagnose,
+        diagnose_projection=parsed.diagnose_projection,
+        legacy_visuals=parsed.legacy_visuals,
     )
 
 
@@ -479,6 +696,9 @@ def load_settings(argv: Sequence[str] | None = None) -> HeatmapSettings:
         output_size=options.output_size,
         kill_limit=options.kill_limit,
         debug_level=options.debug_level,
+        diagnose=options.diagnose,
+        diagnose_projection=options.diagnose_projection,
+        legacy_visuals=options.legacy_visuals,
     )
 
 
@@ -505,6 +725,81 @@ def select_target_maps(
         if code in map_configs:
             selected[code] = dict(map_configs[code])
     return selected
+
+
+def parse_goldsrc_overview(
+    content: str,
+    *,
+    code: str,
+    game: str,
+    map_name: str,
+) -> ImportedOverview:
+    """Parse a GoldSrc ``overviews/<map>.txt`` file into legacy projection values."""
+
+    values: dict[str, str] = {}
+    for raw_line in content.splitlines():
+        line = raw_line.split("//", 1)[0].strip()
+        if not line or line in {"{", "}"}:
+            continue
+        parts = line.split()
+        if len(parts) < 2:
+            continue
+        key = parts[0].upper()
+        if key in {"ZOOM", "HEIGHT", "IMAGE", "ROTATED"}:
+            values[key] = parts[1].strip('"')
+        elif key == "ORIGIN" and len(parts) >= 3:
+            values["ORIGIN_X"] = parts[1]
+            values["ORIGIN_Y"] = parts[2]
+
+    missing = {"ZOOM", "ORIGIN_X", "ORIGIN_Y"} - set(values)
+    if missing:
+        raise ValueError(f"GoldSrc overview missing required keys: {', '.join(sorted(missing))}")
+
+    return ImportedOverview(
+        projection="goldsrc",
+        code=code,
+        game=game,
+        map_name=map_name,
+        xoffset=round(-float(values["ORIGIN_X"])),
+        yoffset=round(float(values["ORIGIN_Y"])),
+        scale=float(values["ZOOM"]),
+        flipx=False,
+        flipy=True,
+        rotate=values.get("ROTATED", "0") not in {"0", "false", "False"},
+        image=values.get("IMAGE"),
+        height=int(float(values["HEIGHT"])) if "HEIGHT" in values else None,
+        manual_required=False,
+    )
+
+
+def parse_source_overview(
+    content: str,
+    *,
+    code: str,
+    game: str,
+    map_name: str,
+) -> ImportedOverview:
+    """Parse a Source/CSGO ``resource/overviews/<map>.txt`` file."""
+
+    values = {match.group("key").lower(): match.group("value") for match in _SOURCE_OVERVIEW_PAIR.finditer(content)}
+    missing = {"pos_x", "pos_y", "scale"} - set(values)
+    if missing:
+        raise ValueError(f"Source overview missing required keys: {', '.join(sorted(missing))}")
+
+    return ImportedOverview(
+        projection="source",
+        code=code,
+        game=game,
+        map_name=map_name,
+        xoffset=round(-float(values["pos_x"])),
+        yoffset=round(float(values["pos_y"])),
+        scale=float(values["scale"]),
+        flipx=False,
+        flipy=True,
+        rotate=values.get("rotate", "0") not in {"0", "false", "False"},
+        material=values.get("material"),
+        manual_required=False,
+    )
 
 
 def build_points_query(
@@ -636,16 +931,35 @@ def load_brush(assets_root: Path, brush_name: str) -> Image.Image:
     return Image.open(brush_path).convert("RGBA")
 
 
-def compute_opacity(point_count: int) -> int:
-    """Return the legacy per-dot opacity percentage."""
+def compute_opacity(point_count: int, *, legacy_visuals: bool = False) -> int:
+    """Return the per-dot opacity percentage."""
 
     safe_points = point_count or 1
     opacity = int((500 / safe_points) * 100)
     if opacity > 40:
-        return 40
+        opacity = 40
     if opacity < 1:
-        return 2
+        opacity = 2
+    if legacy_visuals:
+        return opacity
+    if safe_points <= 5:
+        return max(opacity, 85)
+    if safe_points <= 25:
+        return max(opacity, 65)
     return opacity
+
+
+def prepare_brush_for_visibility(
+    brush: Image.Image,
+    point_count: int,
+    *,
+    legacy_visuals: bool = False,
+) -> Image.Image:
+    """Increase sparse-map dot radius while retaining legacy mode."""
+
+    if legacy_visuals or point_count > 5 or min(brush.size) >= 33:
+        return brush
+    return brush.resize((33, 33), Image.Resampling.LANCZOS)
 
 
 def apply_brush_opacity(brush: Image.Image, opacity_percent: int) -> Image.Image:
@@ -685,10 +999,7 @@ def draw_brush_point(
 ) -> None:
     """Apply one transformed kill position to the overlay."""
 
-    pos_x = -point.pos_x if config.flipx else point.pos_x
-    pos_y = -point.pos_y if config.flipy else point.pos_y
-    x = int((pos_x + config.xoffset) / config.scale)
-    y = int((pos_y + config.yoffset) / config.scale)
+    x, y = transform_point(point, config)
 
     if x < 0 or y < 0 or x >= overlay.width or y >= overlay.height:
         return
@@ -702,6 +1013,61 @@ def draw_brush_point(
     else:
         destination = (int(x - (brush.width / 2)), int(y - (brush.height / 2)))
     overlay.paste(brush, destination, brush)
+
+
+def transform_point(point: HeatmapPoint, config: HeatmapConfig) -> tuple[int, int]:
+    """Transform a stored world coordinate into heatmap source-image pixels."""
+
+    pos_x = -point.pos_x if config.flipx else point.pos_x
+    pos_y = -point.pos_y if config.flipy else point.pos_y
+    x = int((pos_x + config.xoffset) / config.scale)
+    y = int((pos_y + config.yoffset) / config.scale)
+    return x, y
+
+
+def collect_projection_stats(
+    points: Sequence[HeatmapPoint],
+    config: HeatmapConfig,
+    *,
+    image_size: tuple[int, int],
+    cache_status: str = "none",
+) -> ProjectionStats:
+    """Summarize transformed coordinate coverage for diagnostics and tests."""
+
+    transformed = [transform_point(point, config) for point in points]
+    width, height = image_size
+    in_bounds = sum(1 for x, y in transformed if 0 <= x < width and 0 <= y < height)
+    queried = len(transformed)
+    if transformed:
+        xs = [point[0] for point in transformed]
+        ys = [point[1] for point in transformed]
+        min_x = min(xs)
+        max_x = max(xs)
+        min_y = min(ys)
+        max_y = max(ys)
+        raw_xs = [point.pos_x for point in points]
+        raw_ys = [point.pos_y for point in points]
+        raw_min_x = min(raw_xs)
+        raw_max_x = max(raw_xs)
+        raw_min_y = min(raw_ys)
+        raw_max_y = max(raw_ys)
+    else:
+        min_x = max_x = min_y = max_y = None
+        raw_min_x = raw_max_x = raw_min_y = raw_max_y = None
+    return ProjectionStats(
+        queried=queried,
+        in_bounds=in_bounds,
+        out_of_bounds=queried - in_bounds,
+        min_x=min_x,
+        max_x=max_x,
+        min_y=min_y,
+        max_y=max_y,
+        cache_status=cache_status,
+        raw_min_x=raw_min_x,
+        raw_max_x=raw_max_x,
+        raw_min_y=raw_min_y,
+        raw_max_y=raw_max_y,
+    )
 
 
 def build_color_gradient() -> list[tuple[int, int, int]]:
@@ -826,13 +1192,24 @@ def build_generator(settings: HeatmapSettings) -> HeatmapGenerator:
     return HeatmapGenerator(settings, repository)
 
 
+def build_projection_diagnoser(settings: HeatmapSettings) -> HeatmapProjectionDiagnoser:
+    """Construct the DB-first projection diagnostic runner."""
+
+    database = SyncDatabaseAdapter(database_config_from_proxy_config(settings.config))
+    repository = HeatmapRepository(database)
+    return HeatmapProjectionDiagnoser(settings, repository)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Entry point for ``python -m hlstats_py.heatmaps``."""
 
     try:
         settings = load_settings(argv)
-        generator = build_generator(settings)
-        generator.run()
+        if settings.cli.diagnose_projection:
+            build_projection_diagnoser(settings).run()
+        else:
+            generator = build_generator(settings)
+            generator.run()
     except (ConfigError, FileNotFoundError, RuntimeError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

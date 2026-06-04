@@ -73,6 +73,69 @@ The source map-pack JPEGs are still external assets and are not bundled into
 this repository, so a real legacy-vs-Python parity check on production maps
 still requires an installed heatmap pack.
 
+Projection diagnostics can run directly against the DB without regenerating
+JPEGs or replaying logs:
+
+```bash
+cd scripts
+python -m hlstats_py.heatmaps \
+  --configfile hlstats.conf \
+  --game cstrike \
+  --map de_dust2 \
+  --heatmaps-root ../heatmaps \
+  --diagnose-projection
+```
+
+For maps whose world coordinates do not line up with the overview image, use
+the local calibration helper. It can import GoldSrc or Source overview `.txt`
+metadata, write a standalone HTML preview with sliders, and apply the chosen
+legacy projection values only after the in-bounds ratio passes the configured
+threshold:
+
+```bash
+cd scripts
+python heatmap_projection_calibrate.py \
+  --configfile hlstats.conf \
+  --game cstrike \
+  --map de_dust2 \
+  --heatmaps-root ../heatmaps \
+  --overview-file path/to/cstrike/overviews/de_dust2.txt
+```
+
+GoldSrc overview files such as `cstrike/overviews/<map>.txt` and Source-style
+`resource/overviews/<map>.txt` are treated as calibration seeds, not as a
+guarantee that the current web JPEG has the same crop and scale as the shipped
+radar image. Use `--diagnose-projection` and the calibration preview against
+the already populated DB first; only regenerate static JPEGs with
+`--disablecache` after the projection is stable.
+
+## Web Heatmap Overlay
+
+The PHP web layer now has a DB-backed JSON overlay path in addition to the
+legacy generated JPEGs:
+
+- `web/heatmap_points.php?game=<code>&map=<map>` returns transformed canvas
+  points for the global map heatmap.
+- `web/heatmap_points.php?game=<code>&map=<map>&player=<id>&event=kills`
+  returns the selected player's kill locations.
+- `event=deaths` returns where that player died, using victim coordinates when
+  available.
+- `event=both` returns both channels in one payload.
+
+The response keeps the base image dimensions, diagnostics, transformed points,
+and hover metadata. Player-scoped points include separate `killValue` and
+`deathValue` fields so the browser can render kills as a warm
+yellow/orange/red channel and deaths as a cool cyan/blue/violet channel. Hover
+tooltips use the same payload to show top killers, victims, and involved
+players for the nearest bucket.
+
+`mapinfo` uses this JSON layer as an inline canvas overlay on top of the map
+image while keeping the old `<map>-kill.jpg` and `<map>-kill-thumb.jpg`
+lightbox link as a compatibility fallback. `playerinfo` shows a personal
+heatmap widget in the Maps & Servers tab; the map selector is built from maps
+where the player has DB events and the product has heatmap config plus a map
+image.
+
 The module intentionally keeps the legacy topology intact:
 
 `game server -> proxy_daemon_py -> hlstats_py worker -> MySQL -> PHP web`

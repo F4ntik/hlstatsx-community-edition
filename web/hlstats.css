@@ -262,3 +262,145 @@ nav{
     text-decoration:none !important;
     white-space:nowrap;
 }
+
+.heatmap-viewer {
+	max-width: 360px;
+}
+
+.heatmap-viewer-player {
+	max-width: 520px;
+}
+
+.heatmap-canvas-wrap {
+	position: relative;
+	display: inline-block;
+	max-width: 100%;
+	line-height: 0;
+	background: #1f1f1f;
+}
+
+.heatmap-map-base {
+	display: block;
+	max-width: 100%;
+	height: auto;
+}
+
+.heatmap-overlay {
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: 100%;
+	height: 100%;
+}
+
+.heatmap-status {
+	position: absolute;
+	right: 6px;
+	bottom: 6px;
+	min-width: 0;
+	padding: 2px 5px;
+	background: rgba(0, 0, 0, 0.65);
+	color: #fff;
+	font: 10px Arial, sans-serif;
+	line-height: 1.2;
+}
+
+.heatmap-status:empty {
+	display: none;
+}
+
+.heatmap-status.is-warning {
+	background: rgba(150, 42, 16, 0.88);
+	color: #fff5df;
+}
+
+.heatmap-actions {
+	margin-top: 6px;
+	text-align: right;
+}
+
+.heatmap-toggle {
+	min-width: 74px;
+	height: 22px;
+	border: 1px solid #777;
+	background: #e8e8e8;
+	color: #222;
+	font: 11px Arial, sans-serif;
+	cursor: pointer;
+}
+
+.heatmap-toggle.is-active {
+	background: #f5d65b;
+	border-color: #9b7412;
+}
+
+.heatmap-tooltip {
+	position: absolute;
+	display: none;
+	z-index: 4;
+	max-width: 260px;
+	padding: 6px 8px;
+	background: rgba(18, 18, 18, 0.92);
+	border: 1px solid rgba(255, 255, 255, 0.28);
+	color: #fff;
+	font: 11px Arial, sans-serif;
+	line-height: 1.35;
+	text-align: left;
+	pointer-events: none;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+.heatmap-player-panel {
+	margin: 6px 0 14px;
+}
+
+.heatmap-player-controls {
+	margin-bottom: 8px;
+	font: 11px Arial, sans-serif;
+}
+
+.heatmap-player-controls select {
+	margin: 0 8px 0 4px;
+	max-width: 180px;
+}
+
+.heatmap-mode {
+	height: 22px;
+	margin-left: 3px;
+	border: 1px solid #777;
+	background: #e8e8e8;
+	color: #222;
+	font: 11px Arial, sans-serif;
+	cursor: pointer;
+}
+
+.heatmap-mode.is-active {
+	background: #f5d65b;
+	border-color: #9b7412;
+}
+
+.heatmap-legend {
+	display: inline-block;
+	margin-left: 8px;
+	color: #333;
+	font: 11px Arial, sans-serif;
+	white-space: nowrap;
+}
+
+.heatmap-legend-kills,
+.heatmap-legend-deaths {
+	display: inline-block;
+	width: 10px;
+	height: 10px;
+	margin: 0 3px 0 7px;
+	vertical-align: -1px;
+	border: 1px solid rgba(0, 0, 0, 0.35);
+}
+
+.heatmap-legend-kills {
+	background: #ff4b00;
+}
+
+.heatmap-legend-deaths {
+	background: #005cff;
+}

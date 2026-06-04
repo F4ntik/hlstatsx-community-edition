@@ -6,14 +6,18 @@ from pathlib import Path
 from hlstats_py.heatmaps import (
     HeatmapConfig,
     HeatmapGenerator,
+    HeatmapPoint,
     HeatmapRepository,
     HeatmapSettings,
     apply_brush_opacity,
     build_points_query,
+    collect_projection_stats,
     load_settings,
+    parse_goldsrc_overview,
+    parse_source_overview,
     select_target_maps,
 )
-from PIL import Image
+from PIL import Image, ImageChops
 
 
 class FakeCursor:
@@ -292,3 +296,126 @@ def test_heatmap_generator_writes_legacy_outputs_for_2x2_map_name(tmp_path: Path
     assert adapter.closed is True
     _assert_generated_outputs(settings, "de_dust2_2x2", results)
     assert any("hlstats_Events_Frags" in query for query in adapter.executed)
+
+
+def test_collect_projection_stats_reports_in_bounds_and_out_of_bounds_points() -> None:
+    config = _make_config()
+    points = [
+        HeatmapPoint(datetime(2026, 4, 19, 12, 0, 0), 0, 0),
+        HeatmapPoint(datetime(2026, 4, 19, 12, 1, 0), 5000, 5000),
+    ]
+
+    stats = collect_projection_stats(points, config, image_size=(128, 128))
+
+    assert stats.queried == 2
+    assert stats.in_bounds == 1
+    assert stats.out_of_bounds == 1
+    assert stats.min_x == 32
+    assert stats.max_x == 5032
+    assert stats.min_y == 32
+    assert stats.max_y == 5032
+
+
+def test_collect_projection_stats_reports_raw_bounds_and_ratio() -> None:
+    config = _make_config()
+    points = [
+        HeatmapPoint(datetime(2026, 4, 19, 12, 0, 0), -10, 40),
+        HeatmapPoint(datetime(2026, 4, 19, 12, 1, 0), 5000, 6000),
+    ]
+
+    stats = collect_projection_stats(points, config, image_size=(128, 128))
+
+    assert stats.raw_min_x == -10
+    assert stats.raw_max_x == 5000
+    assert stats.raw_min_y == 40
+    assert stats.raw_max_y == 6000
+    assert stats.in_bounds_ratio == 0.5
+
+
+def test_parse_goldsrc_overview_converts_to_legacy_config() -> None:
+    overview = parse_goldsrc_overview(
+        """
+        global
+        {
+            ZOOM 1.260000
+            ORIGIN -223 1120 0
+            ROTATED 0
+        }
+        layer
+        {
+            IMAGE "overviews/de_dust2.bmp"
+            HEIGHT 1024
+        }
+        """,
+        code="cstrike",
+        game="cstrike",
+        map_name="de_dust2",
+    )
+
+    assert overview.projection == "goldsrc"
+    assert overview.manual_required is False
+    assert overview.to_legacy_config().xoffset == 223
+    assert overview.to_legacy_config().yoffset == 1120
+    assert overview.to_legacy_config().scale == 1.26
+    assert overview.to_legacy_config().flipy is True
+
+
+def test_parse_source_overview_converts_to_legacy_config() -> None:
+    overview = parse_source_overview(
+        """
+        "de_dust2"
+        {
+            "material" "overviews/de_dust2"
+            "pos_x" "-5290"
+            "pos_y" "4259"
+            "scale" "6.0"
+            "rotate" "0"
+        }
+        """,
+        code="css",
+        game="css",
+        map_name="de_dust2",
+    )
+
+    assert overview.projection == "source"
+    assert overview.manual_required is False
+    assert overview.to_legacy_config().xoffset == 5290
+    assert overview.to_legacy_config().yoffset == 4259
+    assert overview.to_legacy_config().scale == 6.0
+    assert overview.to_legacy_config().flipy is True
+
+
+def test_heatmap_generator_makes_sparse_points_visibly_readable(tmp_path: Path) -> None:
+    settings = _make_settings(tmp_path)
+    asset_dir = settings.assets_root / "cstrike"
+    asset_dir.mkdir(parents=True)
+    settings.cache_root.mkdir(parents=True)
+    settings.web_root.mkdir(parents=True)
+
+    source_file = asset_dir / "de_dust2.jpg"
+    Image.new("RGB", (96, 96), (40, 40, 40)).save(source_file, format="JPEG")
+    Image.new("RGBA", (17, 17), (255, 255, 255, 48)).save(
+        settings.assets_root / "brush_small.png",
+        format="PNG",
+    )
+
+    rows_by_match = _make_rows("de_dust2")
+    adapter = FakeAdapter(rows_by_match)
+    repository = HeatmapRepository(adapter)  # type: ignore[arg-type]
+    generator = HeatmapGenerator(settings, repository, clock=lambda: 1_713_520_000.0)
+
+    results = generator.run()
+
+    output_file = results[0].output_file
+    assert output_file is not None
+    source = Image.open(source_file).convert("RGB").resize(Image.open(output_file).size)
+    output = Image.open(output_file).convert("RGB")
+    diff = ImageChops.difference(source, output)
+    heat_pixels = [
+        pixel
+        for pixel in diff.crop((0, 96, diff.width, diff.height)).getdata()
+        if max(pixel) >= 18
+    ]
+    assert len(heat_pixels) >= 600
+    assert results[0].diagnostics is not None
+    assert results[0].diagnostics.in_bounds == 1

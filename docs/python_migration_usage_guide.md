@@ -334,6 +334,9 @@ poetry run python -m hlstats_py.heatmaps \
 - Overlay-cache сохраняется в `heatmaps/cache/<code>`.
 - Поддерживаются legacy-флаги `--game`, `--map`, `--disablecache`,
   `--ignoreinfected`.
+- Для быстрой проверки проекции без регенерации JPEG используйте
+  `--diagnose-projection`; он считает queried/in-bounds/out-of-bounds,
+  raw/transformed bounds и текущие `hlstats_Heatmap_Config` значения.
 
 Пример точечного запуска для одной карты:
 
@@ -347,6 +350,65 @@ poetry run python -m hlstats_py.heatmaps \
   --map de_dust2 \
   --disablecache
 ```
+
+### 7.1. Проекция карт и overview-файлы
+
+Координаты `hlstats_Events_Frags.pos_x/pos_y` и
+`pos_victim_x/pos_victim_y` приходят из игровых логов как world-координаты.
+Для отображения на raster overview они переводятся через
+`hlstats_Heatmap_Config`: `xoffset`, `yoffset`, `scale`, `flipx`, `flipy`,
+`rotate`.
+
+Правильный источник стартовой сетки:
+
+- GoldSrc / CS 1.6: `cstrike/overviews/<map>.txt` с `ZOOM`, `ORIGIN`,
+  `ROTATED`, `IMAGE`, `HEIGHT`.
+- Source / CS:S / CS:GO: `resource/overviews/<map>.txt` с `pos_x`, `pos_y`,
+  `scale`, `rotate`, `material`.
+
+Эти файлы являются seed для калибровки. Они не гарантируют идеального
+попадания, если текущий web JPEG отличается от radar BMP/material по размеру,
+crop или версии карты. Для кастомных карт без overview-файла автоматическая
+калибровка невозможна: нужен импорт overview-файла или ручная подгонка.
+
+Локальный DB-first helper:
+
+```bash
+cd scripts
+python heatmap_projection_calibrate.py \
+  --configfile hlstats.conf \
+  --game cstrike \
+  --map de_dust2 \
+  --heatmaps-root ../heatmaps \
+  --overview-file path/to/cstrike/overviews/de_dust2.txt
+```
+
+Helper генерирует HTML preview со слайдерами и может применить значения в
+`hlstats_Heatmap_Config` только после прохождения заданного порога
+in-bounds-ratio. Итерации по калибровке нужно делать на уже заполненной DB; full
+log replay и `--disablecache` регенерацию стоит запускать только после
+стабилизации проекции.
+
+### 7.2. Web overlay и персональные heatmaps
+
+Статические `<map>-kill.jpg` / `<map>-kill-thumb.jpg` остаются legacy fallback,
+но основной видимый слой в web теперь строится через локальный canvas overlay:
+
+- `mode=mapinfo&game=<code>&map=<map>` показывает глобальную теплокарту поверх
+  изображения карты и оставляет старую thumbnail/lightbox ссылку.
+- `web/heatmap_points.php?game=<code>&map=<map>` возвращает JSON-точки,
+  image metadata и diagnostics.
+- `web/heatmap_points.php?game=<code>&map=<map>&player=<id>&event=kills`
+  возвращает точки убийств конкретного игрока.
+- `event=deaths` показывает места смерти игрока по victim-координатам.
+- `event=both` возвращает оба канала в одном payload.
+
+В карточке игрока персональный виджет находится во вкладке Maps & Servers.
+Селект карт строится только из карт, где у игрока есть события и для карты
+существуют heatmap config плюс изображение. Цвета семантические: убийства
+рисуются теплой палитрой yellow/orange/red, смерти - холодной
+cyan/blue/violet. Tooltip по ближайшей точке показывает количество событий,
+раздельные `Kills`/`Deaths`, top killers, top victims и involved players.
 
 Открытое ограничение: реальная parity-проверка legacy PHP vs Python на
 production map-pack картах требует установленного набора

@@ -211,6 +211,34 @@ Minimum replay validation loop:
   validating `hlstats_Players`/country/flag output
 - evidence update in `bug-plan.md`, `issues.jsonl`, or the relevant audit note
 
+### Heatmaps
+
+Run targeted checks when heatmap generation, projection, JSON payloads, or web
+overlay behavior changes:
+
+- Python generator tests:
+  `python -m pytest scripts/hlstats_py/tests/test_heatmaps.py -q`
+- PHP helper smoke:
+  `php scripts/web_heatmap_smoke.php` locally when PHP is installed, or the
+  same script inside the web container.
+- PHP syntax lint for touched heatmap web files:
+  `web/includes/heatmap_points.php`, `web/heatmap_points.php`,
+  `web/heatmap_map.php`, `web/pages/mapinfo.php`, and any touched
+  `playerinfo_*` include.
+- DB-first projection diagnostics before expensive replay/regeneration:
+  `cd scripts && python -m hlstats_py.heatmaps --configfile hlstats.conf --game cstrike --map de_dust2 --heatmaps-root ../heatmaps --diagnose-projection`
+- Browser verification for `mode=mapinfo&game=<code>&map=<map>`: canvas overlay
+  visible, static JPEG/thumb fallback still linked, diagnostics badge appears
+  when in-bounds ratio is weak, console/network clean.
+- Browser verification for `mode=playerinfo&player=<id>&game=<code>` in the
+  Maps & Servers tab: map selector appears for configured maps, `Kills`,
+  `Deaths`, and `Kills/Deaths` redraw the same canvas, warm/cool colors are
+  distinguishable, and hover tooltip shows event counts plus top
+  killers/victims/players.
+
+Full replay and `--disablecache` heatmap regeneration are promotion checks.
+Use the already populated DB for visual/projection iteration first.
+
 ### Frontend / i18n
 
 Run targeted checks when frontend-visible behavior changes:

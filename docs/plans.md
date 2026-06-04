@@ -63,6 +63,10 @@ Current autonomy follow-up entrypoint:
   `TeamBonuses` residuals.
 - Keep replay, compare, and representative EN/RU smoke checks runnable without
   duplicating their runbooks across multiple docs.
+- Continue the heatmap upgrade on the hybrid path: DB-backed canvas overlay in
+  web, static JPEG compatibility fallback, player-scoped kill/death widgets,
+  and per-map projection calibration from overview seeds plus DB-first manual
+  diagnostics.
 - The autonomy/release-readiness follow-up through Phase 9 is complete for the
   current scope. For release-candidate preparation, use
   [`docs/release-readiness.md`](release-readiness.md) and update

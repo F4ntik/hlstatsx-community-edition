@@ -165,4 +165,114 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 <?php
 	}
+
+	$heatmapMaps = array();
+	$heatmapResult = $db->query("
+		SELECT
+			events.map,
+			SUM(events.kills) AS kills,
+			SUM(events.deaths) AS deaths
+		FROM
+		(
+			SELECT
+				hef.map,
+				COUNT(*) AS kills,
+				0 AS deaths
+			FROM
+				hlstats_Events_Frags AS hef
+				INNER JOIN hlstats_Servers AS hs ON hs.serverId = hef.serverId
+				INNER JOIN hlstats_Games AS hg ON hg.code = hs.game
+				INNER JOIN hlstats_Heatmap_Config AS hc ON hc.game = hg.realgame AND hc.map = hef.map
+			WHERE
+				hef.killerId = '$player'
+				AND hs.game = '$game'
+				AND hef.map <> ''
+				AND hef.pos_x IS NOT NULL
+				AND hef.pos_y IS NOT NULL
+			GROUP BY
+				hef.map
+			UNION ALL
+			SELECT
+				hef.map,
+				0 AS kills,
+				COUNT(*) AS deaths
+			FROM
+				hlstats_Events_Frags AS hef
+				INNER JOIN hlstats_Servers AS hs ON hs.serverId = hef.serverId
+				INNER JOIN hlstats_Games AS hg ON hg.code = hs.game
+				INNER JOIN hlstats_Heatmap_Config AS hc ON hc.game = hg.realgame AND hc.map = hef.map
+			WHERE
+				hef.victimId = '$player'
+				AND hs.game = '$game'
+				AND hef.map <> ''
+				AND (
+					(hef.pos_victim_x IS NOT NULL AND hef.pos_victim_y IS NOT NULL)
+					OR (hef.pos_x IS NOT NULL AND hef.pos_y IS NOT NULL)
+				)
+			GROUP BY
+				hef.map
+		) AS events
+		GROUP BY
+			events.map
+		ORDER BY
+			(SUM(events.kills) + SUM(events.deaths)) DESC,
+			events.map ASC
+		LIMIT 20
+	");
+
+	while ($heatmapRow = $db->fetch_array($heatmapResult)) {
+		$candidateMap = $heatmapRow['map'];
+		$mapImage = getImage("/games/$game/maps/$candidateMap");
+		if (!$mapImage) {
+			continue;
+		}
+		$heatmapRow['image'] = $mapImage;
+		$heatmapMaps[] = $heatmapRow;
+	}
+
+	if (count($heatmapMaps) > 0) {
+		$defaultMap = $heatmapMaps[0]['map'];
+		$defaultImage = $heatmapMaps[0]['image'];
+		$endpoint = "heatmap_points.php?game=" . rawurlencode($game) . "&map=" . rawurlencode($defaultMap) . "&player=" . intval($player) . "&event=kills";
+?>
+<div style="clear:both;padding-top:20px;"></div>
+<?php printSectionTitle(eHtml(t('literal.heatmap')) . ': ' . eHtml(t('literal.maps'))); ?>
+<div class="heatmap-player-panel" data-heatmap-game="<?php echo eHtml($game); ?>" data-heatmap-player="<?php echo intval($player); ?>" data-heatmap-map="<?php echo eHtml($defaultMap); ?>" data-heatmap-current-event="kills">
+	<div class="heatmap-player-controls">
+		<label>
+			<?php echo eHtml(t('literal.map')); ?>
+			<select data-heatmap-map-select="1">
+<?php
+		foreach ($heatmapMaps as $heatmapMap) {
+			$mapName = $heatmapMap['map'];
+			$selected = ($mapName === $defaultMap) ? ' selected="selected"' : '';
+			echo '<option value="' . eHtml($mapName) . '"' . $selected . '>' . eHtml($mapName) . ' (' . intval($heatmapMap['kills']) . '/' . intval($heatmapMap['deaths']) . ')</option>';
+		}
+?>
+			</select>
+		</label>
+		<button type="button" class="heatmap-mode is-active" data-heatmap-event="kills"><?php echo eHtml(t('literal.kills')); ?></button>
+		<button type="button" class="heatmap-mode" data-heatmap-event="deaths"><?php echo eHtml(t('literal.deaths')); ?></button>
+		<button type="button" class="heatmap-mode" data-heatmap-event="both"><?php echo eHtml(t('literal.kills_deaths')); ?></button>
+		<span class="heatmap-legend"><span class="heatmap-legend-kills"></span><?php echo eHtml(t('literal.kills')); ?> <span class="heatmap-legend-deaths"></span><?php echo eHtml(t('literal.deaths')); ?></span>
+	</div>
+	<div class="heatmap-viewer heatmap-viewer-player" data-heatmap-endpoint="<?php echo eHtml($endpoint); ?>">
+		<div class="heatmap-canvas-wrap">
+			<img class="heatmap-map-base" src="<?php echo eHtml($defaultImage['url']); ?>" alt="<?php echo eHtml($defaultMap); ?>" />
+			<canvas class="heatmap-overlay" aria-hidden="true"></canvas>
+			<div class="heatmap-status" aria-live="polite"></div>
+			<div class="heatmap-tooltip"></div>
+		</div>
+		<div class="heatmap-actions">
+			<button type="button" class="heatmap-toggle" data-heatmap-toggle="1"><?php echo eHtml(t('literal.heatmap')); ?></button>
+		</div>
+	</div>
+</div>
+<script type="text/javascript">
+if (typeof setupInlineHeatmaps == 'function') {
+	setupInlineHeatmaps();
+}
+</script>
+<?php
+	}
 ?>

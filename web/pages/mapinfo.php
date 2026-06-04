@@ -147,35 +147,52 @@ error(t('literal.invalid_game'));
 </div>
 <br /><br />
 <div class="block">
-<?php // figure out URL and absolute path of image
-	if ($mapimg = getImage("/games/$game/maps/$map"))
+	<?php // figure out URL and absolute path of image
+	$mapimage = getImage("/games/$game/maps/$map");
+	if ($mapimage)
 	{
-		$mapimg = $mapimg['url'];
-	}
-	elseif ($mapimg = getImage("/games/$realgame/maps/$map"))
-	{
-		$mapimg = $mapimg['url'];
+		$mapimg = $mapimage['url'];
 	}
 	else
 	{
-		$mapimg = IMAGE_PATH."/nomap.png";
+		$mapimage = getImage("/games/$realgame/maps/$map");
+		if ($mapimage)
+		{
+			$mapimg = $mapimage['url'];
+		}
+		else
+		{
+			$mapimg = IMAGE_PATH."/nomap.png";
+		}
 	}
-	
+
 	$heatmap = getImage("/games/$game/heatmaps/$map-kill");
 	$heatmapthumb = getImage("/games/$game/heatmaps/$map-kill-thumb");
+	if (!$heatmap && $realgame) {
+		$heatmap = getImage("/games/$realgame/heatmaps/$map-kill");
+		$heatmapthumb = getImage("/games/$realgame/heatmaps/$map-kill-thumb");
+	}
+	$heatmapendpoint = "heatmap_points.php?game=" . rawurlencode($game) . "&map=" . rawurlencode($map);
 
 	if ($mapimg || $g_options['map_dlurl'] || $heatmap)
 	{
 ?>
 	<div class="subblock">
-		<div style="float:left;width:75%;">
-			<?php $table->draw($result, $numitems, 100, 'center'); ?>
-		</div>
 		<div style="float:right;">
 <?php
 			if ($mapimg)
 			{
-				echo "<img src=\"$mapimg\" alt=\"$map\" />";
+				echo "<div class=\"heatmap-viewer\" data-heatmap-endpoint=\"" . eHtml($heatmapendpoint) . "\">";
+				echo "<div class=\"heatmap-canvas-wrap\">";
+				echo "<img class=\"heatmap-map-base\" src=\"" . eHtml($mapimg) . "\" alt=\"" . eHtml($map) . "\" />";
+				echo "<canvas class=\"heatmap-overlay\" aria-hidden=\"true\"></canvas>";
+				echo "<div class=\"heatmap-status\" aria-live=\"polite\"></div>";
+				echo "<div class=\"heatmap-tooltip\"></div>";
+				echo "</div>";
+				echo "<div class=\"heatmap-actions\">";
+				echo "<button type=\"button\" class=\"heatmap-toggle\" data-heatmap-toggle=\"1\">" . eHtml(t('literal.heatmap')) . "</button>";
+				echo "</div>";
+				echo "</div>";
 			}
 
 			if ($g_options['map_dlurl'])
@@ -190,9 +207,13 @@ error(t('literal.invalid_game'));
 
 			if ($heatmap)
 			{
-				echo "<a href=\"" . $heatmap['url'] . "\" rel=\"boxed\" title=\"Heatmap: $map\"><br /><img src=\"" . $heatmapthumb['url'] . "\" alt=\"$map\" /></a>";
+				$thumburl = $heatmapthumb ? $heatmapthumb['url'] : $heatmap['url'];
+				echo "<a href=\"" . eHtml($heatmap['url']) . "\" rel=\"boxed\" title=\"Heatmap: " . eHtml($map) . "\"><br /><img src=\"" . eHtml($thumburl) . "\" alt=\"" . eHtml($map) . "\" /></a>";
 			}
 ?>
+		</div>
+		<div style="float:left;width:75%;">
+			<?php $table->draw($result, $numitems, 100, 'center'); ?>
 		</div>
 	</div>
 <?php

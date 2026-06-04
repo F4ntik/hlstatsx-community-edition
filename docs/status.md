@@ -2,7 +2,16 @@
 
 ## Snapshot
 
-- Last updated: `2026-06-03`
+- Last updated: `2026-06-04`
+- Heatmap work is active on `feature/heatmap-projection-calibration`: the web
+  layer now has a DB-backed canvas overlay for `mapinfo`, a player-scoped
+  heatmap widget in `playerinfo` Maps & Servers, hover metadata for top
+  killers/victims/players, and separate warm/cool color channels for kills and
+  deaths. Static `<map>-kill.jpg` / `<map>-kill-thumb.jpg` generation remains
+  the compatibility fallback. Projection calibration is still the main open
+  quality gate: overview `.txt` files are useful seeds, but each `{game,map}`
+  still needs DB-first in-bounds diagnostics and manual/imported calibration
+  before final `--disablecache` regeneration.
 - `P6d` is no longer an active residual hunt for `Entries`, `ChangeTeam`,
   `PlayerNames`, `Players_History`, or `TeamBonuses`; those gates are closed
   for the supported narrow/default Python contour.
