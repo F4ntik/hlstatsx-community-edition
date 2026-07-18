@@ -12,6 +12,7 @@ import time
 from datetime import datetime, timezone
 from ftplib import FTP, error_perm
 from pathlib import Path
+from typing import TextIO
 
 from hlstats_py.cli import RuntimeSettings, load_settings
 from hlstats_py.goldsrc_physical_lines import iter_merged_goldsrc_physical_lines
@@ -34,6 +35,9 @@ from hlstats_ftp_py.core import (
 VERSION = "0.1.0"
 _SCRIPTS_DIR = Path(__file__).resolve().parents[1]
 _SCANNED_RECORDS_RE = re.compile(r"Scanned (\d+) log records")
+_EMPTY_TIMESTAMP_ONLY_RE = re.compile(
+    r"^\s*L \d{2}/\d{2}/\d{4} - \d{2}:\d{2}:\d{2}:\s*$"
+)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -109,6 +113,36 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
+        "--static-replay",
+        action="store_true",
+        help=(
+            "Replay/parity mode: keep the complete selected log list instead of "
+            "dropping the newest FTP file. Use with --order-by-name and a fresh state."
+        ),
+    )
+    p.add_argument(
+        "--input-manifest",
+        type=Path,
+        default=None,
+        help="Write the final sorted selected-log names to this file before import.",
+    )
+    p.add_argument(
+        "--ignored-lines-manifest",
+        type=Path,
+        default=None,
+        help="Write ignored logical records and parse-error reasons to this file.",
+    )
+    p.add_argument(
+        "--continue-on-parse-error",
+        action="store_true",
+        help="Skip parse-error records only when --ignored-lines-manifest is supplied.",
+    )
+    p.add_argument(
+        "--overwrite-manifests",
+        action="store_true",
+        help="Explicitly allow existing manifest paths to be replaced.",
+    )
+    p.add_argument(
         "--stdin-verbose-events",
         action="store_true",
         help="Enable per-event logs during Python stdin parsing (slower).",
@@ -126,6 +160,37 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Commit DB transaction every N stdin records (default: 1000; 0 disables batching).",
     )
     return p
+
+
+def _write_manifest(
+    path: Path,
+    entries: list[LogFileEntry],
+    *,
+    allow_overwrite: bool = False,
+) -> None:
+    """Write an evidence manifest without silently replacing an old capture."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    mode = "w" if allow_overwrite else "x"
+    with path.open(mode, encoding="utf-8", newline="\n") as handle:
+        for entry in entries:
+            handle.write(f"{entry.name}\n")
+
+
+def _open_manifest(path: Path, *, allow_overwrite: bool = False) -> TextIO:
+    """Open an evidence output path with explicit collision semantics."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path.open("w" if allow_overwrite else "x", encoding="utf-8", newline="\n")
+
+
+def _validate_manifest_options(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    if args.continue_on_parse_error and args.ignored_lines_manifest is None:
+        parser.error("--continue-on-parse-error requires --ignored-lines-manifest")
+    if args.legacy_per_file_runtime and (
+        args.continue_on_parse_error or args.ignored_lines_manifest is not None
+    ):
+        parser.error("parse-error manifest options require batch stdin mode")
 
 
 def _log(quiet: bool, msg: str) -> None:
@@ -252,6 +317,8 @@ def _import_logs_batch(
     args: argparse.Namespace,
     settings: RuntimeSettings,
     last_path: Path,
+    ignored_lines_manifest: TextIO | None = None,
+    continue_on_parse_error: bool = False,
 ) -> int:
     adapter = SyncDatabaseAdapter(
         database_config_from_proxy_config(settings.config),
@@ -279,6 +346,7 @@ def _import_logs_batch(
     imported_records = 0
     progress_every = 20000
     runtime._adapter.connect()
+    import_completed = False
     try:
         runtime._reload_state()
         storage.begin_stdin_batch(transaction_batch_size=settings.stdin_transaction_batch_size)
@@ -289,12 +357,34 @@ def _import_logs_batch(
             )
             local_file = tmp_dir / entry.name
             file_records = 0
+            file_ignored = 0
             with local_file.open("rb") as stdin_f:
-                for merged in iter_merged_goldsrc_physical_lines(stdin_f):
+                for logical_record_number, merged in enumerate(
+                    iter_merged_goldsrc_physical_lines(stdin_f),
+                    start=1,
+                ):
                     line = merged.decode("utf-8", errors="replace")
                     if not line:
                         continue
-                    runtime.process_stdin_line(line, server_address)
+                    if _EMPTY_TIMESTAMP_ONLY_RE.match(line):
+                        file_ignored += 1
+                        if ignored_lines_manifest is not None:
+                            ignored_lines_manifest.write(
+                                f"{entry.name}:{logical_record_number}:empty-timestamp-only-line\n"
+                            )
+                        continue
+                    try:
+                        runtime.process_stdin_line(line, server_address)
+                    except ValueError as exc:
+                        if ignored_lines_manifest is not None:
+                            payload = line.rstrip("\r\n").replace("\t", "\\t")
+                            ignored_lines_manifest.write(
+                                f"{entry.name}:{logical_record_number}:parse-error:{exc}\t{payload}\n"
+                            )
+                        if continue_on_parse_error:
+                            file_ignored += 1
+                            continue
+                        raise
                     imported_records += 1
                     file_records += 1
                     if not args.quiet and file_records % progress_every == 0:
@@ -303,12 +393,19 @@ def _import_logs_batch(
                             flush=True,
                         )
             write_last_mtime(last_path, entry.mtime)
-            _log(not args.quiet, f"done ({file_records} records).")
+            if file_ignored:
+                _log(not args.quiet, f"done ({file_records} records, ignored={file_ignored}).")
+            else:
+                _log(not args.quiet, f"done ({file_records} records).")
         runtime.finalize_stdin_import()
         storage.end_stdin_batch()
+        import_completed = True
     finally:
-        with contextlib.suppress(Exception):
-            storage.end_stdin_batch()
+        if not import_completed:
+            abort_batch = getattr(storage, "abort_stdin_batch", None)
+            if callable(abort_batch):
+                with contextlib.suppress(Exception):
+                    abort_batch()
         with contextlib.suppress(Exception):
             runtime._adapter.close()
     return imported_records
@@ -325,6 +422,7 @@ def run(argv: list[str] | None = None) -> int:
 
     parser = _build_parser()
     args = parser.parse_args(remaining)
+    _validate_manifest_options(parser, args)
 
     explicit_pwd = args.ftp_pwd is not None
     ftp_pwd = args.ftp_pwd if explicit_pwd else os.environ.get("HLSTATS_FTP_PASSWORD")
@@ -375,7 +473,7 @@ def run(argv: list[str] | None = None) -> int:
         name_cap=args.ftp_probe_limit,
         prefer_mlsd=not args.disable_mlsd,
     )
-    stable = without_newest_log(entries)
+    stable = entries if args.static_replay else without_newest_log(entries)
     order_by = "name" if args.order_by_name else "mtime"
     todo = entries_to_download(stable, last_mtime, order_by=order_by)
     if args.max_import_files is not None and args.max_import_files > 0:
@@ -387,6 +485,13 @@ def run(argv: list[str] | None = None) -> int:
             _log(not args.quiet, "OK.\n")
     else:
         _log(not args.quiet, "OK.\n")
+
+    if args.input_manifest is not None:
+        try:
+            _write_manifest(args.input_manifest, todo, allow_overwrite=args.overwrite_manifests)
+        except OSError as exc:
+            print(f"error: cannot write input manifest {args.input_manifest}: {exc}", file=sys.stderr)
+            return 2
 
     listing_elapsed = time.perf_counter() - listing_started
     _log(not args.quiet, " + transfering log files, if todo:\n")
@@ -432,43 +537,69 @@ def run(argv: list[str] | None = None) -> int:
     parse_started = time.perf_counter()
     _log(not args.quiet, " + parsing log files:\n")
     imported_records = 0
-    if args.legacy_per_file_runtime:
-        for i, entry in enumerate(todo):
-            progress = f"({i + 1}/{len(todo)})"
-            local_file = tmp_dir / entry.name
-            _log(not args.quiet, f'    - "{entry.name}" {progress}: parsing... ')
-            with local_file.open("rb") as stdin_f:
-                result = subprocess.run(
-                    worker_base,
-                    stdin=stdin_f,
-                    cwd=str(work_cwd),
-                    env=env,
-                    capture_output=True,
+    ignored_lines_manifest: TextIO | None = None
+    try:
+        if args.ignored_lines_manifest is not None:
+            try:
+                ignored_lines_manifest = _open_manifest(
+                    args.ignored_lines_manifest,
+                    allow_overwrite=args.overwrite_manifests,
                 )
-            if result.returncode != 0:
-                err = (result.stderr or b"").decode("utf-8", errors="replace").strip()
-                out = (result.stdout or b"").decode("utf-8", errors="replace").strip()
+            except OSError as exc:
                 print(
-                    f"error: worker exited {result.returncode} for {entry.name}\n{err}\n{out}",
+                    f"error: cannot open ignored-lines manifest {args.ignored_lines_manifest}: {exc}",
                     file=sys.stderr,
                 )
-                return result.returncode or 2
-            out = (result.stdout or b"").decode("utf-8", errors="replace")
-            err = (result.stderr or b"").decode("utf-8", errors="replace")
-            for stream in (out, err):
-                for match in _SCANNED_RECORDS_RE.finditer(stream):
-                    imported_records += int(match.group(1))
-            _log(not args.quiet, "updating last mtime... ")
-            write_last_mtime(last_path, entry.mtime)
-            _log(not args.quiet, "OK.\n")
-    else:
-        _log(not args.quiet, "    - batch mode: single runtime process for all queued logs")
-        settings = _build_runtime_settings(args)
-        try:
-            imported_records = _import_logs_batch(todo, tmp_dir, args=args, settings=settings, last_path=last_path)
-        except Exception as exc:
-            print(f"error: batch import failed: {exc}", file=sys.stderr)
-            return 2
+                return 2
+
+        if args.legacy_per_file_runtime:
+            for i, entry in enumerate(todo):
+                progress = f"({i + 1}/{len(todo)})"
+                local_file = tmp_dir / entry.name
+                _log(not args.quiet, f'    - "{entry.name}" {progress}: parsing... ')
+                with local_file.open("rb") as stdin_f:
+                    result = subprocess.run(
+                        worker_base,
+                        stdin=stdin_f,
+                        cwd=str(work_cwd),
+                        env=env,
+                        capture_output=True,
+                    )
+                if result.returncode != 0:
+                    err = (result.stderr or b"").decode("utf-8", errors="replace").strip()
+                    out = (result.stdout or b"").decode("utf-8", errors="replace").strip()
+                    print(
+                        f"error: worker exited {result.returncode} for {entry.name}\n{err}\n{out}",
+                        file=sys.stderr,
+                    )
+                    return result.returncode or 2
+                out = (result.stdout or b"").decode("utf-8", errors="replace")
+                err = (result.stderr or b"").decode("utf-8", errors="replace")
+                for stream in (out, err):
+                    for match in _SCANNED_RECORDS_RE.finditer(stream):
+                        imported_records += int(match.group(1))
+                _log(not args.quiet, "updating last mtime... ")
+                write_last_mtime(last_path, entry.mtime)
+                _log(not args.quiet, "OK.\n")
+        else:
+            _log(not args.quiet, "    - batch mode: single runtime process for all queued logs")
+            settings = _build_runtime_settings(args)
+            try:
+                imported_records = _import_logs_batch(
+                    todo,
+                    tmp_dir,
+                    args=args,
+                    settings=settings,
+                    last_path=last_path,
+                    ignored_lines_manifest=ignored_lines_manifest,
+                    continue_on_parse_error=args.continue_on_parse_error,
+                )
+            except Exception as exc:
+                print(f"error: batch import failed: {exc}", file=sys.stderr)
+                return 2
+    finally:
+        if ignored_lines_manifest is not None:
+            ignored_lines_manifest.close()
     parse_elapsed = time.perf_counter() - parse_started
 
     _log(not args.quiet, " - delete tmp log files and directory... ")

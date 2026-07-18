@@ -702,6 +702,29 @@ class EventStorage:
         self._set_skip_adapter_ping(False)
         self._close_db_write_trace()
 
+    def abort_stdin_batch(self) -> None:
+        """Rollback a failed stdin import without committing its pending writes."""
+
+        if self._transaction_batch_size <= 0:
+            self._flush_event_buffer()
+            self._flush_frag_counter_buffer()
+            self._event_buffer = None
+            self._set_skip_adapter_ping(False)
+            self._close_db_write_trace()
+            return
+        try:
+            self._rollback_pending()
+        finally:
+            self._transaction_batch_size = 0
+            self._pending_writes = 0
+            self._pending_records = 0
+            self._set_autocommit(True)
+            self._close_cached_cursor()
+            self._event_buffer = None
+            self._frag_write_deltas = None
+            self._set_skip_adapter_ping(False)
+            self._close_db_write_trace()
+
     def reset_runtime_state(self) -> None:
         """Drop replay/session-local caches after a runtime reload."""
 
@@ -2829,12 +2852,10 @@ class EventStorage:
         return False
 
     def _is_bot_descriptor(self, descriptor: PlayerDescriptor) -> bool:
-        if descriptor.user_id is not None and descriptor.user_id <= 0:
-            return True
         unique_id = (descriptor.unique_id or "").strip()
-        if not unique_id:
-            return False
-        return bool(_BOT_UNIQUE_RE.match(unique_id))
+        if unique_id:
+            return bool(_BOT_UNIQUE_RE.match(unique_id))
+        return descriptor.user_id is not None and descriptor.user_id <= 0
 
     def _server_ignore_bots_enabled(
         self,

@@ -183,6 +183,25 @@ def test_runtime_processes_stdin_line_for_known_server() -> None:
     assert storage.finalize_calls == 1
 
 
+def test_runtime_ignores_empty_timestamp_only_stdin_line() -> None:
+    adapter = StubAdapter()
+    storage = StubStorage()
+    logger = ProxyLogger(LoggerConfig(stream=StringIO()))
+    server = ProxyUdpServer(logger)
+    runtime = HlstatsRuntime(adapter, server, logger, build_dispatcher(), storage)
+    adapter.connect()
+    runtime._reload_state()
+
+    runtime.process_stdin_line(
+        "L 01/20/2025 - 03:55:14: ",
+        "127.0.0.1:27015",
+    )
+    runtime.finalize_stdin_import()
+
+    assert storage.recorded == []
+    assert storage.finalize_calls == 1
+
+
 def test_runtime_projects_map_lifecycle_before_followup_events() -> None:
     adapter = StubAdapter()
     storage = StubStorage()

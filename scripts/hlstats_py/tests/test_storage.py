@@ -4525,6 +4525,47 @@ def test_entry_event_ignores_bots(event_context: EventContext) -> None:
     assert all(query != _INSERT_ENTRY_QUERY for query, _params in connection.executed)
 
 
+def test_transient_zero_userid_does_not_mark_steam_player_as_permanent_bot(
+    event_context: EventContext,
+) -> None:
+    dispatcher = EventDispatcher(
+        [ConnectEventHandler(), TeamEventHandler()],
+        fallback=GenericEventHandler(),
+    )
+    transient_connect = dispatcher.dispatch(
+        parse_log_event(
+            'L 01/02/2024 - 03:04:04: "Mep3ocTb<0><STEAM_0:1:45686725><>" '
+            'connected, address "1.2.3.4:27005"'
+        ),
+        event_context,
+    )
+    valid_team_join = dispatcher.dispatch(
+        parse_log_event(
+            'L 01/02/2024 - 03:04:05: "Mep3ocTb<2><STEAM_0:1:45686725><>" joined team "TERRORIST"'
+        ),
+        event_context,
+    )
+    assert transient_connect is not None
+    assert valid_team_join is not None
+
+    responses: Dict[QueryKey, List[QueryResponse]] = {
+        (_PLAYER_BY_UNIQUE_QUERY, ("1:45686725", "csgo")): [QueryResponse(fetchone=(187,))],
+        (_SELECT_SERVER_CONFIG_QUERY, (7, "IgnoreBots")): [QueryResponse(fetchone=(1,))],
+    }
+    connection = FakeConnection(responses)
+    storage = EventStorage(StubAdapter(connection), clock=lambda: transient_connect.timestamp)
+
+    storage.record(transient_connect, event_context)
+    storage.record(valid_team_join, event_context)
+
+    assert (
+        _INSERT_TEAM_CHANGE_QUERY,
+        (valid_team_join.timestamp, 7, "de_dust2", 187, "TERRORIST"),
+    ) in connection.executed
+    assert storage._player_is_bot[187] is False
+    assert storage._server_active_players[7] == {187}
+
+
 def test_entry_event_records_non_empty_team_players(event_context: EventContext) -> None:
     dispatcher = EventDispatcher(
         [ConnectEventHandler(), EntryEventHandler()],

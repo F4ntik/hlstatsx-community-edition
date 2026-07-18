@@ -3,6 +3,9 @@ param(
     [int]$MaxImportFiles = 1000,
     [string]$ServerIdentity = "37.230.137.48:27015",
     [string]$ArtifactsDir = "",
+    [string]$ArtifactLabel = "",
+    [string]$EvidenceRunId = "",
+    [switch]$OverwriteEvidence,
     [ValidateSet("both", "legacy", "python")]
     [string]$Stack = "both",
     [switch]$SkipBuild,
@@ -70,6 +73,47 @@ if (-not (Test-Path $artifactsPath)) {
     throw "Artifacts path not found: $ArtifactsDir"
 }
 
+function Resolve-ArtifactLabel {
+    param(
+        [string]$Requested,
+        [int]$ImportLimit
+    )
+    if ($Requested) {
+        $value = $Requested.Trim()
+        if ($value -notmatch '^(narrow-1000|full-41513|prefix-[A-Za-z0-9][A-Za-z0-9_.-]*)$') {
+            throw "ArtifactLabel must be narrow-1000, full-41513, or prefix-*; got '$Requested'"
+        }
+        if ($value -eq "narrow-1000" -and $ImportLimit -ne 1000) {
+            throw "ArtifactLabel narrow-1000 requires MaxImportFiles=1000"
+        }
+        if ($value -eq "full-41513" -and $ImportLimit -ne 41513) {
+            throw "ArtifactLabel full-41513 requires MaxImportFiles=41513"
+        }
+        return $value
+    }
+    if ($ImportLimit -eq 1000) {
+        return "narrow-1000"
+    }
+    if ($ImportLimit -eq 41513) {
+        return "full-41513"
+    }
+    return "prefix-$ImportLimit"
+}
+
+$script:ArtifactLabel = Resolve-ArtifactLabel -Requested $ArtifactLabel -ImportLimit $MaxImportFiles
+$script:ContourName = $script:ArtifactLabel
+$script:EvidenceRunId = if ($EvidenceRunId) {
+    $safeRunId = $EvidenceRunId.Trim() -replace '[^A-Za-z0-9_.-]', '_'
+    if ($safeRunId -notmatch '^[A-Za-z0-9][A-Za-z0-9_.-]*$') {
+        throw "EvidenceRunId must contain only letters, digits, dot, underscore, or hyphen"
+    }
+    $safeRunId
+} else {
+    $generatedRunId = (Get-Date).ToUniversalTime().ToString("yyyyMMdd-HHmmssfff")
+    "$generatedRunId-$([guid]::NewGuid().ToString('N').Substring(0, 8))"
+}
+$script:EvidenceLabel = "$script:ArtifactLabel-$script:EvidenceRunId"
+
 function Invoke-ComposeUp {
     param(
         [string]$ComposePath
@@ -102,6 +146,36 @@ function Get-Sha256Text {
         return -join ($hash | ForEach-Object { $_.ToString("x2") })
     } finally {
         $sha.Dispose()
+    }
+}
+
+function Publish-EvidenceFile {
+    param(
+        [string]$SourcePath,
+        [string]$DestinationPath
+    )
+    if (-not (Test-Path -LiteralPath $SourcePath)) {
+        throw "evidence source not found: $SourcePath"
+    }
+    if ((Test-Path -LiteralPath $DestinationPath) -and -not $OverwriteEvidence) {
+        throw "evidence destination already exists; use a new EvidenceRunId or -OverwriteEvidence: $DestinationPath"
+    }
+    $destinationDir = Split-Path -Parent $DestinationPath
+    if (-not (Test-Path -LiteralPath $destinationDir)) {
+        New-Item -ItemType Directory -Path $destinationDir | Out-Null
+    }
+    Copy-Item -LiteralPath $SourcePath -Destination $DestinationPath -Force:$OverwriteEvidence
+}
+
+function Assert-EvidencePathsAvailable {
+    param([string[]]$Paths)
+    if ($OverwriteEvidence) {
+        return
+    }
+    foreach ($path in $Paths) {
+        if (Test-Path -LiteralPath $path) {
+            throw "evidence path already exists; use a new EvidenceRunId or -OverwriteEvidence: $path"
+        }
     }
 }
 
@@ -182,9 +256,14 @@ function Write-ContourInfo {
         [string[]]$Containers,
         [string]$Status = "loaded"
     )
-    $infoPath = Join-Path $contourInfoDir "$StackName-narrow-$MaxImportFiles.json"
+    $infoPath = Join-Path $contourInfoDir "$StackName-$script:EvidenceLabel.json"
+    if ((Test-Path -LiteralPath $infoPath) -and -not $OverwriteEvidence) {
+        throw "contour metadata already exists; use a new EvidenceRunId or -OverwriteEvidence: $infoPath"
+    }
     $info = [ordered]@{
-        contour = "narrow-$MaxImportFiles"
+        contour = $script:ContourName
+        artifact_label = $script:ArtifactLabel
+        evidence_run_id = $script:EvidenceRunId
         stack = $StackName
         status = $Status
         fingerprint = $Fingerprint
@@ -197,7 +276,7 @@ function Write-ContourInfo {
         inputs = $FingerprintPayload
         anchors = $AnchorCounts
     }
-    $info | ConvertTo-Json -Depth 8 | Set-Content -Path $infoPath -Encoding UTF8
+    $info | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $infoPath -Encoding UTF8
     foreach ($container in $Containers) {
         if (Test-ContainerRunning -ContainerName $container) {
             docker cp $infoPath "${container}:/CONTOUR_INFO.json" | Out-Null
@@ -210,8 +289,16 @@ function Test-ReusableLegacyContour {
     param(
         [string]$ExpectedFingerprint
     )
-    $infoPath = Join-Path $contourInfoDir "legacy-narrow-$MaxImportFiles.json"
-    if (-not (Test-Path $infoPath)) {
+    $canonicalInfoPath = Join-Path $contourInfoDir "legacy-$script:ArtifactLabel.json"
+    $versionedInfo = @(Get-ChildItem -LiteralPath $contourInfoDir -Filter "legacy-$script:ArtifactLabel-*.json" -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTimeUtc -Descending)
+    $infoPath = if (Test-Path -LiteralPath $canonicalInfoPath) {
+        $canonicalInfoPath
+    } elseif ($versionedInfo.Count -gt 0) {
+        $versionedInfo[0].FullName
+    } else {
+        $null
+    }
+    if (-not $infoPath) {
         Write-Host "==> Legacy reuse unavailable: contour info file not found."
         return $false
     }
@@ -235,7 +322,7 @@ function Test-ReusableLegacyContour {
         -FingerprintPayload $info.inputs `
         -AnchorCounts $anchors `
         -Containers @("hlstatsx-legacy-db", "hlstatsx-legacy-web", "hlstatsx-legacy-daemon") | Out-Null
-    Write-Host "==> Reusing valid legacy narrow-$MaxImportFiles contour."
+    Write-Host "==> Reusing valid legacy $script:ContourName contour."
     return $true
 }
 
@@ -253,7 +340,7 @@ function Adopt-CurrentLegacyContour {
         -FingerprintPayload $script:LegacyContourFingerprint.payload `
         -AnchorCounts $anchors `
         -Containers @("hlstatsx-legacy-db", "hlstatsx-legacy-web", "hlstatsx-legacy-daemon")
-    Write-Host "==> Adopted current legacy narrow-$MaxImportFiles contour: $infoPath"
+    Write-Host "==> Adopted current legacy $script:ContourName contour: $infoPath"
 }
 
 function Invoke-LegacyReplayImport {
@@ -262,11 +349,12 @@ function Invoke-LegacyReplayImport {
         [int]$ImportLimit,
         [string]$Identity
     )
-    $manifest = Join-Path $auditDir "legacy-input-manifest-1000.txt"
-    $dropped = Join-Path $auditDir "legacy-dropped-lines-1000.txt"
-    $runLog = Join-Path $auditDir "legacy-replay-1000.log"
+    $manifest = Join-Path $auditDir "legacy-input-manifest-$script:EvidenceLabel.txt"
+    $dropped = Join-Path $auditDir "legacy-dropped-lines-$script:EvidenceLabel.txt"
+    $runLog = Join-Path $auditDir "legacy-replay-$script:EvidenceLabel.log"
 
-    $windowDir = Join-Path $auditDir "legacy-window-1000"
+    $windowDir = Join-Path $auditDir "legacy-window-$script:EvidenceLabel"
+    Assert-EvidencePathsAvailable @($manifest, $dropped, $runLog, $windowDir)
     if (-not (Test-Path $windowDir)) {
         New-Item -ItemType Directory -Path $windowDir | Out-Null
     }
@@ -294,6 +382,18 @@ function Invoke-PythonFtpImport {
     param(
         [int]$ImportLimit
     )
+    $pythonInputManifestName = "python-input-manifest-$script:EvidenceLabel.txt"
+    $pythonIgnoredManifestName = "python-ignored-lines-$script:EvidenceLabel.txt"
+    $pythonInputManifestTemp = Join-Path $pythonFtpWork $pythonInputManifestName
+    $pythonIgnoredManifestTemp = Join-Path $pythonFtpWork $pythonIgnoredManifestName
+    foreach ($tempEvidence in @($pythonInputManifestTemp, $pythonIgnoredManifestTemp)) {
+        if ((Test-Path -LiteralPath $tempEvidence) -and -not $OverwriteEvidence) {
+            throw "temporary evidence already exists; use a new EvidenceRunId or -OverwriteEvidence: $tempEvidence"
+        }
+        if (Test-Path -LiteralPath $tempEvidence) {
+            Remove-Item -LiteralPath $tempEvidence -Force
+        }
+    }
     $stateFiles = @(Get-ChildItem -Path $pythonFtpWork -Filter "hlstats-ftp-37.230.137.48-27015.*" -ErrorAction SilentlyContinue)
     foreach ($stateFile in $stateFiles) {
         if ($null -ne $stateFile -and $stateFile.FullName -and (Test-Path $stateFile.FullName)) {
@@ -310,13 +410,17 @@ function Invoke-PythonFtpImport {
             "run", "--rm",
             "--network", "python_hlstatsx_python_net",
             "-v", "${repoRoot}\scripts:/app/scripts",
+            "-v", "${pythonFtpWork}:/tmp/ftp_work",
             "-e", "PYTHONPATH=/app/scripts",
             "python-hlstats-worker",
             "python", "/app/scripts/replay_baseline/replay_python_log.py",
             "/app/scripts/replay_baseline/artifacts",
-            "--server-identity", "$ServerIdentity"
+            "--server-identity", "$ServerIdentity",
+            "--input-manifest", "/tmp/ftp_work/$pythonInputManifestName",
+            "--dropped-lines-manifest", "/tmp/ftp_work/$pythonIgnoredManifestName"
         )
     } else {
+        $ftpProbeLimit = [Math]::Max(500, $ImportLimit + 150)
         $cmd = @(
             "run", "--rm",
             "--network", "python_hlstatsx_python_net",
@@ -336,14 +440,24 @@ function Invoke-PythonFtpImport {
             "--configfile", "/app/hlstats.conf",
             "--cwd", "/tmp/ftp_work",
             "--max-import-files", "$ImportLimit",
-            "--ftp-probe-limit", "2000",
-            "--order-by-name"
+            "--ftp-probe-limit", "$ftpProbeLimit",
+            "--order-by-name",
+            "--static-replay",
+            "--input-manifest", "/tmp/ftp_work/$pythonInputManifestName",
+            "--ignored-lines-manifest", "/tmp/ftp_work/$pythonIgnoredManifestName",
+            "--continue-on-parse-error"
         )
     }
     docker @cmd | Out-Null
     if ($LASTEXITCODE -ne 0) {
         throw "python ftp import failed"
     }
+    Publish-EvidenceFile `
+        -SourcePath $pythonInputManifestTemp `
+        -DestinationPath (Join-Path $auditDir $pythonInputManifestName)
+    Publish-EvidenceFile `
+        -SourcePath $pythonIgnoredManifestTemp `
+        -DestinationPath (Join-Path $auditDir $pythonIgnoredManifestName)
 }
 
 $allStages = @("infra_updown", "baseline_restore", "preflight", "legacy_import", "python_import", "sql_snapshot")
@@ -355,6 +469,7 @@ $stageDependencies = @{
 
 function Get-ConfigFingerprint {
     $fingerprintPayload = @{
+        artifact_label = $script:ArtifactLabel
         max_import_files = $MaxImportFiles
         server_identity = $ServerIdentity
         stack = $Stack
@@ -555,10 +670,10 @@ function Invoke-Stage {
                 throw "legacy_import requested with Stack=python"
             }
             if ($script:ReuseLegacyForRun) {
-                Write-Host "==> Legacy import skipped; valid narrow-$MaxImportFiles contour is already loaded."
+                Write-Host "==> Legacy import skipped; valid $script:ContourName contour is already loaded."
                 return
             }
-            Write-Host "==> Legacy import (1000 logs)"
+            Write-Host "==> Legacy import ($MaxImportFiles logs)"
             Invoke-LegacyReplayImport -InputDirectory $artifactsPath -ImportLimit $MaxImportFiles -Identity $ServerIdentity
             $anchors = Get-ContourAnchorCounts -ContainerName "hlstatsx-legacy-db"
             Write-ContourInfo `
@@ -575,7 +690,7 @@ function Invoke-Stage {
             if ($UsePythonUdpReplay) {
                 Write-Host "==> Python import (UDP replay, opt-in)"
             } else {
-                Write-Host "==> Python import (stdin default, 1000 logs)"
+                Write-Host "==> Python import (stdin default, $MaxImportFiles logs)"
             }
             Invoke-PythonFtpImport -ImportLimit $MaxImportFiles
             $anchors = Get-ContourAnchorCounts -ContainerName "hlstatsx-python-db"
@@ -589,12 +704,16 @@ function Invoke-Stage {
         "sql_snapshot" {
             Write-Host "==> SQL snapshots"
             if (($Stack -eq "both" -or $Stack -eq "legacy") -and -not $script:ReuseLegacyForRun) {
-                powershell -NoProfile -ExecutionPolicy Bypass -File $snapshotScript -Stack legacy -OutputPath (Join-Path $auditDir "legacy-sql-snapshot-1000.txt")
+                $legacySnapshotPath = Join-Path $auditDir "legacy-sql-snapshot-$script:EvidenceLabel.txt"
+                Assert-EvidencePathsAvailable @($legacySnapshotPath)
+                powershell -NoProfile -ExecutionPolicy Bypass -File $snapshotScript -Stack legacy -OutputPath $legacySnapshotPath
             } elseif ($script:ReuseLegacyForRun) {
                 Write-Host "==> Legacy SQL snapshot skipped; valid snapshot anchors are recorded in contour metadata."
             }
             if ($Stack -eq "both" -or $Stack -eq "python") {
-                powershell -NoProfile -ExecutionPolicy Bypass -File $snapshotScript -Stack python -OutputPath (Join-Path $auditDir "python-sql-snapshot-1000.txt")
+                $pythonSnapshotPath = Join-Path $auditDir "python-sql-snapshot-$script:EvidenceLabel.txt"
+                Assert-EvidencePathsAvailable @($pythonSnapshotPath)
+                powershell -NoProfile -ExecutionPolicy Bypass -File $snapshotScript -Stack python -OutputPath $pythonSnapshotPath
             }
         }
         default {

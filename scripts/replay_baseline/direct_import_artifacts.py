@@ -13,7 +13,7 @@ from time import perf_counter
 from typing import Any
 
 from hlstats_ftp_py.core import LogFileEntry
-from hlstats_ftp_py.main import _build_runtime_settings, _import_logs_batch
+from hlstats_ftp_py.main import _build_runtime_settings, _import_logs_batch, _open_manifest, _write_manifest
 from hlstats_py.storage import EventStorage
 
 _SCRIPT_DIR = Path(__file__).resolve().parent
@@ -151,7 +151,32 @@ def _parse_args() -> argparse.Namespace:
         default=27015,
         help="Game server port for stdin routing (default 27015).",
     )
-    return parser.parse_args()
+    parser.add_argument(
+        "--input-manifest",
+        type=Path,
+        default=None,
+        help="Optional output file with ordered input log names, one per line.",
+    )
+    parser.add_argument(
+        "--ignored-lines-manifest",
+        type=Path,
+        default=None,
+        help="Optional output file with Python-side ignored lines and reasons.",
+    )
+    parser.add_argument(
+        "--continue-on-parse-error",
+        action="store_true",
+        help="When set with --ignored-lines-manifest, skip parse-error records after recording them.",
+    )
+    parser.add_argument(
+        "--overwrite-manifests",
+        action="store_true",
+        help="Explicitly allow existing manifest paths to be replaced.",
+    )
+    args = parser.parse_args()
+    if args.continue_on_parse_error and args.ignored_lines_manifest is None:
+        parser.error("--continue-on-parse-error requires --ignored-lines-manifest")
+    return args
 
 
 def main() -> int:
@@ -179,6 +204,9 @@ def main() -> int:
         read_dir = artifacts
         entries = _build_entries(artifacts, max_files=cli.max_files)
 
+    if cli.input_manifest is not None:
+        _write_manifest(cli.input_manifest, entries, allow_overwrite=cli.overwrite_manifests)
+
     args = Namespace(
         gs_ip=cli.gs_ip,
         gs_port=cli.gs_port,
@@ -194,6 +222,7 @@ def main() -> int:
         max_import_files=None,
         ftp_probe_limit=None,
         legacy_per_file_runtime=False,
+        static_replay=True,
         disable_mlsd=False,
         stdin_verbose_events=False,
         parser_backend=cli.parser_backend,
@@ -220,9 +249,25 @@ def main() -> int:
         profiler.enable()
         EventStorage._execute = _counting_execute
 
+    ignored_lines_manifest = None
     try:
-        records = _import_logs_batch(entries, read_dir, args=args, settings=settings, last_path=last_path)
+        if cli.ignored_lines_manifest is not None:
+            ignored_lines_manifest = _open_manifest(
+                cli.ignored_lines_manifest,
+                allow_overwrite=cli.overwrite_manifests,
+            )
+        records = _import_logs_batch(
+            entries,
+            read_dir,
+            args=args,
+            settings=settings,
+            last_path=last_path,
+            ignored_lines_manifest=ignored_lines_manifest,
+            continue_on_parse_error=cli.continue_on_parse_error,
+        )
     finally:
+        if ignored_lines_manifest is not None:
+            ignored_lines_manifest.close()
         if cli.profile:
             EventStorage._execute = original_execute
             if profiler is not None:

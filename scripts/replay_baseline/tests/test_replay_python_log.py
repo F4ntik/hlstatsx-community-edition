@@ -68,6 +68,16 @@ def test_resolve_log_paths_raises_for_missing_path(tmp_path: Path) -> None:
         replay_python_log.resolve_log_paths(missing)
 
 
+def test_write_manifest_uses_lf_for_cross_platform_evidence(tmp_path: Path) -> None:
+    output = tmp_path / "input.txt"
+    replay_python_log.write_manifest(
+        str(output),
+        [tmp_path / "L0000001.log", tmp_path / "L0000002.log"],
+    )
+
+    assert output.read_bytes() == b"L0000001.log\nL0000002.log\n"
+
+
 def test_sender_script_streams_stdin_without_buffering_corpus() -> None:
     sender_script = replay_python_log.build_sender_script()
 

@@ -191,10 +191,8 @@ def write_manifest(path_text: str, log_paths: list[Path]) -> None:
         return
     path = Path(path_text)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        "".join(f"{log_path.name}\n" for log_path in log_paths),
-        encoding="utf-8",
-    )
+    with path.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write("".join(f"{log_path.name}\n" for log_path in log_paths))
 
 
 EMPTY_TEAM_ENTER_EVENT_RE = re.compile(
@@ -214,7 +212,7 @@ def open_dropped_lines_manifest(path_text: str) -> TextIO | None:
         return None
     path = Path(path_text)
     path.parent.mkdir(parents=True, exist_ok=True)
-    return path.open("w", encoding="utf-8")
+    return path.open("w", encoding="utf-8", newline="\n")
 
 
 def mysql_scalar(container: str, database: str, sql: str) -> str:

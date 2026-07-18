@@ -70,6 +70,11 @@ class SupportsEventStorage(Protocol):
     def flush_pending(self) -> None: ...
 
 
+_EMPTY_LOG_RECORD_RE = re.compile(
+    r"^\s*L \d{2}/\d{2}/\d{4} - \d{2}:\d{2}:\d{2}:\s*$"
+)
+
+
 @dataclass(slots=True)
 class RuntimeMapState:
     """Projected map lifecycle state for a server."""
@@ -526,6 +531,8 @@ class HlstatsRuntime:
         self._storage.finalize_import()
 
     def _process_event_payload(self, *, payload: str, server: TrackedServer, source_label: str) -> None:
+        if _EMPTY_LOG_RECORD_RE.match(payload):
+            return
         event = parse_log_event(
             payload,
             backend=self._parser_backend,
