@@ -90,7 +90,8 @@ For maps whose world coordinates do not line up with the overview image, use
 the local calibration helper. It can import GoldSrc or Source overview `.txt`
 metadata, write a standalone HTML preview with sliders, and apply the chosen
 legacy projection values only after the in-bounds ratio passes the configured
-threshold:
+threshold and the separate runtime gate is explicitly acknowledged with
+`--runtime-gate-approved`:
 
 ```bash
 cd scripts

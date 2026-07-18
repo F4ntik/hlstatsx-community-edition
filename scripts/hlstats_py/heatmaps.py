@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import math
 import re
 import sys
 import time
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Protocol
@@ -32,6 +33,22 @@ LEGACY_OUTPUT_SIZES: dict[str, tuple[int, int] | None] = {
 LEGACY_CACHE_MAX_AGE_DAYS = 30
 _CACHE_PATTERN = re.compile(r"^(?P<map>.+)_(?P<timestamp>\d+)\.png$", re.IGNORECASE)
 _SOURCE_OVERVIEW_PAIR = re.compile(r'"(?P<key>[^"]+)"\s+"(?P<value>[^"]*)"')
+
+
+def rotation_steps(value: Any) -> int:
+    """Normalize stored heatmap rotation to quarter-turn steps."""
+
+    return int(value or 0) % 4
+
+
+def normalize_scale(value: Any) -> float:
+    """Return a finite positive projection scale for all render paths."""
+
+    try:
+        scale = float(value)
+    except (TypeError, ValueError):
+        return 1.0
+    return scale if math.isfinite(scale) and scale > 0 else 1.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,7 +106,7 @@ class HeatmapConfig:
     yoffset: int
     flipx: bool
     flipy: bool
-    rotate: bool
+    rotate: int
     days: int
     brush: str
     scale: float
@@ -100,6 +117,53 @@ class HeatmapConfig:
     cropx2: int
     cropy1: int
     cropy2: int
+
+
+def rotate_point(x: int, y: int, steps: int) -> tuple[int, int]:
+    """Rotate a projected point counter-clockwise by quarter turns."""
+
+    normalized = rotation_steps(steps)
+    if normalized == 1:
+        return -y, x
+    if normalized == 2:
+        return -x, -y
+    if normalized == 3:
+        return y, -x
+    return x, y
+
+
+def unrotate_point(x: int, y: int, steps: int) -> tuple[int, int]:
+    """Apply the inverse of :func:`rotate_point`."""
+
+    return rotate_point(x, y, 4 - rotation_steps(steps))
+
+
+def normalize_crop(config: HeatmapConfig, image_size: tuple[int, int]) -> HeatmapConfig:
+    """Clamp a crop rectangle to the source JPEG without mutating stored config."""
+
+    width, height = max(0, int(image_size[0])), max(0, int(image_size[1]))
+    x1 = max(0, int(config.cropx1))
+    y1 = max(0, int(config.cropy1))
+    x2 = max(0, int(config.cropx2))
+    y2 = max(0, int(config.cropy2))
+    if x2 <= 0 or y2 <= 0 or width <= 0 or height <= 0:
+        return replace(config, cropx1=0, cropy1=0, cropx2=0, cropy2=0)
+    x1 = min(width - 1, x1)
+    y1 = min(height - 1, y1)
+    x2 = min(width - x1, x2)
+    y2 = min(height - y1, y2)
+    if x2 <= 0 or y2 <= 0:
+        return replace(config, cropx1=0, cropy1=0, cropx2=0, cropy2=0)
+    return replace(config, cropx1=x1, cropy1=y1, cropx2=x2, cropy2=y2)
+
+
+def effective_image_size(config: HeatmapConfig, image_size: tuple[int, int]) -> tuple[int, int]:
+    """Return the canvas size after applying a normalized crop."""
+
+    normalized = normalize_crop(config, image_size)
+    if normalized.cropx2 > 0 and normalized.cropy2 > 0:
+        return normalized.cropx2, normalized.cropy2
+    return int(image_size[0]), int(image_size[1])
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,7 +188,7 @@ class ImportedOverview:
     scale: float
     flipx: bool
     flipy: bool
-    rotate: bool
+    rotate: int
     image: str | None = None
     height: int | None = None
     material: str | None = None
@@ -277,10 +341,10 @@ class HeatmapRepository:
                 yoffset=int(row[4]),
                 flipx=bool(int(row[5])),
                 flipy=bool(int(row[6])),
-                rotate=bool(int(row[7] or 0)),
+                rotate=rotation_steps(row[7] or 0),
                 days=int(row[8]),
                 brush=str(row[9]),
-                scale=float(row[10]),
+                scale=normalize_scale(row[10]),
                 font=int(row[11]),
                 thumbw=float(row[12]),
                 thumbh=float(row[13]),
@@ -376,6 +440,8 @@ class HeatmapGenerator:
         output_dir = self._settings.web_root / "hlstatsimg" / "games" / code / "heatmaps"
         output_dir.mkdir(parents=True, exist_ok=True)
         self._logger.event("PATH", str(output_dir), 3)
+        base_image = Image.open(source_path).convert("RGBA")
+        config = normalize_crop(config, base_image.size)
 
         cache_dir = self._settings.cache_root / code
         cache_entry = resolve_cache_entry(
@@ -418,14 +484,13 @@ class HeatmapGenerator:
             )
 
         self._logger.event("CREATE", f"Game: {code}, Map: {map_name}, Kills: {len(points)}", 1)
-        base_image = Image.open(source_path).convert("RGBA")
         overlay_path = None if cache_entry is None else cache_entry.path
         overlay = load_overlay(base_image.size, overlay_path)
         first_event = min(point.event_time for point in points)
         diagnostics = collect_projection_stats(
             points,
             config,
-            image_size=overlay.size,
+            image_size=effective_image_size(config, base_image.size),
             cache_status=cache_status,
         )
         self._log_projection_stats(code, map_name, diagnostics)
@@ -532,17 +597,19 @@ class HeatmapProjectionDiagnoser:
 
     def _diagnose_one(self, code: str, map_name: str, config: HeatmapConfig) -> GenerationResult:
         image_size = self._image_size(config, map_name)
+        config = normalize_crop(config, image_size)
+        canvas_size = effective_image_size(config, image_size)
         points = self._repository.fetch_points(
             config,
             ignore_infected=self._settings.cli.ignore_infected,
             kill_limit=self._settings.kill_limit,
             start_timestamp=None,
         )
-        diagnostics = collect_projection_stats(points, config, image_size=image_size)
+        diagnostics = collect_projection_stats(points, config, image_size=canvas_size)
         self._logger.event(
             "PROJECTION",
             (
-                f"Game: {code}, Map: {map_name}, Image: {image_size[0]}x{image_size[1]}, "
+                f"Game: {code}, Map: {map_name}, Image: {canvas_size[0]}x{canvas_size[1]}, "
                 f"Points: {diagnostics.queried}, InBounds: {diagnostics.in_bounds}, "
                 f"OutOfBounds: {diagnostics.out_of_bounds}, Ratio: {diagnostics.in_bounds_ratio:.3f}, "
                 f"RawX: {diagnostics.raw_min_x}..{diagnostics.raw_max_x}, "
@@ -551,7 +618,7 @@ class HeatmapProjectionDiagnoser:
                 f"Y: {diagnostics.min_y}..{diagnostics.max_y}, "
                 f"Config: xoffset={config.xoffset}, yoffset={config.yoffset}, "
                 f"scale={config.scale}, flipx={int(config.flipx)}, flipy={int(config.flipy)}, "
-                f"rotate={int(config.rotate)}"
+                f"rotate={rotation_steps(config.rotate)}"
             ),
             1,
         )
@@ -762,10 +829,10 @@ def parse_goldsrc_overview(
         map_name=map_name,
         xoffset=round(-float(values["ORIGIN_X"])),
         yoffset=round(float(values["ORIGIN_Y"])),
-        scale=float(values["ZOOM"]),
+        scale=normalize_scale(values["ZOOM"]),
         flipx=False,
         flipy=True,
-        rotate=values.get("ROTATED", "0") not in {"0", "false", "False"},
+        rotate=1 if values.get("ROTATED", "0") not in {"0", "false", "False"} else 0,
         image=values.get("IMAGE"),
         height=int(float(values["HEIGHT"])) if "HEIGHT" in values else None,
         manual_required=False,
@@ -793,10 +860,10 @@ def parse_source_overview(
         map_name=map_name,
         xoffset=round(-float(values["pos_x"])),
         yoffset=round(float(values["pos_y"])),
-        scale=float(values["scale"]),
+        scale=normalize_scale(values["scale"]),
         flipx=False,
         flipy=True,
-        rotate=values.get("rotate", "0") not in {"0", "false", "False"},
+        rotate=1 if values.get("rotate", "0") not in {"0", "false", "False"} else 0,
         material=values.get("material"),
         manual_required=False,
     )
@@ -999,7 +1066,7 @@ def draw_brush_point(
 ) -> None:
     """Apply one transformed kill position to the overlay."""
 
-    x, y = transform_point(point, config)
+    x, y = transform_point(point, config, apply_crop=False)
 
     if x < 0 or y < 0 or x >= overlay.width or y >= overlay.height:
         return
@@ -1008,20 +1075,27 @@ def draw_brush_point(
     if red > 200:
         return
 
-    if config.rotate:
-        destination = (int(y - (brush.width / 2)), int(x - (brush.height / 2)))
-    else:
-        destination = (int(x - (brush.width / 2)), int(y - (brush.height / 2)))
+    destination = (int(x - (brush.width / 2)), int(y - (brush.height / 2)))
     overlay.paste(brush, destination, brush)
 
 
-def transform_point(point: HeatmapPoint, config: HeatmapConfig) -> tuple[int, int]:
-    """Transform a stored world coordinate into heatmap source-image pixels."""
+def transform_point(
+    point: HeatmapPoint,
+    config: HeatmapConfig,
+    *,
+    apply_crop: bool = True,
+) -> tuple[int, int]:
+    """Transform a stored world coordinate into final heatmap canvas pixels."""
 
     pos_x = -point.pos_x if config.flipx else point.pos_x
     pos_y = -point.pos_y if config.flipy else point.pos_y
-    x = int((pos_x + config.xoffset) / config.scale)
-    y = int((pos_y + config.yoffset) / config.scale)
+    scale = normalize_scale(config.scale)
+    x = int((pos_x + config.xoffset) / scale)
+    y = int((pos_y + config.yoffset) / scale)
+    x, y = rotate_point(x, y, config.rotate)
+    if apply_crop and config.cropx2 > 0 and config.cropy2 > 0:
+        x -= config.cropx1
+        y -= config.cropy1
     return x, y
 
 
@@ -1105,6 +1179,7 @@ def compose_heatmap(base_image: Image.Image, overlay: Image.Image) -> Image.Imag
 def crop_image(image: Image.Image, config: HeatmapConfig) -> Image.Image:
     """Apply the legacy crop rectangle if it is configured."""
 
+    config = normalize_crop(config, image.size)
     if config.cropx2 <= 0 or config.cropy2 <= 0:
         return image
     return image.crop(

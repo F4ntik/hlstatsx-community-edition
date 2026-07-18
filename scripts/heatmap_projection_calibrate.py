@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import math
 import sys
 from dataclasses import replace
 from pathlib import Path
@@ -15,7 +16,10 @@ from hlstats_py.heatmaps import (  # noqa: E402
     HeatmapPoint,
     HeatmapRepository,
     collect_projection_stats,
+    effective_image_size,
     load_settings,
+    normalize_crop,
+    normalize_scale,
     parse_goldsrc_overview,
     parse_source_overview,
 )
@@ -44,12 +48,17 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Overview file format",
     )
     parser.add_argument("--apply", action="store_true", help="Apply projection values to hlstats_Heatmap_Config")
+    parser.add_argument(
+        "--runtime-gate-approved",
+        action="store_true",
+        help="Explicitly acknowledge the separate runtime gate required by --apply.",
+    )
     parser.add_argument("--xoffset", type=int, help="Projection xoffset to apply")
     parser.add_argument("--yoffset", type=int, help="Projection yoffset to apply")
     parser.add_argument("--scale", type=float, help="Projection scale to apply")
     parser.add_argument("--flipx", type=int, choices=(0, 1), help="Projection flipx to apply")
     parser.add_argument("--flipy", type=int, choices=(0, 1), help="Projection flipy to apply")
-    parser.add_argument("--rotate", type=int, choices=(0, 1), help="Projection rotate to apply")
+    parser.add_argument("--rotate", type=int, choices=(0, 1, 2, 3), help="Projection quarter-turn rotate to apply")
     parser.add_argument(
         "--threshold",
         type=float,
@@ -57,7 +66,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Minimum in-bounds ratio required for --apply unless --force is used",
     )
     parser.add_argument("--force", action="store_true", help="Allow --apply below threshold")
-    return parser.parse_args(list(argv) if argv is not None else None)
+    args = parser.parse_args(list(argv) if argv is not None else None)
+    if args.apply and not args.runtime_gate_approved:
+        parser.error("--apply requires --runtime-gate-approved")
+    if args.scale is not None and (not math.isfinite(args.scale) or args.scale <= 0):
+        parser.error("--scale must be a finite value greater than zero")
+    return args
 
 
 def load_heatmap_settings(args: argparse.Namespace):
@@ -93,11 +107,15 @@ def override_from_args(config: HeatmapConfig, args: argparse.Namespace) -> Heatm
     for name in ("xoffset", "yoffset", "scale"):
         value = getattr(args, name)
         if value is not None:
-            updates[name] = value
-    for name in ("flipx", "flipy", "rotate"):
+            if name == "scale" and value <= 0:
+                raise ValueError("--scale must be greater than zero")
+            updates[name] = normalize_scale(value) if name == "scale" else value
+    for name in ("flipx", "flipy"):
         value = getattr(args, name)
         if value is not None:
             updates[name] = bool(value)
+    if args.rotate is not None:
+        updates["rotate"] = args.rotate % 4
     return replace(config, **updates)
 
 
@@ -169,6 +187,10 @@ def write_preview(
             "flipx": int(config.flipx),
             "flipy": int(config.flipy),
             "rotate": int(config.rotate),
+            "cropx1": int(config.cropx1),
+            "cropy1": int(config.cropy1),
+            "cropx2": int(config.cropx2),
+            "cropy2": int(config.cropy2),
             "game": config.game,
         },
         "game": config.code,
@@ -207,7 +229,7 @@ textarea {{ width: 100%; height: 90px; font: 11px Consolas, monospace; }}
 <label>scale <input id="scale" type="range" min="0.1" max="32" step="0.01"><input id="scale_n" type="number" step="0.01"></label>
 <label>flipx <input id="flipx" type="checkbox"><span></span></label>
 <label>flipy <input id="flipy" type="checkbox"><span></span></label>
-<label>rotate <input id="rotate" type="checkbox"><span></span></label>
+<label>rotate <input id="rotate" type="number" min="0" max="3" step="1"><span></span></label>
 <textarea id="sql" readonly></textarea>
 </div>
 </div>
@@ -229,25 +251,60 @@ function bind(id) {{
   number.oninput = () => {{ range.value = number.value; draw(); }};
 }}
 fields.forEach(bind);
-['flipx','flipy','rotate'].forEach(id => {{
+['flipx','flipy'].forEach(id => {{
   const input = document.getElementById(id);
   input.checked = Boolean(data.config[id]);
   input.onchange = draw;
 }});
+document.getElementById('rotate').value = data.config.rotate || 0;
+document.getElementById('rotate').oninput = draw;
+function normalizeRotation(value) {{
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  const rounded = Math.round(numeric) % 4;
+  return rounded < 0 ? rounded + 4 : rounded;
+}}
+function normalizeScale(value) {{
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : 1;
+}}
+function rotatePoint(x, y, steps) {{
+  const normalized = normalizeRotation(steps);
+  if (normalized === 1) return {{x: -y, y: x}};
+  if (normalized === 2) return {{x: -x, y: -y}};
+  if (normalized === 3) return {{x: y, y: -x}};
+  return {{x, y}};
+}}
+function unrotatePoint(x, y, steps) {{
+  return rotatePoint(x, y, 4 - normalizeRotation(steps));
+}}
 function cfg() {{
   return {{
     xoffset: Number(document.getElementById('xoffset_n').value),
     yoffset: Number(document.getElementById('yoffset_n').value),
-    scale: Number(document.getElementById('scale_n').value) || 1,
+    scale: normalizeScale(document.getElementById('scale_n').value),
     flipx: document.getElementById('flipx').checked ? 1 : 0,
     flipy: document.getElementById('flipy').checked ? 1 : 0,
-    rotate: document.getElementById('rotate').checked ? 1 : 0
+    rotate: normalizeRotation(document.getElementById('rotate').value),
+    cropx1: data.config.cropx1 || 0,
+    cropy1: data.config.cropy1 || 0,
+    cropx2: data.config.cropx2 || 0,
+    cropy2: data.config.cropy2 || 0
   }};
 }}
 function project(p, c) {{
   const xw = c.flipx ? -p.x : p.x;
   const yw = c.flipy ? -p.y : p.y;
-  return {{x: Math.trunc((xw + c.xoffset) / c.scale), y: Math.trunc((yw + c.yoffset) / c.scale)}};
+  let x = Math.trunc((xw + c.xoffset) / c.scale);
+  let y = Math.trunc((yw + c.yoffset) / c.scale);
+  const rotated = rotatePoint(x, y, c.rotate);
+  x = rotated.x;
+  y = rotated.y;
+  if (c.cropx2 > 0 && c.cropy2 > 0) {{
+    x -= c.cropx1;
+    y -= c.cropy1;
+  }}
+  return {{x, y}};
 }}
 function draw() {{
   const c = cfg();
@@ -268,7 +325,18 @@ function draw() {{
   document.getElementById('sql').value =
     `UPDATE hlstats_Heatmap_Config SET xoffset=${{Math.round(c.xoffset)}}, yoffset=${{Math.round(c.yoffset)}}, scale=${{c.scale}}, flipx=${{c.flipx}}, flipy=${{c.flipy}}, rotate=${{c.rotate}} WHERE game='${{data.config.game}}' AND map='${{data.map}}';`;
 }}
-img.onload = draw;
+img.onload = function() {{
+  if (!img.getAttribute('data-cropped') && data.config.cropx2 > 0 && data.config.cropy2 > 0) {{
+    const crop = document.createElement('canvas');
+    crop.width = data.config.cropx2;
+    crop.height = data.config.cropy2;
+    crop.getContext('2d').drawImage(img, data.config.cropx1, data.config.cropy1, crop.width, crop.height, 0, 0, crop.width, crop.height);
+    img.setAttribute('data-cropped', '1');
+    img.src = crop.toDataURL('image/jpeg', 0.92);
+    return;
+  }}
+  draw();
+}};
 draw();
 </script>
 </body>
@@ -318,8 +386,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"error: map image not found: {image_path}", file=sys.stderr)
             return 1
         size = image_size(image_path)
+        config = normalize_crop(config, size)
+        canvas_size = effective_image_size(config, size)
         points = fetch_points(repository, config, args.kill_limit)
-        stats = collect_projection_stats(points, config, image_size=size)
+        stats = collect_projection_stats(points, config, image_size=canvas_size)
 
         if args.apply:
             if stats.in_bounds_ratio < args.threshold and not args.force:
@@ -336,7 +406,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
 
         output = args.output or Path(f"heatmap_projection_{args.game}_{args.map_name}.html")
-        write_preview(output, image_path=image_path, image_size_value=size, points=points, config=config)
+        write_preview(output, image_path=image_path, image_size_value=canvas_size, points=points, config=config)
         print(
             f"wrote {output}: {stats.in_bounds}/{stats.queried} in bounds "
             f"({stats.in_bounds_ratio:.3f})"

@@ -33,7 +33,22 @@ try {
         exit;
     }
 
-    if ($crop && heatmap_has_crop($config)) {
+    $sourceSize = getimagesize($sourcePath);
+    $sourceWidth = intval($sourceSize[0] ?? 0);
+    $sourceHeight = intval($sourceSize[1] ?? 0);
+    if ($sourceWidth <= 0 || $sourceHeight <= 0) {
+        http_response_code(500);
+        exit;
+    }
+    $cropConfig = array(
+        'cropx1' => isset($_GET['cropx1']) ? intval($_GET['cropx1']) : intval($config['cropx1'] ?? 0),
+        'cropy1' => isset($_GET['cropy1']) ? intval($_GET['cropy1']) : intval($config['cropy1'] ?? 0),
+        'cropx2' => isset($_GET['cropx2']) ? intval($_GET['cropx2']) : intval($config['cropx2'] ?? 0),
+        'cropy2' => isset($_GET['cropy2']) ? intval($_GET['cropy2']) : intval($config['cropy2'] ?? 0),
+    );
+    $cropConfig = heatmap_normalize_crop($cropConfig, $sourceWidth, $sourceHeight);
+
+    if ($crop && heatmap_has_crop($cropConfig)) {
         if (!function_exists('imagecreatefromjpeg')) {
             http_response_code(500);
             exit;
@@ -43,16 +58,16 @@ try {
             http_response_code(500);
             exit;
         }
-        $cropped = imagecreatetruecolor(intval($config['cropx2']), intval($config['cropy2']));
+        $cropped = imagecreatetruecolor($cropConfig['cropx2'], $cropConfig['cropy2']);
         imagecopy(
             $cropped,
             $image,
             0,
             0,
-            intval($config['cropx1']),
-            intval($config['cropy1']),
-            intval($config['cropx2']),
-            intval($config['cropy2'])
+            $cropConfig['cropx1'],
+            $cropConfig['cropy1'],
+            $cropConfig['cropx2'],
+            $cropConfig['cropy2']
         );
         header('Content-Type: image/jpeg');
         header('Cache-Control: public, max-age=3600');

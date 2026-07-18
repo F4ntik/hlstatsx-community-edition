@@ -44,6 +44,45 @@ function heatmap_admin_request(): array
     return array_replace($payload, $_POST, $_GET);
 }
 
+function heatmap_admin_same_origin(): bool
+{
+    $expectedHost = strval($_SERVER['HTTP_HOST'] ?? '');
+    if ($expectedHost === '') {
+        return true;
+    }
+    $expectedScheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    foreach (array('HTTP_ORIGIN', 'HTTP_REFERER') as $header) {
+        $value = strval($_SERVER[$header] ?? '');
+        if ($value === '') {
+            continue;
+        }
+        $parts = parse_url($value);
+        $host = strval($parts['host'] ?? '');
+        $port = isset($parts['port']) ? ':' . intval($parts['port']) : '';
+        $scheme = strval($parts['scheme'] ?? '');
+        if ($scheme !== $expectedScheme || ($host . $port) !== $expectedHost) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+function heatmap_admin_require_mutation_allowed(string $action): void
+{
+    if (!in_array($action, array('save', 'upload', 'regenerate'), true)) {
+        return;
+    }
+    if (strtoupper(strval($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'POST') {
+        heatmap_admin_json(array('error' => 'method not allowed'), 405);
+        exit;
+    }
+    if (!heatmap_admin_same_origin()) {
+        heatmap_admin_json(array('error' => 'same-origin request required'), 403);
+        exit;
+    }
+}
+
 function heatmap_admin_config(PDO $pdo, string $game, string $map): ?array
 {
     $config = heatmap_fetch_config($pdo, $game, $map);
@@ -80,6 +119,13 @@ function heatmap_admin_preview(PDO $pdo, array $request, bool $save): void
         heatmap_admin_json(array('error' => 'map image not found'), 404);
         return;
     }
+
+    $config = heatmap_normalize_crop(
+        $config,
+        intval($image['sourceWidth'] ?? $image['width'] ?? 0),
+        intval($image['sourceHeight'] ?? $image['height'] ?? 0)
+    );
+    $image = heatmap_image_metadata($game, $map, $config);
 
     if ($save) {
         heatmap_save_config($pdo, $config);
@@ -118,6 +164,14 @@ function heatmap_admin_upload(PDO $pdo, array $request): void
 
     $result = array('uploaded' => array());
     if (!empty($_FILES['mapImage']['tmp_name'])) {
+        if (intval($_FILES['mapImage']['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) {
+            heatmap_admin_json(array('error' => 'map image upload failed'), 400);
+            return;
+        }
+        if (intval($_FILES['mapImage']['size'] ?? 0) > 20 * 1024 * 1024) {
+            heatmap_admin_json(array('error' => 'map image is too large'), 400);
+            return;
+        }
         $tmp = $_FILES['mapImage']['tmp_name'];
         $size = @getimagesize($tmp);
         if (!$size || intval($size[2] ?? 0) !== IMAGETYPE_JPEG) {
@@ -138,9 +192,21 @@ function heatmap_admin_upload(PDO $pdo, array $request): void
 
     $overviewText = '';
     if (!empty($_FILES['overviewFile']['tmp_name'])) {
+        if (intval($_FILES['overviewFile']['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) {
+            heatmap_admin_json(array('error' => 'overview upload failed'), 400);
+            return;
+        }
+        if (intval($_FILES['overviewFile']['size'] ?? 0) > 1024 * 1024) {
+            heatmap_admin_json(array('error' => 'overview file is too large'), 400);
+            return;
+        }
         $overviewText = (string) file_get_contents($_FILES['overviewFile']['tmp_name']);
     } elseif (!empty($request['overviewText'])) {
         $overviewText = strval($request['overviewText']);
+    }
+    if (strlen($overviewText) > 1024 * 1024) {
+        heatmap_admin_json(array('error' => 'overview text is too large'), 400);
+        return;
     }
     if ($overviewText !== '') {
         $config = heatmap_parse_overview($overviewText, $config);
@@ -167,12 +233,13 @@ function heatmap_admin_regenerate(array $request): void
     }
 
     $root = dirname(__DIR__);
+    $webRoot = is_dir($root . '/web') ? $root . '/web' : __DIR__;
     $scripts = $root . '/scripts';
-    $python = getenv('PYTHON') ?: 'python';
+    $python = getenv('PYTHON') ?: (DIRECTORY_SEPARATOR === '\\' ? 'python' : 'python3');
     $baseCommand = escapeshellarg($python)
         . ' -m hlstats_py.heatmaps'
         . ' --configfile ' . escapeshellarg($scripts . '/hlstats.conf')
-        . ' --web-root ' . escapeshellarg($root . '/web')
+        . ' --web-root ' . escapeshellarg($webRoot)
         . ' --heatmaps-root ' . escapeshellarg($root . '/heatmaps')
         . ' --game ' . escapeshellarg($game)
         . ' --map ' . escapeshellarg($map)
@@ -214,6 +281,7 @@ try {
     $pdo = $container->get('pdo');
     $request = heatmap_admin_request();
     $action = strtolower(strval($request['action'] ?? 'preview'));
+    heatmap_admin_require_mutation_allowed($action);
 
     if ($action === 'games') {
         heatmap_admin_json(array('games' => heatmap_fetch_games($pdo)));

@@ -357,11 +357,23 @@ class Table
 					case 'heatmap':
 						$heatmap = getImage("/games/$game/heatmaps/$colval-kill");
 						$heatmapthumb = getImage("/games/$game/heatmaps/$colval-kill-thumb");
+						if (!$heatmap && $realgame) {
+							$heatmap = getImage("/games/$realgame/heatmaps/$colval-kill");
+							$heatmapthumb = getImage("/games/$realgame/heatmaps/$colval-kill-thumb");
+						}
 
 						if ($heatmap) {
-							$cellbody .= "<span style=\"text-align: center;\"><a href=\"" . $heatmap['url'] . "\" rel=\"boxed\"><img width=\"20\" height=\"16\" src=\"" . $heatmapthumb['url'] . "\" /></a></span>";
+							$thumburl = $heatmapthumb ? $heatmapthumb['url'] : $heatmap['url'];
+							$cellbody .= "<span style=\"text-align: center;\"><a href=\"" . $heatmap['url'] . "\" rel=\"boxed\"><img width=\"20\" height=\"16\" src=\"" . $thumburl . "\" /></a></span>";
 						} else {
-							$cellbody .= "&nbsp;";
+							$mapToken = is_string($colval) && preg_match('/^[A-Za-z0-9_.\-$]+$/', $colval) ? $colval : '';
+							$sourceRoot = dirname(__DIR__, 2) . '/heatmaps/src/' . ($realgame ? $realgame : $game);
+							if ($mapToken !== '' && is_file($sourceRoot . '/' . $mapToken . '.jpg')) {
+								$mapinfo = $g_options['scripturl'] . '?mode=mapinfo&amp;game=' . rawurlencode($game) . '&amp;map=' . rawurlencode($mapToken);
+								$cellbody .= '<span style="text-align: center;"><a href="' . $mapinfo . '" title="' . htmlspecialchars(t('literal.heatmap'), ENT_COMPAT | ENT_SUBSTITUTE, 'UTF-8') . '">' . htmlspecialchars(t('literal.heatmap'), ENT_COMPAT | ENT_SUBSTITUTE, 'UTF-8') . '</a></span>';
+							} else {
+								$cellbody .= "&nbsp;";
+							}
 						}
 						break;
 					default:

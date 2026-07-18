@@ -24,7 +24,7 @@ $playerId = max(0, intval($_GET['player'] ?? 0));
 $event = heatmap_clean_event($_GET['event'] ?? 'kills');
 $renderer = heatmap_clean_renderer_mode($_GET['renderer'] ?? 'thermal');
 $normalization = heatmap_clean_normalization($_GET['normalization'] ?? 'sqrt');
-$days = max(1, min(3650, intval($_GET['days'] ?? 0)));
+$days = isset($_GET['days']) ? max(1, min(3650, intval($_GET['days']))) : 0;
 $limit = max(1, min(50000, intval($_GET['limit'] ?? 10000)));
 
 if ($game === '' || $map === '') {

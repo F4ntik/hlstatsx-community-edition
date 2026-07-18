@@ -5,6 +5,9 @@ RUN apt-get update \
         libfreetype6-dev \
         libjpeg62-turbo-dev \
         libpng-dev \
+        python3 \
+        python3-mysqldb \
+        python3-pil \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install gd mysqli pdo pdo_mysql \
     && rm -rf /var/lib/apt/lists/*
@@ -13,7 +16,13 @@ WORKDIR /var/www/html
 
 COPY web /var/www/html
 COPY scripts/proxy_daemon_py/fullstack/web-config.php /var/www/html/config.php
+COPY scripts/hlstats_py /var/www/scripts/hlstats_py
+COPY scripts/hlx_core /var/www/scripts/hlx_core
+COPY scripts/proxy_daemon_py/fullstack/hlstats.conf /var/www/scripts/hlstats.conf
+COPY heatmaps /var/www/heatmaps
 
 RUN rm -rf /var/www/html/updater \
     && mkdir -p /var/www/html/hlstatsimg/progress \
-    && chown -R www-data:www-data /var/www/html
+    && rm -rf /var/www/heatmaps/cache \
+    && mkdir -p /var/www/heatmaps/cache \
+    && chown -R www-data:www-data /var/www/html /var/www/heatmaps

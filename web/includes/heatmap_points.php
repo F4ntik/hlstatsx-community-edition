@@ -12,7 +12,7 @@ function heatmap_clean_token($value)
     }
 
     $value = trim($value);
-    if ($value === '' || !preg_match('/^[A-Za-z0-9_.-]+$/', $value)) {
+    if ($value === '' || !preg_match('/^[A-Za-z0-9_.\-$]+$/', $value)) {
         return '';
     }
 
@@ -65,10 +65,71 @@ function heatmap_bool($value)
     return intval($value) ? 1 : 0;
 }
 
+function heatmap_rotation_steps($value)
+{
+    $steps = intval($value) % 4;
+    return $steps < 0 ? $steps + 4 : $steps;
+}
+
+function heatmap_rotate_point($x, $y, $steps)
+{
+    $steps = heatmap_rotation_steps($steps);
+    if ($steps === 1) {
+        return array('x' => -$y, 'y' => $x);
+    }
+    if ($steps === 2) {
+        return array('x' => -$x, 'y' => -$y);
+    }
+    if ($steps === 3) {
+        return array('x' => $y, 'y' => -$x);
+    }
+
+    return array('x' => $x, 'y' => $y);
+}
+
+function heatmap_unrotate_point($x, $y, $steps)
+{
+    return heatmap_rotate_point($x, $y, 4 - heatmap_rotation_steps($steps));
+}
+
 function heatmap_scale($value)
 {
     $scale = floatval($value);
-    return $scale == 0.0 ? 1.0 : $scale;
+    return $scale <= 0.0 || !is_finite($scale) ? 1.0 : $scale;
+}
+
+function heatmap_normalize_crop(array $config, $imageWidth = null, $imageHeight = null)
+{
+    $width = $imageWidth === null ? 0 : max(0, intval($imageWidth));
+    $height = $imageHeight === null ? 0 : max(0, intval($imageHeight));
+    $x1 = max(0, intval($config['cropx1'] ?? 0));
+    $y1 = max(0, intval($config['cropy1'] ?? 0));
+    $x2 = max(0, intval($config['cropx2'] ?? 0));
+    $y2 = max(0, intval($config['cropy2'] ?? 0));
+
+    if ($x2 <= 0 || $y2 <= 0) {
+        $x1 = 0;
+        $y1 = 0;
+        $x2 = 0;
+        $y2 = 0;
+    } elseif ($width > 0 && $height > 0) {
+        $x1 = min($width - 1, $x1);
+        $y1 = min($height - 1, $y1);
+        $x2 = min($width - $x1, $x2);
+        $y2 = min($height - $y1, $y2);
+        if ($x2 <= 0 || $y2 <= 0) {
+            $x1 = 0;
+            $y1 = 0;
+            $x2 = 0;
+            $y2 = 0;
+        }
+    }
+
+    $config['cropx1'] = $x1;
+    $config['cropy1'] = $y1;
+    $config['cropx2'] = $x2;
+    $config['cropy2'] = $y2;
+    return $config;
 }
 
 function heatmap_projection_config(array $config)
@@ -78,7 +139,7 @@ function heatmap_projection_config(array $config)
         'yoffset' => intval($config['yoffset'] ?? 0),
         'flipx' => heatmap_bool($config['flipx'] ?? 0),
         'flipy' => heatmap_bool($config['flipy'] ?? 0),
-        'rotate' => heatmap_bool($config['rotate'] ?? 0),
+        'rotate' => heatmap_rotation_steps($config['rotate'] ?? 0),
         'scale' => heatmap_scale($config['scale'] ?? 1),
         'cropx1' => intval($config['cropx1'] ?? 0),
         'cropy1' => intval($config['cropy1'] ?? 0),
@@ -231,7 +292,7 @@ function heatmap_top_actors(array $actors, $limit = 5)
 
 function heatmap_transform_point(array $row, array $config)
 {
-    $projection = heatmap_projection_config($config);
+    $projection = heatmap_projection_config(heatmap_normalize_crop($config));
     $posX = intval($row['pos_x']);
     $posY = intval($row['pos_y']);
 
@@ -244,11 +305,9 @@ function heatmap_transform_point(array $row, array $config)
 
     $x = intval(($posX + $projection['xoffset']) / $projection['scale']);
     $y = intval(($posY + $projection['yoffset']) / $projection['scale']);
-    if ($projection['rotate']) {
-        $tmp = $x;
-        $x = $y;
-        $y = $tmp;
-    }
+    $rotated = heatmap_rotate_point($x, $y, $projection['rotate']);
+    $x = $rotated['x'];
+    $y = $rotated['y'];
     if (heatmap_has_crop($projection)) {
         $x -= $projection['cropx1'];
         $y -= $projection['cropy1'];
@@ -262,14 +321,22 @@ function heatmap_image_metadata($game, $map, array $config)
     $sourcePath = heatmap_source_path($config, $map);
     if (is_file($sourcePath)) {
         $sourceSize = getimagesize($sourcePath);
+        $config = heatmap_normalize_crop($config, intval($sourceSize[0] ?? 0), intval($sourceSize[1] ?? 0));
         $base = array(
             'url' => 'heatmap_map.php?game=' . rawurlencode($game) . '&map=' . rawurlencode($map),
             'width' => intval($sourceSize[0] ?? 0),
             'height' => intval($sourceSize[1] ?? 0),
+            'sourceWidth' => intval($sourceSize[0] ?? 0),
+            'sourceHeight' => intval($sourceSize[1] ?? 0),
             'source' => 'heatmaps/src',
         );
         if (heatmap_has_crop($config)) {
-            $base['url'] .= '&crop=1&v=' . (is_file($sourcePath) ? intval(filemtime($sourcePath)) : 0);
+            $base['url'] .= '&crop=1'
+                . '&cropx1=' . intval($config['cropx1'])
+                . '&cropy1=' . intval($config['cropy1'])
+                . '&cropx2=' . intval($config['cropx2'])
+                . '&cropy2=' . intval($config['cropy2'])
+                . '&v=' . (is_file($sourcePath) ? intval(filemtime($sourcePath)) : 0);
             list($base['width'], $base['height']) = heatmap_projected_image_size($base, $config);
             $base['crop'] = array(
                 'x' => intval($config['cropx1']),
@@ -289,6 +356,7 @@ function heatmap_image_metadata($game, $map, array $config)
     }
     if ($image) {
         $image['source'] = 'hlstatsimg';
+        $image['crop'] = null;
     }
 
     return $image ?: null;
@@ -296,8 +364,30 @@ function heatmap_image_metadata($game, $map, array $config)
 
 function heatmap_build_payload($game, $map, array $image, array $rows, array $config, array $options = array())
 {
-    $width = intval($image['width'] ?? 0);
-    $height = intval($image['height'] ?? 0);
+    $baseWidth = intval($image['sourceWidth'] ?? $image['width'] ?? 0);
+    $baseHeight = intval($image['sourceHeight'] ?? $image['height'] ?? 0);
+    $config = heatmap_normalize_crop($config, $baseWidth, $baseHeight);
+    if (strval($image['source'] ?? '') !== 'heatmaps/src') {
+        $config['cropx1'] = 0;
+        $config['cropy1'] = 0;
+        $config['cropx2'] = 0;
+        $config['cropy2'] = 0;
+    }
+    $width = intval($image['width'] ?? $baseWidth);
+    $height = intval($image['height'] ?? $baseHeight);
+    $payloadCrop = null;
+    if (strval($image['source'] ?? '') === 'heatmaps/src' && heatmap_has_crop($config)) {
+        list($width, $height) = heatmap_projected_image_size(
+            array('width' => $baseWidth, 'height' => $baseHeight),
+            $config
+        );
+        $payloadCrop = array(
+            'x' => intval($config['cropx1']),
+            'y' => intval($config['cropy1']),
+            'width' => intval($config['cropx2']),
+            'height' => intval($config['cropy2']),
+        );
+    }
     $buckets = array();
     $minX = null;
     $maxX = null;
@@ -383,7 +473,7 @@ function heatmap_build_payload($game, $map, array $image, array $rows, array $co
             'width' => $width,
             'height' => $height,
             'source' => strval($image['source'] ?? ''),
-            'crop' => $image['crop'] ?? null,
+            'crop' => $payloadCrop,
         ),
         'points' => $points,
         'max' => max(1, $max),
@@ -498,10 +588,13 @@ function heatmap_merge_config_override(array $config, array $values)
             $config[$field] = intval($values[$field]);
         }
     }
-    foreach (array('flipx', 'flipy', 'rotate') as $field) {
+    foreach (array('flipx', 'flipy') as $field) {
         if (isset($values[$field]) && $values[$field] !== '') {
             $config[$field] = heatmap_bool($values[$field]);
         }
+    }
+    if (isset($values['rotate']) && $values['rotate'] !== '') {
+        $config['rotate'] = heatmap_rotation_steps($values['rotate']);
     }
     foreach (array('scale', 'thumbw', 'thumbh') as $field) {
         if (isset($values[$field]) && $values[$field] !== '') {
@@ -513,12 +606,14 @@ function heatmap_merge_config_override(array $config, array $values)
     }
     $config['scale'] = heatmap_scale($config['scale'] ?? 1);
     $config['days'] = max(1, min(3650, intval($config['days'] ?? 30)));
+    $config = heatmap_normalize_crop($config);
 
     return $config;
 }
 
 function heatmap_save_config(PDO $pdo, array $config)
 {
+    $config = heatmap_normalize_crop($config);
     $statement = $pdo->prepare(
         'INSERT INTO hlstats_Heatmap_Config
             (map, game, xoffset, yoffset, flipx, flipy, rotate, days, brush, scale, font, thumbw, thumbh, cropx1, cropy1, cropx2, cropy2)
@@ -548,7 +643,7 @@ function heatmap_save_config(PDO $pdo, array $config)
         'yoffset' => intval($config['yoffset']),
         'flipx' => heatmap_bool($config['flipx']),
         'flipy' => heatmap_bool($config['flipy']),
-        'rotate' => heatmap_bool($config['rotate']),
+        'rotate' => heatmap_rotation_steps($config['rotate']),
         'days' => max(1, intval($config['days'])),
         'brush' => strval($config['brush'] ?? 'small'),
         'scale' => heatmap_scale($config['scale']),
@@ -651,18 +746,25 @@ function heatmap_fetch_known_maps(PDO $pdo, $game)
 {
     $statement = $pdo->prepare(
         'SELECT map FROM (
-            SELECT map FROM hlstats_Heatmap_Config hc
+            SELECT DISTINCT hef.map, 0 AS priority FROM hlstats_Events_Frags hef
+            INNER JOIN hlstats_Servers hs ON hs.serverId = hef.serverId
+            INNER JOIN hlstats_Games g ON g.code = hs.game
+            INNER JOIN hlstats_Heatmap_Config hc ON hc.game = g.realgame AND hc.map = hef.map
+            WHERE hs.game = :game_ready AND hef.map <> ""
+            UNION ALL
+            SELECT hc.map, 1 AS priority FROM hlstats_Heatmap_Config hc
             INNER JOIN hlstats_Games g ON g.realgame = hc.game
             WHERE g.code = :game_config
-            UNION
-            SELECT hef.map FROM hlstats_Events_Frags hef
+            UNION ALL
+            SELECT DISTINCT hef.map, 2 AS priority FROM hlstats_Events_Frags hef
             INNER JOIN hlstats_Servers hs ON hs.serverId = hef.serverId
             WHERE hs.game = :game_events AND hef.map <> ""
         ) maps
-        ORDER BY map ASC
+        GROUP BY map
+        ORDER BY MIN(priority) ASC, map ASC
         LIMIT 300'
     );
-    $statement->execute(array('game_config' => $game, 'game_events' => $game));
+    $statement->execute(array('game_ready' => $game, 'game_config' => $game, 'game_events' => $game));
     return $statement->fetchAll(PDO::FETCH_COLUMN);
 }
 

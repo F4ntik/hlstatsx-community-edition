@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 
@@ -12,9 +13,16 @@ from hlstats_py.heatmaps import (
     apply_brush_opacity,
     build_points_query,
     collect_projection_stats,
+    crop_image,
+    effective_image_size,
     load_settings,
+    normalize_crop,
+    normalize_scale,
     parse_goldsrc_overview,
     parse_source_overview,
+    rotate_point,
+    transform_point,
+    unrotate_point,
     select_target_maps,
 )
 from PIL import Image, ImageChops
@@ -123,7 +131,7 @@ def _make_config() -> HeatmapConfig:
         yoffset=32,
         flipx=False,
         flipy=False,
-        rotate=False,
+        rotate=0,
         days=30,
         brush="small",
         scale=1.0,
@@ -135,6 +143,61 @@ def _make_config() -> HeatmapConfig:
         cropy1=0,
         cropy2=0,
     )
+
+
+def test_transform_point_supports_quarter_turn_rotations() -> None:
+    point = HeatmapPoint(datetime(2026, 4, 19, 12, 0, 0), 10, 20)
+
+    assert transform_point(point, _make_config()) == (42, 52)
+    assert transform_point(point, replace(_make_config(), rotate=1, xoffset=0, yoffset=0)) == (-20, 10)
+    assert transform_point(point, replace(_make_config(), rotate=2, xoffset=0, yoffset=0)) == (-10, -20)
+    assert transform_point(point, replace(_make_config(), rotate=3, xoffset=0, yoffset=0)) == (20, -10)
+
+
+def test_non_positive_scale_uses_safe_default() -> None:
+    point = HeatmapPoint(datetime(2026, 4, 19, 12, 0, 0), 10, 20)
+    assert normalize_scale(0) == 1.0
+    assert normalize_scale(-2) == 1.0
+    assert transform_point(point, replace(_make_config(), scale=0, xoffset=0, yoffset=0)) == (10, 20)
+
+
+def test_rotation_round_trip_and_fourth_power() -> None:
+    original = (17, -29)
+    for steps in range(4):
+        rotated = rotate_point(*original, steps)
+        assert unrotate_point(*rotated, steps) == original
+        after_four = rotated
+        for _ in range(3):
+            after_four = rotate_point(*after_four, steps)
+        assert after_four == original
+
+
+def test_crop_normalization_and_effective_canvas() -> None:
+    config = replace(
+        _make_config(),
+        cropx1=90,
+        cropy1=-5,
+        cropx2=50,
+        cropy2=100,
+    )
+    normalized = normalize_crop(config, (100, 80))
+    assert (normalized.cropx1, normalized.cropy1, normalized.cropx2, normalized.cropy2) == (90, 0, 10, 80)
+    assert effective_image_size(config, (100, 80)) == (10, 80)
+    assert crop_image(Image.new("RGB", (100, 80)), config).size == (10, 80)
+
+
+def test_projection_stats_use_cropped_canvas_coordinates() -> None:
+    config = replace(_make_config(), xoffset=0, yoffset=0, cropx1=10, cropy1=20, cropx2=30, cropy2=40)
+    points = [
+        HeatmapPoint(datetime(2026, 4, 19, 12, 0, 0), 15, 25),
+        HeatmapPoint(datetime(2026, 4, 19, 12, 1, 0), 50, 60),
+    ]
+
+    stats = collect_projection_stats(points, config, image_size=effective_image_size(config, (100, 100)))
+
+    assert stats.in_bounds == 1
+    assert stats.out_of_bounds == 1
+    assert (stats.min_x, stats.max_x, stats.min_y, stats.max_y) == (5, 40, 5, 40)
 
 
 def _make_rows(map_name: str) -> dict[str, list[tuple[object, ...]]]:
