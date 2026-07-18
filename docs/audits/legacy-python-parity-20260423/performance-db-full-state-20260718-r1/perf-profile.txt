@@ -1,0 +1,73 @@
+# cProfile top-30 (cumtime)
+         801365 function calls (801137 primitive calls) in 5.029 seconds
+
+   Ordered by: cumulative time
+   List reduced from 649 to 30 due to restriction <30>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.011    0.011    5.074    5.074 D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\hlstats_ftp_py\main.py:313(_import_logs_batch)
+     2287    0.010    0.000    4.611    0.002 D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\hlstats_py\runtime.py:517(process_stdin_line)
+     2287    0.031    0.000    4.592    0.002 D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\hlstats_py\runtime.py:533(_process_event_payload)
+     2287    0.043    0.000    4.266    0.002 D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\hlstats_py\storage.py:874(record)
+     4613    0.016    0.000    3.766    0.001 D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\replay_baseline\direct_import_artifacts.py:237(_counting_execute)
+     4613    0.019    0.000    3.750    0.001 D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\hlstats_py\storage.py:3569(_execute)
+     3134    0.010    0.000    3.645    0.001 C:\Users\semer\AppData\Roaming\Python\Python313\site-packages\MySQLdb\cursors.py:162(execute)
+     3134    0.019    0.000    3.487    0.001 C:\Users\semer\AppData\Roaming\Python\Python313\site-packages\MySQLdb\cursors.py:325(_query)
+     3038    0.010    0.000    3.483    0.001 D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\hlstats_py\storage.py:3605(_execute_direct)
+     3134    0.011    0.000    3.419    0.001 C:\Users\semer\AppData\Roaming\Python\Python313\site-packages\MySQLdb\connections.py:282(query)
+     3134    3.407    0.001    3.407    0.001 {function Connection.query at 0x000001CC8E53CB80}
+     2134    0.038    0.000    2.677    0.001 D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\hlstats_py\storage.py:1803(_resolve_player_id)
+     2101    0.008    0.000    2.521    0.001 D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\hlstats_py\storage.py:3083(_ensure_player_history_row)
+     1288    0.011    0.000    1.751    0.001 D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\hlstats_py\storage.py:1764(_prime_player_state)
+      282    0.007    0.000    1.082    0.004 D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\hlstats_py\storage.py:1370(_record_statsme)
+      282    0.004    0.000    0.404    0.001 D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\hlstats_py\storage.py:1431(_record_statsme2)
+       44    0.002    0.000    0.309    0.007 D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\hlstats_py\storage.py:979(_record_frag)
+        4    0.000    0.000    0.280    0.070 D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\hlx_core\db.py:316(_connect_with_retries)
+     4613    0.026    0.000    0.264    0.000 D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\hlstats_py\storage.py:3618(_trace_db_write)
+        1    0.000    0.000    0.260    0.260 D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\hlx_core\db.py:169(connect)
+     17/5    0.000    0.000    0.258    0.052 <frozen importlib._bootstrap>:1349(_find_and_load)
+     17/5    0.000    0.000    0.258    0.052 <frozen importlib._bootstrap>:1304(_find_and_load_unlocked)
+     17/5    0.000    0.000    0.255    0.051 <frozen importlib._bootstrap>:911(_load_unlocked)
+     14/5    0.000    0.000    0.255    0.051 <frozen importlib._bootstrap_external>:1020(exec_module)
+    42/10    0.000    0.000    0.241    0.024 <frozen importlib._bootstrap>:480(_call_with_frames_removed)
+        6    0.000    0.000    0.241    0.040 {built-in method builtins.__import__}
+     14/5    0.000    0.000    0.238    0.048 {built-in method builtins.exec}
+        4    0.000    0.000    0.230    0.057 D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\hlx_core\db.py:432(_load_default_connector)
+        9    0.000    0.000    0.229    0.025 <frozen importlib._bootstrap>:1390(_handle_fromlist)
+        1    0.000    0.000    0.227    0.227 C:\Users\semer\AppData\Roaming\Python\Python313\site-packages\MySQLdb\__init__.py:1(<module>)
+
+
+
+# SQL template counts (top-30)
+      2106 | INSERT INTO hlstats_Players_History (`playerId`, `eventTime`, `game`, `skill`) VALUES (%s, %s, %s, %s) ON DUPLICATE KEY UPDATE `playerId` = `playerId`
+       735 | INSERT INTO hlstats_Events_Admin (`eventTime`, `serverId`, `map`, `type`, `message`, `playerName`) VALUES (%s, %s, %s, %s, %s, %s)
+       282 | INSERT INTO hlstats_Events_Statsme (`eventTime`, `serverId`, `map`, `playerId`, `weapon`, `shots`, `hits`, `headshots`, `damage`, `kills`, `deaths`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+       282 | UPDATE hlstats_Players SET `shots` = `shots` + %s, `hits` = `hits` + %s WHERE `playerId` = %s
+       282 | INSERT INTO hlstats_Events_Statsme2 (`eventTime`, `serverId`, `map`, `playerId`, `weapon`, `head`, `chest`, `stomach`, `leftarm`, `rightarm`, `leftleg`, `rightleg`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+       174 | UPDATE hlstats_Servers SET `ct_shots` = `ct_shots` + %s, `ct_hits` = `ct_hits` + %s, `map_ct_shots` = `map_ct_shots` + %s, `map_ct_hits` = `map_ct_hits` + %s WHERE `serverId` = %s
+       108 | UPDATE hlstats_Players SET `skill` = `skill` + %s WHERE `playerId` = %s
+       108 | UPDATE hlstats_Servers SET `ts_shots` = `ts_shots` + %s, `ts_hits` = `ts_hits` + %s, `map_ts_shots` = `map_ts_shots` + %s, `map_ts_hits` = `map_ts_hits` + %s WHERE `serverId` = %s
+        86 | UPDATE hlstats_Players SET `kills` = `kills` + %s, `headshots` = `headshots` + %s, `deaths` = `deaths` + %s, `suicides` = `suicides` + %s, `skill` = `skill` + %s, `kill_streak` = IF(%s > `kill_streak`, %s, `kill_streak`), `death_streak` = IF(%s > `death_streak`, %s, `death_streak`) WHERE `playerId` = %s
+        77 | UPDATE hlstats_Actions SET `count` = `count` + 1 WHERE `id` = %s
+        61 | INSERT INTO hlstats_Events_PlayerActions (`eventTime`, `serverId`, `map`, `playerId`, `actionId`, `bonus`) VALUES (%s, %s, %s, %s, %s, %s)
+        48 | INSERT INTO hlstats_Events_TeamBonuses (`eventTime`, `serverId`, `map`, `playerId`, `actionId`, `bonus`) VALUES (%s, %s, %s, %s, %s, %s)
+        43 | INSERT INTO hlstats_Events_Frags (`eventTime`, `serverId`, `map`, `killerId`, `victimId`, `weapon`, `headshot`, `killerRole`, `victimRole`, `pos_x`, `pos_y`, `pos_z`, `pos_victim_x`, `pos_victim_y`, `pos_victim_z`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        43 | INSERT INTO hlstats_Weapons (`game`, `code`, `name`, `modifier`, `kills`, `headshots`) VALUES (%s, %s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE `kills` = `kills` + VALUES(`kills`), `headshots` = `headshots` + VALUES(`headshots`), `name` = VALUES(`name`)
+        43 | UPDATE hlstats_Servers SET `kills` = `kills` + %s, `headshots` = `headshots` + %s WHERE `serverId` = %s
+        43 | INSERT INTO hlstats_Maps_Counts (`game`, `map`, `kills`, `headshots`) VALUES (%s, %s, %s, %s) ON DUPLICATE KEY UPDATE `kills` = `kills` + VALUES(`kills`), `headshots` = `headshots` + VALUES(`headshots`)
+        13 | UPDATE hlstats_Servers SET `players` = %s, `act_players` = %s WHERE `serverId` = %s
+        11 | UPDATE hlstats_Players SET `lastName` = %s WHERE `playerId` = %s
+        10 | UPDATE hlstats_Players SET `last_skill_change` = %s WHERE `playerId` = %s
+         6 | INSERT INTO hlstats_PlayerNames (`playerId`, `name`, `lastuse`, `numuses`) VALUES (%s, %s, %s, 1) ON DUPLICATE KEY UPDATE `lastuse` = VALUES(`lastuse`), `numuses` = `numuses` + 1
+         6 | INSERT INTO hlstats_Events_ChangeTeam (`eventTime`, `serverId`, `map`, `playerId`, `team`) VALUES (%s, %s, %s, %s, %s)
+         6 | UPDATE hlstats_Players SET `connection_time` = `connection_time` + %s WHERE `playerId` = %s
+         6 | UPDATE hlstats_Players SET `kill_streak` = IF(%s > `kill_streak`, %s, `kill_streak`), `death_streak` = IF(%s > `death_streak`, %s, `death_streak`) WHERE `playerId` = %s
+         6 | UPDATE hlstats_PlayerNames SET `connection_time` = `connection_time` + %s, `kills` = `kills` + %s, `deaths` = `deaths` + %s, `suicides` = `suicides` + %s, `headshots` = `headshots` + %s, `shots` = `shots` + %s, `hits` = `hits` + %s WHERE `playerId` = %s AND `name` = %s
+         5 | INSERT INTO hlstats_Events_Disconnects (`eventTime`, `serverId`, `map`, `playerId`) VALUES (%s, %s, %s, %s)
+         5 | UPDATE hlstats_Players_History SET `connection_time` = `connection_time` + %s, `kills` = `kills` + %s, `deaths` = `deaths` + %s, `suicides` = `suicides` + %s, `skill` = %s, `headshots` = `headshots` + %s, `shots` = `shots` + %s, `hits` = `hits` + %s, `teamkills` = `teamkills` + %s, `death_streak` = IF(%s > `death_streak`, %s, `death_streak`), `kill_streak` = IF(%s > `kill_streak`, %s, `kill_streak`), `skill_change` = `skill_change` + %s WHERE `playerId` = %s AND `eventTime` = %s AND `game` = %s
+         4 | INSERT INTO hlstats_Events_Connects (`eventTime`, `serverId`, `map`, `playerId`, `ipAddress`, `hostname`, `hostgroup`) VALUES (%s, %s, %s, %s, %s, %s, %s)
+         4 | UPDATE hlstats_Players SET `lastAddress` = %s WHERE `playerId` = %s
+         3 | INSERT INTO hlstats_Events_Chat (`eventTime`, `serverId`, `map`, `playerId`, `message_mode`, `message`) VALUES (%s, %s, %s, %s, %s, %s)
+         1 | UPDATE hlstats_Servers SET `act_map` = %s WHERE `serverId` = %s
+
+baseline-metrics: files=1, records=2287, elapsed_s=5.075, lines_per_sec=450.67, sql_exec_total=4613, sql_per_record=2.017

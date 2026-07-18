@@ -1,5 +1,10 @@
 # Public Web RU i18n Handoff
 
+Historical donor-web handoff note only.
+
+This handoff targeted a separate public-web-only i18n branch. It is not the
+current source of truth for this integrated product lane.
+
 ## Branch and scope
 - Repository: `D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-web-ru-i18n`
 - Branch: `feature/web-public-ru-i18n`

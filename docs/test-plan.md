@@ -24,6 +24,43 @@ Validate that the integrated product repository works as one coherent stack:
 
 Do not restate those runbooks here. This document is the verification matrix.
 
+## Targeted gates for replay evidence and heatmaps
+
+For the import/heatmap contract, run the narrow checks before any Docker
+replay:
+
+```powershell
+$env:PYTHONPATH = 'scripts'
+python -m pytest `
+  scripts/hlstats_ftp_py/tests/test_main.py `
+  scripts/replay_baseline/tests/test_direct_import_artifacts.py `
+  scripts/replay_baseline/tests/test_dual_contour_script.py `
+  scripts/hlstats_py/tests/test_heatmaps.py `
+  scripts/hlstats_py/tests/test_heatmap_projection_migrate.py `
+  scripts/hlstats_py/tests/test_heatmap_projection_calibrate.py -q
+python -m compileall -q scripts/hlstats_py scripts/hlstats_ftp_py scripts/replay_baseline
+node scripts/heatmap_js_smoke.js
+node --check web/includes/js/heatmap.js
+php scripts/web_heatmap_smoke.php
+```
+
+The PHP command requires a PHP CLI on the validation host. If it is absent,
+run the same smoke in the built `python-web` Docker image and record that
+runtime result explicitly; do not silently call a source-only check a runtime
+gate. The acceptance replay additionally requires a fresh Docker worker image, a unique
+`EvidenceRunId`, `-UseDumpRestore`, equal final input manifests, both
+same-run ignored/drop manifests, matching contour metadata and snapshots, and
+no unexpected DB drift. Existing `*-1000` artifacts must first pass the
+evidence inventory classification.
+
+Projection migration is read-only by default. Inspect the rotate distribution,
+verify a backup, and obtain the separate runtime approval before
+`--apply --runtime-gate-approved`; `--apply` without the explicit gate flag is
+rejected before DB connection. A distribution containing rotate `2` or `3` is
+a manual-classification stop. The DB-first calibration helper applies the same
+fail-closed rule: `heatmap_projection_calibrate.py --apply` also requires
+`--runtime-gate-approved`.
+
 ## Validation scope
 
 In scope:
@@ -227,7 +264,7 @@ overlay behavior changes:
   `web/pages/admintasks/heatmaps.php`, `web/pages/mapinfo.php`, and any
   touched `playerinfo_*` include.
 - DB-first projection diagnostics before expensive replay/regeneration:
-  `cd scripts && python -m hlstats_py.heatmaps --configfile hlstats.conf --game cstrike --map de_dust2 --heatmaps-root ../heatmaps --diagnose-projection`
+  `python scripts/hlstats_py/heatmaps.py --configfile scripts/replay_baseline/comparison/python/hlstats.host.conf --game cstrike --map de_dust2 --heatmaps-root heatmaps --assets-root heatmaps/src --diagnose-projection`
 - Browser verification for `mode=mapinfo&game=<code>&map=<map>`: canvas overlay
   visible, static JPEG/thumb fallback still linked, diagnostics badge appears
   when in-bounds ratio is weak, console/network clean.

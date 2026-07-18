@@ -1,0 +1,7 @@
+L0120085.log:222:empty-timestamp-only-line
+L0721022.log:222:empty-timestamp-only-line
+L1021207.log:225:empty-timestamp-only-line
+L1030239.log:804:empty-timestamp-only-line
+L1127178.log:222:empty-timestamp-only-line
+L1129033.log:159:empty-timestamp-only-line
+L1203059.log:367:empty-timestamp-only-line

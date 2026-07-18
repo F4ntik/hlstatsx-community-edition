@@ -1,5 +1,10 @@
 # Status: Web Frontend i18n
 
+Historical donor-web status note only.
+
+This file reflects a separate frontend translation pass, not the current
+integrated product-lane status.
+
 ## Current phase
 
 The i18n skeleton exists as the baseline translation architecture, but the

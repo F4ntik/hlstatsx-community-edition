@@ -1,5 +1,10 @@
 # Public Web RU Translation Branch
 
+Historical donor-web note only.
+
+This file describes an older public-web-only i18n scope. It is not the current
+source of truth for the integrated Python+i18n product lane.
+
 ## Goal
 - Add a reusable bilingual i18n layer for the public PHP frontend.
 - Keep English as the default language.

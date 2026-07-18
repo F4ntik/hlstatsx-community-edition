@@ -48,6 +48,23 @@ python scripts/hlstats_py/benchmarks/benchmark_parser.py `
   --backend python
 ```
 
+For a reproducible side-by-side profile of the existing `python` and `native`
+parser paths without touching a DB, use the bounded helper and a fresh output
+directory (see [`rust-parser-boundary.md`](rust-parser-boundary.md) for the
+exact output contract):
+
+```powershell
+$env:PYTHONPATH = 'scripts'
+$run = Join-Path $env:TEMP 'hlstats-processing-profile-20260718-r1'
+python scripts/replay_baseline/profile_processing_subset.py `
+  scripts/replay_baseline/artifacts/parity-trace-rakza-window/L0105062.log `
+  --max-files 1 --backends python native --output-dir $run
+```
+
+The helper writes `processing-profile.json`, per-backend `.pstats`, and
+top-function reports under `$run`; it never opens a database.  It is suitable
+for processing evidence, not DB-write evidence.
+
 Direct import profile:
 
 ```powershell
@@ -62,6 +79,12 @@ python scripts/replay_baseline/direct_import_artifacts.py `
 The profiled import writes `perf-profile.txt` plus replay/import summaries
 under `scripts/replay_baseline/artifacts/`. Keep those files with the release
 candidate evidence when the run is used for release signoff.
+
+For SQL-write profiling, use an explicitly disposable benchmark DB and set
+`HLSTATS_DB_WRITE_TRACE_PATH` plus `--audit-dir` to a fresh run directory; the
+exact command, expected outputs, and safety boundary are in
+[`rust-parser-boundary.md`](rust-parser-boundary.md).  Never run that command
+against an accepted parity DB or evidence directory.
 
 Write-path smoke benchmark:
 

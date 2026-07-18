@@ -16,10 +16,19 @@ Implement and document here. Use
 `hlstatsx-community-edition-web-ru-i18n/` only as read-only reference unless a
 task explicitly spans them.
 
+Documentation map:
+
+- use [`docs/README.md`](README.md) to distinguish canonical runbooks from
+  historical notes;
+- when documents disagree, prefer `docs/status.md`, `docs/plans.md`,
+  `docs/test-plan.md`, and `docs/release-readiness.md`.
+
 Canonical runbooks:
 
 - replay mechanics and fast-path guidance:
   [`docs/replay-fast-path.md`](replay-fast-path.md)
+- first-divergence workflow for a completed full-corpus legacy/Python replay:
+  [`docs/full-corpus-first-divergence.md`](full-corpus-first-divergence.md)
 - parity debug workflow for narrow residuals:
   [`docs/parity-debug-pipeline.md`](parity-debug-pipeline.md)
 - audit evidence and bug triage:
@@ -27,9 +36,9 @@ Canonical runbooks:
 - release-readiness metrics, profiling, artifact, and deployment handoff:
   [`docs/release-readiness.md`](release-readiness.md)
 
-Current autonomy follow-up entrypoint:
+Historical autonomy follow-up context:
 
-- if the task is to continue repo autonomy / release-readiness follow-up, read
+- if the task needs the rationale behind the completed autonomy phases, read
   these in order after `docs/status.md`:
   [`docs/autonomy-review-20260601.md`](autonomy-review-20260601.md),
   [`docs/autonomy-work-plan-20260601.md`](autonomy-work-plan-20260601.md)
@@ -177,6 +186,16 @@ Current scope:
   frontend/runtime changes affect visible routes
 - keep release-readiness evidence in `docs/status.md` and `docs/test-plan.md`
   current without duplicating audit history
+- keep replay evidence attributable: canonical `ArtifactLabel` values,
+  unique `EvidenceRunId`, final selected input manifests, same-run ignored/drop
+  manifests, and explicit no-overwrite behavior
+- keep heatmap projection changes behind the source-ready/runtime-accepted
+  boundary; rotate migration requires distribution inspection, backup, and a
+  separate runtime gate. The 2026-07-18 runtime gate is accepted: the guarded
+  migration advanced the version marker from `1` to `2`, retained the
+  `{0:442}` distribution and all replay anchors, and passed one-map browser,
+  canvas-toggle, and static-JPEG acceptance. The verified pre-migration backup
+  and preserved full-41513 databases are recorded in the parity audit.
 
 Definition of done:
 
@@ -238,7 +257,17 @@ Current working rules:
   `TeamBonuses` without fresh focused evidence.
 - Before starting any non-trivial new parity fix, use a read-only subagent to
   inspect and document how the legacy Perl code implements the behavior.
+- Treat legacy as a reference, not an oracle: verify whether the legacy trace
+  is internally consistent before calling a Python row a regression.
 - Use single-log and narrow-window replay before another broad contour run.
+- For any fresh contour, verify the evidence inventory before pairing artifacts;
+  a filename ending in `-1000` is not sufficient to establish narrow-1000.
+- Accept a replay contour only after input manifests, ignored/drop manifests,
+  contour metadata, snapshots, and stable-key SQL drift all agree.
+- The fresh `full-41513` run is retained as diagnostic evidence: its input
+  manifests and parser artifacts are valid, but its broad stable-key residuals
+  are not promoted into the supported narrow-1000 acceptance gate. Use the
+  full-corpus runbook for any follow-up prefix/window localization.
 - After a point fix, inspect the automatic `30/30` guard-window parity rerun
   from `Run-SingleLogParity.ps1` before promoting the fix.
 - Separate raw replay GeoIP-only player differences from real

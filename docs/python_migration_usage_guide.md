@@ -385,9 +385,10 @@ python heatmap_projection_calibrate.py \
 
 Helper генерирует HTML preview со слайдерами и может применить значения в
 `hlstats_Heatmap_Config` только после прохождения заданного порога
-in-bounds-ratio. Итерации по калибровке нужно делать на уже заполненной DB; full
-log replay и `--disablecache` регенерацию стоит запускать только после
-стабилизации проекции.
+in-bounds-ratio и отдельного runtime-gate через
+`--apply --runtime-gate-approved`. Итерации по калибровке нужно делать на уже
+заполненной DB; full log replay и `--disablecache` регенерацию стоит запускать
+только после стабилизации проекции.
 
 ### 7.2. Web overlay и персональные heatmaps
 

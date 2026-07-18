@@ -1,5 +1,11 @@
 # Актуальный план работ по итогам ревью
 
+Завершённый исторический план.
+
+Фазы этого документа закрыты и сохранены как audit trail. Для текущего
+исполнения используйте `docs/status.md`, `docs/plans.md`,
+`docs/test-plan.md` и `docs/release-readiness.md`.
+
 ## Цель
 
 Довести ветку `experiment/parity-trace-harness` до состояния, где:

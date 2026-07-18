@@ -1,0 +1,30 @@
+{
+  "input_files": [
+    "scripts\\replay_baseline\\artifacts\\parity-trace-rakza-window\\L0105062.log"
+  ],
+  "results": [
+    {
+      "backend": "python",
+      "files": 1,
+      "records": 2287,
+      "parsed": 2287,
+      "parse_errors": 0,
+      "elapsed_seconds": 0.19743219995871186,
+      "profile_elapsed_seconds": 0.41223610006272793,
+      "records_per_second": 11583.723427476725,
+      "parsed_per_second": 11583.723427476725
+    },
+    {
+      "backend": "native",
+      "files": 1,
+      "records": 2287,
+      "parsed": 2287,
+      "parse_errors": 0,
+      "elapsed_seconds": 0.1680348999798298,
+      "profile_elapsed_seconds": 0.34686960000544786,
+      "records_per_second": 13610.267868606594,
+      "parsed_per_second": 13610.267868606594
+    }
+  ],
+  "db_touched": false
+}

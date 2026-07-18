@@ -1,5 +1,11 @@
 # Next Chat Task
 
+Historical continuation note only.
+
+Do not use this file as the primary task entrypoint. For current work, start
+from `docs/status.md`, `docs/plans.md`, `docs/test-plan.md`, and
+`docs/release-readiness.md`.
+
 Workspace:
 `D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n`
 

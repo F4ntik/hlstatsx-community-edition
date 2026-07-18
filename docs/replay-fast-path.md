@@ -27,6 +27,33 @@
    файлов. Подробнее: **`docs/audits/legacy-python-parity-20260423/performance.md`**
    и раздел replay в **`docs/test-plan.md`**.
 
+## Контракт манифестов и артефактов
+
+Для сравнимого batch-прогона список файлов фиксируется после сортировки,
+статического отбора и ограничения `--max-files`. В режиме `--static-replay`
+FTP-контур не отбрасывает самый новый файл по mtime; это режим для replay,
+когда входом является уже выбранный набор файлов.
+
+Прямой импорт и FTP-контур принимают:
+
+```text
+--input-manifest <path>
+--ignored-lines-manifest <path>
+--continue-on-parse-error
+```
+
+`--continue-on-parse-error` без `--ignored-lines-manifest` отвергается до
+импорта. Манифест входов содержит именно финальный выбранный список, а
+манифест ignored-lines пишется из того же Python-процесса. Существующий файл
+не перезаписывается неявно; для намеренной замены нужен явный
+`--overwrite-manifests`. Runner передаёт временные пути в контейнер и
+публикует их в audit-dir только после успешного импорта.
+
+Для каждого прогона задавайте канонический `ArtifactLabel`:
+`narrow-1000`, `full-41513` или `prefix-*`, и уникальный `EvidenceRunId`.
+Старые артефакты с именем `*-1000` проверяйте по количеству, SHA и contour
+metadata: часть из них является misnamed `full-41513`, а не narrow-1000.
+
 ## Где искать команды и нюансы
 
 | Тема | Документ / скрипт |
@@ -85,6 +112,28 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\replay_baseline\comp
 перезаписывает legacy SQL snapshot. Metadata пишется в
 `scripts/replay_baseline/comparison/.parity-state/contour-info/` и копируется
 в запущенные контейнеры как `/CONTOUR_INFO.json`.
+
+Для heatmap-проекции единый контракт rotate — `0..3` с истинными четверть-
+оборотами и обратным преобразованием. Старые записи с rotate только `0/1`
+можно переводить отдельным версионированным updater после read-only проверки
+распределения; при наличии `2/3` updater останавливается для ручной
+классификации и не выполняет массовый SQL.
+
+Сначала запускайте dry-run:
+
+```powershell
+python scripts/heatmap_projection_migrate.py `
+  --configfile scripts/replay_baseline/comparison/python/hlstats.host.conf
+```
+
+`--apply --runtime-gate-approved` разрешается только после проверки
+распределения, backup и отдельного runtime-gate. Сам `--apply` без второго
+флага отклоняется до подключения к БД. Это не часть автоматического replay
+или narrow-1000 promotion.
+
+Ручной DB-first калибратор использует тот же fail-closed контракт: его
+`--apply` также требует `--runtime-gate-approved`; preview без `--apply` остаётся
+read-only.
 
 Если legacy narrow-1000 уже был успешно прогнан до появления metadata, можно
 один раз принять текущее состояние как эталон:

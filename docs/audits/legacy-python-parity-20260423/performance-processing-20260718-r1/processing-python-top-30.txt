@@ -1,0 +1,37 @@
+# cProfile top-30 cumulative time; backend=python
+         134586 function calls in 0.393 seconds
+
+   Ordered by: cumulative time
+   List reduced from 52 to 30 due to restriction <30>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.011    0.011    0.412    0.412 D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\replay_baseline\profile_processing_subset.py:51(_scan)
+     2287    0.005    0.000    0.325    0.000 D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\hlstats_py\protocol.py:192(parse_log_event)
+     2287    0.038    0.000    0.320    0.000 D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\hlstats_py\protocol.py:204(_parse_log_event_python)
+     2152    0.047    0.000    0.122    0.000 D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\hlstats_py\protocol.py:314(_consume_player)
+     1179    0.014    0.000    0.105    0.000 D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\hlstats_py\protocol.py:461(_parse_trigger_event)
+     8066    0.100    0.000    0.100    0.000 {method 'match' of 're.Pattern' objects}
+     2288    0.015    0.000    0.074    0.000 D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\hlstats_py\goldsrc_physical_lines.py:23(iter_merged_goldsrc_physical_lines)
+     2287    0.006    0.000    0.051    0.000 D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\hlstats_py\goldsrc_physical_lines.py:14(line_starts_new_goldsrc_record)
+     1539    0.029    0.000    0.042    0.000 D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\hlstats_py\protocol.py:411(_parse_properties)
+     1950    0.032    0.000    0.032    0.000 D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\hlstats_py\protocol.py:397(_find_closing_quote)
+    50645    0.025    0.000    0.025    0.000 {method 'group' of 're.Match' objects}
+      106    0.004    0.000    0.013    0.000 D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\hlstats_py\protocol.py:428(_parse_kill_event)
+      735    0.002    0.000    0.010    0.000 D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\hlstats_py\protocol.py:684(_parse_generic_event)
+     1950    0.004    0.000    0.008    0.000 D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\hlstats_py\protocol.py:376(_normalize_unique_id)
+     4314    0.008    0.000    0.008    0.000 {method 'lstrip' of 'str' objects}
+     2287    0.008    0.000    0.008    0.000 {method 'startswith' of 'bytes' objects}
+     1950    0.006    0.000    0.006    0.000 <string>:2(__init__)
+     8366    0.006    0.000    0.006    0.000 {method 'strip' of 'str' objects}
+    16046    0.006    0.000    0.006    0.000 {method 'startswith' of 'str' objects}
+     2287    0.004    0.000    0.004    0.000 {method 'lstrip' of 'bytes' objects}
+     2288    0.004    0.000    0.004    0.000 {method 'readline' of '_io.BufferedReader' objects}
+      168    0.001    0.000    0.004    0.000 D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\hlstats_py\protocol.py:652(_parse_world_event)
+     1955    0.004    0.000    0.004    0.000 {method 'split' of 'str' objects}
+       73    0.001    0.000    0.003    0.000 D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\hlstats_py\protocol.py:667(_parse_team_trigger_event)
+     1539    0.003    0.000    0.003    0.000 {method 'finditer' of 're.Pattern' objects}
+     2287    0.003    0.000    0.003    0.000 {method 'rstrip' of 'bytes' objects}
+     2287    0.002    0.000    0.002    0.000 {method 'decode' of 'bytes' objects}
+     1950    0.001    0.000    0.001    0.000 {method 'replace' of 'str' objects}
+     1950    0.001    0.000    0.001    0.000 {method 'extend' of 'list' objects}
+     2287    0.001    0.000    0.001    0.000 {method 'strip' of 'bytes' objects}

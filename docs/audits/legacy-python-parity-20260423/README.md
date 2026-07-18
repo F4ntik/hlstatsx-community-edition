@@ -47,7 +47,35 @@ docs/audits/legacy-python-parity-20260423/
   agent-render-static.md
   agent-runtime-db.md
   bug-plan.md
+  evidence-inventory-20260717.md
+  runtime-db-diff-narrow-1000-20260717-narrow-1000-r1.md
+  runtime-db-diff-full-41513-20260717-full-41513-r1.md
+  runtime-heatmap-migration-gate-20260718.md
 ```
+
+Replay evidence also keeps the final selected input manifest and the
+same-process ignored/drop manifest for each contour. Use canonical labels
+(`narrow-1000`, `full-41513`, `prefix-*`) plus a unique `EvidenceRunId`; do not
+infer a contour from the filename suffix alone. The inventory documents that
+some retained `*-1000` files are actually full-41513 captures and therefore
+cannot be paired with narrow-1000 evidence.
+
+The fresh narrow acceptance evidence for
+`20260717-narrow-1000-r1` is recorded in
+`runtime-db-diff-narrow-1000-20260717-narrow-1000-r1.md`; it includes the
+byte-identical final manifests, same-run drop/ignore artifacts, contour
+metadata/snapshot anchors, and the explicit GeoIP-only compare classification.
+
+The separately labelled full-corpus diagnostic run
+`20260717-full-41513-r1` is recorded in
+`runtime-db-diff-full-41513-20260717-full-41513-r1.md`. Its input manifests
+match byte-for-byte, but the full stable-key compare remains non-green across
+player/session/event tables. This report is diagnostic evidence and does not
+replace or weaken the accepted narrow-1000 gate.
+
+The heatmap projection read-only distribution and pre-migration backup are
+recorded in `runtime-heatmap-migration-gate-20260718.md`; the guarded updater
+remains unapplied pending a separate runtime gate.
 
 ## Execution Notes
 
@@ -223,7 +251,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\replay_baseline\comp
 Notes for parity safety:
 - FTP path must import the same retained corpus and preserve server identity
   `37.230.137.48:27015`.
-- Keep/import manifests so legacy and Python inputs remain comparable.
+- Keep/import manifests so legacy and Python inputs remain comparable. The
+  Python manifest must be the final sorted selected list, and the ignored-lines
+  manifest must be emitted by that same import run.
+- Use a unique `ArtifactLabel`/`EvidenceRunId`; the runner refuses implicit
+  overwrite and publishes manifests to the audit directory only after a
+  successful import.
 - The helper now runs `hlstats_awards_py --geoip` after import by default.
   Use `-SkipGeoIp` only for targeted debug runs and record it in audit notes.
 
@@ -562,6 +595,8 @@ For every assigned route:
 - Both contours contain `37.230.137.48:27015`.
 - Both contours processed the same retained corpus, or the reference blocker is
   explicitly logged.
+- Final selected input manifests are byte-identical; both ignore/drop manifests
+  and contour metadata are present and attributable to the same run.
 - Runtime diff was captured before page conclusions.
 - All route groups have an agent report.
 - Every issue has a repro URL/SQL/log/screenshot anchor.

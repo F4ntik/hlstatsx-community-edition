@@ -1,10 +1,10 @@
-﻿stack=legacy
-container=hlstatsx-legacy-db
-timestamp=2026-06-05T17:46:06
+﻿stack=python
+container=hlstatsx-python-db
+timestamp=2026-07-18T06:06:44
 
 [counts]
-players=6039
-frags=536996
+players=6092
+frags=537210
 frags_empty_map=0
 maps_counts_rows=114
 awards_rows=0
@@ -14,44 +14,44 @@ ribbons_rows=0
 frags_minmax=2023-06-28 23:43:35|2026-04-21 21:32:37
 
 [top_frag_maps]
-de_dust2	78539
-$2000$	68054
+de_dust2	78540
+$2000$	68155
 fy_pool_day	46429
-aim_map	43425
-de_inferno	41141
-de_nuke	21712
-aim_ulbc_arena	20641
-de_aztec	18412
-aim_headshot	16637
-fy_snow	16204
+aim_map	43502
+de_inferno	41170
+de_nuke	21714
+aim_ulbc_arena	20642
+de_aztec	18414
+aim_headshot	16624
+fy_snow	16208
 aim_ulbc_picolo	14473
 de_mirage	13407
 cs_mansion	13350
 de_dust	10989
 de_train	8262
-de_tuscan	6517
+de_tuscan	6518
 awp_india	5135
 de_clan1_mill	5130
 de_cbble	4399
 cs_speedrun	4372
 
 [top_maps_counts]
-de_dust2	78539
-$2000$	68054
+de_dust2	78540
+$2000$	68155
 fy_pool_day	46429
-aim_map	43425
-de_inferno	41141
-de_nuke	21712
-aim_ulbc_arena	20641
-de_aztec	18412
-aim_headshot	16637
-fy_snow	16204
+aim_map	43502
+de_inferno	41170
+de_nuke	21714
+aim_ulbc_arena	20642
+de_aztec	18414
+aim_headshot	16624
+fy_snow	16208
 aim_ulbc_picolo	14473
 de_mirage	13407
 cs_mansion	13350
 de_dust	10989
 de_train	8262
-de_tuscan	6517
+de_tuscan	6518
 awp_india	5135
 de_clan1_mill	5130
 de_cbble	4399

@@ -1,7 +1,10 @@
-# Dual Contour 1000-Log Runbook
+# Dual Contour Evidence Runbook
 
 ## Goal
-Bring up legacy and python comparison contours from the same baseline, import 1000 logs each, and prepare page-visible parity checks.
+Bring up legacy and Python comparison contours from the same baseline, import
+the selected contour window, and prepare attributable page-visible parity
+checks. A supported 1,000-log acceptance run is labelled `narrow-1000`; a
+full diagnostic run is labelled `full-41513`.
 
 ## Mandatory parity condition
 Parity testing is valid only if both contours process the exact same replay input:
@@ -19,17 +22,57 @@ If this condition is not met, any page or SQL mismatch must be treated as input 
 - Python DB container: `hlstatsx-python-db`
 
 ## One-command orchestration
-Use:
+For a fresh supported narrow run, use a unique run id:
 
-`powershell -NoProfile -ExecutionPolicy Bypass -File scripts\replay_baseline\comparison\Run-DualContour-1000.ps1 -MaxImportFiles 1000`
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File `
+  scripts\replay_baseline\comparison\Run-DualContour-1000.ps1 `
+  -MaxImportFiles 1000 `
+  -ArtifactLabel narrow-1000 `
+  -EvidenceRunId 20260718-narrow-1000-r2 `
+  -UseDumpRestore
+```
+
+Replace the example `EvidenceRunId` with a new unique id. Reusing an existing
+id is refused unless `-OverwriteEvidence` is supplied explicitly.
 
 What it does:
 - brings both stacks down/up
 - restores baseline for both stacks
 - runs bounded import for legacy and python
-- writes SQL snapshots:
-  - `docs/audits/legacy-python-parity-20260423/legacy-sql-snapshot-1000.txt`
-  - `docs/audits/legacy-python-parity-20260423/python-sql-snapshot-1000.txt`
+- writes final selected manifests, same-run drop/ignored-line manifests,
+  contour metadata, and SQL snapshots with the label and run id in each name;
+  Python manifests are published to the audit directory only after the
+  Python batch import succeeds
+
+The accepted evidence currently retained for this lane is:
+
+| Artifact | Value |
+| --- | --- |
+| label / run | `narrow-1000` / `20260717-narrow-1000-r1` |
+| final manifest | 1,000 lines, 13,000 bytes, SHA-256 `95bfdb5951922c0c36aab2c5263e1880b227e845b34c9262939b028d0fbebe8a` for both stacks |
+| contour anchors | players `323`, frags `5464`, team bonuses `4765`, entries `0`, server rows `1` |
+| verdict | accepted narrow gate; raw compare retains only the documented GeoIP-only player residual |
+
+See `runtime-db-diff-narrow-1000-20260717-narrow-1000-r1.md` and
+`evidence-inventory-20260717.md` for the complete file list, ignored/drop
+manifest hashes, metadata, and normalized snapshots. The older files ending
+in `-1000` remain retained history; the inventory classifies those whose
+counts/anchors are full corpus as `full-41513`.
+
+For the separate full diagnostic, use:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File `
+  scripts\replay_baseline\comparison\Run-DualContour-1000.ps1 `
+  -MaxImportFiles 41513 `
+  -ArtifactLabel full-41513 `
+  -EvidenceRunId 20260718-full-41513-r2 `
+  -UseDumpRestore
+```
+
+Do not promote this full run over the accepted narrow contour; its broad
+stable-key residuals remain diagnostic.
 
 ## Staged orchestration (resume-friendly)
 `Run-DualContour-1000.ps1` now supports staged execution with run-state files under:
@@ -90,6 +133,25 @@ Strict dependency policy:
 - no dominant empty map rows (`map=''`) in frags
 - both contours confirmed against the same 1000-log manifest/window
 
+## Evidence acceptance checklist
+
+Accept a run only when all of these hold:
+
+- legacy and Python final input manifests are byte-identical and have the
+  expected count/SHA;
+- both same-run ignored/drop manifests exist, including an empty Python
+  ignored manifest when no Python records were skipped;
+- both contour metadata files carry the same canonical label, run id,
+  baseline mode, selected-log fingerprint, and comparable anchors;
+- normalized snapshots agree for the accepted scope and
+  `compare_stats_dbs.py` reports no new drift beyond an explicitly documented
+  policy residual;
+- no old evidence file was silently replaced.
+
+The runner's temporary Python manifest paths are mounted into the container;
+publication into `docs/audits/...` happens only after a zero exit status from
+the Python import.
+
 ## Notes
 - Page parity verdict must be based on visible page data first.
 - SQL is supporting evidence for root-cause triage only.
@@ -109,12 +171,51 @@ Rules:
 - Compare pages first, SQL second.
 
 Minimal flow:
-1. Reset both contours to same baseline.
-2. Create `legacy-window-1000` and `legacy-input-manifest-1000.txt`.
-3. Replay legacy from this window.
-4. Replay python from this same window (not from FTP incremental mode).
-5. Save SQL snapshots for sanity checks.
-6. Run page-visible parity audit.
+1. Reset both contours to the same dump baseline.
+2. Run the canonical runner with a unique `ArtifactLabel`/`EvidenceRunId`.
+3. Confirm the runner's final manifests and same-run drop/ignored artifacts.
+4. Compare metadata and normalized SQL snapshots for the same run.
+5. Run the page-visible parity audit.
+
+Do not manually pair the historical `legacy-window-1000` files with a fresh
+Python snapshot; use the runner's published run bundle.
+
+## Heatmap migration and post-migration UI gate
+
+This is a separate runtime-gated operation and is not part of replay
+acceptance. First inspect the distribution and verify the retained backup:
+
+```powershell
+python scripts/heatmap_projection_migrate.py `
+  --configfile scripts/replay_baseline/comparison/python/hlstats.host.conf
+```
+
+Do not pass any DB-mutating `--apply` until the owner gives explicit runtime
+approval. The versioned updater and the DB-first calibration helper both
+require `--runtime-gate-approved`; without that flag they reject the request
+before connecting to the database. If the distribution contains stored
+`rotate=2` or `rotate=3`, stop for manual classification and do not issue mass
+SQL. After an approved migration, use `--disablecache` for one selected map
+and manually verify the admin wizard/canvas overlay, diagnostics, and static
+map/heatmap JPEG fallback.
+
+The post-migration regeneration command is:
+
+```powershell
+python scripts/hlstats_py/heatmaps.py `
+  --configfile scripts/replay_baseline/comparison/python/hlstats.host.conf `
+  --game cstrike `
+  --map de_dust2 `
+  --heatmaps-root heatmaps `
+  --assets-root heatmaps/src `
+  --web-root web `
+  --disablecache `
+  --diagnose
+```
+
+Run this only after the backup and approved migration; the current
+pre-migration `de_dust2` diagnostic is recorded in
+`runtime-heatmap-migration-gate-20260718.md` and is not acceptance evidence.
 
 ## New chat starter template
 Copy this into a new chat to restart quickly:

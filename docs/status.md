@@ -2,7 +2,7 @@
 
 ## Snapshot
 
-- Last updated: `2026-06-04`
+- Last updated: `2026-07-18`
 - Heatmap work is active on `feature/heatmap-projection-calibration`: the web
   layer now has a DB-backed canvas overlay for `mapinfo`, a player-scoped
   heatmap widget in `playerinfo` Maps & Servers, hover metadata for top
@@ -12,6 +12,46 @@
   quality gate: overview `.txt` files are useful seeds, but each `{game,map}`
   still needs DB-first in-bounds diagnostics and manual/imported calibration
   before final `--disablecache` regeneration.
+- The 2026-07-17 evidence review is source-ready for the import/heatmap
+  contract: the valid narrow-1000 manifest pair is recorded separately from
+  stale `*-1000` files that are actually full-41513 captures. Batch FTP/direct
+  import now require an ignored-lines manifest when parse errors are continued,
+  publish final manifests only after successful import, and use canonical
+  labels plus unique evidence run ids.
+- Heatmap rotate is now a normalized `0..3` quarter-turn contract with shared
+  crop normalization across PHP, JavaScript, Python, and the JPEG fallback.
+  The versioned rotate migration remains read-only until a distribution check,
+  backup, and separate runtime gate; stored `2/3` values are a manual stop.
+  Its eventual row conversion and version marker are now applied atomically
+  with rollback on marker failure. Non-positive/non-finite projection scales
+  are normalized to a safe positive value in render paths, and calibration CLI
+  input rejects invalid scale values before any apply.
+- Narrow runtime acceptance for this review is now evidenced by a fresh Docker
+  `-UseDumpRestore` dual-contour run under
+  `narrow-1000/20260717-narrow-1000-r1`: the final input manifests are
+  byte-identical (`1000` lines, SHA
+  `95bfdb5951922c0c36aab2c5263e1880b227e845b34c9262939b028d0fbebe8a`), both
+  drop/ignore manifests are published, metadata anchors match
+  (`323/5464/4765/0`), and normalized SQL snapshot sections match. The raw
+  compare retains only the documented `hlstats_Players` GeoIP-only residual
+  (`250` paired rows, `0` non-GeoIP pairs); no new replay drift was observed.
+  PHP/GD smoke passed in the Docker web image because local PHP CLI is not
+  installed. A separately labelled `full-41513` run completed with matching
+  input manifests and explicit Python ignored-line evidence, but its full
+  stable-key compare remains diagnostic/non-green; see
+  `docs/audits/legacy-python-parity-20260423/runtime-db-diff-full-41513-20260717-full-41513-r1.md`.
+  A read-only heatmap check against the running Python DB found
+  `rotate={0:442}` with no stored `2/3` values. A verified pre-migration
+  backup is retained as
+  `docs/audits/legacy-python-parity-20260423/runtime-python-db-backup-before-heatmap-migration-20260718-064706.sql.gz`
+  (SHA-256
+  `BEC10451F6913DD695DEF1CEFB4EF8138B08B1D353AF2AEC02A58524E7B170F4`).
+  The explicit runtime approval for either DB-mutating `--apply` and the
+  post-migration manual `--disablecache` wizard/canvas/static-JPEG gate remain
+  open; see
+  `runtime-heatmap-migration-gate-20260718.md`.
+  The separate calibration backup/migration plus manual static-JPEG/UI gate
+  remains intentionally open.
 - `P6d` is no longer an active residual hunt for `Entries`, `ChangeTeam`,
   `PlayerNames`, `Players_History`, or `TeamBonuses`; those gates are closed
   for the supported narrow/default Python contour.
@@ -23,9 +63,31 @@
   [`docs/parity-debug-pipeline.md`](parity-debug-pipeline.md) and
   [`docs/replay-fast-path.md`](replay-fast-path.md), then write evidence into
   `docs/audits/legacy-python-parity-20260423/`.
+- A separate full-corpus first-divergence track now exists for cases where both
+  completed contours already processed the same sorted corpus but final anchors
+  differ. Use
+  [`docs/full-corpus-first-divergence.md`](full-corpus-first-divergence.md);
+  do not rerun the full legacy replay just to localize the first mismatch.
 
 Current parity state:
 
+- The full-corpus first-divergence root cause for the `L0628063.log` opening
+  window is closed at the unit/runtime-state level. Python previously treated a
+  real Steam player seen once with transient `userid <= 0` as a permanent bot
+  for the whole replay process; for `1:45686725` this suppressed the later
+  `Mep3ocTb` `ChangeTeam` row, kept `MinPlayers=4` under-counted, and gated the
+  first legacy-only `Frags`/`TeamBonuses` rows on `2023-06-28 23:43..23:46`.
+  Persistent bot classification is now based on BOT-style unique IDs, while
+  name-only `userid <= 0` descriptors remain bot-like. The fresh main-window
+  `L0628063` replay now matches legacy on the requested `ChangeTeam`,
+  `Frags`, `TeamBonuses`, and `Entries` anchors; the remaining narrow compare
+  drift is the separate `Players` GeoIP-only split plus one Python-only
+  `kill_streak_2` `PlayerActions` row at `2023-06-28 23:44:48`. That residual
+  is tracked as a must-fix because it changes a visible action counter; legacy
+  remains the reference baseline, but it can still contain its own bug, so the
+  policy decision comes from the compare impact, not legacy infallibility.
+  Targeted regression, real `L0628063` window harness, and storage/runtime
+  tests pass.
 - The defuse-boundary `kill_streak_*` residual is closed. The follow-up
   `L0102207.log` case showed that a recorded `Defused_The_Bomb` should not
   suppress the defuser's pending round-end streak; suppression is now limited
@@ -198,11 +260,42 @@ Current parity state:
 
 ## In Progress
 
-- [ ] No active implementation phase. Next work should be scoped from the
-  release checklist or a fresh product requirement.
+- [ ] Full-corpus first-divergence investigation remains a diagnostic track,
+  separate from the closed supported `narrow-1000` P6d contour. The fresh
+  `full-41513/20260717-full-41513-r1` run now has byte-identical input manifests,
+  same-run drop/ignore artifacts, SQL snapshots, contour metadata, and a
+  recorded non-green stable-key compare in
+  `runtime-db-diff-full-41513-20260717-full-41513-r1.md`; next work, if needed,
+  is prefix/window localization rather than another full baseline replay.
 
 ## Done
 
+- Accepted the heatmap runtime gate after preserving both expensive
+  `full-41513` databases as verified restorable dumps. The guarded projection
+  migration advanced version `1 -> 2`, retained `{0:442}` and all Python
+  replay anchors, and passed one-map admin preview, canvas-toggle, and served
+  static-JPEG checks. Browser acceptance also found and fixed a stored-config
+  load regression; initial/map/Load requests no longer replace DB values with
+  default form controls. Processing and disposable full-state DB profiles show
+  that SQL round trips dominate (`4613` executions for `2287` records,
+  `450.67 records/s`) while parser-only work is about `3.3%` of import wall
+  time. The next performance boundary is parity-safe SQL reduction/batching;
+  any first Rust stage should remain an optional parser backend behind the
+  existing rollback seam.
+- Updated the heatmap admin calibration editor so the visual selection box now
+  follows the actual overlay point bounds instead of the full map canvas,
+  resize handles adjust projection scale with offset compensation, and rotate
+  cycles through `0/90/180/270` quarter-turn states while preserving existing
+  `rotate=1` compatibility. Targeted Python heatmap tests, JS syntax check, and
+  Python compile checks passed; local PHP heatmap smoke remains blocked because
+  `php` is not available on this Windows `PATH`.
+- Added `docs/README.md` as the documentation map for this product lane so
+  canonical task entrypoints are separated from historical migration and i18n
+  notes.
+- Added `docs/full-corpus-first-divergence.md` and parameterized
+  `Run-DualContour-1000.ps1` artifact labels so prefix/window replay runs can
+  preserve manifests, dropped-line files, SQL snapshots, and contour metadata
+  without overwriting the retained `narrow-1000` evidence.
 - Prepared the `hlstatsx_py` release-line cleanup: obsolete local Perl
   production/runtime and maintenance entrypoints were removed from the active
   product lane, while replay/parity harnesses, retained evidence, tests, logs,

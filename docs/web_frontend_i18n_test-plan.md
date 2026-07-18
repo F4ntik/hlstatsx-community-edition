@@ -1,5 +1,10 @@
 # Test Plan: Web Frontend i18n
 
+Historical donor-web test note only.
+
+This file is retained as reference for the older web-only i18n pass. Use
+`docs/test-plan.md` for the current integrated product-lane validation matrix.
+
 ## Objective
 
 Verify that the frontend translation pass removes unintended English UI text

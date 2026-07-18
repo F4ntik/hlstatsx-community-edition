@@ -1,0 +1,16 @@
+main_legacy_trace=scripts/replay_baseline/artifacts/parity-traces/L0628063-botlike-userid-sql/legacy-general.log
+main_legacy_trace_lines=201
+main_legacy_trace_dropped_lines=5
+main_python_trace=scripts/replay_baseline/artifacts/parity-traces/L0628063-botlike-userid-sql/python-writes.jsonl
+main_python_trace_records=206
+main_compare=scripts/replay_baseline/artifacts/parity-traces/L0628063-botlike-userid-sql/compare-stats.txt
+main_trace_diff=scripts/replay_baseline/artifacts/parity-traces/L0628063-botlike-userid-sql/write-trace-diff.txt
+main_trace_diff_exit=0
+guard_legacy_trace=scripts/replay_baseline/artifacts/parity-traces/L0628063-botlike-userid-guard-30x30/legacy-general.log
+guard_legacy_trace_lines=49
+guard_legacy_trace_dropped_lines=3
+guard_python_trace=scripts/replay_baseline/artifacts/parity-traces/L0628063-botlike-userid-guard-30x30/python-writes.jsonl
+guard_python_trace_records=52
+guard_compare=scripts/replay_baseline/artifacts/parity-traces/L0628063-botlike-userid-guard-30x30/compare-stats.txt
+guard_trace_diff=scripts/replay_baseline/artifacts/parity-traces/L0628063-botlike-userid-guard-30x30/write-trace-diff.txt
+guard_trace_diff_exit=0

@@ -39,4 +39,14 @@ __pycache__/
 /docs/audits/**/*-dropped-lines*.txt
 /docs/audits/**/window-*/
 /.codex_tmp/
+/.codex/
+/.playwright-cli/
 Thumbs.db
+
+# Local runtime backups are referenced by SHA-256 in audit Markdown, but are
+# too large and too environment-specific for ordinary Git history.
+/docs/audits/legacy-python-parity-20260423/runtime-*.sql.gz
+
+# Generated heatmap overlays are disposable; committed web JPEG fallbacks are
+# stored under web/hlstatsimg instead.
+/heatmaps/cache/

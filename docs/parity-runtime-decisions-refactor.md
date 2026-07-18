@@ -1,5 +1,11 @@
 # Parity Runtime Decisions Refactor
 
+Historical design note only.
+
+The baseline counts and open-residual framing in this file are not the current
+repo truth anymore. Use `docs/status.md`, `docs/plans.md`, and
+`docs/parity-acceptance-policy.md` for current decisions.
+
 ## Current baseline
 
 - Branch point: `test` at `9d4bd6b fix(hlstats-py): align team bonus active roster eligibility`.
