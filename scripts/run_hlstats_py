@@ -5,6 +5,7 @@ set -euo pipefail
 SCRIPTPATH=.
 CONFFILE=hlstats.conf
 PYTHON_BIN="${PYTHON_BIN:-python3}"
+HLX_LIFECYCLE_PYTHON="${HLX_LIFECYCLE_PYTHON:-${PYTHON_BIN}}"
 LOGDIR="${SCRIPTPATH}/logs"
 PIDDIR="${SCRIPTPATH}"
 MODULE="hlstats_py.runtime"
@@ -19,17 +20,26 @@ start_worker() {
   local log="${LOGDIR}/hlstats_py_${port}_$(date +%Y-%m-%d_%H-%M-%S)"
   local pidfile="${PIDDIR}/hlstats_py_${port}.pid"
 
-  if [ -f "${pidfile}" ] && kill -0 "$(cat "${pidfile}")" >/dev/null 2>&1; then
-    echo "Worker already running on port ${port}"
-    return 0
+  if hlx_prepare_pid_file_for_start "${pidfile}" "Python stats worker on port ${port}" "${MODULE}"; then
+    :
+  else
+    local prepare_status=$?
+    [ "${prepare_status}" -eq 2 ] && return 0
+    return "${prepare_status}"
   fi
-
-  rm -f "${pidfile}"
+  if ! hlx_identity_platform_supported; then
+    echo "Refusing to start Python stats worker on port ${port}: Linux procfs identity checks are unavailable" >&2
+    return 1
+  fi
   "${PYTHON_BIN}" -m "${MODULE}" \
     --configfile="${CONFFILE}" \
     --port="${port}" \
     --foreground > "${log}" 2>&1 &
-  echo $! > "${pidfile}"
+  local pid=$!
+  if ! hlx_write_pid_file "${pidfile}" "${pid}" "${MODULE}"; then
+    echo "Python stats worker on port ${port} started but its identity could not be recorded; refusing lifecycle control" >&2
+    return 1
+  fi
   echo "Started Python stats worker on port ${port}"
 }
 
@@ -37,16 +47,23 @@ stop_worker() {
   local port="$1"
   local pidfile="${PIDDIR}/hlstats_py_${port}.pid"
 
-  hlx_stop_pid_file "${pidfile}" "Python stats worker on port ${port}"
+  hlx_stop_pid_file "${pidfile}" "Python stats worker on port ${port}" "${MODULE}"
 }
 
 status_worker() {
   local port="$1"
   local pidfile="${PIDDIR}/hlstats_py_${port}.pid"
-  if [ -f "${pidfile}" ] && kill -0 "$(cat "${pidfile}")" >/dev/null 2>&1; then
+  if hlx_pid_file_status "${pidfile}" "${MODULE}"; then
     echo "Python stats worker on port ${port} is running"
   else
-    echo "Python stats worker on port ${port} is not running"
+    local status=$?
+    if [ "${status}" -eq 1 ]; then
+      hlx_remove_stale_pid_file "${pidfile}" "Python stats worker on port ${port}"
+      echo "Python stats worker on port ${port} is not running"
+    else
+      echo "Refusing status for Python stats worker on port ${port}: process ownership cannot be proven" >&2
+      return 1
+    fi
   fi
 }
 

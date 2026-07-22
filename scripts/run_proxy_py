@@ -5,6 +5,7 @@ set -euo pipefail
 confdir=.
 conffile=hlstats.conf
 python_bin="${PYTHON_BIN:-python3}"
+HLX_LIFECYCLE_PYTHON="${HLX_LIFECYCLE_PYTHON:-${python_bin}}"
 logdir=logs
 logfile="proxy_py$(date +_%Y%m%d_%H-%M-%S)"
 piddir="${confdir}"
@@ -30,18 +31,28 @@ run_proxy() {
 }
 
 start_proxy() {
-  if [ -f "${pidfile}" ] && kill -0 "$(cat "${pidfile}")" >/dev/null 2>&1; then
-    echo "HLstatsX proxy runtime already running"
-    return 0
+  if hlx_prepare_pid_file_for_start "${pidfile}" "HLstatsX Python proxy runtime" "${module}"; then
+    :
+  else
+    local prepare_status=$?
+    [ "${prepare_status}" -eq 2 ] && return 0
+    return "${prepare_status}"
   fi
-  rm -f "${pidfile}"
+  if ! hlx_identity_platform_supported; then
+    echo "Refusing to start HLstatsX Python proxy runtime: Linux procfs identity checks are unavailable" >&2
+    return 1
+  fi
   run_proxy > "${logdir}/${logfile}" 2>&1 &
-  echo $! > "${pidfile}"
+  local pid=$!
+  if ! hlx_write_pid_file "${pidfile}" "${pid}" "${module}"; then
+    echo "HLstatsX Python proxy runtime started but its identity could not be recorded; refusing lifecycle control" >&2
+    return 1
+  fi
   echo "Started HLstatsX Python proxy runtime"
 }
 
 stop_proxy() {
-  hlx_stop_pid_file "${pidfile}" "HLstatsX Python proxy runtime"
+  hlx_stop_pid_file "${pidfile}" "HLstatsX Python proxy runtime" "${module}"
 }
 
 case "${1:-}" in

@@ -46,9 +46,11 @@ label is not an import-path rename.
 ## Product contracts
 
 - Default runtime:
-  - `scripts/run_proxy_py`
-  - `scripts/run_hlstats_py`
+  - Linux/systemd managed launchers: `scripts/run_proxy_py` and
+    `scripts/run_hlstats_py` (require Linux procfs and Python pidfd support)
   - `python -m hlstats_py.runtime`
+  - non-Linux: run the Python modules in the foreground under the
+    platform-native supervisor or manually; do not use shell PID-file control
 - Frontend i18n:
   - language selection is explicit
   - `lang=en|ru`

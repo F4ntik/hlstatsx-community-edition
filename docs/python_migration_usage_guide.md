@@ -60,7 +60,7 @@ Python-порт прокси-демона — основной сервис, п�
 
 * **База данных**: для локальных проверок используйте один из сценариев:
   * Минимальная MySQL — выполните `docker compose up -d`, схема создастся автоматически.
-  * E2E-песочница — `e2e/start.sh` запустит MySQL (`localhost:33070`), сам демон и мок-воркеры; `e2e/stop.sh` выключит окружение. Скрипты написаны на Bash, поэтому под Windows их удобнее запускать через WSL или Git Bash. Если у вас только PowerShell, смотрите раздел 6.2 в руководстве по прокси-демону — там описан ручной запуск контейнеров.
+  * E2E-песочница — `e2e/start.sh` запустит MySQL (`localhost:33070`), сам демон и мок-воркеры; `e2e/stop.sh` выключит окружение. Скрипты написаны на Bash, поэтому под Windows их удобнее запускать через WSL или Git Bash. Это относится только к E2E-песочнице, не к production lifecycle launcher-ам ниже. Если у вас только PowerShell, смотрите раздел 6.2 в руководстве по прокси-демону — там описан ручной запуск контейнеров.
   * Полный Python-стек — `fullstack/docker-compose.yml` поднимает `mysql + proxy-daemon + hlstats worker + php web` и подходит для smoke-теста всей цепочки.
 * **Конфиг**: убедитесь, что рядом доступен `hlstats.conf` (или `hlstats.local.conf`) с заполненными параметрами `DBHost`, `DBName`, `DBUsername`, `DBPassword`, `ProxyKey`, `BindIP`, `Port`, `DebugLevel`.
 * **Верификация**: проверьте конфигурацию, не запуская рабочие процессы:
@@ -161,7 +161,14 @@ legacy-compatible import semantics, route that workload through the documented
 
 ### 3.6 Lifecycle launcher-ы для deployment
 
-Python runtime-ы можно запускать через shell launcher-ы из `scripts/`:
+Managed shell launcher-ы из `scripts/` поддерживаются только на Linux-хостах
+под systemd: им необходимы `/proc`, Linux `pidfd` и Python с
+`os.pidfd_open`/`signal.pidfd_send_signal`. Git Bash, обычный Windows и другие
+non-Linux platform-ы не являются поддерживаемой средой для этих launcher-ов;
+они явно откажутся запускать managed runtime, а не перейдут к небезопасному
+raw-PID fallback.
+
+На поддерживаемом Linux/systemd deployment используйте:
 
 ```bash
 cd scripts
@@ -171,17 +178,36 @@ cd scripts
 
 Остановка использует production-safe порядок: сначала `SIGTERM`, затем ожидание
 до `HLX_STOP_TIMEOUT` секунд, и только после timeout отправляется `SIGKILL`.
-Тот же helper очищает stale PID-файлы, если процесс уже завершился или PID-файл
-повреждён:
+Каждый сигнал связан с проверенным PID-state (PID, boot id, start time и
+expected module) через pidfd. Автоматически очищается только структурно
+корректный v1 PID-state, для которого процесса уже нет. Повреждённый,
+нечитаемый или старый однострочный PID-файл сохраняется и приводит к
+fail-closed отказу: перед удалением требуется attended verification.
 
 ```bash
 HLX_STOP_TIMEOUT=15 ./run_proxy_py stop
 HLX_STOP_TIMEOUT=15 ./run_hlstats_py stop 28000
 ```
 
-Для systemd/инициализационных шаблонов вызывайте `stop`/`restart` этих
-launcher-ов, а не прямой `kill -9`: Python runtimes обрабатывают `SIGTERM` и
-успевают закрыть UDP transport и соединения с БД.
+Для systemd unit вызывайте `stop`/`restart` этих launcher-ов, а не прямой
+`kill -9`: Python runtimes обрабатывают `SIGTERM` и успевают закрыть UDP
+transport и соединения с БД.
+
+На Windows и других non-Linux hosts используйте supported manual path: запускайте
+runtime foreground-командой под platform-native supervisor, который владеет
+process handle, без PID-файлов shell launcher-а. Например, из PowerShell в
+`scripts/`:
+
+```powershell
+$env:PYTHONPATH = "$PWD\proxy_daemon_py"
+py -m proxy_daemon_py.runtime --configfile=hlstats.conf --foreground
+py -m hlstats_py.runtime --configfile=hlstats.conf --port=28000 --foreground
+```
+
+Перед обновлением с legacy launcher-а остановите runtime доверенным прежним
+supervisor-ом и вручную подтвердите, что PID-файл больше не относится к живому
+процессу. Только затем удаляйте старый PID-файл; следующий managed Linux start
+создаст v1 state с identity metadata.
 
 ## 4. Скрипт наград hlstats_awards_py (scripts/hlstats_awards_py)
 
