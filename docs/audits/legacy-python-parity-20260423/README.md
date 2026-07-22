@@ -51,6 +51,7 @@ docs/audits/legacy-python-parity-20260423/
   runtime-db-diff-narrow-1000-20260717-narrow-1000-r1.md
   runtime-db-diff-full-41513-20260717-full-41513-r1.md
   runtime-heatmap-migration-gate-20260718.md
+  maintenance-parity-20260722.md
 ```
 
 Replay evidence also keeps the final selected input manifest and the
@@ -76,6 +77,11 @@ replace or weaken the accepted narrow-1000 gate.
 The heatmap projection read-only distribution and pre-migration backup are
 recorded in `runtime-heatmap-migration-gate-20260718.md`; the guarded updater
 remains unapplied pending a separate runtime gate.
+
+The current release-clean maintenance acceptance is recorded in
+`maintenance-parity-20260722.md`. It supersedes the old raw-only GeoIP
+residual for the supported `narrow-1000` maintenance contour, while retaining
+the earlier raw replay evidence for diagnostics.
 
 ## Execution Notes
 

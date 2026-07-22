@@ -108,11 +108,11 @@ Historical autonomy follow-up context:
   automatic `30` lines before / `30` lines after guard-window pass when a safe
   event anchor is available. Treat failures there as a sign that the fix is too
   narrow or overfit to one exact line.
-- Treat full `narrow-1000`, Docker rebuilds, GeoIP backfill, and web smoke as
-  promotion gates, not first-line debugging tools. Raw replay compare can show
-  an accepted GeoIP-only `hlstats_Players` diff because stdin replay does not
-  run maintenance backfill; release-clean parity requires the post-replay
-  `hlstats_awards_py --geoip` step.
+- Treat full `narrow-1000`, Docker rebuilds, maintenance, DB compare, and web
+  smoke as promotion gates, not first-line debugging tools. Raw replay compare
+  can show an accepted GeoIP-only `hlstats_Players` diff because stdin replay
+  does not run maintenance backfill; release-clean parity uses the canonical
+  dual runner's shared inactive/awards/ribbons/GeoIP maintenance receipt.
 - Keep context compact:
   summarize findings, link audit notes, avoid pasting long command transcripts,
   and store detailed SQL/replay evidence under
@@ -247,8 +247,8 @@ Current gates:
 - `[x] P6d-M4`: `hlstats_Players` is classified as a closed GeoIP-only
   contour/policy rule. Raw replay compare can show `250/250` `country`/`flag`
   rows because stdin replay writes `lastAddress` but does not run maintenance
-  GeoIP backfill. Release-clean parity requires post-replay
-  `hlstats_awards_py --geoip`, after which `hlstats_Players` should disappear
+  GeoIP backfill. Release-clean parity invokes the canonical dual runner's
+  shared maintenance receipt, after which `hlstats_Players` should disappear
   from the compare.
 - `[x] P6d-M5`: `hlstats_Events_ChangeTeam` is closed after the second TDD fix
   and narrow-1000 replay/compare. The final compare had no
@@ -317,6 +317,34 @@ normalized records/s or incremental Statsme wall-speed proof. The disposable
 profile shows fewer physical DB calls, but its profiled and isolated-host wall
 samples are not a promotion claim. See
 `docs/audits/legacy-python-parity-20260423/performance-db-sql-opt-narrow-1000-20260718-statsme-bench-r1/`.
+
+### [x] P6g. Release-clean maintenance parity and P1 hardening closure
+
+Outcome:
+The only canonical heavy gate now starts both contours from a fresh baseline,
+performs the shared historical maintenance receipt (`UseTimestamp=1`, inactive,
+awards, ribbons, strict GeoIP), then snapshots, compares, and smokes the web
+before it can pass. Legacy is tested as an EN reference; the Python product is
+tested in EN and RU with dynamically resolved populated signature IDs. The
+accepted clean gates are `prefix-100/20260722-maintenance-prefix-100-r8` and
+`narrow-1000/20260722-maintenance-narrow-1000-r1`; both report no logical DB
+differences after maintenance. The runner stages only selected FTP logs to
+avoid Docker Desktop startup stalls, and CI packages its sanitized canonical
+outcome rather than rerunning partial post-gates. Evidence and the rejected
+intermediate hypotheses are in
+[`maintenance-parity-20260722.md`](audits/legacy-python-parity-20260423/maintenance-parity-20260722.md).
+
+### [ ] P6h. Gradual EventStorage strangler split
+
+Status: planned, not started.
+
+Do not replace the replay-critical storage facade wholesale. Characterize and
+preserve its serialized transaction/order contract, then extract one bounded
+state, repository, or event-family seam at a time behind the existing facade.
+Every completed slice requires focused contract tests and a clean
+`prefix-100`; each coherent milestone additionally requires a clean
+`narrow-1000`. The concrete dependency order and stop conditions are in
+[`2026-07-22-event-storage-strangler-plan.md`](plans/2026-07-22-event-storage-strangler-plan.md).
 
 ## Out of scope for this lane
 

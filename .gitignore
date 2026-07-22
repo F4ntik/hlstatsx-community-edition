@@ -38,6 +38,11 @@ __pycache__/
 /docs/audits/**/*-input-manifest*.txt
 /docs/audits/**/*-dropped-lines*.txt
 /docs/audits/**/window-*/
+
+# Generated maintenance parity transcripts can contain raw player identities,
+# IP/GeoIP fields, and failed-compare examples. Keep them local by default;
+# explicitly review and force-stage only compact accepted evidence.
+/docs/audits/legacy-python-parity-20260423/*-maintenance-*.txt
 /.codex_tmp/
 /.codex/
 /.playwright-cli/

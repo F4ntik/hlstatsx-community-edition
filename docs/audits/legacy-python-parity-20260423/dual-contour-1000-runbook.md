@@ -40,6 +40,14 @@ What it does:
 - brings both stacks down/up
 - restores baseline for both stacks
 - runs bounded import for legacy and python
+- configures and verifies `UseTimestamp=1` in both disposable DBs, then runs
+  legacy/Python `inactive -> awards -> ribbons -> strict GeoIP` against the
+  same resolved historical date/horizon; it never runs prune on the historical
+  corpus
+- writes full GeoIP/awards/ribbons SQL anchors, stable-key DB compare evidence,
+  a legacy EN-reference web-smoke log, and a Python EN/RU product web-smoke
+  log; signature IDs are resolved from shared populated combat players rather
+  than copied from a stale fixture
 - writes final selected manifests, same-run drop/ignored-line manifests,
   contour metadata, and SQL snapshots with the label and run id in each name;
   Python manifests are published to the audit directory only after the
@@ -59,6 +67,31 @@ See `runtime-db-diff-narrow-1000-20260717-narrow-1000-r1.md` and
 manifest hashes, metadata, and normalized snapshots. The older files ending
 in `-1000` remain retained history; the inventory classifies those whose
 counts/anchors are full corpus as `full-41513`.
+
+### Historical maintenance receipt
+
+The normal runner is **release-clean** by default. It derives
+`MaintenanceDate` from the common maximum fragment day plus one, passes the
+same `MaintenanceNumDays`, and records both values in
+`maintenance-summary-<label>-<run>.txt`. It also records the exact action set,
+`UseTimestamp=1` readbacks, table counts, DB-diff verdict, web-smoke logs, and
+side-by-side daily/global/ribbons URLs.
+
+The `UseTimestamp` override exists only in the restored disposable test DBs:
+otherwise `inactive` follows host clock and hides a historical corpus before
+awards. Prune is deliberately omitted because its `DeleteDays` cutoff is also
+host-clock based and would erase historical events.
+
+`-SkipMaintenance` produces an explicitly `raw-only` receipt. It is the only
+mode where `-ReuseValidLegacy` is allowed; release-clean runs always perform a
+fresh legacy import and snapshot so the post-maintenance state is attributable.
+
+For a large source corpus, the Python FTP compose receives only the selected
+manifest logs from `.parity-state/ftp-logs/<EvidenceRunId>`. The runner verifies
+the staged names/count before compose and the final manifests prove the
+selected SHA; it never mounts the full corpus into the FTP server. This avoids
+the image startup ownership scan that can otherwise make a healthy replay look
+stuck for many minutes.
 
 For the separate full diagnostic, use:
 
@@ -81,14 +114,17 @@ stable-key residuals remain diagnostic.
 
 New flags:
 
-- `-OnlyStage <infra_updown|baseline_restore|preflight|legacy_import|python_import|sql_snapshot>`
+- `-OnlyStage <infra_updown|baseline_restore|preflight|legacy_import|python_import|maintenance|sql_snapshot|logical_compare|web_smoke>`
 - `-FromStage <stage> -ToStage <stage>`
 - `-ResumeLatest` or `-ResumeRunId <id>`
 - `-Stack both|legacy|python` (default: `both`)
 
 Strict dependency policy:
 
-- `legacy_import`, `python_import`, `sql_snapshot` require completed `baseline_restore` and `preflight` in the same run state.
+- `legacy_import`, `python_import`, `maintenance`, and `sql_snapshot` require
+  completed `baseline_restore` and `preflight` in the same run state;
+  `maintenance` additionally requires the selected imports, `logical_compare`
+  requires snapshots, and `web_smoke` requires a passing logical compare.
 - If an earlier stage is rerun, downstream completed stages are invalidated automatically.
 
 ### Common operator flows
@@ -116,6 +152,10 @@ Strict dependency policy:
 
 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\replay_baseline\comparison\Run-DualContour-1000.ps1 -OnlyStage sql_snapshot -ResumeLatest -Stack both`
 
+6) Raw-only reuse for event/debug investigation (never release-clean):
+
+`powershell -NoProfile -ExecutionPolicy Bypass -File scripts\replay_baseline\comparison\Run-DualContour-1000.ps1 -MaxImportFiles 1000 -UseDumpRestore -ReuseValidLegacy -SkipMaintenance`
+
 ### Troubleshooting
 - Error `State fingerprint mismatch`: parameters changed compared to the saved run. Start a new run (no resume flags) or rerun baseline+preflight with consistent flags.
 - Error `requires completed stage 'baseline_restore'/'preflight'`: run the missing stage(s) first with the same `-ResumeLatest` or `-ResumeRunId`.
@@ -132,6 +172,8 @@ Strict dependency policy:
 - maps visible in `hlstats_Events_Frags` and `hlstats_Maps_Counts`
 - no dominant empty map rows (`map=''`) in frags
 - both contours confirmed against the same 1000-log manifest/window
+- after maintenance, both SQL snapshots show `maintenance_use_timestamp=1` and
+  nonzero fragment anchors remain present
 
 ## Evidence acceptance checklist
 
@@ -146,6 +188,9 @@ Accept a run only when all of these hold:
 - normalized snapshots agree for the accepted scope and
   `compare_stats_dbs.py` reports no new drift beyond an explicitly documented
   policy residual;
+- release-clean maintenance summary reports passed maintenance, compare, and
+  both web smokes, with matching `UseTimestamp=1` readbacks and inspectable
+  daily/global/ribbons URLs;
 - no old evidence file was silently replaced.
 
 The runner's temporary Python manifest paths are mounted into the container;

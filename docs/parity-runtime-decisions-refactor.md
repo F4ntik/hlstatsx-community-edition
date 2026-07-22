@@ -295,9 +295,11 @@ Future tooling should make this explicit instead of relying on memory:
 
 - store contour state in `scripts/replay_baseline/comparison/.parity-state/`
   with separate legacy and Python stage fingerprints
-- use `Run-DualContour-1000.ps1 -ReuseValidLegacy` for Python-only refactors;
-  when the legacy metadata/fingerprint is valid, the script skips legacy
-  compose down/up, restore, import, and SQL snapshot
+- use `Run-DualContour-1000.ps1 -ReuseValidLegacy -SkipMaintenance` only for a
+  raw-only Python-only debug/refactor loop; when the legacy
+  metadata/fingerprint is valid, the script skips legacy compose down/up,
+  restore, import, and SQL snapshot. A release-clean result always performs a
+  fresh legacy import and shared maintenance.
 - use `-AdoptCurrentLegacy` once after a known-good legacy narrow-1000 run if
   the DB is already loaded but metadata was not created yet
 - write inspectable contour metadata to

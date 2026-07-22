@@ -92,8 +92,8 @@ only when it passes:
 - automatic `30/30` guard-window parity after point fixes
 - small related-log cluster when the bug is lifecycle-dependent
 - full `narrow-1000` contour
-- GeoIP backfill and replay-backed web smoke only when the changed surface can
-  affect those outputs
+- maintenance-enabled GeoIP/awards/ribbons and replay-backed web smoke when the
+  changed surface can affect those outputs
 
 Do not start with broad replay when a single residual can be reduced to one
 log, one SQL anchor, or one focused regression.
@@ -125,9 +125,10 @@ CI coverage:
   heavy gate for the Docker-backed legacy-vs-Python replay contour. The heavy
   job is bound to a self-hosted Windows parity runner because the current
   contour scripts use Windows PowerShell, Docker Compose, fixed local container
-  names, and host bind paths. The job runs dual replay, post-replay GeoIP
-  backfill, compact DB compare, replay-backed EN/RU smoke, and uploads both
-  parity state/audit artifacts and `release-readiness-artifacts`.
+  names, and host bind paths. Its canonical runner performs dual replay,
+  historical-clock maintenance (`inactive`, awards, ribbons, GeoIP), compact
+  DB compare, legacy EN-reference plus Python EN/RU replay-backed smoke before
+  the retained evidence is packaged.
 - The `hlstatsx_py` release line does not ship local Perl production
   entrypoints. Legacy behavior remains a replay/reference acceptance layer, not
   a production runtime dependency.
@@ -176,12 +177,14 @@ Required checks when observability or release-handoff behavior changes:
 Release candidate evidence should include:
 
 - product CI results;
-- heavy parity replay plus post-replay GeoIP backfill and compact compare;
-- replay-backed EN/RU web smoke;
+- heavy release-clean parity replay with integrated maintenance, compact compare,
+  and retained receipt;
+- replay-backed legacy EN-reference and Python EN/RU web smoke;
 - at least one `HLstats metrics:` summary from stdin import or runtime stop;
 - benchmark/profile output when parser, storage, replay, DB mode, reconnect,
   lifecycle, or control-plane behavior changed;
-- `release-readiness-artifacts` from nightly/manual parity when available.
+- the sanitized `nightly-parity-summary` from nightly/manual parity when
+  available.
 
 ### Replay / runtime parity
 
@@ -195,10 +198,13 @@ Required checks when parity-affecting runtime/storage code changes:
 
 - restore a clean comparison baseline
 - run the relevant single-log or narrow-window replay first
-- run `compare_stats_dbs.py`
-- run GeoIP backfill when claiming release-clean parity, validating
-  `hlstats_Players`/country/flag output, or checking pages that render GeoIP
-  fields; otherwise document raw replay GeoIP-only diffs as pre-backfill
+- for release-clean parity, run the canonical dual runner maintenance stage;
+  it records a shared historical award date/horizon, sets and verifies
+  `UseTimestamp=1` in the disposable contours, then runs inactive players,
+  awards, ribbons, GeoIP, compare, and web smoke fail-closed
+- validate `hlstats_Players` full GeoIP plus awards/ribbons through the saved
+  compare and maintenance summary; otherwise use `-SkipMaintenance` only for a
+  documented raw-only debug result
 - record residual classification in `docs/audits/legacy-python-parity-20260423/`
 
 Current parity gates:
@@ -210,10 +216,10 @@ Current parity gates:
 - `P6d-M3`: `hlstats_Events_Entries` is closed for the current narrow
   contour/default Python path; direct counts are `legacy=0`, `python=0`.
 - `P6d-M4`: `hlstats_Players` raw replay compare can show an accepted
-  GeoIP-only `country`/`flag` diff because stdin replay does not run
-  maintenance GeoIP backfill. Release-clean parity requires post-replay
-  `hlstats_awards_py --geoip`, after which `hlstats_Players` should disappear
-  from the compare.
+  GeoIP-only diff because stdin replay does not run maintenance. A
+  release-clean run uses the dual runner's shared legacy/Python maintenance
+  receipt, which compares full GeoIP (`flag`, `country`, `city`, `state`,
+  latitude, longitude) alongside awards and ribbons.
 - `P6d-M5`: `hlstats_Events_ChangeTeam` is closed for the current
   `narrow-1000` contour; direct SQL anchors are `legacy
   total=1345/unassigned=47` and `python total=1345/unassigned=47`.
@@ -227,9 +233,9 @@ Parity acceptance layers:
   targeted Python tests for the changed surface, replay helper smoke, and
   narrow Python replay/compare only when the change can affect parity.
 - scheduled or manual release-readiness work uses the heavy subset:
-  `Run-DualContour-1000.ps1 -UseDumpRestore -ReuseValidLegacy
-  -MaxImportFiles 1000`, post-replay `hlstats_awards_py --geoip`, and
-  `compare_stats_dbs.py --max-examples 20`, with artifacts retained from
+  fresh `Run-DualContour-1000.ps1 -UseDumpRestore -MaxImportFiles 1000`
+  without `-ReuseValidLegacy`. It performs maintenance, compare, legacy EN
+  reference smoke, and Python EN/RU product smoke itself, with artifacts retained from
   `docs/audits/legacy-python-parity-20260423/` and
   `scripts/replay_baseline/comparison/.parity-state/`.
 - Legacy reference behavior remains required for baseline regeneration,
@@ -243,9 +249,10 @@ Minimum replay validation loop:
 - single-log parity or narrow contour replay
 - automatic `30/30` guard-window pass for point fixes when an event anchor is
   available
-- `python scripts\replay_baseline\compare_stats_dbs.py --max-examples 20`
-- post-replay `hlstats_awards_py --geoip` when claiming release-clean parity or
-  validating `hlstats_Players`/country/flag output
+- successful canonical-runner maintenance summary, including non-empty input
+  anchors, shared date/horizon, `UseTimestamp=1` readbacks, automatic
+  `compare_stats_dbs.py --max-examples 20`, legacy EN-reference and Python
+  EN/RU product web-smoke logs
 - evidence update in `bug-plan.md`, `issues.jsonl`, or the relevant audit note
 
 ### Heatmaps
@@ -295,11 +302,13 @@ container. CI also runs `php scripts/web_i18n_smoke.php`, which pins the
 request/cookie/session language priority, language-aware URL generation,
 historical cache key language separation, and the no-mutation contract for the
 new request/cache helpers.
-The heavy nightly parity workflow additionally runs
-`python scripts/replay_baseline/web_route_smoke.py --base-url
-http://127.0.0.1:8281 --langs en ru` after replay and GeoIP backfill, so
-representative EN/RU routes are checked against replay-backed data without
-making ordinary PRs depend on the full Docker contour.
+The heavy runner invokes `web_route_smoke.py` after its maintenance compare:
+the English-only legacy web is the EN reference, while the Python product is
+checked in EN and RU. It resolves one populated combat signature player for
+legacy and two distinct populated combat players for Python before smoke, so a
+stale fixture ID cannot silently turn a meaningful PNG route into a weak
+check. This keeps representative routes replay-backed without making ordinary
+PRs depend on the full Docker contour.
 
 Request/language/cache boundary checks:
 
@@ -337,15 +346,19 @@ Representative replay-backed routes:
 - `mode=game&game=cstrike&lang=ru`
 - `mode=servers&server_id=2&game=cstrike&lang=ru`
 - `mode=players&game=cstrike&lang=ru`
+- `mode=awards&game=cstrike&tab=daily&lang=ru`
+- `mode=awards&game=cstrike&tab=global&lang=ru`
+- `mode=awards&game=cstrike&tab=ribbons&lang=ru`
 - `mode=playerinfo&lang=ru`
 - `sig.php?player_id=<known>&lang=ru`
 - `status.php?lang=ru`
 
-The scripted route smoke covers the first three public routes plus
-`status.php` and `sig.php?player_id=<known>` for both `en` and `ru`; use
-`--sig-player-id` when the replay fixture's known player anchor differs from
-the default. Keep broader browser inspection for layout-specific or
-route-specific frontend work.
+The scripted route smoke covers public/game/player/server routes, all three
+populated awards tabs, `status.php`, and `sig.php?player_id=<known>`. The
+canonical parity runner calls it as legacy `--langs en` and Python
+`--langs en ru`, with explicit resolved `--sig-player-id` values; do not apply
+the RU marker contract to the original English-only legacy web. Keep broader
+browser inspection for layout-specific or route-specific frontend work.
 
 ## Stop-and-fix rules
 

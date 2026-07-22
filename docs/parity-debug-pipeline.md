@@ -28,11 +28,13 @@ Run the normal contour only to discover residuals:
 powershell -NoProfile -ExecutionPolicy Bypass `
   -File scripts\replay_baseline\comparison\Run-DualContour-1000.ps1 `
   -MaxImportFiles 1000 `
-  -UseDumpRestore `
-  -ReuseValidLegacy
-
-python scripts\replay_baseline\compare_stats_dbs.py --max-examples 20
+  -UseDumpRestore
 ```
+
+The release-clean runner performs its own post-import maintenance, compare,
+legacy EN-reference smoke, and Python EN/RU product smoke. Use
+`-ReuseValidLegacy -SkipMaintenance` only when
+deliberately collecting a raw-debug contour; it is not release-clean evidence.
 
 Record the useful example fields:
 

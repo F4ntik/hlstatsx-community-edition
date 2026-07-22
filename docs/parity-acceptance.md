@@ -55,10 +55,11 @@ Expected scope:
 - scheduled/manual `.github/workflows/nightly-parity.yml` execution on the
   self-hosted Windows parity runner;
 - full Docker-backed dual replay for the supported contour via
-  `scripts/replay_baseline/comparison/Run-DualContour-1000.ps1`;
-- compare output and SQL anchors for the heavy run;
-- post-replay `hlstats_awards_py --geoip` so release-clean parity is checked,
-  not only the accepted raw replay diff;
+  `scripts/replay_baseline/comparison/Run-DualContour-1000.ps1` without
+  `-ReuseValidLegacy`;
+- the runner's shared historical maintenance receipt: `UseTimestamp=1`,
+  inactive players, awards, ribbons, strict GeoIP, SQL anchors, stable-key DB
+  compare, legacy EN-reference web smoke, and Python EN/RU product web smoke;
 - archived artifacts sufficient to reproduce or investigate failures later.
 
 ## Reproducible Fixtures and Artifacts
@@ -81,8 +82,10 @@ Record the fixture identity for any accepted parity baseline:
   name for `narrow-1000`;
 - `server_identity=37.230.137.48:27015`;
 - replay policy such as `--drop-empty-team-enter-events`;
-- whether the run is raw replay parity or release-clean parity after GeoIP
-  backfill.
+- whether the run is raw-only or release-clean;
+- for release-clean: resolved maintenance date/horizon, exact selected actions,
+  `UseTimestamp=1` readback in each disposable contour, and the no-prune
+  historical-corpus rule.
 
 ### Required stored artifacts
 
@@ -92,6 +95,8 @@ Keep or refresh these artifacts for the accepted contour:
   `scripts/replay_baseline/comparison/.parity-state/contour-info/`;
 - compare output from `compare_stats_dbs.py`;
 - SQL row-count anchors/snapshots for the relevant run;
+- `maintenance-summary-*`, two maintenance logs, and two web-smoke logs for a
+  release-clean run;
 - any targeted audit note needed to explain an accepted difference or failure.
 
 The current accepted `narrow-1000` metadata lives in:

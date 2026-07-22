@@ -58,6 +58,16 @@ Docker volume для `/tmp/ftp_work`, а после успешной фазы э
 набору логов может остановить Python FTP-воркер в I/O wait. Конфликт имени
 volume является ошибкой запуска, а не поводом переиспользовать чужой том.
 
+Перед поднятием Python FTP-сервиса runner также копирует **только выбранные**
+логи в `scripts/replay_baseline/comparison/.parity-state/ftp-logs/<EvidenceRunId>`
+и монтирует именно эту staging-папку. Он проверяет состав и число файлов до
+старта compose; итоговые manifests затем подтверждают их общий SHA. Исходный
+corpus не изменяется. Это не косметика: bind-mount всего corpus заставлял
+FTP-образ обходить и менять владельца десятков тысяч файлов при старте, из-за
+чего health-check выглядел как зависший replay. При неожиданном файле в stage
+не очищайте его вручную: сохраните его для диагностики и используйте новый
+`EvidenceRunId`.
+
 Для каждого прогона задавайте канонический `ArtifactLabel`:
 `narrow-1000`, `full-41513` или `prefix-*`, и уникальный `EvidenceRunId`.
 Старые артефакты с именем `*-1000` проверяйте по количеству, SHA и contour
@@ -88,6 +98,46 @@ stdin-фазы. Счётчик фрагов — только telemetry живо�
 приёмки: успех подтверждают код завершения runner, финальное сравнение
 контуров и сохранённые audit-артефакты.
 
+## Release-clean maintenance после исторического replay
+
+Обычный dual runner теперь не заканчивается на raw event import. После обоих
+imports он автоматически выполняет в **обоих disposable DB**:
+
+```text
+UseTimestamp=1 -> inactive -> awards -> ribbons -> GeoIP
+```
+
+`UseTimestamp=1` проверяется readback-ом и заставляет inactive вычислять
+активность от максимального `hlstats_Servers.last_event` replay, а не от
+текущего времени хоста. Это необходимо для исторического corpus: исходный
+`UseTimestamp=0` и `DeleteDays` зависят от wall clock. Поэтому runner намеренно
+не передаёт `-p`/`--prune`: prune мог бы удалить архивные events до awards.
+
+Выполняйте maintenance-enabled gate как свежий dual run, без
+`-ReuseValidLegacy`:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File `
+  scripts\replay_baseline\comparison\Run-DualContour-1000.ps1 `
+  -MaxImportFiles 1000 `
+  -ArtifactLabel narrow-1000 `
+  -EvidenceRunId <new-id> `
+  -UseDumpRestore
+```
+
+Runner сам сохраняет maintenance logs, SQL snapshots, `logical-compare-*`,
+legacy EN-reference web-smoke log и Python EN/RU product web-smoke log.
+`maintenance-summary-*` содержит дату/horizon, action set, readback
+`UseTimestamp`, GeoIP/awards/ribbons counts, diff verdict, фактические языки и
+динамически найденные signature player IDs, а также прямые URL daily/global/
+ribbons для ручной side-by-side проверки.
+
+`-SkipMaintenance` — только raw-debug escape hatch. Он делает evidence
+`raw-only`; только в этом режиме разрешён `-ReuseValidLegacy`. Для
+release-clean acceptance не запускайте отдельный Python-only `--geoip` или
+отдельный compare после успешного canonical runner: они уже являются его
+fail-closed стадиями.
+
 ## Source-log граница IgnoreBots
 
 Для `IgnoreBots` только точное сообщение `Log file started` открывает новую
@@ -102,11 +152,27 @@ runner, post-replay GeoIP и полное DB-сравнение без drift. Д
 `frags=5464`. Подробная история, включая отвергнутые pre-fix прогоны, находится
 в `docs/audits/legacy-python-parity-20260423/prefix-100-20260722-p6f-history-cache-validation.md`.
 
+Принятый release-clean maintenance gate от того же дня добавил awards/ribbons
+и strict GeoIP к этому контракту: `prefix-100` run
+`20260722-maintenance-prefix-100-r8` и финальный `narrow-1000` run
+`20260722-maintenance-narrow-1000-r1` завершились без logical DB drift.
+Полный прогон имеет одинаковые `frags=5464`, `awards=998`,
+`player_awards=9`, `player_ribbons=8` и полные GeoIP counts
+`250/250/219/221/250` в legacy/Python. Его воспроизводимое объяснение,
+отвергнутые промежуточные гипотезы и границы EN-reference/Python EN/RU лежат в
+`docs/audits/legacy-python-parity-20260423/maintenance-parity-20260722.md`.
+
 Минимальный acceptance loop для изменения replay-пути: после точечных
-регрессий выполнить `prefix-100`, затем полный `narrow-1000`; для каждого
-прогона дождаться успешного runner, выполнить GeoIP-pass и
-`compare_stats_dbs.py`. Отдельный счётчик фрагов помогает заметить зависание,
-но никогда не заменяет финальный table diff.
+регрессий выполнить maintenance-enabled `prefix-100`, затем полный
+maintenance-enabled `narrow-1000`; для каждого прогона дождаться успешного
+runner и проверить его maintenance summary, automatic DB compare и web smoke.
+
+Во время долгого replay не опрашивайте постоянно одну и ту же terminal-строку.
+Выделенный monitor читает только `COUNT(*)` из `hlstats_Events_Frags` в обеих
+disposable DB не чаще одного раза в минуту и фиксирует изменение счётчиков или
+явную недоступность DB. Это telemetry для раннего обнаружения зависания, а не
+acceptance: итогом остаётся exit code runner и сохранённые maintenance summary,
+compare и web-smoke evidence.
 
 ## Где искать команды и нюансы
 
@@ -149,15 +215,14 @@ snapshot legacy narrow-1000, не трогать legacy DB, переиграть
 FTP/stdin и запустить `compare_stats_dbs.py`. Если хотя бы один input из списка
 выше изменился, legacy нужно переиграть от dump-baseline.
 
-Для инспекции контейнеров следующий tooling milestone должен добавить metadata
-в labels и/или mounted file вроде `/app/CONTOUR_INFO.json`: тип контура,
-baseline, corpus window, server identity, replay policy, время импорта,
-row-count anchors.
+Для release-clean Python-only изменения legacy всё равно нужно переигрывать
+свежо: import anchors не подтверждают post-maintenance состояние. Reuse ниже
+предназначен только для raw event-debug.
 
-Текущий флаг для этого loop:
+Для raw event-debug loop (не release-clean) текущий флаг:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\replay_baseline\comparison\Run-DualContour-1000.ps1 -MaxImportFiles 1000 -UseDumpRestore -ReuseValidLegacy
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\replay_baseline\comparison\Run-DualContour-1000.ps1 -MaxImportFiles 1000 -UseDumpRestore -ReuseValidLegacy -SkipMaintenance
 ```
 
 Если metadata/fingerprint для legacy не найден или anchors невалидны, скрипт
@@ -193,12 +258,13 @@ read-only.
 один раз принять текущее состояние как эталон:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\replay_baseline\comparison\Run-DualContour-1000.ps1 -MaxImportFiles 1000 -UseDumpRestore -AdoptCurrentLegacy -ReuseValidLegacy -OnlyStage preflight
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\replay_baseline\comparison\Run-DualContour-1000.ps1 -MaxImportFiles 1000 -UseDumpRestore -AdoptCurrentLegacy -ReuseValidLegacy -SkipMaintenance -OnlyStage preflight
 ```
 
-Использовать `-AdoptCurrentLegacy` только после известного успешного replay
+Использовать `-AdoptCurrentLegacy` только после известного успешного raw replay
 того же окна; этот флаг доверяет текущей legacy DB и записывает fingerprint +
-row-count anchors.
+row-count anchors. Такая adoption/reuse-команда даёт только raw-only receipt и
+не заменяет свежий release-clean dual run.
 
 ## Образ worker и свежий код
 

@@ -2,7 +2,21 @@
 
 ## Snapshot
 
-- Last updated: `2026-07-18`
+- Last updated: `2026-07-22`
+- The release-clean P1 hardening closure for post-ingest maintenance is
+  accepted. The canonical runner now stages only the selected FTP logs,
+  performs legacy-compatible `inactive -> awards -> ribbons -> strict GeoIP`
+  after both fresh imports, saves failed native tool output before fail-close,
+  and treats legacy English as the reference while testing the Python product
+  in EN and RU. The clean `prefix-100`
+  `20260722-maintenance-prefix-100-r8` and the final clean `narrow-1000`
+  `20260722-maintenance-narrow-1000-r1` both pass logical DB comparison. The
+  latter has shared manifest SHA
+  `95bfdb5951922c0c36aab2c5263e1880b227e845b34c9262939b028d0fbebe8a`,
+  `323` players, `5464` frags, `998` awards, `9` player awards, `8` ribbons,
+  and matching full GeoIP counts `250/250/219/221/250`. Focused calculator and
+  replay-helper tests total `103 passed`. The full report is
+  `docs/audits/legacy-python-parity-20260423/maintenance-parity-20260722.md`.
 - Heatmap work is active on `feature/heatmap-projection-calibration`: the web
   layer now has a DB-backed canvas overlay for `mapinfo`, a player-scoped
   heatmap widget in `playerinfo` Maps & Servers, hover metadata for top
@@ -149,8 +163,9 @@ Current parity state:
   stats/session fields do not write `country`/`flag`; on the Python path,
   `storage.py` runtime writes `lastAddress`/stats/session while GeoIP fields
   are maintenance/backfill via `hlstats_awards_py` and not stdin replay. Raw
-  replay parity may therefore carry this accepted GeoIP-only diff; release-clean
-  parity requires post-replay `hlstats_awards_py --geoip`, after which
+  replay parity may therefore carry this accepted GeoIP-only diff; current
+  release-clean parity uses the canonical dual runner's shared
+  inactive/awards/ribbons/GeoIP maintenance receipt, after which
   `hlstats_Players` should disappear from the compare. No minimal runtime fix
   remains for `hlstats_Players`.
 - The first `hlstats_PlayerNames` anchor is stateful, not a clean isolated
@@ -264,14 +279,14 @@ Current parity state:
   `test_rollover_blank_status_followed_by_unassigned_trigger_emits_implicit_change_team`
   and `test_rollover_blank_connect_and_blank_entry_before_unassigned_trigger_emits_implicit_change_team`
   passed; `unassigned or team_change or rollover` was `12/12`,
-  `test_storage.py` was `133/133`, and the final `Run-DualContour-1000` rerun
+  `test_storage.py` was `133/133`, and the historical raw comparison rerun
   with `-ReuseValidLegacy` reused valid legacy from run state
   `20260526-081158.json`. The final compare had no
   `hlstats_Events_ChangeTeam` residual. The only raw-replay difference was the
   accepted pre-backfill `hlstats_Players` GeoIP-only contour/policy diff
   (`323/323`, `250` legacy-only rows, `250` python-only rows); release-clean
-  validation applies the post-replay GeoIP backfill described above. SQL anchors
-  for `ChangeTeam` were `legacy total=1345/unassigned=47` and `python
+  validation now uses the canonical runner maintenance receipt. SQL anchors for
+  `ChangeTeam` were `legacy total=1345/unassigned=47` and `python
   total=1345/unassigned=47`.
 
 ## In Progress
@@ -326,8 +341,8 @@ Current parity state:
   `hlstats_Players_History.skill_change` on the per-day history row, resets
   the cumulative value on day rollover, and keeps ignored-bot trend neutral.
   Targeted storage tests passed, the broader `test_runtime_decisions.py` +
-  `test_storage.py` suite passed, fresh `Run-DualContour-1000 -ReuseValidLegacy`
-  completed, the raw `compare_stats_dbs.py --max-examples 20` report still had
+  `test_storage.py` suite passed, a historical raw `Run-DualContour-1000`
+  reuse run completed, the raw `compare_stats_dbs.py --max-examples 20` report still had
   only the accepted pre-backfill GeoIP-only `hlstats_Players` diff, and
   replay-backed `mode=players` HTML on the Python contour now contains rendered
   `t0/t1/t2` trend icons.
@@ -462,8 +477,9 @@ Current parity state:
   where Perl remains required: reference behavior, baseline regeneration,
   targeted investigation, and heavy acceptance replay. `.github/workflows/nightly-parity.yml`
   now runs replay helper smoke plus a self-hosted Windows parity runner job for
-  `Run-DualContour-1000.ps1 -UseDumpRestore -ReuseValidLegacy`, post-replay
-  GeoIP backfill, compact DB compare, and artifact upload. `docs/test-plan.md`
+  `Run-DualContour-1000.ps1 -UseDumpRestore` with fresh legacy import and its
+  integrated inactive/awards/ribbons/GeoIP maintenance, compact DB compare,
+  web smoke, and artifact upload. `docs/test-plan.md`
   records that routine PR work no longer requires live Perl when fixture inputs
   and the accepted legacy contour are unchanged.
 - Completed Phase 8 of `docs/autonomy-work-plan-20260601.md`: PHP language
@@ -477,9 +493,9 @@ Current parity state:
   explicit `game` change arrives. Product CI runs `scripts/web_i18n_smoke.php`
   after PHP syntax lint to pin EN/RU language priority, URL generation,
   cache-key separation, and no-mutation behavior. The heavy nightly parity
-  workflow runs `scripts/replay_baseline/web_route_smoke.py` after replay,
-  GeoIP backfill, and DB compare to cover representative EN/RU web routes on
-  replay-backed data.
+  workflow delegates maintenance, DB compare, and route smoke entirely to the
+  canonical runner: legacy is its EN reference and Python is its EN/RU product
+  contour, both against replay-backed data.
 - Completed Phase 9 of `docs/autonomy-work-plan-20260601.md`: `hlstats_py`
   now emits a stable structured metrics summary on runtime stop and finite
   stdin import completion, including processed events, event throughput, stdin
@@ -487,9 +503,9 @@ Current parity state:
   command/rejection counts. `docs/release-readiness.md` now defines the
   observability contract, profiling/benchmark commands, release candidate
   checklist, deployment/config handoff notes, and the current log-based
-  metrics limitation. `.github/workflows/nightly-parity.yml` now uploads a
-  separate `release-readiness-artifacts` bundle for release handoff evidence
-  alongside the parity audit artifact.
+  metrics limitation. `.github/workflows/nightly-parity.yml` uploads the
+  runner-derived sanitized `nightly-parity-summary` for release handoff rather
+  than a second, partial post-run gate.
 - Completed player-card/runtime web parity hardening: `sig.php` now uses the
   same EN/RU i18n bootstrap as the public web entrypoints with legacy English
   fallback text, player-card signature preview/direct/BBCode links preserve the
@@ -516,6 +532,11 @@ Current parity state:
    GeoIP-only `Players.country`/`flag` classification. This remains
    source-validated evidence, not a replacement for the release-clean GeoIP
    backfill gate. See the audit report for disposable-DB evidence.
+4. Do not start a broad `EventStorage` rewrite. The planned strangler sequence
+   preserves its single-worker ordering and transaction contracts, then moves
+   one bounded seam at a time with a clean `prefix-100` after every slice and
+   `narrow-1000` after each milestone; see
+   [`docs/plans/2026-07-22-event-storage-strangler-plan.md`](plans/2026-07-22-event-storage-strangler-plan.md).
 
 ## Decisions
 

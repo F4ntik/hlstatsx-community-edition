@@ -15,6 +15,27 @@ by the maintenance path:
 This keeps the product lane aligned with the legacy operational model:
 runtime ingest first, maintenance backfill second.
 
+## Historical dual-replay contour
+
+For release-clean parity evidence, do not call this Python command by itself
+after replay. `Run-DualContour-1000.ps1` invokes GeoIP together with legacy
+maintenance in both disposable contours, after a shared historical award date
+is resolved. It records full GeoIP plus awards/ribbons comparison and web
+evidence in `maintenance-summary-*`.
+
+The runner first sets and verifies `UseTimestamp=1` in both restored test DBs
+so inactive-player processing uses the replay's latest server event instead of
+the current host time. It deliberately excludes prune: an old corpus must stay
+intact while awards are calculated. This override is confined to the restored
+test DB; normal production maintenance keeps its configured behavior.
+
+The accepted maintenance gate is `20260722-maintenance-narrow-1000-r1`: both
+contours have `250` populated flags/countries, `219` cities, `221` states, and
+`250` coordinate pairs after the receipt. It also proves that this backfill is
+not isolated from award rendering: the legacy EN reference and Python EN/RU
+award/ribbon routes pass against the populated replay data. See
+`docs/audits/legacy-python-parity-20260423/maintenance-parity-20260722.md`.
+
 ## Preconditions
 
 - The target DB already contains players with `lastAddress <> ''`

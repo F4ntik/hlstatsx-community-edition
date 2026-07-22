@@ -128,11 +128,11 @@ Before calling a release candidate ready, collect fresh evidence for:
 - product CI: `proxy_daemon_py`, `hlstats_py`, `replay_baseline`, PHP lint,
   web i18n smoke, and docs sanity check;
 - heavy parity acceptance:
-  `Run-DualContour-1000.ps1 -UseDumpRestore -ReuseValidLegacy -MaxImportFiles 1000`;
-- post-replay GeoIP backfill before claiming release-clean player/country
-  parity;
-- compact DB compare with `compare_stats_dbs.py --max-examples 20`;
-- replay-backed EN/RU route smoke with `web_route_smoke.py`;
+  fresh `Run-DualContour-1000.ps1 -UseDumpRestore -MaxImportFiles 1000`
+  without `-ReuseValidLegacy`;
+- its retained release-clean maintenance receipt: historical `UseTimestamp=1`,
+  inactive/awards/ribbons/GeoIP actions, compact DB compare, legacy
+  EN-reference route smoke, and Python EN/RU product route smoke;
 - `hlstats_py` metrics summary from either stdin import or runtime shutdown;
 - benchmark/profile output when the release changes parser, storage, replay,
   DB mode, reconnect, lifecycle, or control-plane behavior;

@@ -17,16 +17,20 @@ legacy and Python imports and before SQL snapshots. It runs the same selected
 actions against each contour:
 
 ```text
-prune -> inactive players -> awards -> ribbons -> GeoIP
+UseTimestamp=1 -> inactive players -> awards -> ribbons -> GeoIP
 ```
 
-This is the legacy `hlstats-awards.pl` execution order for the legacy default
-actions (`-iarp`) extended with opt-in GeoIP (`-g`). The Python calculator must
-move its current GeoIP step from before awards/ribbons to after ribbons.
+This is the legacy calculation order with an explicit historical-clock setup
+inside the disposable replay DBs. `UseTimestamp=1` makes both implementations
+derive activity from the latest server event in the replay rather than the
+host's wall clock. The Python calculator must move its current GeoIP step from
+before awards/ribbons to after ribbons.
 
-`optimize` and `clans` are deliberately not part of the default contour:
+`prune`, `optimize`, and `clans` are deliberately not part of the default
+historical contour:
 
-- legacy does not run either by default;
+- prune uses the host-clock `DeleteDays` cutoff and would erase an old replay
+  corpus before awards can be calculated;
 - table optimisation is an intrusive diagnostic, not a parity calculation;
 - Python's parsed `clans` action has no calculator implementation, so claiming
   it in a default parity receipt would be false.
@@ -56,14 +60,16 @@ The canonical stage sequence becomes:
 
 ```text
 infra_updown -> baseline_restore -> preflight -> legacy_import -> python_import
--> maintenance -> sql_snapshot
+-> maintenance -> sql_snapshot -> logical_compare -> web_smoke
 ```
 
 The runner invokes legacy maintenance in its own contour and Python
 `hlstats_awards_py` in the Python worker. Both commands use the same resolved
-date, horizon, selected actions, and their contour-local config. GeoIP runs in
-strict mode; a missing database/binary is a failure, not a silent replay-safe
-skip.
+date, horizon, selected actions, historical inactivity clock, and their
+contour-local config. GeoIP runs in strict mode; a missing database/binary is a
+failure, not a silent replay-safe skip. A release-clean run must freshly import
+and snapshot legacy: `-ReuseValidLegacy` is allowed only with
+`-SkipMaintenance`, which marks the result raw-only.
 
 Any maintenance command failure stops the runner before snapshots. Existing
 raw-import artifacts remain useful for diagnosis, but the state records
@@ -81,11 +87,13 @@ extended, rather than replaced, with stable-key normalizers for:
   longitude), not only `country`.
 
 The runner also writes a compact maintenance summary alongside SQL snapshots:
-resolved date/horizon, action exit status, table counts, stable-key diff result,
-and representative awards/ribbons/player routes for legacy (`8181`) and Python
-(`8281`). Existing web-route smoke covers the populated award-facing routes;
-the summary gives an operator stable, data-backed URLs for side-by-side visual
-inspection rather than relying on row counts alone.
+resolved date/horizon, action set, `UseTimestamp` readbacks, action exit status,
+table counts, stable-key diff result, and representative daily/global/ribbons/
+player routes for legacy (`8181`) and Python (`8281`). The original legacy web
+is English-only and is therefore the EN reference; the Python product smoke
+covers the same populated award tabs in EN and RU. The summary gives an
+operator stable, data-backed URLs for side-by-side visual inspection rather
+than relying on row counts alone.
 
 ## Tests and acceptance
 
@@ -94,7 +102,8 @@ Add focused tests for:
 1. Python calculator action ordering matching Perl, including GeoIP after
    awards/ribbons.
 2. Runner command construction, stage ordering, shared resolved date/horizon,
-   default maintenance, and `-SkipMaintenance` labelling.
+   historical `UseTimestamp=1` override/readback, no-prune invariant, fresh
+   legacy requirement, default maintenance, and `-SkipMaintenance` labelling.
 3. Stable-key normalization/diffs for awards, player-awards, ribbons, and full
    GeoIP fields.
 4. Maintenance-summary and award-facing web-route smoke contracts.
@@ -110,3 +119,22 @@ Acceptance is layered:
 All relevant commands, maintenance-date semantics, raw-versus-release-clean
 labels, and evidence locations are documented in the replay runbook, test plan,
 parity acceptance guide, and status record.
+
+## Accepted implementation evidence
+
+The acceptance sequence completed on `2026-07-22`:
+
+- `prefix-100` / `20260722-maintenance-prefix-100-r8` passed after the focused
+  calculator and runner regressions;
+- `narrow-1000` / `20260722-maintenance-narrow-1000-r1` processed the shared
+  1,000-file manifest (SHA-256
+  `95bfdb5951922c0c36aab2c5263e1880b227e845b34c9262939b028d0fbebe8a`),
+  retained matching `frags=5464`, passed full logical DB comparison and the
+  legacy EN/Python EN+RU route smoke; and
+- the canonical CI workflow now treats this one runner as the authority for
+  maintenance, compare, and route smoke, then packages only its sanitized
+  summary.
+
+The detailed evidence, including rejected intermediate runs and DB-only
+progress-monitoring rules, is recorded in
+`docs/audits/legacy-python-parity-20260423/maintenance-parity-20260722.md`.
