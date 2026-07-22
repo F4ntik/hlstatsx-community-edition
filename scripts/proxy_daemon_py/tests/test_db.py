@@ -303,7 +303,22 @@ def test_sync_fetch_options_returns_mapping() -> None:
     assert connection.executed == [("SELECT `keyname`, `value` FROM hlstats_Options", None)]
 
 
-def test_sync_fetch_proxy_key_requires_value() -> None:
+@pytest.mark.parametrize("value", [None, "", " \t\n "])
+def test_sync_fetch_proxy_key_requires_configured_value(value: object) -> None:
+    responses: dict[QueryKey, QueryResponse] = {
+        ("SELECT `value` FROM hlstats_Options WHERE `keyname` = %s", ("Proxy_Key",)): QueryResponse(
+            fetchone=(value,)
+        )
+    }
+    connection = FakeConnection(responses)
+    adapter = db.SyncDatabaseAdapter(CONFIG, connector=connector_for(connection))
+    adapter.connect()
+
+    with pytest.raises(db.DatabaseError):
+        adapter.fetch_proxy_key()
+
+
+def test_sync_fetch_proxy_key_requires_row() -> None:
     responses: dict[QueryKey, QueryResponse] = {
         ("SELECT `value` FROM hlstats_Options WHERE `keyname` = %s", ("Proxy_Key",)): QueryResponse(
             fetchone=None
@@ -315,6 +330,19 @@ def test_sync_fetch_proxy_key_requires_value() -> None:
 
     with pytest.raises(db.DatabaseError):
         adapter.fetch_proxy_key()
+
+
+def test_sync_fetch_proxy_key_returns_configured_value() -> None:
+    responses: dict[QueryKey, QueryResponse] = {
+        ("SELECT `value` FROM hlstats_Options WHERE `keyname` = %s", ("Proxy_Key",)): QueryResponse(
+            fetchone=("proxy-secret",)
+        )
+    }
+    connection = FakeConnection(responses)
+    adapter = db.SyncDatabaseAdapter(CONFIG, connector=connector_for(connection))
+    adapter.connect()
+
+    assert adapter.fetch_proxy_key() == "proxy-secret"
 
 
 def test_sync_fetch_daemons_parses_entries() -> None:

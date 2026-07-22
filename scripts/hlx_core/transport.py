@@ -3,11 +3,21 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from asyncio import DatagramProtocol, DatagramTransport
 from dataclasses import dataclass
 from typing import Callable
 
 from hlx_core.log import ProxyLogger
+
+
+_PROXY_KEY_PATTERN = re.compile(r"(PROXY Key=)\S*")
+
+
+def _redact_proxy_key(text: str) -> str:
+    """Remove proxy key values from diagnostic output without altering packets."""
+
+    return _PROXY_KEY_PATTERN.sub(r"\1<redacted>", text)
 
 
 @dataclass(slots=True)
@@ -72,7 +82,7 @@ class ProxyDatagramProtocol(DatagramProtocol):
 
         text = data.decode("utf-8", errors="replace")
         self._logger.control(
-            f"Received {len(data)} bytes from {host}:{port}: {text}",
+            f"Received {len(data)} bytes from {host}:{port}: {_redact_proxy_key(text)}",
         )
         self._queue.put_nowait(
             InboundDatagram(

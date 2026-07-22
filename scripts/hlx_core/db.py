@@ -201,10 +201,9 @@ class SyncDatabaseAdapter:
             "SELECT `value` FROM hlstats_Options WHERE `keyname` = %s",
             ("Proxy_Key",),
         )
-        if not row:
+        if not row or row[0] is None or not str(row[0]).strip():
             raise DatabaseError("Proxy key is not configured in hlstats_Options")
-        value = row[0]
-        return "" if value is None else str(value)
+        return str(row[0])
 
     def fetch_daemons(self) -> list[ProxyDaemonTarget]:
         """Return the configured proxy sub-daemons ordered as stored in the DB."""

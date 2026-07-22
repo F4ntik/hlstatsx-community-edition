@@ -28,7 +28,7 @@ async def _run_enqueues_valid_datagram() -> None:
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        payload = b"PROXY Key=test"
+        payload = b"PROXY Key=proxy-secret"
         sock.sendto(payload, address)
 
         datagram: InboundDatagram = await asyncio.wait_for(server.queue.get(), timeout=1)
@@ -37,8 +37,12 @@ async def _run_enqueues_valid_datagram() -> None:
         await server.stop()
 
     assert datagram.data == payload
+    assert datagram.text == payload.decode("utf-8")
     assert datagram.address[0] == address[0]
-    assert "Received" in buffer.getvalue()
+    log_contents = buffer.getvalue()
+    assert "Received" in log_contents
+    assert "PROXY Key=<redacted>" in log_contents
+    assert "proxy-secret" not in log_contents
 
 
 async def _run_drops_invalid_payloads() -> None:
