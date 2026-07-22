@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from hlstats_ftp_py.checkpoint import FtpCheckpoint, mtime_to_us
+
 
 @dataclass(frozen=True, slots=True)
 class LogFileEntry:
@@ -61,6 +63,38 @@ def entries_to_download(
         [e for e in stable_entries if e.mtime > last_mtime],
         key=sort_key,
     )
+
+
+def entries_after_checkpoint(
+    stable_entries: list[LogFileEntry],
+    checkpoint: FtpCheckpoint | None,
+    *,
+    order_by: Literal["mtime", "name"] = "mtime",
+) -> list[LogFileEntry]:
+    """Return logs after the durable cursor, oldest first.
+
+    A bootstrapped legacy marker has no filename, so it deliberately keeps the
+    historical strict-mtime cutoff.  Once a durable cursor has committed a
+    file, the filename makes equal-mtime ordering deterministic.
+    """
+
+    if checkpoint is None:
+        eligible = list(stable_entries)
+    elif checkpoint.name is None:
+        eligible = [entry for entry in stable_entries if mtime_to_us(entry.mtime) > checkpoint.mtime_us]
+    else:
+        cursor = (checkpoint.mtime_us, checkpoint.name)
+        eligible = [
+            entry
+            for entry in stable_entries
+            if (mtime_to_us(entry.mtime), entry.name) > cursor
+        ]
+    sort_key = (
+        (lambda entry: (entry.name, entry.mtime))
+        if order_by == "name"
+        else (lambda entry: (mtime_to_us(entry.mtime), entry.name))
+    )
+    return sorted(eligible, key=sort_key)
 
 
 def filter_log_names(names: list[str]) -> list[str]:

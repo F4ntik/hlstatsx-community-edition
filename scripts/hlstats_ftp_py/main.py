@@ -23,8 +23,14 @@ from hlx_core.db import SyncDatabaseAdapter
 from hlx_core.log import LoggerConfig, ProxyLogger
 from hlx_core.transport import ProxyUdpServer
 
+from hlstats_ftp_py.checkpoint import (
+    DurableFtpCheckpoint,
+    FtpCheckpoint,
+    checkpoint_identity,
+)
 from hlstats_ftp_py.core import (
     LogFileEntry,
+    entries_after_checkpoint,
     entries_to_download,
     filter_log_names,
     read_last_mtime,
@@ -113,6 +119,14 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
+        "--legacy-file-marker",
+        action="store_true",
+        help=(
+            "Use the historical local .last marker instead of the P1 MySQL checkpoint. "
+            "This compatibility mode cannot provide atomic checkpointing."
+        ),
+    )
+    p.add_argument(
         "--static-replay",
         action="store_true",
         help=(
@@ -157,7 +171,10 @@ def _build_parser() -> argparse.ArgumentParser:
         "--stdin-transaction-batch-size",
         type=int,
         default=1000,
-        help="Commit DB transaction every N stdin records (default: 1000; 0 disables batching).",
+        help=(
+            "Legacy file-marker mode: commit DB transaction every N stdin records "
+            "(default: 1000; 0 disables batching). Durable FTP checkpoints use one transaction per file."
+        ),
     )
     return p
 
@@ -191,6 +208,8 @@ def _validate_manifest_options(parser: argparse.ArgumentParser, args: argparse.N
         args.continue_on_parse_error or args.ignored_lines_manifest is not None
     ):
         parser.error("parse-error manifest options require batch stdin mode")
+    if args.legacy_per_file_runtime and not args.legacy_file_marker:
+        parser.error("--legacy-per-file-runtime requires explicit --legacy-file-marker")
 
 
 def _log(quiet: bool, msg: str) -> None:
@@ -319,12 +338,16 @@ def _import_logs_batch(
     last_path: Path,
     ignored_lines_manifest: TextIO | None = None,
     continue_on_parse_error: bool = False,
+    checkpoint_store: DurableFtpCheckpoint | None = None,
+    adapter: SyncDatabaseAdapter | None = None,
 ) -> int:
-    adapter = SyncDatabaseAdapter(
-        database_config_from_proxy_config(settings.config),
-        import_mode=True,
-        enable_multi_statements=True,
-    )
+    adapter_is_owned = adapter is None
+    if adapter is None:
+        adapter = SyncDatabaseAdapter(
+            database_config_from_proxy_config(settings.config),
+            import_mode=True,
+            enable_multi_statements=True,
+        )
     logger = ProxyLogger(LoggerConfig(level=settings.log_level))
     transport = ProxyUdpServer(logger)
     dispatcher = build_dispatcher()
@@ -345,69 +368,115 @@ def _import_logs_batch(
     server_address = f"{args.gs_ip}:{args.gs_port}".strip().lower()
     imported_records = 0
     progress_every = 20000
-    runtime._adapter.connect()
+    if adapter_is_owned:
+        runtime._adapter.connect()
     import_completed = False
+
+    def process_file(index: int, entry: LogFileEntry) -> None:
+        nonlocal imported_records
+        _log(
+            not args.quiet,
+            f'    - "{entry.name}" ({index}/{len(todo)}): batch parsing... ',
+        )
+        local_file = tmp_dir / entry.name
+        file_records = 0
+        file_ignored = 0
+        with local_file.open("rb") as stdin_f:
+            for logical_record_number, merged in enumerate(
+                iter_merged_goldsrc_physical_lines(stdin_f),
+                start=1,
+            ):
+                line = merged.decode("utf-8", errors="replace")
+                if not line:
+                    continue
+                if _EMPTY_TIMESTAMP_ONLY_RE.match(line):
+                    file_ignored += 1
+                    if ignored_lines_manifest is not None:
+                        ignored_lines_manifest.write(
+                            f"{entry.name}:{logical_record_number}:empty-timestamp-only-line\n"
+                        )
+                    continue
+                try:
+                    runtime.process_stdin_line(line, server_address)
+                except ValueError as exc:
+                    if ignored_lines_manifest is not None:
+                        payload = line.rstrip("\r\n").replace("\t", "\\t")
+                        ignored_lines_manifest.write(
+                            f"{entry.name}:{logical_record_number}:parse-error:{exc}\t{payload}\n"
+                        )
+                    if continue_on_parse_error:
+                        file_ignored += 1
+                        continue
+                    raise
+                imported_records += 1
+                file_records += 1
+                if not args.quiet and file_records % progress_every == 0:
+                    print(
+                        f"      progress: {entry.name} -> {file_records} records",
+                        flush=True,
+                    )
+        if file_ignored:
+            _log(not args.quiet, f"done ({file_records} records, ignored={file_ignored}).")
+        else:
+            _log(not args.quiet, f"done ({file_records} records).")
+
+    def mirror_legacy_marker(entry: LogFileEntry) -> None:
+        try:
+            write_last_mtime(last_path, entry.mtime)
+        except OSError as exc:
+            # The database cursor is authoritative after a successful commit.
+            # A stale compatibility file can only cause an explicit legacy-mode
+            # replay; it must not turn a committed import into a skipped run.
+            print(
+                f"warning: MySQL checkpoint committed, but cannot mirror {last_path}: {exc}",
+                file=sys.stderr,
+            )
+
     try:
         runtime._reload_state()
-        storage.begin_stdin_batch(transaction_batch_size=settings.stdin_transaction_batch_size)
-        for index, entry in enumerate(todo, start=1):
-            _log(
-                not args.quiet,
-                f'    - "{entry.name}" ({index}/{len(todo)}): batch parsing... ',
-            )
-            local_file = tmp_dir / entry.name
-            file_records = 0
-            file_ignored = 0
-            with local_file.open("rb") as stdin_f:
-                for logical_record_number, merged in enumerate(
-                    iter_merged_goldsrc_physical_lines(stdin_f),
-                    start=1,
-                ):
-                    line = merged.decode("utf-8", errors="replace")
-                    if not line:
-                        continue
-                    if _EMPTY_TIMESTAMP_ONLY_RE.match(line):
-                        file_ignored += 1
-                        if ignored_lines_manifest is not None:
-                            ignored_lines_manifest.write(
-                                f"{entry.name}:{logical_record_number}:empty-timestamp-only-line\n"
-                            )
-                        continue
-                    try:
-                        runtime.process_stdin_line(line, server_address)
-                    except ValueError as exc:
-                        if ignored_lines_manifest is not None:
-                            payload = line.rstrip("\r\n").replace("\t", "\\t")
-                            ignored_lines_manifest.write(
-                                f"{entry.name}:{logical_record_number}:parse-error:{exc}\t{payload}\n"
-                            )
-                        if continue_on_parse_error:
-                            file_ignored += 1
-                            continue
-                        raise
-                    imported_records += 1
-                    file_records += 1
-                    if not args.quiet and file_records % progress_every == 0:
-                        print(
-                            f"      progress: {entry.name} -> {file_records} records",
-                            flush=True,
-                        )
-            write_last_mtime(last_path, entry.mtime)
-            if file_ignored:
-                _log(not args.quiet, f"done ({file_records} records, ignored={file_ignored}).")
-            else:
-                _log(not args.quiet, f"done ({file_records} records).")
-        runtime.finalize_stdin_import()
-        storage.end_stdin_batch()
+        if checkpoint_store is None:
+            storage.begin_stdin_batch(transaction_batch_size=settings.stdin_transaction_batch_size)
+            for index, entry in enumerate(todo, start=1):
+                process_file(index, entry)
+                write_last_mtime(last_path, entry.mtime)
+            runtime.finalize_stdin_import()
+            storage.end_stdin_batch()
+        else:
+            # A file is the checkpointable unit.  The final file also owns the
+            # import-tail writes, so its cursor is advanced only after those
+            # writes have joined the same transaction.
+            storage.begin_stdin_batch(transaction_batch_size=0)
+            final_entry = todo[-1] if todo else None
+            for index, entry in enumerate(todo, start=1):
+                checkpoint_store.begin()
+                process_file(index, entry)
+                if entry is final_entry:
+                    continue
+                checkpoint_store.advance(entry)
+                checkpoint_store.commit()
+                mirror_legacy_marker(entry)
+            if final_entry is None:
+                checkpoint_store.begin()
+            runtime.finalize_stdin_import()
+            if final_entry is not None:
+                checkpoint_store.advance(final_entry)
+            checkpoint_store.commit()
+            if final_entry is not None:
+                mirror_legacy_marker(final_entry)
+            storage.end_stdin_batch()
         import_completed = True
     finally:
         if not import_completed:
+            if checkpoint_store is not None:
+                with contextlib.suppress(Exception):
+                    checkpoint_store.rollback()
             abort_batch = getattr(storage, "abort_stdin_batch", None)
             if callable(abort_batch):
                 with contextlib.suppress(Exception):
                     abort_batch()
-        with contextlib.suppress(Exception):
-            runtime._adapter.close()
+        if adapter_is_owned:
+            with contextlib.suppress(Exception):
+                runtime._adapter.close()
     return imported_records
 
 
@@ -432,12 +501,105 @@ def run(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 1
+    if args.order_by_name:
+        work_cwd = args.cwd if args.cwd is not None else Path.cwd()
+        last_path = work_cwd / f"hlstats-ftp-{args.gs_ip}-{args.gs_port}.last"
+        if read_last_mtime(last_path):
+            print(
+                f"error: --order-by-name requires a fresh FTP state; remove {last_path}",
+                file=sys.stderr,
+            )
+            return 1
+
+    return _run_ftp_import(args, ftp_pwd)
+
+
+def _run_ftp_import(args: argparse.Namespace, ftp_pwd: str) -> int:
+    """Run one FTP fetch/import and always release the database source lock."""
+
+    work_cwd = args.cwd if args.cwd is not None else Path.cwd()
+    last_path = work_cwd / f"hlstats-ftp-{args.gs_ip}-{args.gs_port}.last"
+    last_mtime = read_last_mtime(last_path)
+    checkpoint_store: DurableFtpCheckpoint | None = None
+    checkpoint_adapter: SyncDatabaseAdapter | None = None
+    checkpoint = None
+    settings: RuntimeSettings | None = None
+    try:
+        if not args.legacy_file_marker:
+            settings = _build_runtime_settings(args)
+            checkpoint_adapter = SyncDatabaseAdapter(
+                database_config_from_proxy_config(settings.config),
+                import_mode=True,
+                enable_multi_statements=True,
+            )
+            checkpoint_adapter.connect()
+            checkpoint_store = DurableFtpCheckpoint(
+                checkpoint_adapter,
+                source_key=checkpoint_identity(
+                    game_server_ip=args.gs_ip,
+                    game_server_port=args.gs_port,
+                    ftp_host=args.ftp_ip or args.gs_ip,
+                    ftp_port=args.ftp_port,
+                    ftp_dir=args.ftp_dir,
+                ),
+            )
+            checkpoint_store.acquire_lock()
+            checkpoint_store.verify_schema()
+            checkpoint = checkpoint_store.load()
+            if args.order_by_name and (last_mtime or checkpoint is not None):
+                print(
+                    f"error: --order-by-name requires a fresh FTP state; remove {last_path} "
+                    "and clear the durable checkpoint for this FTP source",
+                    file=sys.stderr,
+                )
+                return 1
+            if checkpoint is None and last_mtime:
+                checkpoint = checkpoint_store.bootstrap_legacy_marker(last_mtime)
+        elif args.order_by_name and last_mtime:
+            print(
+                f"error: --order-by-name requires a fresh FTP state; remove {last_path}",
+                file=sys.stderr,
+            )
+            return 1
+        return _run_ftp_import_body(
+            args,
+            ftp_pwd,
+            work_cwd=work_cwd,
+            last_path=last_path,
+            last_mtime=last_mtime,
+            checkpoint=checkpoint,
+            checkpoint_store=checkpoint_store,
+            checkpoint_adapter=checkpoint_adapter,
+            settings=settings,
+        )
+    except Exception as exc:
+        print(f"error: FTP import stopped: {exc}", file=sys.stderr)
+        return 2
+    finally:
+        if checkpoint_store is not None:
+            checkpoint_store.release_lock()
+        if checkpoint_adapter is not None:
+            with contextlib.suppress(Exception):
+                checkpoint_adapter.close()
+
+
+def _run_ftp_import_body(
+    args: argparse.Namespace,
+    ftp_pwd: str,
+    *,
+    work_cwd: Path,
+    last_path: Path,
+    last_mtime: float,
+    checkpoint: FtpCheckpoint | None,
+    checkpoint_store: DurableFtpCheckpoint | None,
+    checkpoint_adapter: SyncDatabaseAdapter | None,
+    settings: RuntimeSettings | None,
+) -> int:
+    """Run one FTP fetch/import after checkpoint ownership has been established."""
 
     gs_ip = args.gs_ip
     gs_port = args.gs_port
     ftp_ip = args.ftp_ip or gs_ip
-    work_cwd = args.cwd if args.cwd is not None else Path.cwd()
-    last_path = work_cwd / f"hlstats-ftp-{gs_ip}-{gs_port}.last"
     tmp_dir = work_cwd / f"hlstats-ftp-{gs_ip}-{gs_port}.tmp"
 
     _log(not args.quiet, f"\nStarting hlstats_ftp_py for IP {gs_ip}, Port {gs_port}...\n")
@@ -445,13 +607,6 @@ def run(argv: list[str] | None = None) -> int:
     tmp_dir.mkdir(parents=True, exist_ok=True)
     _log(not args.quiet, "OK.")
 
-    last_mtime = read_last_mtime(last_path)
-    if args.order_by_name and last_mtime:
-        print(
-            f"error: --order-by-name requires a fresh FTP state; remove {last_path}",
-            file=sys.stderr,
-        )
-        return 1
     if last_mtime:
         _log(not args.quiet, f"\n - getting last mtime info... OK: last mtime {last_mtime}.\n")
     else:
@@ -475,7 +630,10 @@ def run(argv: list[str] | None = None) -> int:
     )
     stable = entries if args.static_replay else without_newest_log(entries)
     order_by = "name" if args.order_by_name else "mtime"
-    todo = entries_to_download(stable, last_mtime, order_by=order_by)
+    if checkpoint_store is None:
+        todo = entries_to_download(stable, last_mtime, order_by=order_by)
+    else:
+        todo = entries_after_checkpoint(stable, checkpoint, order_by=order_by)
     if args.max_import_files is not None and args.max_import_files > 0:
         cap = args.max_import_files
         if len(todo) > cap:
@@ -583,7 +741,8 @@ def run(argv: list[str] | None = None) -> int:
                 _log(not args.quiet, "OK.\n")
         else:
             _log(not args.quiet, "    - batch mode: single runtime process for all queued logs")
-            settings = _build_runtime_settings(args)
+            if settings is None:
+                settings = _build_runtime_settings(args)
             try:
                 imported_records = _import_logs_batch(
                     todo,
@@ -593,6 +752,8 @@ def run(argv: list[str] | None = None) -> int:
                     last_path=last_path,
                     ignored_lines_manifest=ignored_lines_manifest,
                     continue_on_parse_error=args.continue_on_parse_error,
+                    checkpoint_store=checkpoint_store,
+                    adapter=checkpoint_adapter,
                 )
             except Exception as exc:
                 print(f"error: batch import failed: {exc}", file=sys.stderr)

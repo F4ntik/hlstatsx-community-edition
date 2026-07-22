@@ -36,6 +36,31 @@ $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $composePath = Join-Path $PSScriptRoot "comparison\$Stack\docker-compose.yml"
 $artifactsRoot = Join-Path $PSScriptRoot "artifacts"
 $snapshotRoot = Join-Path $artifactsRoot "snapshots\$Stack"
+$ftpCheckpointMigration = Join-Path $repoRoot "sql\migrations\2026_07_22_ftp_checkpoint.sql"
+$ftpImporterWriteTables = @(
+    "hlstats_Actions",
+    "hlstats_Events_Admin",
+    "hlstats_Events_ChangeTeam",
+    "hlstats_Events_Chat",
+    "hlstats_Events_Connects",
+    "hlstats_Events_Disconnects",
+    "hlstats_Events_Entries",
+    "hlstats_Events_Frags",
+    "hlstats_Events_PlayerActions",
+    "hlstats_Events_PlayerPlayerActions",
+    "hlstats_Events_Statsme",
+    "hlstats_Events_Statsme2",
+    "hlstats_Events_Suicides",
+    "hlstats_Events_TeamBonuses",
+    "hlstats_Events_Teamkills",
+    "hlstats_Maps_Counts",
+    "hlstats_PlayerNames",
+    "hlstats_Players",
+    "hlstats_Players_History",
+    "hlstats_PlayerUniqueIds",
+    "hlstats_Servers",
+    "hlstats_Weapons"
+)
 
 $stackInfo = switch ($Stack) {
     "legacy" {
@@ -121,6 +146,64 @@ function Wait-DbReady {
     if ($LASTEXITCODE -ne 0) {
         throw "MySQL in $dbContainer did not become ready"
     }
+}
+
+function Invoke-DisposableFtpCheckpointMigration {
+    # This runner addresses only comparison containers selected by -Stack.  It
+    # never targets a configured production database and the migration itself
+    # is idempotent, so restored/snapshotted disposable contours stay runnable.
+    if (-not (Test-Path $ftpCheckpointMigration)) {
+        throw "FTP checkpoint migration not found: $ftpCheckpointMigration"
+    }
+    $containerMigrationPath = "/tmp/hlstats-ftp-checkpoint-migration.sql"
+    docker cp $ftpCheckpointMigration "${dbContainer}:$containerMigrationPath"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to copy FTP checkpoint migration into $dbContainer"
+    }
+    docker exec $dbContainer sh -lc "mysql -uroot -proot123 $DatabaseName < $containerMigrationPath"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to apply FTP checkpoint migration in disposable $dbContainer"
+    }
+    $engine = (Invoke-ContainerMysql -SkipColumnNames -Sql @"
+SELECT ENGINE
+FROM information_schema.TABLES
+WHERE TABLE_SCHEMA = '$DatabaseName' AND TABLE_NAME = 'hlstats_FTP_Checkpoints';
+"@).Trim()
+    if ($engine -ne "InnoDB") {
+        throw "Disposable FTP checkpoint table must be InnoDB in $dbContainer, got '$engine'"
+    }
+}
+
+function Invoke-DisposableFtpImporterEngineMigration {
+    # This is intentionally constrained to the exact EventStorage FTP write
+    # set.  It runs only against the selected comparison container after a
+    # restore; production schema migration remains an operator-owned step.
+    foreach ($table in $ftpImporterWriteTables) {
+        $engine = (Invoke-ContainerMysql -SkipColumnNames -Sql @"
+SELECT ENGINE
+FROM information_schema.TABLES
+WHERE TABLE_SCHEMA = '$DatabaseName' AND TABLE_NAME = '$table';
+"@).Trim()
+        if (-not $engine) {
+            throw "Disposable FTP importer table missing in ${dbContainer}: $table"
+        }
+        if ($engine -ne "InnoDB") {
+            Invoke-ContainerMysql -Sql "ALTER TABLE $table ENGINE=InnoDB;" | Out-Null
+            $engine = (Invoke-ContainerMysql -SkipColumnNames -Sql @"
+SELECT ENGINE
+FROM information_schema.TABLES
+WHERE TABLE_SCHEMA = '$DatabaseName' AND TABLE_NAME = '$table';
+"@).Trim()
+        }
+        if ($engine -ne "InnoDB") {
+            throw "Disposable FTP importer table must be InnoDB in ${dbContainer}: $table (got '$engine')"
+        }
+    }
+}
+
+function Invoke-DisposableFtpDurableSchemaPreparation {
+    Invoke-DisposableFtpCheckpointMigration
+    Invoke-DisposableFtpImporterEngineMigration
 }
 
 function Set-ComparisonSqlMode {
@@ -310,6 +393,8 @@ function Invoke-DumpRestore {
         throw "Failed to restore baseline into $dbContainer"
     }
 
+    Invoke-DisposableFtpDurableSchemaPreparation
+
     if ($Stack -eq "python") {
         Invoke-PythonProxyBootstrap
     }
@@ -323,6 +408,7 @@ function Invoke-SnapshotRestore {
     Invoke-DbServiceUp
     Wait-DbReady
     Set-ComparisonSqlMode
+    Invoke-DisposableFtpDurableSchemaPreparation
     Invoke-StateChecks
 }
 

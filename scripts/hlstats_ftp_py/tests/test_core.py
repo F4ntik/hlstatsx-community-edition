@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from hlstats_ftp_py.checkpoint import FtpCheckpoint, mtime_to_us
 from hlstats_ftp_py.core import (
     LogFileEntry,
+    entries_after_checkpoint,
     entries_to_download,
     filter_log_names,
     read_last_mtime,
@@ -46,13 +48,33 @@ def test_entries_to_download_can_order_by_name_for_replay_parity() -> None:
         LogFileEntry("L0106057.log", 20.0),
         LogFileEntry("L0106058.log", 30.0),
     ]
-
     assert [e.name for e in entries_to_download(stable, 0, order_by="name")] == [
         "L0106057.log",
         "L0106058.log",
         "L0106059.log",
     ]
 
+
+def test_durable_checkpoint_uses_filename_to_resume_same_mtime_without_duplicates() -> None:
+    stable = [
+        LogFileEntry("a.log", 10.0),
+        LogFileEntry("b.log", 10.0),
+        LogFileEntry("c.log", 20.0),
+    ]
+    checkpoint = FtpCheckpoint(mtime_us=mtime_to_us(10.0), name="a.log")
+
+    assert [entry.name for entry in entries_after_checkpoint(stable, checkpoint)] == ["b.log", "c.log"]
+
+
+def test_legacy_file_marker_bootstrap_preserves_strict_mtime_behavior() -> None:
+    stable = [
+        LogFileEntry("a.log", 10.0),
+        LogFileEntry("b.log", 10.0),
+        LogFileEntry("c.log", 20.0),
+    ]
+    legacy_checkpoint = FtpCheckpoint(mtime_us=mtime_to_us(10.0), name=None)
+
+    assert [entry.name for entry in entries_after_checkpoint(stable, legacy_checkpoint)] == ["c.log"]
 
 def test_filter_log_names() -> None:
     assert filter_log_names(["x.LOG", "dir/game.log", "readme.txt"]) == ["game.log", "x.LOG"]
