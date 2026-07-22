@@ -12,6 +12,7 @@ WORKDIR /app
 COPY scripts/proxy_daemon_py /app/scripts/proxy_daemon_py
 COPY scripts/hlx_core /app/scripts/hlx_core
 COPY scripts/hlstats_py /app/scripts/hlstats_py
+COPY scripts/hlstats_awards_py /app/scripts/hlstats_awards_py
 COPY scripts/hlstats_ftp_py /app/scripts/hlstats_ftp_py
 
 RUN pip install --no-cache-dir --upgrade pip \
