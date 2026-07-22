@@ -72,6 +72,9 @@ from hlstats_py.storage import (
     _UPDATE_SERVER_MAP_LOADING_QUERY,
     _UPDATE_SERVER_MAP_STARTED_QUERY,
     _UPDATE_SERVER_PLAYER_TOTALS_QUERY,
+    _UPDATE_SERVER_CT_SHOTS_HITS_QUERY,
+    _UPDATE_SERVER_TS_SHOTS_HITS_QUERY,
+    _UPDATE_PLAYER_SHOTS_HITS_QUERY,
     _UPSERT_PLAYER_UNIQUE_QUERY,
     _UPSERT_PLAYER_HISTORY_QUERY,
     _UPSERT_PLAYER_NAME_QUERY,
@@ -743,6 +746,16 @@ def test_ignore_bots_keep_last_skill_change_neutral_on_flush(
     storage.record(disconnect_update, event_context)
 
     assert (_UPDATE_PLAYER_LAST_SKILL_CHANGE_QUERY, (0, 201)) in connection.executed
+
+
+def test_ignored_bot_history_seed_state_is_reset_per_source_log_epoch() -> None:
+    storage = EventStorage(StubAdapter(FakeConnection()))
+    storage._ignored_bot_history_seeded.add((7, "bot:abc", 664, 201))
+    storage.mark_source_log_boundary(7)
+    assert storage._ignored_bot_history_seeded == set()
+    storage._ignored_bot_history_seeded.add((8, "bot:abc", 664, 201))
+    storage.mark_source_log_boundary(7)
+    assert storage._ignored_bot_history_seeded == {(8, "bot:abc", 664, 201)}
 
 
 def test_record_suicide_event_uses_suicides_table(dispatcher: EventDispatcher, event_context: EventContext) -> None:
@@ -2637,6 +2650,38 @@ def test_disconnect_realigns_history_row_to_event_day(event_context: EventContex
     assert (_DELETE_PLAYER_HISTORY_QUERY, (101, source_day, "csgo")) in connection.executed
 
 
+def test_realign_history_delete_invalidates_ensured_source_day_cache(event_context: EventContext) -> None:
+    source_timestamp = datetime(2024, 1, 5, 9, 0, 0)
+    source_day = datetime(2024, 1, 5)
+    target_timestamp = datetime(2024, 1, 2, 3, 4, 5)
+    responses: Dict[QueryKey, List[QueryResponse]] = {
+        (
+            _SELECT_PLAYER_HISTORY_SNAPSHOT_QUERY,
+            (101, source_day, "csgo"),
+        ): [QueryResponse(fetchone=(0, 3, 5, 0, 1013, 2, 85, 21, 0, 3, 2, 13))],
+    }
+    connection = FakeConnection(responses)
+    storage = EventStorage(StubAdapter(connection))
+    storage.begin_stdin_batch(transaction_batch_size=100)
+
+    storage._ensure_player_history_row(connection, event_context, 101, source_timestamp)
+    storage._realign_player_history_day(
+        connection,
+        context=event_context,
+        player_id=101,
+        event_timestamp=target_timestamp,
+        processed_at=source_timestamp,
+    )
+    storage._ensure_player_history_row(connection, event_context, 101, source_timestamp)
+
+    source_day_upserts = [
+        entry
+        for entry in connection.executed
+        if entry == (_UPSERT_PLAYER_HISTORY_QUERY, (101, source_day, "csgo", 1000))
+    ]
+    assert len(source_day_upserts) == 2
+
+
 def test_stdin_processing_uses_event_timestamp_for_name_lastuse(event_context: EventContext) -> None:
     chat_dispatcher = EventDispatcher([ChatEventHandler()])
     chat_event = parse_log_event(
@@ -2751,7 +2796,9 @@ def test_ignore_bots_flushes_connection_time_without_history_delta(
         (_SELECT_SERVER_CONFIG_QUERY, (7, "IgnoreBots")): [QueryResponse(fetchone=(1,))],
     }
     connection = FakeConnection(responses)
-    storage = EventStorage(StubAdapter(connection), clock=lambda: connect_update.timestamp)
+    # Deliberately separate source event day from processing day: replay may
+    # attempt to seed both daily keys at this boundary.
+    storage = EventStorage(StubAdapter(connection), clock=lambda: datetime(2024, 1, 3, 3, 4, 5))
 
     storage.record(connect_update, event_context)
     storage.record(disconnect_update, event_context)
@@ -2761,6 +2808,10 @@ def test_ignore_bots_flushes_connection_time_without_history_delta(
         _UPDATE_PLAYERNAME_TOTALS_QUERY,
         (7, 0, 0, 0, 0, 0, 0, 201, "BotOne"),
     ) in connection.executed
+    history_upserts = [params for query, params in connection.executed if query == _UPSERT_PLAYER_HISTORY_QUERY]
+    assert history_upserts
+    assert all(params[1] == datetime(2024, 1, 2) for params in history_upserts)
+    assert all(params[1] != datetime(2024, 1, 3) for params in history_upserts)
     assert (
         _UPDATE_PLAYER_HISTORY_QUERY,
         (7, 0, 0, 0, 1000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 201, history_timestamp, "csgo"),
@@ -3457,7 +3508,7 @@ def test_ignore_bots_marks_bot_hidden_and_skips_chat(event_context: EventContext
     assert all(query != _INSERT_CHAT_QUERY for query, _params in connection.executed)
 
 
-def test_ignore_bots_keeps_history_seed_skill_at_legacy_default(event_context: EventContext) -> None:
+def test_ignore_bots_keeps_initial_resolution_history_seed(event_context: EventContext) -> None:
     chat_dispatcher = EventDispatcher([ChatEventHandler()])
     event = parse_log_event('L 01/02/2024 - 03:04:05: "BotOne<664><BOT><CT>" say "first"')
     update = chat_dispatcher.dispatch(event, event_context)
@@ -3471,10 +3522,108 @@ def test_ignore_bots_keeps_history_seed_skill_at_legacy_default(event_context: E
     storage.record(update, event_context)
 
     assert (_UPDATE_IGNORED_BOT_PLAYER_QUERY, (201,)) in connection.executed
-    assert (
-        _UPSERT_PLAYER_HISTORY_QUERY,
-        (201, datetime(2024, 1, 2, 0, 0), "csgo", 1000),
-    ) in connection.executed
+    history_upserts = [params for query, params in connection.executed if query == _UPSERT_PLAYER_HISTORY_QUERY]
+    assert history_upserts
+    assert all(params[1] == datetime(2024, 1, 2) for params in history_upserts)
+    assert all(params[1] != datetime(2024, 1, 3) for params in history_upserts)
+
+
+def test_ignore_bots_does_not_seed_later_event_day_for_same_identity(event_context: EventContext) -> None:
+    chat_dispatcher = EventDispatcher([ChatEventHandler()])
+    first_update = chat_dispatcher.dispatch(
+        parse_log_event('L 01/01/2024 - 23:59:59: "BotOne<664><BOT><CT>" say "first"'),
+        event_context,
+    )
+    second_update = chat_dispatcher.dispatch(
+        parse_log_event('L 01/02/2024 - 00:00:01: "BotOne<664><BOT><CT>" say "second"'),
+        event_context,
+    )
+    responses: Dict[QueryKey, List[QueryResponse]] = {
+        (_LAST_INSERT_ID_QUERY, None): [QueryResponse(fetchone=(201,))],
+        (_SELECT_SERVER_CONFIG_QUERY, (7, "IgnoreBots")): [QueryResponse(fetchone=(1,))],
+    }
+    connection = FakeConnection(responses)
+    storage = EventStorage(
+        StubAdapter(connection),
+        clock=lambda: first_update.timestamp,
+        use_event_timestamps_for_processing=True,
+    )
+
+    storage.record(first_update, event_context)
+    storage.record(second_update, event_context)
+
+    history_upserts = [params for query, params in connection.executed if query == _UPSERT_PLAYER_HISTORY_QUERY]
+    assert history_upserts == [(201, datetime(2024, 1, 1), "csgo", 1000)]
+
+
+def test_ignore_bots_reseeds_after_source_log_boundary_for_same_userid(
+    event_context: EventContext,
+) -> None:
+    chat_dispatcher = EventDispatcher([ChatEventHandler()])
+    first_update = chat_dispatcher.dispatch(
+        parse_log_event('L 01/01/2024 - 23:59:59: "BotOne<664><BOT><CT>" say "first"'),
+        event_context,
+    )
+    continuous_update = chat_dispatcher.dispatch(
+        parse_log_event('L 01/02/2024 - 00:00:01: "BotOne<664><BOT><CT>" say "continuous"'),
+        event_context,
+    )
+    next_log_update = chat_dispatcher.dispatch(
+        parse_log_event('L 01/02/2024 - 00:05:48: "BotOne<664><BOT><CT>" say "next log"'),
+        event_context,
+    )
+    responses: Dict[QueryKey, List[QueryResponse]] = {
+        (_LAST_INSERT_ID_QUERY, None): [QueryResponse(fetchone=(201,))],
+        (_SELECT_SERVER_CONFIG_QUERY, (7, "IgnoreBots")): [QueryResponse(fetchone=(1,))],
+    }
+    connection = FakeConnection(responses)
+    storage = EventStorage(
+        StubAdapter(connection),
+        clock=lambda: first_update.timestamp,
+        use_event_timestamps_for_processing=True,
+    )
+
+    storage.record(first_update, event_context)
+    storage.record(continuous_update, event_context)
+    storage.mark_source_log_boundary(event_context.server_id)
+    storage.record(next_log_update, event_context)
+
+    history_upserts = [params for query, params in connection.executed if query == _UPSERT_PLAYER_HISTORY_QUERY]
+    assert history_upserts == [
+        (201, datetime(2024, 1, 1), "csgo", 1000),
+        (201, datetime(2024, 1, 2), "csgo", 1000),
+    ]
+
+
+def test_ignore_bots_disabled_seeds_each_event_day_for_same_bot_identity(event_context: EventContext) -> None:
+    chat_dispatcher = EventDispatcher([ChatEventHandler()])
+    first_update = chat_dispatcher.dispatch(
+        parse_log_event('L 01/01/2024 - 23:59:59: "BotOne<664><BOT><CT>" say "first"'),
+        event_context,
+    )
+    second_update = chat_dispatcher.dispatch(
+        parse_log_event('L 01/02/2024 - 00:00:01: "BotOne<664><BOT><CT>" say "second"'),
+        event_context,
+    )
+    responses: Dict[QueryKey, List[QueryResponse]] = {
+        (_LAST_INSERT_ID_QUERY, None): [QueryResponse(fetchone=(201,))],
+        (_SELECT_SERVER_CONFIG_QUERY, (7, "IgnoreBots")): [QueryResponse(fetchone=(0,))],
+    }
+    connection = FakeConnection(responses)
+    storage = EventStorage(
+        StubAdapter(connection),
+        clock=lambda: first_update.timestamp,
+        use_event_timestamps_for_processing=True,
+    )
+
+    storage.record(first_update, event_context)
+    storage.record(second_update, event_context)
+
+    history_upserts = [params for query, params in connection.executed if query == _UPSERT_PLAYER_HISTORY_QUERY]
+    assert history_upserts == [
+        (201, datetime(2024, 1, 1), "csgo", 1000),
+        (201, datetime(2024, 1, 2), "csgo", 1000),
+    ]
 
 
 def test_ignore_bots_skips_name_change_profile_update(event_context: EventContext) -> None:
@@ -3681,7 +3830,7 @@ def test_online_event_commit_does_not_update_unrelated_cached_player_profile(
 
     storage.begin_online_event()
     # The real resolver marks only identities encountered by this logical
-    # packet. Keep a second cached player present to catch an accidental
+    # packet.  Keep a second cached player present to catch an accidental
     # all-player profile/connection scan during commit.
     storage._online_event_touched_players.add(101)
     storage._update_player_rollups(
@@ -3744,6 +3893,196 @@ def test_zero_sized_stdin_batch_keeps_deferred_rollups_for_import_finalization(
     storage.finalize_import()
     assert storage._player_name_rollups == {}
     assert storage._player_history_rollups == {}
+
+
+def test_player_history_row_ensure_is_cached_per_player_day_and_game(event_context: EventContext) -> None:
+    connection = FakeConnection()
+    storage = EventStorage(StubAdapter(connection))
+    timestamp = datetime(2024, 1, 2, 3, 4, 5)
+    storage.begin_stdin_batch(transaction_batch_size=100)
+
+    storage._ensure_player_history_row(connection, event_context, 101, timestamp)
+    storage._ensure_player_history_row(connection, event_context, 101, timestamp)
+    other_game = EventContext(
+        server_id=event_context.server_id,
+        game="cstrike",
+        schema=event_context.schema,
+        localization=event_context.localization,
+        extras=event_context.extras,
+    )
+    storage._ensure_player_history_row(connection, other_game, 101, timestamp)
+    storage._ensure_player_history_row(connection, event_context, 101, timestamp + timedelta(days=1))
+
+    history_upserts = [entry for entry in connection.executed if entry[0] == _UPSERT_PLAYER_HISTORY_QUERY]
+    assert history_upserts == [
+        (_UPSERT_PLAYER_HISTORY_QUERY, (101, datetime(2024, 1, 2), "csgo", 1000)),
+        (_UPSERT_PLAYER_HISTORY_QUERY, (101, datetime(2024, 1, 2), "cstrike", 1000)),
+        (_UPSERT_PLAYER_HISTORY_QUERY, (101, datetime(2024, 1, 3), "csgo", 1000)),
+    ]
+
+
+def test_db_write_trace_keeps_statsme_counter_templates_when_buffered(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    trace_path = tmp_path / "writes.jsonl"
+    monkeypatch.setenv("HLSTATS_DB_WRITE_TRACE_PATH", str(trace_path))
+    connection = FakeConnection()
+    storage = EventStorage(StubAdapter(connection))
+
+    storage.begin_stdin_batch(transaction_batch_size=100)
+    storage._execute(connection, _UPDATE_PLAYER_SHOTS_HITS_QUERY, (2, 1, 101))
+    storage._execute(connection, _UPDATE_SERVER_CT_SHOTS_HITS_QUERY, (5, 2, 50, 20, 7))
+    storage._execute(connection, _UPDATE_SERVER_TS_SHOTS_HITS_QUERY, (6, 3, 4, 1, 7))
+    storage.end_stdin_batch()
+
+    rows = [json.loads(line) for line in trace_path.read_text(encoding="utf-8").splitlines()]
+    assert rows == [
+        {"sql": _UPDATE_PLAYER_SHOTS_HITS_QUERY, "params": [2, 1, 101]},
+        {"sql": _UPDATE_SERVER_CT_SHOTS_HITS_QUERY, "params": [5, 2, 50, 20, 7]},
+        {"sql": _UPDATE_SERVER_TS_SHOTS_HITS_QUERY, "params": [6, 3, 4, 1, 7]},
+    ]
+
+
+def test_player_history_row_ensure_cache_is_invalidated_by_batch_rollback(event_context: EventContext) -> None:
+    connection = FakeConnection()
+    storage = EventStorage(StubAdapter(connection))
+    timestamp = datetime(2024, 1, 2, 3, 4, 5)
+    storage.begin_stdin_batch(transaction_batch_size=100)
+
+    storage._ensure_player_history_row(connection, event_context, 101, timestamp)
+    storage._rollback_pending()
+    storage._ensure_player_history_row(connection, event_context, 101, timestamp)
+
+    history_upserts = [entry for entry in connection.executed if entry[0] == _UPSERT_PLAYER_HISTORY_QUERY]
+    assert len(history_upserts) == 2
+    assert connection.rollback_calls == 1
+
+
+def test_player_history_row_ensure_does_not_cache_failed_execute(event_context: EventContext) -> None:
+    connection = FakeConnection()
+    storage = EventStorage(StubAdapter(connection))
+    storage.begin_stdin_batch(transaction_batch_size=100)
+    timestamp = datetime(2024, 1, 2, 3, 4, 5)
+    original_execute = storage._execute
+
+    def fail_execute(*_args: object, **_kwargs: object) -> None:
+        raise RuntimeError("simulated write failure")
+
+    storage._execute = fail_execute  # type: ignore[method-assign]
+    with pytest.raises(RuntimeError, match="simulated write failure"):
+        storage._ensure_player_history_row(connection, event_context, 101, timestamp)
+    storage._execute = original_execute  # type: ignore[method-assign]
+    storage._ensure_player_history_row(connection, event_context, 101, timestamp)
+
+    history_upserts = [entry for entry in connection.executed if entry[0] == _UPSERT_PLAYER_HISTORY_QUERY]
+    assert len(history_upserts) == 1
+
+
+def test_player_history_row_ensure_cache_is_cleared_on_normal_stdin_end(event_context: EventContext) -> None:
+    connection = FakeConnection()
+    storage = EventStorage(StubAdapter(connection))
+    timestamp = datetime(2024, 1, 2, 3, 4, 5)
+    storage.begin_stdin_batch(transaction_batch_size=100)
+    storage._ensure_player_history_row(connection, event_context, 101, timestamp)
+    storage.end_stdin_batch()
+    storage.begin_stdin_batch(transaction_batch_size=100)
+    storage._ensure_player_history_row(connection, event_context, 101, timestamp)
+
+    history_upserts = [entry for entry in connection.executed if entry[0] == _UPSERT_PLAYER_HISTORY_QUERY]
+    assert len(history_upserts) == 2
+
+
+def test_player_history_row_ensure_remains_uncached_online(event_context: EventContext) -> None:
+    connection = FakeConnection()
+    storage = EventStorage(StubAdapter(connection))
+    timestamp = datetime(2024, 1, 2, 3, 4, 5)
+
+    storage._ensure_player_history_row(connection, event_context, 101, timestamp)
+    storage._ensure_player_history_row(connection, event_context, 101, timestamp)
+
+    history_upserts = [entry for entry in connection.executed if entry[0] == _UPSERT_PLAYER_HISTORY_QUERY]
+    assert len(history_upserts) == 2
+
+
+def test_statsme_counter_deltas_aggregate_flush_and_online_fallback(event_context: EventContext) -> None:
+    connection = FakeConnection()
+    storage = EventStorage(StubAdapter(connection))
+    storage.begin_stdin_batch(transaction_batch_size=100)
+    storage._execute(connection, _UPDATE_PLAYER_SHOTS_HITS_QUERY, (2, 1, 101))
+    storage._execute(connection, _UPDATE_PLAYER_SHOTS_HITS_QUERY, (3, 4, 101))
+    storage._execute(connection, _UPDATE_SERVER_CT_SHOTS_HITS_QUERY, (5, 2, 50, 20, 7))
+    storage._flush_statsme_counter_buffer()
+    assert (_UPDATE_PLAYER_SHOTS_HITS_QUERY, (5, 5, 101)) in connection.executed
+    assert (_UPDATE_SERVER_CT_SHOTS_HITS_QUERY, (5, 2, 50, 20, 7)) in connection.executed
+    storage.end_stdin_batch()
+    storage._execute(connection, _UPDATE_PLAYER_SHOTS_HITS_QUERY, (1, 1, 101))
+    assert (_UPDATE_PLAYER_SHOTS_HITS_QUERY, (1, 1, 101)) in connection.executed
+
+
+def test_statsme_counter_deltas_clear_on_rollback_and_flush_before_map_reset(event_context: EventContext) -> None:
+    connection = FakeConnection()
+    storage = EventStorage(StubAdapter(connection))
+    storage.begin_stdin_batch(transaction_batch_size=100)
+    storage._execute(connection, _UPDATE_SERVER_TS_SHOTS_HITS_QUERY, (2, 3, 2, 3, 7))
+    storage.apply_server_map_transition(7, "started", "de_nuke", datetime(2024, 1, 1))
+    queries = [query for query, _ in connection.executed]
+    assert queries.index(_UPDATE_SERVER_TS_SHOTS_HITS_QUERY) < queries.index(_UPDATE_SERVER_MAP_STARTED_QUERY)
+    storage._execute(connection, _UPDATE_PLAYER_SHOTS_HITS_QUERY, (4, 5, 101))
+    storage._rollback_pending()
+    storage._flush_statsme_counter_buffer()
+    assert (_UPDATE_PLAYER_SHOTS_HITS_QUERY, (4, 5, 101)) not in connection.executed
+
+
+def test_statsme_counter_buffer_is_disabled_by_zero_sized_batch() -> None:
+    connection = FakeConnection()
+    storage = EventStorage(StubAdapter(connection))
+    storage.begin_stdin_batch(transaction_batch_size=100)
+    storage._execute(connection, _UPDATE_PLAYER_SHOTS_HITS_QUERY, (2, 1, 101))
+    storage.begin_stdin_batch(transaction_batch_size=0)
+    storage.end_stdin_batch()
+
+    assert not any(query == _UPDATE_PLAYER_SHOTS_HITS_QUERY for query, _ in connection.executed)
+
+
+def test_maybe_commit_batch_flushes_statsme_counter_delta() -> None:
+    connection = FakeConnection()
+    storage = EventStorage(StubAdapter(connection))
+    storage.begin_stdin_batch(transaction_batch_size=1)
+    storage._execute(connection, _UPDATE_PLAYER_SHOTS_HITS_QUERY, (2, 1, 101))
+    storage._pending_records = 1
+
+    storage._maybe_commit_batch()
+
+    assert (_UPDATE_PLAYER_SHOTS_HITS_QUERY, (2, 1, 101)) in connection.executed
+    assert connection.commit_calls == 1
+
+
+def test_partial_statsme_flush_is_cleared_by_abort() -> None:
+    connection = FakeConnection()
+    storage = EventStorage(StubAdapter(connection))
+    storage.begin_stdin_batch(transaction_batch_size=100)
+    storage._execute(connection, _UPDATE_PLAYER_SHOTS_HITS_QUERY, (2, 1, 101))
+    storage._execute(connection, _UPDATE_SERVER_CT_SHOTS_HITS_QUERY, (5, 2, 5, 2, 7))
+    original_execute_direct = storage._execute_direct
+    calls = 0
+
+    def partial_execute(connection_arg, query, params):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise RuntimeError("simulated statsme flush failure")
+        return original_execute_direct(connection_arg, query, params)
+
+    storage._execute_direct = partial_execute  # type: ignore[method-assign]
+    with pytest.raises(RuntimeError, match="simulated statsme flush failure"):
+        storage._flush_statsme_counter_buffer()
+    storage.abort_stdin_batch()
+    storage._execute_direct = original_execute_direct  # type: ignore[method-assign]
+    storage._flush_statsme_counter_buffer()
+
+    assert connection.rollback_calls == 1
+    assert storage._statsme_counter_deltas is None
+    assert calls == 2
 
 
 def test_apply_server_map_transition_loading_query() -> None:

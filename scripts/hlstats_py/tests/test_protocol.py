@@ -232,3 +232,9 @@ def test_parse_log_event_native_backend_matches_python_for_bot_identity():
     assert native_event.actor is not None
     assert python_event.actor.unique_id == native_event.actor.unique_id
     assert python_event.actor.unique_id == "BOT:b9cd427d72a4e627fa34d90ea0c96015"
+
+
+def test_log_file_started_is_a_generic_epoch_boundary_message():
+    event = parse_log_event("L 06/15/2023 - 10:15:42: Log file started")
+    assert event.event_type is LogEventType.GENERIC
+    assert event.message == "Log file started"

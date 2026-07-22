@@ -48,6 +48,7 @@ class StubStorage:
         self.finalize_calls = 0
         self.flush_pending_calls = 0
         self.online_event_calls: list[str] = []
+        self.source_log_boundaries: list[int] = []
 
     def begin_online_event(self) -> None:
         self.online_event_calls.append("begin")
@@ -57,6 +58,10 @@ class StubStorage:
 
     def abort_online_event(self) -> None:
         self.online_event_calls.append("abort")
+
+    def mark_source_log_boundary(self, server_id: int) -> None:
+        self.source_log_boundaries.append(server_id)
+        self.online_event_calls.append("boundary")
 
     def apply_server_map_transition(
         self, server_id: int, phase: str, map_name: str, event_timestamp: object
@@ -582,6 +587,59 @@ def test_runtime_processes_stdin_line_for_known_server() -> None:
         )
     ]
     assert storage.finalize_calls == 1
+
+
+def test_runtime_marks_only_exact_log_file_started_boundary() -> None:
+    adapter = StubAdapter()
+    storage = StubStorage()
+    logger = ProxyLogger(LoggerConfig(stream=StringIO()))
+    runtime = HlstatsRuntime(adapter, ProxyUdpServer(logger), logger, build_dispatcher(), storage)
+    adapter.connect()
+    runtime._reload_state()
+
+    runtime.process_stdin_line("L 01/02/2024 - 03:00:00: Log file started", "127.0.0.1:27015")
+    runtime.process_stdin_line("L 01/02/2024 - 03:00:01: Log file started elsewhere", "127.0.0.1:27015")
+
+    assert storage.source_log_boundaries == [7]
+    assert storage.online_event_calls == ["boundary", "begin", "commit", "begin", "commit"]
+
+
+async def _run_async_source_log_boundary_uses_storage_executor() -> None:
+    class ThreadRecordingStorage(StubStorage):
+        def __init__(self) -> None:
+            super().__init__()
+            self.boundary_threads: list[int] = []
+
+        def mark_source_log_boundary(self, server_id: int) -> None:
+            self.boundary_threads.append(threading.get_ident())
+            super().mark_source_log_boundary(server_id)
+
+    adapter = StubAdapter()
+    storage = ThreadRecordingStorage()
+    logger = ProxyLogger(LoggerConfig(stream=StringIO()))
+    runtime = HlstatsRuntime(adapter, ProxyUdpServer(logger), logger, build_dispatcher(), storage)
+    event_loop_thread = threading.get_ident()
+
+    await runtime.start("127.0.0.1", 0)
+    try:
+        owner_thread = runtime._storage_owner_thread_id
+        assert owner_thread is not None
+        assert owner_thread != event_loop_thread
+
+        await runtime.process_stdin_line_async(
+            "L 01/02/2024 - 03:00:00: Log file started",
+            "127.0.0.1:27015",
+        )
+
+        assert storage.source_log_boundaries == [7]
+        assert storage.boundary_threads == [owner_thread]
+        assert storage.online_event_calls == ["boundary", "begin", "commit"]
+    finally:
+        await runtime.stop()
+
+
+def test_async_source_log_boundary_uses_storage_executor() -> None:
+    asyncio.run(_run_async_source_log_boundary_uses_storage_executor())
 
 
 def test_runtime_ignores_empty_timestamp_only_stdin_line() -> None:

@@ -85,6 +85,8 @@ class SupportsEventStorage(Protocol):
 
     def flush_pending(self) -> None: ...
 
+    def mark_source_log_boundary(self, server_id: int) -> None: ...
+
 
 class _HardTerminationRequired(RuntimeError):
     """Signal that the executable must abandon an uninterruptible DB worker."""
@@ -1154,6 +1156,8 @@ class HlstatsRuntime:
             self._raise_if_storage_operation_cancelled(operation_fence)
         else:
             self._require_non_event_loop_storage_context("_persist_online_event")
+        if event.event_type is LogEventType.GENERIC and event.message == "Log file started":
+            self._storage.mark_source_log_boundary(context.server_id)
         self._storage.begin_online_event()
         try:
             if operation_fence is not None:

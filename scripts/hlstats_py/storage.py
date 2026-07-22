@@ -1,19 +1,20 @@
 """Persistence layer that mirrors ``hlstats.pl`` database mutations."""
 from __future__ import annotations
 
-from calendar import timegm
-from collections.abc import Mapping
-from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
 import json
 import os
-from pathlib import Path
 import re
-from typing import Any, Callable, Optional, Protocol, TextIO
+from calendar import timegm
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any, Optional, Protocol, TextIO
 
 from hlx_core import db as proxy_db
-from .events import EventCategory, EventContext, EventUpdate
+
 from .event_buffer import BufferPolicy, EventBuffer
+from .events import EventCategory, EventContext, EventUpdate
 from .frag_write_delta_buffer import FragWriteDeltaBuffer
 from .protocol import PlayerDescriptor
 from .runtime_decisions import (
@@ -23,6 +24,8 @@ from .runtime_decisions import (
     should_persist_player_identity,
     should_reward_team_player,
 )
+from .statsme_counter_delta_buffer import StatsmeCounterDeltaBuffer
+
 
 class StorageError(RuntimeError):
     """Raised when an event update cannot be written to the database."""
@@ -596,6 +599,11 @@ class EventStorage:
         self._player_name_lastuse: dict[tuple[int, str], datetime] = {}
         self._player_name_rollups: dict[int, _PlayerNameRollup] = {}
         self._player_history_rollups: dict[int, _PlayerHistoryRollup] = {}
+        # A successful history upsert proves this exact daily row exists until
+        # runtime state is reset or a pending stdin transaction is rolled back.
+        # Keep this deliberately narrower than the rollup/flush lifecycle: it
+        # only suppresses repeated ensure-row no-ops for the same key.
+        self._ensured_player_history_rows: set[tuple[int, datetime, str]] = set()
         self._player_daily_skill_changes: dict[int, int] = {}
         self._player_daily_skill_change_days: dict[int, datetime] = {}
         self._player_last_flushed_skills: dict[int, int] = {}
@@ -617,6 +625,7 @@ class EventStorage:
         self._player_is_bot: dict[int, bool] = {}
         self._player_is_bot_cache: dict[tuple[int, str], bool] = {}
         self._ignored_bot_profiles_applied: set[tuple[int, int]] = set()
+        self._ignored_bot_history_seeded: set[tuple[int, str, int | None, int]] = set()
         self._player_last_user_id: dict[int, int] = {}
         self._weapon_modifiers: dict[tuple[str, str], float] = {}
         self._player_kill_streaks: dict[int, int] = {}
@@ -640,7 +649,7 @@ class EventStorage:
         self._online_event_active = False
         self._online_event_touched_players: set[int] = set()
         # Only ids recorded by the active online event may be flushed before
-        # its commit. The broader rollup dictionaries are intentionally kept
+        # its commit.  The broader rollup dictionaries are intentionally kept
         # for stdin import finalization and must never make a live packet walk
         # every cached player.
         self._online_event_deferred_players: set[int] = set()
@@ -650,6 +659,7 @@ class EventStorage:
         self._cached_cursor_connection: proxy_db.SupportsConnection | None = None
         self._event_buffer: EventBuffer | None = None
         self._frag_write_deltas: FragWriteDeltaBuffer | None = None
+        self._statsme_counter_deltas: StatsmeCounterDeltaBuffer | None = None
         self._team_bonus_stage_counts: dict[str, int] = {}
         self._team_bonus_stage_action_counts: dict[str, dict[int, int]] = {}
         self._team_bonus_stage_map_counts: dict[str, dict[str, int]] = {}
@@ -667,12 +677,14 @@ class EventStorage:
     def begin_stdin_batch(self, *, transaction_batch_size: int) -> None:
         """Enable batched transaction mode for high-volume stdin imports."""
         self._stdin_batch_active = True
+        self._ensured_player_history_rows.clear()
         if transaction_batch_size <= 0:
             self._transaction_batch_size = 0
             self._pending_writes = 0
             self._pending_records = 0
             self._event_buffer = None
             self._frag_write_deltas = None
+            self._statsme_counter_deltas = None
             self._set_skip_adapter_ping(False)
             return
         self._transaction_batch_size = transaction_batch_size
@@ -682,6 +694,7 @@ class EventStorage:
         self._set_skip_adapter_ping(True)
         self._event_buffer = EventBuffer(policy=BufferPolicy(max_buffered_events=5000))
         self._frag_write_deltas = FragWriteDeltaBuffer()
+        self._statsme_counter_deltas = StatsmeCounterDeltaBuffer()
 
     def configure_event_buffer(self, *, max_buffered_events: int) -> None:
         if max_buffered_events <= 0:
@@ -725,7 +738,7 @@ class EventStorage:
         """Commit one live logical event and restore autocommit.
 
         A failed commit is rolled back before the connection is returned to
-        its normal autocommit mode. The caller must treat any exception as a
+        its normal autocommit mode.  The caller must treat any exception as a
         fatal online storage failure.
         """
 
@@ -774,13 +787,17 @@ class EventStorage:
         if self._transaction_batch_size <= 0:
             self._flush_event_buffer()
             self._flush_frag_counter_buffer()
+            self._flush_statsme_counter_buffer()
             self._event_buffer = None
+            self._statsme_counter_deltas = None
             self._set_skip_adapter_ping(False)
             self._stdin_batch_active = False
+            self._ensured_player_history_rows.clear()
             self._close_db_write_trace()
             return
         self._flush_event_buffer()
         self._flush_frag_counter_buffer()
+        self._flush_statsme_counter_buffer()
         self._commit_pending(force=True)
         self._transaction_batch_size = 0
         self._pending_writes = 0
@@ -789,8 +806,10 @@ class EventStorage:
         self._close_cached_cursor()
         self._event_buffer = None
         self._frag_write_deltas = None
+        self._statsme_counter_deltas = None
         self._set_skip_adapter_ping(False)
         self._stdin_batch_active = False
+        self._ensured_player_history_rows.clear()
         self._close_db_write_trace()
 
     def abort_stdin_batch(self) -> None:
@@ -799,9 +818,12 @@ class EventStorage:
         if self._transaction_batch_size <= 0:
             self._flush_event_buffer()
             self._flush_frag_counter_buffer()
+            self._flush_statsme_counter_buffer()
             self._event_buffer = None
+            self._statsme_counter_deltas = None
             self._set_skip_adapter_ping(False)
             self._stdin_batch_active = False
+            self._ensured_player_history_rows.clear()
             self._close_db_write_trace()
             return
         try:
@@ -814,8 +836,10 @@ class EventStorage:
             self._close_cached_cursor()
             self._event_buffer = None
             self._frag_write_deltas = None
+            self._statsme_counter_deltas = None
             self._set_skip_adapter_ping(False)
             self._stdin_batch_active = False
+            self._ensured_player_history_rows.clear()
             self._close_db_write_trace()
 
     def reset_runtime_state(self) -> None:
@@ -831,6 +855,9 @@ class EventStorage:
         self._player_history_rollups.clear()
         self._online_event_touched_players.clear()
         self._online_event_deferred_players.clear()
+        self._ensured_player_history_rows.clear()
+        if self._statsme_counter_deltas is not None:
+            self._statsme_counter_deltas.clear()
         self._player_daily_skill_changes.clear()
         self._player_daily_skill_change_days.clear()
         self._player_last_flushed_skills.clear()
@@ -852,6 +879,7 @@ class EventStorage:
         self._player_is_bot.clear()
         self._player_is_bot_cache.clear()
         self._ignored_bot_profiles_applied.clear()
+        self._ignored_bot_history_seeded.clear()
         self._player_last_user_id.clear()
         self._weapon_modifiers.clear()
         self._player_kill_streaks.clear()
@@ -878,6 +906,7 @@ class EventStorage:
         flush_timestamp = self._connection_time_flush_timestamp()
         self._flush_event_buffer()
         self._flush_frag_counter_buffer()
+        self._flush_statsme_counter_buffer()
         self._flush_all_open_player_connection_times(connection, flush_timestamp)
         self._flush_all_pending_player_history_rollups(connection, flush_timestamp)
         self._flush_all_player_profile_names(connection)
@@ -891,6 +920,7 @@ class EventStorage:
         flush_timestamp = self._connection_time_flush_timestamp()
         self._flush_event_buffer()
         self._flush_frag_counter_buffer()
+        self._flush_statsme_counter_buffer()
         self._flush_all_open_player_connection_times(connection, flush_timestamp)
         self._flush_all_pending_player_history_rollups(connection, flush_timestamp)
         self._flush_all_player_profile_names(connection)
@@ -919,6 +949,7 @@ class EventStorage:
                 self._refresh_server_player_totals(connection, server_id)
             return
         if phase == "started":
+            self._flush_statsme_counter_buffer()
             started_unix = int(timegm(self._map_lifecycle_timestamp().timetuple()))
             self._execute(
                 connection,
@@ -1920,6 +1951,7 @@ class EventStorage:
 
         cache_key = self._cache_key_for_player(context.game, descriptor)
         player_id = self._player_cache.get(cache_key)
+        is_first_runtime_identity_resolution = player_id is None
         if player_id is None:
             player_id = self._lookup_player(connection, descriptor, context.game)
             if player_id is None:
@@ -2011,8 +2043,25 @@ class EventStorage:
                 track_player_name=track_player_name,
                 force_alias_use=force_alias_use,
             )
-        self._ensure_player_history_row(connection, context, player_id, timestamp)
-        if self._history_timestamp(processed_at) != self._history_timestamp(timestamp):
+        # Legacy can retain one initial history seed for an ignored bot per
+        # source-log epoch. Later events for that cached identity in the same
+        # epoch must not open another daily history row.
+        skip_player_history = self._should_skip_player_history(connection, player_id, context.server_id)
+        ignored_bot_seed_key = (
+            context.server_id,
+            self._canonical_unique_id(descriptor.unique_id or ""),
+            descriptor.user_id,
+            player_id,
+        )
+        needs_ignored_bot_seed = skip_player_history and ignored_bot_seed_key not in self._ignored_bot_history_seeded
+        if is_first_runtime_identity_resolution or not skip_player_history or needs_ignored_bot_seed:
+            self._ensure_player_history_row(connection, context, player_id, timestamp)
+            if needs_ignored_bot_seed:
+                self._ignored_bot_history_seeded.add(ignored_bot_seed_key)
+        if (
+            self._history_timestamp(processed_at) != self._history_timestamp(timestamp)
+            and not skip_player_history
+        ):
             self._ensure_player_history_row(connection, context, player_id, processed_at)
         return player_id
 
@@ -2290,6 +2339,13 @@ class EventStorage:
         server_id: int,
     ) -> bool:
         return self._player_is_bot.get(player_id, False) and self._server_ignore_bots_enabled(connection, server_id)
+
+    def mark_source_log_boundary(self, server_id: int) -> None:
+        """Start a new source-log epoch without dropping persistent player identity cache."""
+
+        self._ignored_bot_history_seeded = {
+            key for key in self._ignored_bot_history_seeded if key[0] != server_id
+        }
 
     def _flush_player_connection_time(
         self,
@@ -3187,11 +3243,17 @@ class EventStorage:
         timestamp: datetime,
     ) -> None:
         self._player_skills.setdefault(player_id, 1000)
+        history_timestamp = self._history_timestamp(timestamp)
+        history_key = (player_id, history_timestamp, context.game)
+        if self._transaction_batch_size > 0 and history_key in self._ensured_player_history_rows:
+            return
         self._execute(
             connection,
             _UPSERT_PLAYER_HISTORY_QUERY,
-            (player_id, self._history_timestamp(timestamp), context.game, self._player_skills[player_id]),
+            (player_id, history_timestamp, context.game, self._player_skills[player_id]),
         )
+        if self._transaction_batch_size > 0:
+            self._ensured_player_history_rows.add(history_key)
 
     def _update_player_rollups(
         self,
@@ -3620,6 +3682,7 @@ class EventStorage:
             _DELETE_PLAYER_HISTORY_QUERY,
             (player_id, source_day, context.game),
         )
+        self._ensured_player_history_rows.discard((player_id, source_day, context.game))
 
     def _processing_timestamp(self, event_timestamp: datetime) -> datetime:
         if self._use_event_timestamps_for_processing:
@@ -3674,7 +3737,11 @@ class EventStorage:
         params: tuple[Any, ...] | None,
     ) -> None:
         self._trace_db_write(query, params)
-        if params is not None and query in _APPEND_ONLY_EVENT_INSERT_QUERIES:
+        if (
+            self._stdin_batch_active
+            and params is not None
+            and query in _APPEND_ONLY_EVENT_INSERT_QUERIES
+        ):
             buffer = self._event_buffer
             if buffer is not None:
                 should_flush = buffer.add(query, params)
@@ -3682,6 +3749,8 @@ class EventStorage:
                     self._flush_event_buffer()
                 return
         if params is not None and self._buffer_frag_counter_write(query, params):
+            return
+        if params is not None and self._buffer_statsme_counter_write(query, params):
             return
         self._execute_direct(connection, query, params)
 
@@ -3700,6 +3769,24 @@ class EventStorage:
         if query == _UPSERT_MAP_COUNTS_QUERY:
             game, map_name, kills, headshots = params
             buf.add_map_counts(str(game), str(map_name), int(kills), int(headshots))
+            return True
+        return False
+
+    def _buffer_statsme_counter_write(self, query: str, params: tuple[Any, ...]) -> bool:
+        buf = self._statsme_counter_deltas
+        if buf is None:
+            return False
+        if query == _UPDATE_PLAYER_SHOTS_HITS_QUERY:
+            shots, hits, player_id = params
+            buf.add_player(int(player_id), int(shots), int(hits))
+            return True
+        if query == _UPDATE_SERVER_CT_SHOTS_HITS_QUERY:
+            shots, hits, map_shots, map_hits, server_id = params
+            buf.add_server(int(server_id), "CT", int(shots), int(hits), int(map_shots), int(map_hits))
+            return True
+        if query == _UPDATE_SERVER_TS_SHOTS_HITS_QUERY:
+            shots, hits, map_shots, map_hits, server_id = params
+            buf.add_server(int(server_id), "TERRORIST", int(shots), int(hits), int(map_shots), int(map_hits))
             return True
         return False
 
@@ -3771,6 +3858,22 @@ class EventStorage:
             execute=_emit,
         )
 
+    def _flush_statsme_counter_buffer(self) -> None:
+        buf = self._statsme_counter_deltas
+        if buf is None:
+            return
+        connection = self._connection()
+
+        def _emit(query: str, params: tuple[object, ...]) -> None:
+            self._execute_direct(connection, query, params)
+
+        buf.flush(
+            update_player_query=_UPDATE_PLAYER_SHOTS_HITS_QUERY,
+            update_server_ct_query=_UPDATE_SERVER_CT_SHOTS_HITS_QUERY,
+            update_server_ts_query=_UPDATE_SERVER_TS_SHOTS_HITS_QUERY,
+            execute=_emit,
+        )
+
     def _fetchone(
         self,
         connection: proxy_db.SupportsConnection,
@@ -3816,6 +3919,7 @@ class EventStorage:
         ):
             self._flush_event_buffer()
             self._flush_frag_counter_buffer()
+            self._flush_statsme_counter_buffer()
             self._commit_pending(force=True)
 
     def _commit_pending(self, *, force: bool = False) -> None:
@@ -3841,7 +3945,7 @@ class EventStorage:
         for player_id in sorted(self._online_event_touched_players):
             self._flush_player_connection_time(connection, player_id, flush_timestamp)
         # Connection-time processing can itself accumulate a name rollup, so
-        # snapshot after that pass. Do not replace these loops with the
+        # snapshot after that pass.  Do not replace these loops with the
         # all-player helpers: those are intentionally reserved for finite
         # stdin imports and would turn every live packet into O(cache size).
         for player_id in sorted(self._online_event_deferred_players):
@@ -3870,8 +3974,12 @@ class EventStorage:
             buffer.clear()
         if self._frag_write_deltas is not None:
             self._frag_write_deltas.clear()
+        if self._statsme_counter_deltas is not None:
+            self._statsme_counter_deltas.clear()
         self._player_name_rollups.clear()
+        self._ensured_player_history_rows.clear()
         self._ignored_bot_profiles_applied.clear()
+        self._ignored_bot_history_seeded.clear()
         self._closed_player_objects.clear()
         if self._transaction_batch_size <= 0:
             return
