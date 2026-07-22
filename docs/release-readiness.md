@@ -93,6 +93,24 @@ $env:PYTHONPATH = "scripts;scripts/replay_baseline"
 python scripts/replay_baseline/bench_write_path.py --mode subprocess --lines 300
 ```
 
+The preserved full-state one-log SQL evidence in
+`docs/audits/legacy-python-parity-20260423/performance-db-sql-opt-20260718-sql-write-opt-r1/`
+measured the stdin-only history ensure-row cache at 4,613 to 2,519 logical
+calls and 4.457 s to 2.071 s for 2,287 records. It is development evidence,
+not a replacement for an accepted `narrow-1000` contour.
+
+The bounded Statsme counter-delta slice has retained release evidence under
+`docs/audits/legacy-python-parity-20260423/performance-db-sql-opt-narrow-1000-20260718-statsme-bench-r1/`.
+Its 427 explicit product tests, prefix r2 and fresh no-reuse narrow r1 parity,
+and product-path timing record the exact 1,000-file manifest SHA and anchors.
+The profile reduced physical `Connection.query` calls from 124,630 to 60,785,
+but `462.691 s` profiled and `246.362 s` isolated-host unprofiled wall samples
+are not matched incremental-speed evidence. Do not promote this slice on wall
+time alone; use its accepted narrow parity and GeoIP-only residual classification
+as the correctness evidence. The product-path legacy/Python `1.108x` is a
+same-corpus elapsed ratio only; see
+`docs/audits/legacy-python-parity-20260423/runtime-product-timing-20260718-statsme-product-timing-r1-legacy-reference.md`.
+
 Ephemeral Docker benchmarks remain optional release diagnostics:
 
 ```powershell

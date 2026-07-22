@@ -55,6 +55,22 @@
 - `P6d` is no longer an active residual hunt for `Entries`, `ChangeTeam`,
   `PlayerNames`, `Players_History`, or `TeamBonuses`; those gates are closed
   for the supported narrow/default Python contour.
+- The bounded Statsme counter-delta slice is source- and runtime-accepted:
+  427 explicit product tests passed; prefix r2 and fresh no-reuse narrow r1
+  retain only the accepted GeoIP-only `hlstats_Players` residual. The
+  product-path Python-only import, with accepted legacy reused, measured
+  `138.4203224 s` / `4,451.15 records/s` against fresh legacy `153.389 s`
+  (`9.76%` less elapsed; `1.108x` same-corpus elapsed ratio, not normalized
+  throughput). Its manifest is
+  1,000 files, SHA
+  `95BFDB5951922C0C36AAB2C5263E1880B227E845B34C9262939B028D0FBEBE8A`, with
+  ignored=0 and anchors `323/5464/4765/0/1`. Disposable profiling observed
+  `Connection.query` calls `124,630 -> 60,785` (`-51.2%`), but the profiled
+  `462.691 s` and isolated-host unprofiled `246.362 s` samples are
+  environmentally non-comparable and do not justify an incremental wall-speed
+  promotion. Evidence:
+  `docs/audits/legacy-python-parity-20260423/performance-db-sql-opt-narrow-1000-20260718-statsme-bench-r1/` and
+  `runtime-product-timing-20260718-statsme-product-timing-r1-legacy-reference.md`.
 - The active autonomy track is now release-readiness/product hardening:
   docs truth, repository-wide CI, package/runtime boundaries, lifecycle and
   control-plane hardening, explicit DB modes, parity acceptance automation,
@@ -490,6 +506,16 @@ Current parity state:
    evidence handoff runbook.
 2. Keep the stale reconnect-code fix out of scope unless fresh code or test
    evidence contradicts the current implementation.
+3. SQL write-path slice `20260718-sql-write-opt-r1` is source-validated: the
+   stdin-only `Players_History` ensure-row cache reduced the preserved
+   `L0105062.log` logical SQL count from 4,613 to 2,519 and wall time from
+   4.457 s to 2.071 s without stable-key drift outside the known wall-clock
+   `Players.last_event` field. A fresh no-reuse `narrow-1000`
+   `20260718-sqlwrite-r2` promotion confirms matching manifests, anchors, and
+   SQL snapshot bodies; its only database residual is the established
+   GeoIP-only `Players.country`/`flag` classification. This remains
+   source-validated evidence, not a replacement for the release-clean GeoIP
+   backfill gate. See the audit report for disposable-DB evidence.
 
 ## Decisions
 

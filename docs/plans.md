@@ -72,6 +72,10 @@ Historical autonomy follow-up context:
   `TeamBonuses` residuals.
 - Keep replay, compare, and representative EN/RU smoke checks runnable without
   duplicating their runbooks across multiple docs.
+- Retain the narrow stdin-only `Players_History` ensure-row cache validated by
+  `performance-db-sql-opt-20260718-sql-write-opt-r1`; do not broaden it to the
+  online runtime. The next SQL candidate needs a separate flush-boundary and
+  error-semantics investigation.
 - Continue the heatmap upgrade on the hybrid path: DB-backed canvas overlay in
   web, static JPEG compatibility fallback, player-scoped kill/death widgets,
   and per-map projection calibration from overview seeds plus DB-first manual
@@ -300,6 +304,19 @@ Outcome:
 Replay-critical map flow, awards/ribbons behavior, and GeoIP handling were
 modernized and replay-validated without changing the default strict product
 contract.
+
+### [x] P6f. Bounded Statsme counter-delta write slice
+
+Outcome:
+Statsme player/server counter updates are batched at the stdin transaction
+boundary while append-only Statsme events remain explicit. The slice has 427
+explicit product tests, prefix r2 plus fresh no-reuse narrow r1 parity, and a
+Python-only product-path timing gate with only the accepted GeoIP Players
+residual. The legacy/Python `1.108x` figure is a same-corpus elapsed ratio, not
+normalized records/s or incremental Statsme wall-speed proof. The disposable
+profile shows fewer physical DB calls, but its profiled and isolated-host wall
+samples are not a promotion claim. See
+`docs/audits/legacy-python-parity-20260423/performance-db-sql-opt-narrow-1000-20260718-statsme-bench-r1/`.
 
 ## Out of scope for this lane
 

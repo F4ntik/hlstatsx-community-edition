@@ -43,3 +43,14 @@
 - Run tests and replay checks in **this** subproject after edits.
 - Rebuild `hlstats-worker` when Dockerized replay must pick up new `hlstats_py`
   code (see `docs/replay-fast-path.md`).
+- For a long Docker replay, use the DB-backed monitoring procedure in
+  `docs/replay-fast-path.md`: delegate one monitor where possible, sample
+  MySQL `hlstats_Events_Frags` count in both contours no more than once per 60
+  seconds, and do not tightly poll an unchanged terminal line. Counts are
+  telemetry only, never replay-acceptance evidence.
+- Keep Python replay scratch in a unique named Docker volume per evidence run;
+  export only the declared manifests rather than bind-mounting scratch I/O on
+  Docker Desktop, where host mounts can stall the import.
+- For `IgnoreBots`, the exact source-log message `Log file started` starts a
+  new per-server bot-seed epoch without clearing the player identity cache. In
+  asynchronous replay that mutation belongs to the serialized storage executor.

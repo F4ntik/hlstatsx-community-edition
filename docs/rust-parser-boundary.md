@@ -88,6 +88,11 @@ removing redundant SQL and introducing parity-safe batching, with focused
 storage tests and SQL-trace/parity comparison, before broadening the Rust
 boundary.
 
+The later `20260718-sql-write-opt-r1` stdin-only history-row cache reduced the
+same full-state log to 2.071 s; its cProfile still attributes 1.170 s to
+MySQL `Connection.query` while parser work is 0.163 s. Rust therefore remains
+an optional parser-only stage; storage/runtime expansion remains out of scope.
+
 ## First Rust boundary
 
 Stage 1 may add an **optional parser-only** Rust implementation behind the
@@ -109,3 +114,12 @@ normalization, timestamp parsing, and subtle event/lifecycle ordering.  The
 measured full-state profile shows that storage and DB round trips dominate;
 re-measure after parity-safe SQL reduction before reconsidering a broader Rust
 scope.
+
+The later bounded Statsme counter-delta slice confirms the same boundary at
+`narrow-1000` scale: its disposable profile reduced physical
+`Connection.query` calls from 124,630 to 60,785, while native parser cumulative
+time was 35.541 s. The profiled 462.691 s and isolated-host unprofiled 246.362
+s samples are environmentally non-comparable, so they do not establish an
+incremental end-to-end wall-speed gain. Rust remains optional parser-only work;
+do not use this storage evidence to widen its scope. Evidence:
+`docs/audits/legacy-python-parity-20260423/performance-db-sql-opt-narrow-1000-20260718-statsme-bench-r1/`.

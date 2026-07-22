@@ -49,10 +49,64 @@ FTP-контур не отбрасывает самый новый файл по
 `--overwrite-manifests`. Runner передаёт временные пути в контейнер и
 публикует их в audit-dir только после успешного импорта.
 
+### Scratch-том Python-контура
+
+Для stdin-импорта `Run-DualContour-1000.ps1` создаёт уникальный именованный
+Docker volume для `/tmp/ftp_work`, а после успешной фазы экспортирует из него
+только два manifest-файла в audit-dir и удаляет volume в `finally`. Не
+подменяйте его host bind-mount: на Docker Desktop/Windows 9p доступ к большому
+набору логов может остановить Python FTP-воркер в I/O wait. Конфликт имени
+volume является ошибкой запуска, а не поводом переиспользовать чужой том.
+
 Для каждого прогона задавайте канонический `ArtifactLabel`:
 `narrow-1000`, `full-41513` или `prefix-*`, и уникальный `EvidenceRunId`.
 Старые артефакты с именем `*-1000` проверяйте по количеству, SHA и contour
 metadata: часть из них является misnamed `full-41513`, а не narrow-1000.
+
+## Мониторинг долгого replay
+
+Долгий Docker-replay не мониторится частым опросом терминала: неподвижная
+строка в нём не означает остановку, а такой polling тратит ресурсы оператора.
+При доступной командной работе назначайте одного отдельного наблюдателя. Он
+снимает MySQL `COUNT(*)` из `hlstats_Events_Frags` в обоих контурах не чаще
+одного раза в 60 секунд; основной исполнитель в это время продолжает
+подготовку артефактов или анализ результата.
+
+Для стандартного comparison compose используйте запрос ниже, подставив имя
+нужного контейнера (`hlstatsx-legacy-db` или `hlstatsx-python-db`):
+
+```powershell
+docker exec <db-container> mysql -uroot -proot123 -D hlstatsxce -N -B -e "SELECT COUNT(*) FROM hlstats_Events_Frags;"
+```
+
+`root123` здесь — одноразовый fixture-пароль из локального replay compose, а
+не production credential. Во время restore таблица может ещё отсутствовать:
+один такой ответ является стартовой гонкой, нужно дождаться полного интервала
+и повторить выборку, а не объявлять прогон неуспешным. На фазе legacy-import
+растёт только legacy-контур; Python-контур может оставаться нулевым до своей
+stdin-фазы. Счётчик фрагов — только telemetry живого прогресса, но не критерий
+приёмки: успех подтверждают код завершения runner, финальное сравнение
+контуров и сохранённые audit-артефакты.
+
+## Source-log граница IgnoreBots
+
+Для `IgnoreBots` только точное сообщение `Log file started` открывает новую
+source-log эпоху: сбрасывается per-server bot-seed epoch, но не cache player
+identity. В асинхронном stdin/replay этот reset выполняется сериализованным
+storage executor, а не parse-loop/event-loop до постановки DB-операции.
+
+Принятый source-log gate от `2026-07-22`: `prefix-100` и `narrow-1000` прошли
+runner, post-replay GeoIP и полное DB-сравнение без drift. Для narrow-1000
+используйте evidence ID
+`20260722-ignorebots-source-log-narrow-1000-r1`; оба SQL snapshots имеют
+`frags=5464`. Подробная история, включая отвергнутые pre-fix прогоны, находится
+в `docs/audits/legacy-python-parity-20260423/prefix-100-20260722-p6f-history-cache-validation.md`.
+
+Минимальный acceptance loop для изменения replay-пути: после точечных
+регрессий выполнить `prefix-100`, затем полный `narrow-1000`; для каждого
+прогона дождаться успешного runner, выполнить GeoIP-pass и
+`compare_stats_dbs.py`. Отдельный счётчик фрагов помогает заметить зависание,
+но никогда не заменяет финальный table diff.
 
 ## Где искать команды и нюансы
 
