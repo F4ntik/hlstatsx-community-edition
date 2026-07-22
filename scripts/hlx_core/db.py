@@ -124,7 +124,7 @@ class SyncDatabaseAdapter:
         retry_backoff: float = 1.0,
         connect_timeout: float = 5.0,
         read_timeout: float = 5.0,
-        write_timeout: float | None = None,
+        write_timeout: float = 5.0,
         enable_multi_statements: bool = False,
         executemany_chunk_size: int = 1000,
         import_mode: bool = False,
@@ -134,10 +134,12 @@ class SyncDatabaseAdapter:
             raise ValueError("max_retries must be non-negative")
         if retry_backoff < 0:
             raise ValueError("retry_backoff must be non-negative")
-        if connect_timeout <= 0:
+        if not math.isfinite(connect_timeout) or connect_timeout <= 0:
             raise ValueError("connect_timeout must be positive")
-        if read_timeout <= 0:
+        if not math.isfinite(read_timeout) or read_timeout <= 0:
             raise ValueError("read_timeout must be positive")
+        if not math.isfinite(write_timeout) or write_timeout <= 0:
+            raise ValueError("write_timeout must be positive")
         if executemany_chunk_size <= 0:
             raise ValueError("executemany_chunk_size must be positive")
         if enable_multi_statements and not import_mode:
@@ -326,8 +328,7 @@ class SyncDatabaseAdapter:
             "read_timeout": self._normalize_timeout(self._read_timeout),
             "init_command": self._connection_init_command(),
         }
-        if self._write_timeout is not None:
-            params["write_timeout"] = self._normalize_timeout(self._write_timeout)
+        params["write_timeout"] = self._normalize_timeout(self._write_timeout)
         if self._enable_multi_statements:
             client_flag = self._resolve_client_multi_statements_flag()
             if client_flag is not None:
@@ -498,7 +499,7 @@ class DatabaseAdapter:
         retry_backoff: float = 1.0,
         connect_timeout: float = 5.0,
         read_timeout: float = 5.0,
-        write_timeout: float | None = None,
+        write_timeout: float = 5.0,
         loop: asyncio.AbstractEventLoop | None = None,
         executor: Executor | None = None,
         runner: Runner | None = None,

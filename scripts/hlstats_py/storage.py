@@ -636,6 +636,14 @@ class EventStorage:
         self._suppress_next_round_end_kill_streak: dict[int, set[int]] = {}
         self._server_totals_dirty: set[int] = set()
         self._transaction_batch_size = 0
+        self._stdin_batch_active = False
+        self._online_event_active = False
+        self._online_event_touched_players: set[int] = set()
+        # Only ids recorded by the active online event may be flushed before
+        # its commit. The broader rollup dictionaries are intentionally kept
+        # for stdin import finalization and must never make a live packet walk
+        # every cached player.
+        self._online_event_deferred_players: set[int] = set()
         self._pending_writes = 0
         self._pending_records = 0
         self._cached_cursor: proxy_db.SupportsCursor | None = None
@@ -658,6 +666,7 @@ class EventStorage:
 
     def begin_stdin_batch(self, *, transaction_batch_size: int) -> None:
         """Enable batched transaction mode for high-volume stdin imports."""
+        self._stdin_batch_active = True
         if transaction_batch_size <= 0:
             self._transaction_batch_size = 0
             self._pending_writes = 0
@@ -680,6 +689,86 @@ class EventStorage:
             return
         self._event_buffer = EventBuffer(policy=BufferPolicy(max_buffered_events=max_buffered_events))
 
+    def begin_online_event(self) -> None:
+        """Start the explicit transaction for one live logical event.
+
+        Stdin imports own their transaction and buffer lifecycle, including a
+        zero-sized transaction batch, so they deliberately bypass this path.
+        """
+
+        if self._stdin_batch_active:
+            return
+        if self._online_event_active:
+            raise StorageError("online event transaction already active")
+        if (
+            self._player_name_rollups
+            or self._player_history_rollups
+            or self._online_event_touched_players
+            or self._online_event_deferred_players
+        ):
+            raise StorageError("online event has unflushed deferred rollups")
+        buffer = self._event_buffer
+        if buffer is not None and buffer.buffered_rows > 0:
+            raise StorageError("online event buffers are not supported")
+        self._event_buffer = None
+        try:
+            self._set_autocommit(False)
+        except Exception:
+            try:
+                self._set_autocommit(True)
+            except Exception:
+                pass
+            raise
+        self._online_event_active = True
+
+    def commit_online_event(self) -> None:
+        """Commit one live logical event and restore autocommit.
+
+        A failed commit is rolled back before the connection is returned to
+        its normal autocommit mode. The caller must treat any exception as a
+        fatal online storage failure.
+        """
+
+        if not self._online_event_active:
+            return
+        try:
+            self._flush_online_event_rollups()
+            self._commit_pending(force=True)
+        except Exception:
+            try:
+                self._rollback_online_event()
+            finally:
+                try:
+                    self._set_autocommit(True)
+                finally:
+                    self._finish_online_event()
+            raise
+        try:
+            self._set_autocommit(True)
+        except Exception:
+            try:
+                self._rollback_online_event()
+            finally:
+                try:
+                    self._set_autocommit(True)
+                finally:
+                    self._finish_online_event()
+            raise
+        self._finish_online_event()
+
+    def abort_online_event(self) -> None:
+        """Rollback a failed live logical event and restore autocommit."""
+
+        if not self._online_event_active:
+            return
+        try:
+            self._rollback_online_event()
+        finally:
+            try:
+                self._set_autocommit(True)
+            finally:
+                self._finish_online_event()
+
     def end_stdin_batch(self) -> None:
         """Flush pending writes and restore autocommit after stdin import."""
         if self._transaction_batch_size <= 0:
@@ -687,6 +776,7 @@ class EventStorage:
             self._flush_frag_counter_buffer()
             self._event_buffer = None
             self._set_skip_adapter_ping(False)
+            self._stdin_batch_active = False
             self._close_db_write_trace()
             return
         self._flush_event_buffer()
@@ -700,6 +790,7 @@ class EventStorage:
         self._event_buffer = None
         self._frag_write_deltas = None
         self._set_skip_adapter_ping(False)
+        self._stdin_batch_active = False
         self._close_db_write_trace()
 
     def abort_stdin_batch(self) -> None:
@@ -710,6 +801,7 @@ class EventStorage:
             self._flush_frag_counter_buffer()
             self._event_buffer = None
             self._set_skip_adapter_ping(False)
+            self._stdin_batch_active = False
             self._close_db_write_trace()
             return
         try:
@@ -723,6 +815,7 @@ class EventStorage:
             self._event_buffer = None
             self._frag_write_deltas = None
             self._set_skip_adapter_ping(False)
+            self._stdin_batch_active = False
             self._close_db_write_trace()
 
     def reset_runtime_state(self) -> None:
@@ -736,6 +829,8 @@ class EventStorage:
         self._player_name_lastuse.clear()
         self._player_name_rollups.clear()
         self._player_history_rollups.clear()
+        self._online_event_touched_players.clear()
+        self._online_event_deferred_players.clear()
         self._player_daily_skill_changes.clear()
         self._player_daily_skill_change_days.clear()
         self._player_last_flushed_skills.clear()
@@ -1876,6 +1971,8 @@ class EventStorage:
         self._mark_player_seen_on_server(context.server_id, player_id, update_live_roster=update_live_roster)
         self._player_connection_time_flush_at.setdefault(player_id, timestamp)
         self._player_connection_time_context[player_id] = (context.server_id, context.game)
+        if self._online_event_active:
+            self._online_event_touched_players.add(player_id)
         normalized_team = self._normalize_team_name(descriptor.team)
         if not (userid_rollover and not normalized_team and not update_live_roster):
             self._server_player_last_activity.setdefault(context.server_id, {})[player_id] = timestamp
@@ -2366,6 +2463,8 @@ class EventStorage:
         shots: int = 0,
         hits: int = 0,
     ) -> None:
+        if self._online_event_active:
+            self._online_event_deferred_players.add(player_id)
         rollup = self._player_name_rollups.setdefault(player_id, _PlayerNameRollup())
         rollup.add(
             connection_time=connection_time,
@@ -3135,6 +3234,8 @@ class EventStorage:
         resolved_death_streak = death_streak or 0
         resolved_kill_streak = kill_streak or 0
         if defer_history:
+            if self._online_event_active:
+                self._online_event_deferred_players.add(player_id)
             rollup = self._player_history_rollups.setdefault(player_id, _PlayerHistoryRollup())
             rollup.add(
                 kills=kills,
@@ -3727,6 +3828,41 @@ class EventStorage:
         self._pending_writes = 0
         if self._transaction_batch_size > 0:
             self._pending_records = 0
+
+    def _flush_online_event_rollups(self) -> None:
+        """Write deferred rollups before committing their live event.
+
+        Online packets must not pass deferred session/name/history totals into
+        a later packet's transaction. Stdin retains its batch/finalize lifecycle.
+        """
+
+        connection = self._connection()
+        flush_timestamp = self._connection_time_flush_timestamp()
+        for player_id in sorted(self._online_event_touched_players):
+            self._flush_player_connection_time(connection, player_id, flush_timestamp)
+        # Connection-time processing can itself accumulate a name rollup, so
+        # snapshot after that pass. Do not replace these loops with the
+        # all-player helpers: those are intentionally reserved for finite
+        # stdin imports and would turn every live packet into O(cache size).
+        for player_id in sorted(self._online_event_deferred_players):
+            self._flush_pending_player_history_rollup(connection, player_id, flush_timestamp)
+        for player_id in sorted(self._online_event_deferred_players):
+            self._flush_player_profile_name(connection, player_id)
+        for server_id in sorted(self._server_totals_dirty):
+            self._refresh_server_player_totals(connection, server_id)
+
+    def _rollback_online_event(self) -> None:
+        connection = self._connection()
+        rollback = getattr(connection, "rollback", None)
+        if callable(rollback):
+            rollback()
+
+    def _finish_online_event(self) -> None:
+        self._pending_writes = 0
+        self._pending_records = 0
+        self._online_event_active = False
+        self._online_event_touched_players.clear()
+        self._online_event_deferred_players.clear()
 
     def _rollback_pending(self) -> None:
         buffer = self._event_buffer

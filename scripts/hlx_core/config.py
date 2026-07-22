@@ -25,6 +25,10 @@ _DEFAULTS: Mapping[str, str] = MappingProxyType(
         "Port": "27500",
         "DebugLevel": "0",
         "EventQueueSize": "10",
+        # This is intentionally distinct from the legacy proxy-daemon
+        # EventQueueSize.  It bounds only the Python HLstats worker's UDP
+        # ingress queue.
+        "IngressQueueSize": "1000",
         "CpanelHack": "0",
     }
 )
@@ -43,6 +47,7 @@ class ProxyConfig:
     port: int
     debug_level: int
     event_queue_size: int
+    ingress_queue_size: int
     cpanel_hack: bool
     raw: Mapping[str, str]
 
@@ -95,6 +100,9 @@ def _build_proxy_config(config_path: Path, raw: Mapping[str, str]) -> ProxyConfi
     event_queue_size = _parse_int(raw.get("EventQueueSize", ""), "EventQueueSize")
     if event_queue_size <= 0:
         raise ConfigError("EventQueueSize must be greater than zero")
+    ingress_queue_size = _parse_int(raw.get("IngressQueueSize", ""), "IngressQueueSize")
+    if ingress_queue_size <= 0:
+        raise ConfigError("IngressQueueSize must be greater than zero")
 
     cpanel_hack = _parse_bool(raw.get("CpanelHack", ""), "CpanelHack")
 
@@ -112,6 +120,7 @@ def _build_proxy_config(config_path: Path, raw: Mapping[str, str]) -> ProxyConfi
         port=port,
         debug_level=debug_level,
         event_queue_size=event_queue_size,
+        ingress_queue_size=ingress_queue_size,
         cpanel_hack=cpanel_hack,
         raw=frozen_raw,
     )

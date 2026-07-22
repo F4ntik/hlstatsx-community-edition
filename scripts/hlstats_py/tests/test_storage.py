@@ -3565,6 +3565,187 @@ def test_ignored_bot_profile_cache_is_cleared_on_rollback(event_context: EventCo
     assert connection.rollback_calls == 1
 
 
+def test_online_events_commit_independently_without_cross_event_buffering() -> None:
+    connection = FakeConnection()
+    storage = EventStorage(StubAdapter(connection))
+    storage.configure_event_buffer(max_buffered_events=5000)
+
+    for message in ("first", "second"):
+        storage.begin_online_event()
+        storage._execute(
+            connection,
+            _INSERT_CHAT_QUERY,
+            (datetime(2024, 1, 2, 3, 4, 5), 7, "de_dust2", 101, 1, message),
+        )
+        assert (_INSERT_CHAT_QUERY, (datetime(2024, 1, 2, 3, 4, 5), 7, "de_dust2", 101, 1, message)) in connection.executed
+        storage.commit_online_event()
+
+    assert connection.commit_calls == 2
+    assert connection.autocommit_calls == [False, True, False, True]
+    assert storage._event_buffer is None
+
+
+def test_online_commit_failure_rolls_back_and_restores_autocommit() -> None:
+    class FailingCommitConnection(FakeConnection):
+        def commit(self) -> None:
+            super().commit()
+            raise RuntimeError("synthetic commit failure")
+
+    connection = FailingCommitConnection()
+    storage = EventStorage(StubAdapter(connection))
+    storage.begin_online_event()
+    storage._execute(
+        connection,
+        _INSERT_CHAT_QUERY,
+        (datetime(2024, 1, 2, 3, 4, 5), 7, "de_dust2", 101, 1, "failed"),
+    )
+
+    with pytest.raises(RuntimeError, match="synthetic commit failure"):
+        storage.commit_online_event()
+
+    assert connection.commit_calls == 1
+    assert connection.rollback_calls == 1
+    assert connection.autocommit_calls == [False, True]
+    assert storage._online_event_active is False
+
+
+def test_online_event_abort_rolls_back_and_restores_autocommit() -> None:
+    connection = FakeConnection()
+    storage = EventStorage(StubAdapter(connection))
+    storage.begin_online_event()
+    storage._execute(
+        connection,
+        _INSERT_CHAT_QUERY,
+        (datetime(2024, 1, 2, 3, 4, 5), 7, "de_dust2", 101, 1, "failed"),
+    )
+
+    storage.abort_online_event()
+
+    assert connection.rollback_calls == 1
+    assert connection.autocommit_calls == [False, True]
+    assert storage._online_event_active is False
+
+
+def test_online_event_commit_scopes_deferred_player_name_and_history_rollups(
+    event_context: EventContext,
+) -> None:
+    connection = FakeConnection()
+    storage = EventStorage(StubAdapter(connection))
+    timestamp = datetime(2024, 1, 2, 3, 4, 5)
+    storage._player_names[101] = "Alice"
+    storage._player_connection_time_context[101] = (event_context.server_id, event_context.game)
+
+    for kills in (1, 2):
+        storage.begin_online_event()
+        storage._update_player_rollups(
+            connection,
+            context=event_context,
+            timestamp=timestamp,
+            processed_at=timestamp,
+            player_id=101,
+            kills=kills,
+        )
+        assert 101 in storage._player_name_rollups
+        assert 101 in storage._player_history_rollups
+        storage.commit_online_event()
+        assert storage._player_name_rollups == {}
+        assert storage._player_history_rollups == {}
+
+    history_kills = [
+        params[1]
+        for query, params in connection.executed
+        if query == _UPDATE_PLAYER_HISTORY_QUERY and params is not None
+    ]
+    name_kills = [
+        params[1]
+        for query, params in connection.executed
+        if query == _UPDATE_PLAYERNAME_TOTALS_QUERY and params is not None
+    ]
+    assert history_kills == [1, 2]
+    assert name_kills == [1, 2]
+    assert connection.commit_calls == 2
+
+
+def test_online_event_commit_does_not_update_unrelated_cached_player_profile(
+    event_context: EventContext,
+) -> None:
+    connection = FakeConnection()
+    storage = EventStorage(StubAdapter(connection))
+    timestamp = datetime(2024, 1, 2, 3, 4, 5)
+    storage._player_names[101] = "Alice"
+    storage._player_names[202] = "Unrelated"
+    storage._player_connection_time_context[101] = (event_context.server_id, event_context.game)
+    storage._player_connection_time_context[202] = (event_context.server_id, event_context.game)
+    storage._player_connection_time_flush_at[101] = timestamp
+    storage._player_connection_time_flush_at[202] = timestamp
+
+    storage.begin_online_event()
+    # The real resolver marks only identities encountered by this logical
+    # packet. Keep a second cached player present to catch an accidental
+    # all-player profile/connection scan during commit.
+    storage._online_event_touched_players.add(101)
+    storage._update_player_rollups(
+        connection,
+        context=event_context,
+        timestamp=timestamp,
+        processed_at=timestamp,
+        player_id=101,
+        kills=1,
+    )
+    storage.commit_online_event()
+
+    assert (_UPDATE_PLAYER_NAME_QUERY, ("Unrelated", 202)) not in connection.executed
+    assert all(
+        not (query == _UPDATE_PLAYER_CONNECTION_TIME_QUERY and params is not None and params[-1] == 202)
+        for query, params in connection.executed
+    )
+
+
+def test_zero_sized_stdin_batch_does_not_open_online_event_transactions() -> None:
+    connection = FakeConnection()
+    storage = EventStorage(StubAdapter(connection))
+    storage.begin_stdin_batch(transaction_batch_size=0)
+    storage.begin_online_event()
+    storage._execute(
+        connection,
+        _INSERT_CHAT_QUERY,
+        (datetime(2024, 1, 2, 3, 4, 5), 7, "de_dust2", 101, 1, "stdin"),
+    )
+    storage.commit_online_event()
+    storage.end_stdin_batch()
+
+    assert connection.autocommit_calls == []
+    assert connection.commit_calls == 0
+
+
+def test_zero_sized_stdin_batch_keeps_deferred_rollups_for_import_finalization(
+    event_context: EventContext,
+) -> None:
+    connection = FakeConnection()
+    storage = EventStorage(StubAdapter(connection))
+    timestamp = datetime(2024, 1, 2, 3, 4, 5)
+    storage.begin_stdin_batch(transaction_batch_size=0)
+    storage._player_names[101] = "Alice"
+    storage._player_connection_time_context[101] = (event_context.server_id, event_context.game)
+    storage._update_player_rollups(
+        connection,
+        context=event_context,
+        timestamp=timestamp,
+        processed_at=timestamp,
+        player_id=101,
+        kills=1,
+    )
+
+    storage.begin_online_event()
+    storage.commit_online_event()
+
+    assert 101 in storage._player_name_rollups
+    assert 101 in storage._player_history_rollups
+    storage.finalize_import()
+    assert storage._player_name_rollups == {}
+    assert storage._player_history_rollups == {}
+
+
 def test_apply_server_map_transition_loading_query() -> None:
     connection = FakeConnection({})
     storage = EventStorage(StubAdapter(connection))
