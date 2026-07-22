@@ -5,12 +5,19 @@ using the shared synchronous MySQL adapter from `proxy_daemon_py`. Each action
 emits a deterministic sequence of SQL statements so that the behaviour can be
 validated in tests and monitored during roll-out.
 
+When several actions are requested, the legacy-compatible order is `prune`,
+`optimize`, `inactive`, `awards`, `ribbons`, then `geoip`. The release-clean
+historical contour deliberately selects only the trailing four actions, so
+archive events remain available while awards are calculated.
+
 ## Player activity refresh (`--inactive`)
 
 1. Read `MinActivity` and `UseTimestamp` from `hlstats_Options`.
-2. When timestamps are enabled, fetch `MAX(last_event)` per game from
-   `hlstats_Servers` and update player activity with
-   `TIMESTAMPDIFF(SECOND, last_event, <max>)`. Otherwise compare to `NOW()`.
+2. `hlstats_Servers.last_event` and `hlstats_Players.last_event` are Unix-epoch
+   `INT` values. When timestamps are enabled, fetch `MAX(last_event)` per game
+   and update activity with numeric `<max> - hlstats_Players.last_event`.
+   Otherwise use `UNIX_TIMESTAMP() - hlstats_Players.last_event` as the
+   wall-clock fallback; do not apply `TIMESTAMPDIFF` to these integer fields.
 3. Hide inactive players (`hideranking = 3`) when `activity < 0`.
 
 ## GeoIP backfill (`--geoip`)
@@ -47,6 +54,9 @@ validated in tests and monitored during roll-out.
    - connection time streaks.
 4. Persist the winners into `hlstats_Awards` and mirror them in
    `hlstats_Players_Awards` for ribbon processing.
+5. Keep the two historical `headshot` meanings distinct: object/action awards
+   (`type=O`) match the literal action code `headshot`, while weapon awards
+   (`type=W`) match the numeric frag headshot flag `1`.
 
 ## Ribbon recomputation (`--ribbons`)
 

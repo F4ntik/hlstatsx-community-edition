@@ -25,8 +25,8 @@ UPDATE_ACTIVITY_NOW = normalize_sql(
     """
     UPDATE hlstats_Players
     SET activity = IF(
-        (%s > TIMESTAMPDIFF(SECOND, hlstats_Players.last_event, NOW())),
-        ((100 / %s) * (%s - TIMESTAMPDIFF(SECOND, hlstats_Players.last_event, NOW()))),
+        (%s > (UNIX_TIMESTAMP() - hlstats_Players.last_event)),
+        ((100 / %s) * (%s - (UNIX_TIMESTAMP() - hlstats_Players.last_event))),
         -1
     )
     """

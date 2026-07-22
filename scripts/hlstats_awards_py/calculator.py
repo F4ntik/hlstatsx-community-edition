@@ -174,6 +174,10 @@ class AwardsCalculator:
             self._optimize_tables(connection)
         if AwardsAction.INACTIVE in actions:
             self._update_player_activity(connection)
+        if AwardsAction.AWARDS in actions:
+            self._process_awards(connection, settings.cli.numdays, settings.cli.date)
+        if AwardsAction.RIBBONS in actions:
+            self._process_ribbons(connection)
         if AwardsAction.GEOIP in actions:
             try:
                 self._process_geoip(connection, settings)
@@ -181,10 +185,6 @@ class AwardsCalculator:
                 if self._policy.strict_geoip:
                     raise
                 print(f"warning: {exc}; skipping GeoIP in replay-safe mode")
-        if AwardsAction.AWARDS in actions:
-            self._process_awards(connection, settings.cli.numdays, settings.cli.date)
-        if AwardsAction.RIBBONS in actions:
-            self._process_ribbons(connection)
 
     # ------------------------------------------------------------------
     # Inactive player handling
@@ -239,8 +239,8 @@ class AwardsCalculator:
                     """
                     UPDATE hlstats_Players
                     SET activity = IF(
-                        (%s > TIMESTAMPDIFF(SECOND, hlstats_Players.last_event, %s)),
-                        ((100 / %s) * (%s - TIMESTAMPDIFF(SECOND, hlstats_Players.last_event, %s))),
+                        (%s > (%s - hlstats_Players.last_event)),
+                        ((100 / %s) * (%s - (%s - hlstats_Players.last_event))),
                         -1
                     )
                     WHERE hlstats_Players.game = %s
@@ -260,8 +260,8 @@ class AwardsCalculator:
                 """
                 UPDATE hlstats_Players
                 SET activity = IF(
-                    (%s > TIMESTAMPDIFF(SECOND, hlstats_Players.last_event, NOW())),
-                    ((100 / %s) * (%s - TIMESTAMPDIFF(SECOND, hlstats_Players.last_event, NOW()))),
+                    (%s > (UNIX_TIMESTAMP() - hlstats_Players.last_event)),
+                    ((100 / %s) * (%s - (UNIX_TIMESTAMP() - hlstats_Players.last_event))),
                     -1
                 )
                 """,
@@ -858,7 +858,7 @@ class AwardQueryBuilder:
             )
 
         context = _award_context(award)
-        match_value = 1 if award.code == "headshot" else award.code
+        match_value = 1 if award.award_type == "W" and award.code == "headshot" else award.code
         return (
             self._generic_daily(context, match_value),
             (award.game, match_value),
