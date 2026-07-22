@@ -142,7 +142,8 @@ function f_num($number) {
 	}
 }
 
-	$player_id = 0;  
+	$player_id = 0;
+	$realgame = '';
 	if (isset($_GET['player_id'])) {
 		$player_id = valid_request($_GET['player_id'], true);
 	} elseif (isset($_GET['steam_id']) && isset($_GET['game'])) {
@@ -185,12 +186,17 @@ function f_num($number) {
 		$show_flags = valid_request($_GET['show_flags'], true);
 	}
 
-	if (file_exists(IMAGE_PATH.'/progress/sig_'.$player_id.'.png')) {
-		$file_timestamp = @filemtime(IMAGE_PATH.'/progress/sig_'.$player_id.'.png');
+	$signature_cache_request = $_GET;
+	$signature_cache_request['lang'] = current_lang();
+	ksort($signature_cache_request);
+	$signature_cache_path = IMAGE_PATH . '/progress/sig_' . md5(http_build_query($signature_cache_request)) . '.png';
+
+	if (is_file($signature_cache_path)) {
+		$file_timestamp = @filemtime($signature_cache_path);
 		if ($file_timestamp + IMAGE_UPDATE_INTERVAL > time()) {
 			if (isset($_SERVER['HTTP_IF_MODIFIED_SINCE'])) {
 				$browser_timestamp = strtotime($_SERVER['HTTP_IF_MODIFIED_SINCE']);
-				if ($browser_timestamp + IMAGE_UPDATE_INTERVAL > time()) {
+				if ($browser_timestamp !== false && $browser_timestamp >= $file_timestamp) {
 					header('HTTP/1.0 304 Not Modified');
 					exit; 
 				}
@@ -198,6 +204,8 @@ function f_num($number) {
 
 			$mod_date = date('D, d M Y H:i:s \G\M\T', $file_timestamp);
 			header('Last-Modified:'.$mod_date);
+			header('Content-Length: ' . filesize($signature_cache_path));
+			readfile($signature_cache_path);
 			exit;
 		}  
 	}
@@ -428,16 +436,14 @@ if ($player_id > 0) {
 		}
 	}
         imagealphablending($image, true);
-	$timestamp   = $playerdata['connection_time'];
-	$days        = floor($timestamp / 86400);
-	$hours       = $days * 24;   
-	$hours       += floor($timestamp / 3600 % 24);
+	$timestamp   = max(0, (int) $playerdata['connection_time']);
+	$hours       = intdiv($timestamp, 3600);
 	if ($hours < 10)
 		$hours = '0'.$hours; 
-	$min         = floor($timestamp / 60 % 60); 
+	$min         = intdiv($timestamp % 3600, 60);
 	if ($min < 10)
 		$min = '0'.$min; 
-	$sec         = floor($timestamp % 60);
+	$sec         = $timestamp % 60;
 	if ($sec < 10)
 		$sec = '0'.$sec; 
 	$con_time = $hours.':'.$min.':'.$sec;

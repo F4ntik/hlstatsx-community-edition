@@ -15,6 +15,9 @@ ROUTES = (
     ("hlstats.php", {"mode": "game", "game": "cstrike"}),
     ("hlstats.php", {"mode": "players", "game": "cstrike"}),
     ("hlstats.php", {"mode": "servers", "server_id": "2", "game": "cstrike"}),
+    ("hlstats.php", {"mode": "awards", "game": "cstrike", "tab": "daily"}),
+    ("hlstats.php", {"mode": "awards", "game": "cstrike", "tab": "global"}),
+    ("hlstats.php", {"mode": "awards", "game": "cstrike", "tab": "ribbons"}),
     ("status.php", {}),
 )
 
@@ -32,6 +35,23 @@ PHP_ERROR_MARKERS = (
 )
 
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+
+
+def map_signature_player_ids(langs: list[str], sig_player_ids: list[str] | None) -> dict[str, str]:
+    """Bind one distinct positive signature player ID to each requested language."""
+    if not langs:
+        raise ValueError("at least one --langs value is required")
+    if len(set(langs)) != len(langs):
+        raise ValueError("--langs values must be unique for signature player mapping")
+    if sig_player_ids is None or len(sig_player_ids) != len(langs):
+        raise ValueError(
+            "provide exactly one --sig-player-id per requested language, in --langs order"
+        )
+    if len(set(sig_player_ids)) != len(sig_player_ids):
+        raise ValueError("--sig-player-id values must be distinct")
+    if any(not player_id.isascii() or not player_id.isdigit() or int(player_id) <= 0 for player_id in sig_player_ids):
+        raise ValueError("--sig-player-id values must be positive decimal player IDs")
+    return dict(zip(langs, sig_player_ids, strict=True))
 
 
 def build_url(base_url: str, route: str, params: dict[str, str], lang: str) -> str:
@@ -92,15 +112,28 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--base-url", required=True, help="Base URL, for example http://127.0.0.1:8281")
     parser.add_argument("--langs", nargs="+", default=["en", "ru"], help="Languages to smoke")
     parser.add_argument("--timeout", type=float, default=10.0, help="HTTP timeout per route")
-    parser.add_argument("--sig-player-id", default="203", help="Known replay-backed playerId for sig.php")
+    parser.add_argument(
+        "--sig-player-id",
+        action="append",
+        help="Replay-backed playerId for sig.php; repeat once per --langs value in order",
+    )
     args = parser.parse_args(argv)
+    try:
+        signature_player_ids = map_signature_player_ids(args.langs, args.sig_player_id)
+    except ValueError as exc:
+        parser.error(str(exc))
 
     failures: list[str] = []
     for lang in args.langs:
         for route, params in ROUTES:
             url = build_url(args.base_url, route, params, lang)
             failures.extend(assert_route(url, lang, args.timeout))
-        sig_url = build_url(args.base_url, "sig.php", {"player_id": args.sig_player_id}, lang)
+        sig_url = build_url(
+            args.base_url,
+            "sig.php",
+            {"player_id": signature_player_ids[lang]},
+            lang,
+        )
         failures.extend(assert_signature_route(sig_url, args.timeout))
 
     if failures:

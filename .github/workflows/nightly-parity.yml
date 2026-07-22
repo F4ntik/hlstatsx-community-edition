@@ -62,31 +62,7 @@ jobs:
           $maxImportFiles = [int] "${{ github.event.inputs.max_import_files || '1000' }}"
           & scripts/replay_baseline/comparison/Run-DualContour-1000.ps1 `
             -UseDumpRestore `
-            -ReuseValidLegacy `
             -MaxImportFiles $maxImportFiles
-
-      - name: Run post-replay GeoIP backfill
-        id: geoip-backfill
-        shell: powershell
-        run: |
-          docker exec hlstatsx-python-worker `
-            python -m hlstats_awards_py `
-            --configfile /app/hlstats.conf `
-            --geoip
-
-      - name: Compare replay databases
-        id: database-compare
-        shell: powershell
-        run: |
-          python scripts/replay_baseline/compare_stats_dbs.py --max-examples 20
-
-      - name: Smoke replay-backed EN/RU web routes
-        id: web-smoke
-        shell: powershell
-        run: |
-          python scripts/replay_baseline/web_route_smoke.py `
-            --base-url http://127.0.0.1:8281 `
-            --langs en ru
 
       - name: Package sanitized parity summary
         if: always()
@@ -97,10 +73,7 @@ jobs:
           python scripts/replay_baseline/package_ci_artifacts.py `
             --output-directory $artifactDirectory `
             --max-import-files ${{ github.event.inputs.max_import_files || '1000' }} `
-            --dual-replay-outcome '${{ steps.dual-replay.outcome }}' `
-            --geoip-backfill-outcome '${{ steps.geoip-backfill.outcome }}' `
-            --database-compare-outcome '${{ steps.database-compare.outcome }}' `
-            --web-smoke-outcome '${{ steps.web-smoke.outcome }}'
+            --dual-replay-outcome '${{ steps.dual-replay.outcome }}'
           "artifact_file=$artifactDirectory/nightly-parity-summary.json" >> $env:GITHUB_OUTPUT
 
       - name: Upload sanitized parity summary

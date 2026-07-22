@@ -41,17 +41,9 @@ def package_summary(
     *,
     max_import_files: int,
     dual_replay_outcome: str,
-    geoip_backfill_outcome: str,
-    database_compare_outcome: str,
-    web_smoke_outcome: str,
 ) -> Path:
     """Write a fixed-name, metadata-only summary and return its path."""
-    outcomes = {
-        "dual_replay": dual_replay_outcome,
-        "geoip_backfill": geoip_backfill_outcome,
-        "database_compare": database_compare_outcome,
-        "web_smoke": web_smoke_outcome,
-    }
+    outcomes = {"dual_replay": dual_replay_outcome}
     invalid_outcomes = sorted(set(outcomes.values()) - _ALLOWED_OUTCOMES)
     if invalid_outcomes:
         raise ValueError(f"unsupported step outcome(s): {', '.join(invalid_outcomes)}")
@@ -61,10 +53,15 @@ def package_summary(
     output_directory.mkdir(parents=True, exist_ok=True)
     destination = output_directory / SUMMARY_FILENAME
     payload = {
-        "schema_version": 1,
+        "schema_version": 2,
         "publication": "sanitized-nightly-parity-summary",
         "max_import_files": max_import_files,
         "steps": outcomes,
+        "dual_replay_integrated_gates": [
+            "historical_maintenance",
+            "database_compare",
+            "web_smoke",
+        ],
     }
     destination.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return destination
@@ -75,9 +72,6 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--output-directory", type=Path, required=True)
     parser.add_argument("--max-import-files", type=_positive_int, required=True)
     parser.add_argument("--dual-replay-outcome", type=_outcome, required=True)
-    parser.add_argument("--geoip-backfill-outcome", type=_outcome, required=True)
-    parser.add_argument("--database-compare-outcome", type=_outcome, required=True)
-    parser.add_argument("--web-smoke-outcome", type=_outcome, required=True)
     return parser.parse_args(argv)
 
 
@@ -87,9 +81,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.output_directory,
         max_import_files=args.max_import_files,
         dual_replay_outcome=args.dual_replay_outcome,
-        geoip_backfill_outcome=args.geoip_backfill_outcome,
-        database_compare_outcome=args.database_compare_outcome,
-        web_smoke_outcome=args.web_smoke_outcome,
     )
     print(summary)
     return 0

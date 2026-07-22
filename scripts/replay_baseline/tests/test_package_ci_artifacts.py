@@ -13,23 +13,20 @@ def test_package_summary_writes_fixed_metadata_only_artifact(tmp_path) -> None:
         tmp_path / "publication",
         max_import_files=1000,
         dual_replay_outcome="success",
-        geoip_backfill_outcome="success",
-        database_compare_outcome="failure",
-        web_smoke_outcome="skipped",
     )
 
     assert output.name == "nightly-parity-summary.json"
     assert list(output.parent.iterdir()) == [output]
     assert json.loads(output.read_text(encoding="utf-8")) == {
-        "schema_version": 1,
+        "schema_version": 2,
         "publication": "sanitized-nightly-parity-summary",
         "max_import_files": 1000,
-        "steps": {
-            "dual_replay": "success",
-            "geoip_backfill": "success",
-            "database_compare": "failure",
-            "web_smoke": "skipped",
-        },
+        "steps": {"dual_replay": "success"},
+        "dual_replay_integrated_gates": [
+            "historical_maintenance",
+            "database_compare",
+            "web_smoke",
+        ],
     }
 
 
@@ -40,9 +37,6 @@ def test_package_summary_rejects_unbounded_outcome_text(tmp_path, outcome: str) 
             tmp_path,
             max_import_files=1000,
             dual_replay_outcome=outcome,
-            geoip_backfill_outcome="success",
-            database_compare_outcome="success",
-            web_smoke_outcome="success",
         )
 
 
@@ -55,12 +49,6 @@ def test_parse_args_rejects_nonpositive_import_limit() -> None:
                 "--max-import-files",
                 "0",
                 "--dual-replay-outcome",
-                "success",
-                "--geoip-backfill-outcome",
-                "success",
-                "--database-compare-outcome",
-                "success",
-                "--web-smoke-outcome",
                 "success",
             ]
         )
@@ -89,4 +77,14 @@ def test_workflows_keep_shared_packages_and_raw_replay_output_out_of_uploads() -
     ):
         assert raw_path not in nightly
 
+    # Release-clean maintenance needs a freshly imported legacy contour.  The
+    # runner rejects reuse because its old anchors are not post-maintenance
+    # evidence, so CI must not ask for that incompatible shortcut.
+    assert "-ReuseValidLegacy" not in nightly
+    # The canonical runner is the single fail-closed authority for its
+    # maintenance, logical compare, and replay-backed EN/RU smoke gates.
+    assert "scripts/replay_baseline/web_route_smoke.py" not in nightly
+    assert "id: geoip-backfill" not in nightly
+    assert "id: database-compare" not in nightly
+    assert "--dual-replay-outcome '${{ steps.dual-replay.outcome }}'" in nightly
     assert "path: ${{ steps.package-summary.outputs.artifact_file }}" in nightly

@@ -16,11 +16,15 @@ param(
     [switch]$UsePythonUdpReplay,
     [switch]$UseDumpRestore,
     [switch]$RecreateBaselineSnapshot,
-    [ValidateSet("infra_updown", "baseline_restore", "preflight", "legacy_import", "python_import", "sql_snapshot")]
+    [switch]$SkipMaintenance,
+    [string]$MaintenanceDate = "",
+    [ValidateRange(1, 36500)]
+    [int]$MaintenanceNumDays = 1,
+    [ValidateSet("infra_updown", "baseline_restore", "preflight", "legacy_import", "python_import", "maintenance", "sql_snapshot", "logical_compare", "web_smoke")]
     [string]$FromStage = "",
-    [ValidateSet("infra_updown", "baseline_restore", "preflight", "legacy_import", "python_import", "sql_snapshot")]
+    [ValidateSet("infra_updown", "baseline_restore", "preflight", "legacy_import", "python_import", "maintenance", "sql_snapshot", "logical_compare", "web_smoke")]
     [string]$ToStage = "",
-    [ValidateSet("infra_updown", "baseline_restore", "preflight", "legacy_import", "python_import", "sql_snapshot")]
+    [ValidateSet("infra_updown", "baseline_restore", "preflight", "legacy_import", "python_import", "maintenance", "sql_snapshot", "logical_compare", "web_smoke")]
     [string]$OnlyStage = "",
     [string]$ResumeRunId = "",
     [switch]$ResumeLatest,
@@ -39,6 +43,7 @@ $snapshotScript = Join-Path $here "Snapshot-ContourSql.ps1"
 $pythonFtpWork = Join-Path $here "python\ftp_work"
 $stateRoot = Join-Path $here ".parity-state"
 $contourInfoDir = Join-Path $stateRoot "contour-info"
+$ftpLogStageRoot = Join-Path $stateRoot "ftp-logs"
 
 if (-not (Test-Path $restoreScript)) {
     throw "restore-baseline.ps1 not found: $restoreScript"
@@ -72,6 +77,7 @@ $artifactsPath = (Resolve-Path $ArtifactsDir).Path
 if (-not (Test-Path $artifactsPath)) {
     throw "Artifacts path not found: $ArtifactsDir"
 }
+$script:SelectedReplayLogs = $null
 
 function Resolve-ArtifactLabel {
     param(
@@ -113,6 +119,55 @@ $script:EvidenceRunId = if ($EvidenceRunId) {
     "$generatedRunId-$([guid]::NewGuid().ToString('N').Substring(0, 8))"
 }
 $script:EvidenceLabel = "$script:ArtifactLabel-$script:EvidenceRunId"
+$script:FtpLogStagePath = Join-Path $ftpLogStageRoot $script:EvidenceRunId
+$script:EvidenceClassification = if ($SkipMaintenance) { "raw-only" } else { "release-clean" }
+$script:LegacyMaintenanceActions = "-i -a -r -g"
+$script:PythonMaintenanceActions = "--inactive --awards --ribbons --geoip"
+
+function Invoke-DockerCaptured {
+    param([string[]]$DockerArguments)
+    $previousErrorActionPreference = $ErrorActionPreference
+    $exitCode = 1
+    try {
+        # Docker Compose reports ordinary progress on stderr; capture it without converting exit-zero output into a terminating error.
+        $ErrorActionPreference = "Continue"
+        $output = & docker @DockerArguments 2>&1 | Out-String
+        if ($null -ne $LASTEXITCODE) {
+            $exitCode = $LASTEXITCODE
+        }
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    return [pscustomobject]@{ output = $output; exit_code = $exitCode }
+}
+
+function Get-ContainerHealthDiagnostic {
+    param([string]$ContainerName)
+    $inspect = Invoke-DockerCaptured -DockerArguments @(
+        "inspect", "-f", "{{if .State.Health}}{{.State.Health.Status}}{{else}}missing-health{{end}}", $ContainerName
+    )
+    $diagnostic = $inspect.output.Trim()
+    if ($inspect.exit_code -ne 0) {
+        return [pscustomobject]@{ status = "inspect-failed"; diagnostic = $diagnostic }
+    }
+    return [pscustomobject]@{ status = $diagnostic; diagnostic = $diagnostic }
+}
+
+function Wait-PythonFtpHealthy {
+    param([string]$ContainerName = "hlstatsx-python-log-ftp")
+    $diagnostics = @()
+    for ($attempt = 1; $attempt -le 45; $attempt++) {
+        $health = Get-ContainerHealthDiagnostic -ContainerName $ContainerName
+        $diagnostics += "attempt=$attempt,status=$($health.status),detail=$($health.diagnostic)"
+        if ($health.status -eq "healthy") {
+            return [pscustomobject]@{ healthy = $true; diagnostics = ($diagnostics -join " | ") }
+        }
+        if ($attempt -lt 45) {
+            Start-Sleep -Seconds 2
+        }
+    }
+    return [pscustomobject]@{ healthy = $false; diagnostics = ($diagnostics -join " | ") }
+}
 
 function Invoke-ComposeUp {
     param(
@@ -122,7 +177,28 @@ function Invoke-ComposeUp {
     if (-not $SkipBuild) {
         $args += "--build"
     }
-    docker @args | Out-Null
+    $composeResult = Invoke-DockerCaptured -DockerArguments $args
+    $composeOutput = $composeResult.output
+    if ($composeResult.exit_code -eq 0) {
+        return
+    }
+
+    $isPythonCompose = [System.IO.Path]::GetFullPath($ComposePath) -eq [System.IO.Path]::GetFullPath($pythonCompose)
+    $ftpDependencyFailure = $composeOutput -match "hlstatsx-python-log-ftp"
+    if ($isPythonCompose -and $ftpDependencyFailure) {
+        $ftpHealth = Wait-PythonFtpHealthy
+        if ($ftpHealth.healthy) {
+            Write-Host "==> Python FTP health recovered; retrying docker compose up once."
+            $retryResult = Invoke-DockerCaptured -DockerArguments $args
+            $retryOutput = $retryResult.output
+            if ($retryResult.exit_code -eq 0) {
+                return
+            }
+            throw "docker compose up retry failed: $ComposePath. Initial diagnostics: $($composeOutput.Trim()). FTP health diagnostics: $($ftpHealth.diagnostics). Retry diagnostics: $($retryOutput.Trim())"
+        }
+        throw "docker compose up failed while Python FTP dependency remained non-healthy: $ComposePath. Initial diagnostics: $($composeOutput.Trim()). FTP health diagnostics: $($ftpHealth.diagnostics)"
+    }
+    throw "docker compose up failed: $ComposePath. Diagnostics: $($composeOutput.Trim())"
 }
 
 function Invoke-ContainerMysqlScalar {
@@ -135,6 +211,17 @@ function Invoke-ContainerMysqlScalar {
         throw "mysql query failed in $ContainerName"
     }
     return ($value | Out-String).Trim()
+}
+
+function Invoke-ContainerMysqlCommand {
+    param(
+        [string]$ContainerName,
+        [string]$Sql
+    )
+    docker exec $ContainerName mysql -uroot -proot123 -D hlstatsxce -e $Sql | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "mysql command failed in $ContainerName"
+    }
 }
 
 function Get-Sha256Text {
@@ -179,15 +266,31 @@ function Assert-EvidencePathsAvailable {
     }
 }
 
+function Get-SelectedReplayLogs {
+    param(
+        [string]$InputDirectory,
+        [int]$ImportLimit
+    )
+    $isCanonicalReplaySelection = $InputDirectory -eq $artifactsPath -and $ImportLimit -eq $MaxImportFiles
+    if ($isCanonicalReplaySelection -and $null -ne $script:SelectedReplayLogs) {
+        return $script:SelectedReplayLogs
+    }
+    $selected = @(Get-ChildItem -LiteralPath $InputDirectory -Filter "*.log" -File | Sort-Object Name | Select-Object -First $ImportLimit)
+    if ($selected.Count -eq 0) {
+        throw "no *.log files found for replay in $InputDirectory"
+    }
+    if ($isCanonicalReplaySelection) {
+        $script:SelectedReplayLogs = $selected
+    }
+    return $selected
+}
+
 function Get-SelectedLogFingerprint {
     param(
         [string]$InputDirectory,
         [int]$ImportLimit
     )
-    $selected = @(Get-ChildItem -Path $InputDirectory -Filter "*.log" | Sort-Object Name | Select-Object -First $ImportLimit)
-    if ($selected.Count -eq 0) {
-        throw "no *.log files found for fingerprint in $InputDirectory"
-    }
+    $selected = @(Get-SelectedReplayLogs -InputDirectory $InputDirectory -ImportLimit $ImportLimit)
     $lines = @()
     foreach ($log in $selected) {
         $lines += "$($log.Name)|$($log.Length)"
@@ -215,6 +318,7 @@ function Get-ContourFingerprint {
         logs_sha256 = $logFingerprint.sha256
         server_identity = $ServerIdentity
         replay_policy = "drop-empty-team-enter-events"
+        maintenance_classification = $script:EvidenceClassification
         baseline_mode = if ($UseDumpRestore) { "dump" } else { "snapshot" }
         recreate_baseline_snapshot = [bool]$RecreateBaselineSnapshot
     }
@@ -245,6 +349,289 @@ function Get-ContourAnchorCounts {
         entries = [int](Invoke-ContainerMysqlScalar -ContainerName $ContainerName -Sql "SELECT COUNT(*) FROM hlstats_Events_Entries;")
         server_rows = [int](Invoke-ContainerMysqlScalar -ContainerName $ContainerName -Sql "SELECT COUNT(*) FROM hlstats_Servers WHERE address='37.230.137.48' AND port=27015;")
     }
+}
+
+function Get-SharedSignaturePlayerIds {
+    $signaturePlayerSql = @"
+SELECT playerId
+FROM hlstats_Players
+WHERE playerId > 0
+  AND game = 'cstrike'
+  AND lastName <> ''
+  AND (kills > 0 OR deaths > 0)
+ORDER BY playerId ASC
+LIMIT 2;
+"@
+    $legacyIds = @((Invoke-ContainerMysqlScalar -ContainerName "hlstatsx-legacy-db" -Sql $signaturePlayerSql) -split '\r?\n' | Where-Object { $_ -match '^[1-9][0-9]*$' })
+    $pythonIds = @((Invoke-ContainerMysqlScalar -ContainerName "hlstatsx-python-db" -Sql $signaturePlayerSql) -split '\r?\n' | Where-Object { $_ -match '^[1-9][0-9]*$' })
+    if ($legacyIds.Count -ne 2 -or $pythonIds.Count -ne 2) {
+        throw "web route smoke requires two populated cstrike signature players in both contours"
+    }
+    if (($legacyIds | Select-Object -Unique).Count -ne 2 -or ($pythonIds | Select-Object -Unique).Count -ne 2) {
+        throw "web route smoke signature player IDs must be distinct in both contours"
+    }
+    if (($legacyIds -join ',') -ne ($pythonIds -join ',')) {
+        throw "web route smoke signature player IDs are not shared by legacy and python contours"
+    }
+    return $legacyIds
+}
+
+function Stage-SelectedFtpLogs {
+    $selected = @(Get-SelectedReplayLogs -InputDirectory $artifactsPath -ImportLimit $MaxImportFiles)
+    if (-not (Test-Path -LiteralPath $ftpLogStageRoot)) {
+        New-Item -ItemType Directory -Path $ftpLogStageRoot | Out-Null
+    }
+    if (-not (Test-Path -LiteralPath $script:FtpLogStagePath)) {
+        New-Item -ItemType Directory -Path $script:FtpLogStagePath | Out-Null
+    }
+
+    $selectedByName = @{}
+    foreach ($log in $selected) {
+        $selectedByName[$log.Name] = $log
+    }
+    $stagedItems = @(Get-ChildItem -LiteralPath $script:FtpLogStagePath)
+    foreach ($stagedItem in $stagedItems) {
+        if ($stagedItem.PSIsContainer -or -not $selectedByName.ContainsKey($stagedItem.Name)) {
+            throw "FTP log stage contains an unexpected item; preserve it for diagnostics and use a new EvidenceRunId: $($stagedItem.FullName)"
+        }
+        $source = $selectedByName[$stagedItem.Name]
+        if ($stagedItem.Length -ne $source.Length -or (Get-FileHash -LiteralPath $stagedItem.FullName -Algorithm SHA256).Hash -ne (Get-FileHash -LiteralPath $source.FullName -Algorithm SHA256).Hash) {
+            throw "FTP log stage differs from the selected replay log; preserve it for diagnostics and use a new EvidenceRunId: $($stagedItem.FullName)"
+        }
+    }
+    foreach ($log in $selected) {
+        $stagedPath = Join-Path $script:FtpLogStagePath $log.Name
+        if (-not (Test-Path -LiteralPath $stagedPath)) {
+            Copy-Item -LiteralPath $log.FullName -Destination $stagedPath
+        }
+    }
+    $finalFiles = @(Get-ChildItem -LiteralPath $script:FtpLogStagePath -File)
+    if ($finalFiles.Count -ne $selected.Count) {
+        throw "FTP log stage does not contain exactly the selected replay logs: $script:FtpLogStagePath"
+    }
+    foreach ($log in $selected) {
+        if (-not (Test-Path -LiteralPath (Join-Path $script:FtpLogStagePath $log.Name))) {
+            throw "FTP log stage is missing selected replay log: $($log.Name)"
+        }
+    }
+    return $script:FtpLogStagePath
+}
+
+function Get-MaintenanceCounts {
+    param([string]$ContainerName)
+    return [ordered]@{
+        awards = [int](Invoke-ContainerMysqlScalar -ContainerName $ContainerName -Sql "SELECT COUNT(*) FROM hlstats_Awards;")
+        player_awards = [int](Invoke-ContainerMysqlScalar -ContainerName $ContainerName -Sql "SELECT COUNT(*) FROM hlstats_Players_Awards;")
+        player_ribbons = [int](Invoke-ContainerMysqlScalar -ContainerName $ContainerName -Sql "SELECT COUNT(*) FROM hlstats_Players_Ribbons;")
+        geoip_flag = [int](Invoke-ContainerMysqlScalar -ContainerName $ContainerName -Sql "SELECT COUNT(*) FROM hlstats_Players WHERE lastAddress <> '' AND flag <> '';")
+        geoip_country = [int](Invoke-ContainerMysqlScalar -ContainerName $ContainerName -Sql "SELECT COUNT(*) FROM hlstats_Players WHERE lastAddress <> '' AND country <> '';")
+        geoip_city = [int](Invoke-ContainerMysqlScalar -ContainerName $ContainerName -Sql "SELECT COUNT(*) FROM hlstats_Players WHERE lastAddress <> '' AND city <> '';")
+        geoip_state = [int](Invoke-ContainerMysqlScalar -ContainerName $ContainerName -Sql "SELECT COUNT(*) FROM hlstats_Players WHERE lastAddress <> '' AND state <> '';")
+        geoip_coordinates = [int](Invoke-ContainerMysqlScalar -ContainerName $ContainerName -Sql "SELECT COUNT(*) FROM hlstats_Players WHERE lastAddress <> '' AND lat IS NOT NULL AND lng IS NOT NULL;")
+    }
+}
+
+function Get-ContourReplayMaxDate {
+    param([string]$ContainerName)
+    $value = Invoke-ContainerMysqlScalar -ContainerName $ContainerName -Sql "SELECT COALESCE(DATE(MAX(eventTime)), '') FROM hlstats_Events_Frags;"
+    if (-not $value) {
+        throw "cannot resolve maintenance date: no fragment eventTime in $ContainerName"
+    }
+    try {
+        return [DateTime]::ParseExact($value, "yyyy-MM-dd", [System.Globalization.CultureInfo]::InvariantCulture)
+    } catch {
+        throw "cannot resolve maintenance date: invalid fragment date '$value' in $ContainerName"
+    }
+}
+
+function Set-HistoricalMaintenanceTimestamp {
+    param([string]$ContainerName)
+    Invoke-ContainerMysqlCommand `
+        -ContainerName $ContainerName `
+        -Sql "UPDATE hlstats_Options SET value='1' WHERE keyname='UseTimestamp';"
+    $readback = Invoke-ContainerMysqlScalar `
+        -ContainerName $ContainerName `
+        -Sql "SELECT value FROM hlstats_Options WHERE keyname='UseTimestamp';"
+    if ($readback -ne "1") {
+        throw "UseTimestamp override verification failed in ${ContainerName}: expected 1, got '$readback'"
+    }
+    return $readback
+}
+
+function Resolve-MaintenanceInputs {
+    if ($MaintenanceDate) {
+        try {
+            $parsed = [DateTime]::ParseExact($MaintenanceDate, "yyyy-MM-dd", [System.Globalization.CultureInfo]::InvariantCulture)
+            return [ordered]@{ date = $parsed.ToString("yyyy-MM-dd"); numdays = $MaintenanceNumDays; source = "explicit" }
+        } catch {
+            throw "MaintenanceDate must use YYYY-MM-DD, got '$MaintenanceDate'"
+        }
+    }
+    if ($script:RunState.maintenance -and $script:RunState.maintenance.resolved_date) {
+        return [ordered]@{ date = [string]$script:RunState.maintenance.resolved_date; numdays = $MaintenanceNumDays; source = "resumed" }
+    }
+    $legacyMax = $null
+    $pythonMax = $null
+    if ($Stack -eq "both" -or $Stack -eq "legacy") { $legacyMax = Get-ContourReplayMaxDate -ContainerName "hlstatsx-legacy-db" }
+    if ($Stack -eq "both" -or $Stack -eq "python") { $pythonMax = Get-ContourReplayMaxDate -ContainerName "hlstatsx-python-db" }
+    if ($Stack -eq "both" -and $legacyMax -ne $pythonMax) {
+        throw "maintenance date verification failed: legacy fragment maximum $($legacyMax.ToString('yyyy-MM-dd')) differs from Python $($pythonMax.ToString('yyyy-MM-dd'))"
+    }
+    $replayMax = if ($legacyMax) { $legacyMax } else { $pythonMax }
+    return [ordered]@{ date = $replayMax.AddDays(1).ToString("yyyy-MM-dd"); numdays = $MaintenanceNumDays; source = "replay-window-max-plus-one" }
+}
+
+function ConvertTo-RedactedMaintenanceCommand {
+    param([string[]]$Command)
+    $redacted = @()
+    for ($index = 0; $index -lt $Command.Count; $index++) {
+        $argument = $Command[$index]
+        if ($argument -eq "--db-password") {
+            $redacted += $argument
+            if ($index + 1 -lt $Command.Count) {
+                $redacted += "***REDACTED***"
+                $index++
+            }
+            continue
+        }
+        if ($argument -match "^--db-password=") {
+            $redacted += "--db-password=***REDACTED***"
+            continue
+        }
+        $redacted += $argument
+    }
+    return $redacted
+}
+
+function Invoke-MaintenanceCommand {
+    param([string]$StackName, [string]$LogPath, [string[]]$Command)
+    $displayCommand = @(ConvertTo-RedactedMaintenanceCommand -Command $Command)
+    Write-Host "==> $StackName maintenance: $($displayCommand -join ' ')"
+    docker @Command 2>&1 | Tee-Object -FilePath $LogPath | Out-Host
+    $exitCode = $LASTEXITCODE
+    if (-not (Test-Path -LiteralPath $LogPath)) {
+        New-Item -ItemType File -Path $LogPath -Force | Out-Null
+    }
+    return [pscustomobject]@{ stack = $StackName; status = if ($exitCode -eq 0) { "passed" } else { "failed" }; exit_code = $exitCode; log_path = $LogPath; counts = [ordered]@{} }
+}
+
+function Invoke-PythonCaptured {
+    param([string[]]$Command, [string]$LogPath)
+    $previousErrorActionPreference = $ErrorActionPreference
+    $exitCode = 1
+    $output = ""
+    try {
+        # Preserve the native exit code and its complete output even when this runner uses Stop globally.
+        $ErrorActionPreference = "Continue"
+        $output = python @Command 2>&1 | Out-String
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($output.Length -gt 0) {
+        Set-Content -Path $LogPath -Value $output -NoNewline
+        Write-Host $output -NoNewline
+    } elseif (-not (Test-Path -LiteralPath $LogPath)) {
+        New-Item -ItemType File -Path $LogPath -Force | Out-Null
+    }
+    return $exitCode
+}
+
+function Invoke-WebRouteSmoke {
+    param(
+        [string]$StackName,
+        [string]$BaseUrl,
+        [string]$LogPath,
+        [string[]]$Languages,
+        [string[]]$SignaturePlayerIds
+    )
+    if ($Languages.Count -ne $SignaturePlayerIds.Count) {
+        throw "web route smoke requires one signature player ID for each requested language"
+    }
+    Write-Host "==> $StackName web route smoke: $BaseUrl"
+    $command = @("scripts/replay_baseline/web_route_smoke.py", "--base-url", $BaseUrl, "--langs") + $Languages
+    foreach ($playerId in $SignaturePlayerIds) {
+        $command += @("--sig-player-id", $playerId)
+    }
+    $exitCode = Invoke-PythonCaptured -Command $command -LogPath $LogPath
+    return [pscustomobject]@{ stack = $StackName; status = if ($exitCode -eq 0) { "passed" } else { "failed" }; exit_code = $exitCode; evidence_path = $LogPath }
+}
+
+function Get-MaintenanceCountSummaryLines {
+    param([object]$Counts)
+    if ($Counts -is [System.Collections.IDictionary]) {
+        foreach ($entry in $Counts.GetEnumerator()) { "$($entry.Key)=$($entry.Value)" }
+        return
+    }
+    foreach ($property in $Counts.PSObject.Properties) { "$($property.Name)=$($property.Value)" }
+}
+
+function Set-MaintenanceSummaryPath {
+    param([object]$State, [string]$SummaryPath)
+    $maintenance = $State.maintenance
+    if ($maintenance -is [System.Collections.IDictionary]) {
+        $maintenance["summary_path"] = $SummaryPath
+    } else {
+        $maintenance.summary_path = $SummaryPath
+    }
+}
+
+function Write-MaintenanceSummary {
+    param([object]$State)
+    $summaryPath = Join-Path $auditDir "maintenance-summary-$script:EvidenceLabel.txt"
+    $maintenance = $State.maintenance
+    $compare = $State.logical_compare
+    $webSmoke = $State.web_smoke
+    $lines = @(
+        "evidence_label=$script:EvidenceLabel",
+        "evidence_classification=$script:EvidenceClassification",
+        "maintenance_status=$($maintenance.status)",
+        "maintenance_date=$($maintenance.resolved_date)",
+        "maintenance_numdays=$($maintenance.numdays)",
+        "maintenance_date_source=$($maintenance.date_source)",
+        "legacy_maintenance_actions=$($maintenance.legacy_actions)",
+        "python_maintenance_actions=$($maintenance.python_actions)",
+        "inactive_time_mode=$($maintenance.inactive_time_mode)",
+        "legacy_use_timestamp=$($maintenance.legacy_use_timestamp)",
+        "python_use_timestamp=$($maintenance.python_use_timestamp)",
+        "legacy_maintenance_status=$($maintenance.legacy.status)",
+        "legacy_maintenance_exit_code=$($maintenance.legacy.exit_code)",
+        "python_maintenance_status=$($maintenance.python.status)",
+        "python_maintenance_exit_code=$($maintenance.python.exit_code)",
+        "logical_compare=$($compare.status)",
+        "logical_compare_evidence=$($compare.evidence_path)",
+        "web_smoke=$($webSmoke.status)",
+        "web_smoke_signature_player_ids=$($webSmoke.signature_player_ids -join ',')",
+        "legacy_web_smoke_languages=$($webSmoke.legacy_languages -join ',')",
+        "legacy_web_smoke_signature_player_ids=$($webSmoke.legacy_signature_player_ids -join ',')",
+        "legacy_web_smoke_status=$($webSmoke.legacy.status)",
+        "legacy_web_smoke_evidence=$($webSmoke.legacy.evidence_path)",
+        "python_web_smoke_languages=$($webSmoke.python_languages -join ',')",
+        "python_web_smoke_signature_player_ids=$($webSmoke.python_signature_player_ids -join ',')",
+        "python_web_smoke_status=$($webSmoke.python.status)",
+        "python_web_smoke_evidence=$($webSmoke.python.evidence_path)",
+        "",
+        "[legacy_counts]"
+    )
+    $lines += Get-MaintenanceCountSummaryLines -Counts $maintenance.legacy.counts
+    $lines += ""
+    $lines += "[python_counts]"
+    $lines += Get-MaintenanceCountSummaryLines -Counts $maintenance.python.counts
+    $lines += ""
+    $lines += "[visual_inspection]"
+    $lines += "legacy_players=http://127.0.0.1:8181/hlstats.php?mode=players"
+    $lines += "legacy_daily_awards=http://127.0.0.1:8181/hlstats.php?mode=awards&game=cstrike&tab=daily&lang=en"
+    $lines += "legacy_global_awards=http://127.0.0.1:8181/hlstats.php?mode=awards&game=cstrike&tab=global&lang=en"
+    $lines += "legacy_ribbons=http://127.0.0.1:8181/hlstats.php?mode=awards&game=cstrike&tab=ribbons&lang=en"
+    $lines += "python_players=http://127.0.0.1:8281/hlstats.php?mode=players"
+    $lines += "python_daily_awards=http://127.0.0.1:8281/hlstats.php?mode=awards&game=cstrike&tab=daily&lang=en"
+    $lines += "python_global_awards=http://127.0.0.1:8281/hlstats.php?mode=awards&game=cstrike&tab=global&lang=en"
+    $lines += "python_ribbons=http://127.0.0.1:8281/hlstats.php?mode=awards&game=cstrike&tab=ribbons&lang=en"
+    $lines += "python_daily_awards_ru=http://127.0.0.1:8281/hlstats.php?mode=awards&game=cstrike&tab=daily&lang=ru"
+    $lines += "python_global_awards_ru=http://127.0.0.1:8281/hlstats.php?mode=awards&game=cstrike&tab=global&lang=ru"
+    $lines += "python_ribbons_ru=http://127.0.0.1:8281/hlstats.php?mode=awards&game=cstrike&tab=ribbons&lang=ru"
+    $lines -join "`r`n" | Set-Content -LiteralPath $summaryPath -Encoding UTF8
+    return $summaryPath
 }
 
 function Write-ContourInfo {
@@ -359,10 +746,7 @@ function Invoke-LegacyReplayImport {
         New-Item -ItemType Directory -Path $windowDir | Out-Null
     }
     Get-ChildItem -Path $windowDir -Filter "*.log" -ErrorAction SilentlyContinue | Remove-Item -Force
-    $selected = Get-ChildItem -Path $InputDirectory -Filter "*.log" | Sort-Object Name | Select-Object -First $ImportLimit
-    if (-not $selected -or $selected.Count -eq 0) {
-        throw "no *.log files found for legacy import in $InputDirectory"
-    }
+    $selected = @(Get-SelectedReplayLogs -InputDirectory $InputDirectory -ImportLimit $ImportLimit)
     foreach ($log in $selected) {
         Copy-Item -Path $log.FullName -Destination (Join-Path $windowDir $log.Name) -Force
     }
@@ -483,11 +867,14 @@ function Invoke-PythonFtpImport {
     }
 }
 
-$allStages = @("infra_updown", "baseline_restore", "preflight", "legacy_import", "python_import", "sql_snapshot")
+$allStages = @("infra_updown", "baseline_restore", "preflight", "legacy_import", "python_import", "maintenance", "sql_snapshot", "logical_compare", "web_smoke")
 $stageDependencies = @{
     "legacy_import" = @("baseline_restore", "preflight")
     "python_import" = @("baseline_restore", "preflight")
-    "sql_snapshot"  = @("baseline_restore", "preflight")
+    "maintenance" = @("baseline_restore", "preflight")
+    "sql_snapshot"  = @("baseline_restore", "preflight", "maintenance")
+    "logical_compare" = @("sql_snapshot")
+    "web_smoke" = @("logical_compare")
 }
 
 function Get-ConfigFingerprint {
@@ -499,6 +886,12 @@ function Get-ConfigFingerprint {
         use_python_udp_replay = [bool]$UsePythonUdpReplay
         use_dump_restore = [bool]$UseDumpRestore
         recreate_baseline_snapshot = [bool]$RecreateBaselineSnapshot
+        skip_maintenance = [bool]$SkipMaintenance
+        maintenance_date = $MaintenanceDate
+        maintenance_numdays = $MaintenanceNumDays
+        maintenance_legacy_actions = $script:LegacyMaintenanceActions
+        maintenance_python_actions = $script:PythonMaintenanceActions
+        maintenance_inactive_time_mode = "per-game-server-last_event"
     } | ConvertTo-Json -Compress
     return [System.Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes($fingerprintPayload))
 }
@@ -535,6 +928,25 @@ function Load-RunState {
         if ($propNames -notcontains "invalidated_by") {
             $state | Add-Member -NotePropertyName "invalidated_by" -NotePropertyValue @()
         }
+        if ($propNames -notcontains "evidence_classification") {
+            $state | Add-Member -NotePropertyName "evidence_classification" -NotePropertyValue $script:EvidenceClassification
+        }
+        if ($propNames -notcontains "maintenance") {
+            $state | Add-Member -NotePropertyName "maintenance" -NotePropertyValue $null
+        }
+        if ($propNames -notcontains "logical_compare") {
+            $state | Add-Member -NotePropertyName "logical_compare" -NotePropertyValue ([ordered]@{ status = "pending"; evidence_path = "" })
+        }
+        if ($propNames -notcontains "web_smoke") {
+            $state | Add-Member -NotePropertyName "web_smoke" -NotePropertyValue ([ordered]@{
+                status = "pending"
+                signature_player_ids = @()
+                legacy = [ordered]@{ status = "pending"; exit_code = ""; evidence_path = "" }
+                python = [ordered]@{ status = "pending"; exit_code = ""; evidence_path = "" }
+            })
+        } elseif (@($state.web_smoke.PSObject.Properties.Name) -notcontains "signature_player_ids") {
+            $state.web_smoke | Add-Member -NotePropertyName "signature_player_ids" -NotePropertyValue @()
+        }
         return $state
     }
     $runId = [System.IO.Path]::GetFileNameWithoutExtension($Path)
@@ -546,6 +958,15 @@ function Load-RunState {
         completed_stages = @()
         stage_artifacts = @{}
         invalidated_by = @()
+        evidence_classification = $script:EvidenceClassification
+        maintenance = $null
+        logical_compare = [ordered]@{ status = "pending"; evidence_path = "" }
+        web_smoke = [ordered]@{
+            status = "pending"
+            signature_player_ids = @()
+            legacy = [ordered]@{ status = "pending"; exit_code = ""; evidence_path = "" }
+            python = [ordered]@{ status = "pending"; exit_code = ""; evidence_path = "" }
+        }
     }
 }
 
@@ -596,6 +1017,14 @@ function Assert-StageDependenciesSatisfied {
             throw "Stage '$Stage' requires completed stage '$required'."
         }
     }
+    if ($Stage -eq "maintenance") {
+        if (($Stack -eq "both" -or $Stack -eq "legacy") -and $completed -notcontains "legacy_import") {
+            throw "Stage 'maintenance' requires completed stage 'legacy_import'."
+        }
+        if (($Stack -eq "both" -or $Stack -eq "python") -and $completed -notcontains "python_import") {
+            throw "Stage 'maintenance' requires completed stage 'python_import'."
+        }
+    }
 }
 
 function Invalidate-DownstreamStages {
@@ -642,7 +1071,8 @@ function Invoke-Stage {
             docker compose -f $pythonCompose down | Out-Null
 
             Write-Host "==> Bring contours up"
-            $env:HLSTATS_FTP_LOGS_HOST_PATH = $artifactsPath
+            Stage-SelectedFtpLogs | Out-Null
+            $env:HLSTATS_FTP_LOGS_HOST_PATH = $script:FtpLogStagePath
             $env:HLSTATS_FTP_PASSWORD = "hlxftp123"
             if (-not $script:ReuseLegacyForRun) {
                 Invoke-ComposeUp -ComposePath $legacyCompose
@@ -724,6 +1154,107 @@ function Invoke-Stage {
                 -AnchorCounts $anchors `
                 -Containers @("hlstatsx-python-db", "hlstatsx-python-web", "hlstatsx-python-worker", "hlstatsx-python-proxy", "hlstatsx-python-log-ftp") | Out-Null
         }
+        "maintenance" {
+            $summaryPath = Join-Path $auditDir "maintenance-summary-$script:EvidenceLabel.txt"
+            $legacyLogPath = Join-Path $auditDir "legacy-maintenance-$script:EvidenceLabel.log"
+            $pythonLogPath = Join-Path $auditDir "python-maintenance-$script:EvidenceLabel.log"
+            Assert-EvidencePathsAvailable @($summaryPath, $legacyLogPath, $pythonLogPath)
+            if ($SkipMaintenance) {
+                Write-Host "==> Maintenance skipped via -SkipMaintenance; evidence is raw-only."
+                $script:RunState.maintenance = [ordered]@{
+                    status = "skipped"
+                    resolved_date = ""
+                    numdays = $MaintenanceNumDays
+                    date_source = "skipped"
+                    legacy_actions = $script:LegacyMaintenanceActions
+                    python_actions = $script:PythonMaintenanceActions
+                    inactive_time_mode = "skipped"
+                    legacy_use_timestamp = ""
+                    python_use_timestamp = ""
+                    summary_path = ""
+                    legacy = [ordered]@{ status = "skipped"; exit_code = ""; log_path = ""; counts = [ordered]@{} }
+                    python = [ordered]@{ status = "skipped"; exit_code = ""; log_path = ""; counts = [ordered]@{} }
+                }
+                Save-RunState -State $script:RunState -Path $script:StateFile
+                return
+            }
+
+            $inputs = [ordered]@{ date = ""; numdays = $MaintenanceNumDays; source = "unresolved" }
+            $legacyRecord = [pscustomobject]@{ status = "not_applicable"; exit_code = ""; log_path = ""; counts = [ordered]@{} }
+            $pythonRecord = [pscustomobject]@{ status = "not_applicable"; exit_code = ""; log_path = ""; counts = [ordered]@{} }
+            $legacyUseTimestamp = ""
+            $pythonUseTimestamp = ""
+            try {
+                $inputs = Resolve-MaintenanceInputs
+                # Historical replay evidence must retain its complete corpus; default maintenance never prunes it.
+                # Use per-game server last_event for inactivity instead of the host clock for historical replay data.
+                if ($Stack -eq "both" -or $Stack -eq "legacy") {
+                    $legacyUseTimestamp = Set-HistoricalMaintenanceTimestamp -ContainerName "hlstatsx-legacy-db"
+                }
+                if ($Stack -eq "both" -or $Stack -eq "python") {
+                    $pythonUseTimestamp = Set-HistoricalMaintenanceTimestamp -ContainerName "hlstatsx-python-db"
+                }
+                if ($Stack -eq "both" -or $Stack -eq "legacy") {
+                    # The legacy image's /scripts/hlstats.conf deliberately has blank DB fields;
+                    # daemon CLI options are not inherited by this separate Perl process.
+                    $legacyCommand = @(
+                        "exec", "--workdir", "/scripts", "hlstatsx-legacy-daemon",
+                        "perl", "./hlstats-awards.pl",
+                        "--db-host", "db:3306",
+                        "--db-name", "hlstatsxce",
+                        "--db-username", "hlstatsxce",
+                        "--db-password", "hlx123",
+                        "-i", "-a", "-r", "-g",
+                        "--numdays", "$($inputs.numdays)",
+                        "--date", "$($inputs.date)"
+                    )
+                    $legacyRecord = Invoke-MaintenanceCommand -StackName "legacy" -LogPath $legacyLogPath -Command $legacyCommand
+                    if ($legacyRecord.exit_code -ne 0) { throw "legacy maintenance failed" }
+                    $legacyRecord.counts = Get-MaintenanceCounts -ContainerName "hlstatsx-legacy-db"
+                }
+                if ($Stack -eq "both" -or $Stack -eq "python") {
+                    $pythonCommand = @("exec", "hlstatsx-python-worker", "python", "-m", "hlstats_awards_py", "--configfile", "/app/hlstats.conf", "--inactive", "--awards", "--ribbons", "--geoip", "--numdays", "$($inputs.numdays)", "--date", "$($inputs.date)")
+                    $pythonRecord = Invoke-MaintenanceCommand -StackName "python" -LogPath $pythonLogPath -Command $pythonCommand
+                    if ($pythonRecord.exit_code -ne 0) { throw "python maintenance failed" }
+                    $pythonRecord.counts = Get-MaintenanceCounts -ContainerName "hlstatsx-python-db"
+                }
+                $script:RunState.maintenance = [ordered]@{
+                    status = "passed"
+                    resolved_date = $inputs.date
+                    numdays = $inputs.numdays
+                    date_source = $inputs.source
+                    legacy_actions = $script:LegacyMaintenanceActions
+                    python_actions = $script:PythonMaintenanceActions
+                    inactive_time_mode = "per-game-server-last_event (UseTimestamp=1)"
+                    legacy_use_timestamp = $legacyUseTimestamp
+                    python_use_timestamp = $pythonUseTimestamp
+                    summary_path = ""
+                    legacy = $legacyRecord
+                    python = $pythonRecord
+                }
+            } catch {
+                $script:RunState.maintenance = [ordered]@{
+                    status = "failed"
+                    resolved_date = $inputs.date
+                    numdays = $inputs.numdays
+                    date_source = $inputs.source
+                    legacy_actions = $script:LegacyMaintenanceActions
+                    python_actions = $script:PythonMaintenanceActions
+                    inactive_time_mode = "override_pending_or_failed"
+                    legacy_use_timestamp = $legacyUseTimestamp
+                    python_use_timestamp = $pythonUseTimestamp
+                    summary_path = ""
+                    legacy = $legacyRecord
+                    python = $pythonRecord
+                }
+                Save-RunState -State $script:RunState -Path $script:StateFile
+                $summaryPath = Write-MaintenanceSummary -State $script:RunState
+                Set-MaintenanceSummaryPath -State $script:RunState -SummaryPath $summaryPath
+                Save-RunState -State $script:RunState -Path $script:StateFile
+                throw
+            }
+            Save-RunState -State $script:RunState -Path $script:StateFile
+        }
         "sql_snapshot" {
             Write-Host "==> SQL snapshots"
             if (($Stack -eq "both" -or $Stack -eq "legacy") -and -not $script:ReuseLegacyForRun) {
@@ -739,6 +1270,68 @@ function Invoke-Stage {
                 powershell -NoProfile -ExecutionPolicy Bypass -File $snapshotScript -Stack python -OutputPath $pythonSnapshotPath
             }
         }
+        "logical_compare" {
+            $comparePath = Join-Path $auditDir "logical-compare-$script:EvidenceLabel.txt"
+            Assert-EvidencePathsAvailable @($comparePath)
+            if ($Stack -ne "both") {
+                $script:RunState.logical_compare = [ordered]@{ status = "not_applicable"; evidence_path = "" }
+                Save-RunState -State $script:RunState -Path $script:StateFile
+                return
+            }
+            Write-Host "==> Logical DB compare"
+            $compareExit = Invoke-PythonCaptured -Command @("scripts/replay_baseline/compare_stats_dbs.py", "--max-examples", "20") -LogPath $comparePath
+            $script:RunState.logical_compare = [ordered]@{
+                status = if ($compareExit -eq 0) { "passed" } else { "failed" }
+                exit_code = $compareExit
+                evidence_path = $comparePath
+            }
+            Save-RunState -State $script:RunState -Path $script:StateFile
+            $summaryPath = Write-MaintenanceSummary -State $script:RunState
+            Set-MaintenanceSummaryPath -State $script:RunState -SummaryPath $summaryPath
+            Save-RunState -State $script:RunState -Path $script:StateFile
+            if ($compareExit -ne 0) {
+                throw "logical DB compare failed; evidence: $comparePath"
+            }
+        }
+        "web_smoke" {
+            $legacyLogPath = Join-Path $auditDir "legacy-web-smoke-$script:EvidenceLabel.log"
+            $pythonLogPath = Join-Path $auditDir "python-web-smoke-$script:EvidenceLabel.log"
+            $evidencePaths = @()
+            if ($Stack -eq "both" -or $Stack -eq "legacy") { $evidencePaths += $legacyLogPath }
+            if ($Stack -eq "both" -or $Stack -eq "python") { $evidencePaths += $pythonLogPath }
+            Assert-EvidencePathsAvailable $evidencePaths
+            $signaturePlayerIds = @(Get-SharedSignaturePlayerIds)
+            $legacyLanguages = @("en")
+            $pythonLanguages = @("en", "ru")
+            $legacySignaturePlayerIds = @($signaturePlayerIds[0])
+            $pythonSignaturePlayerIds = @($signaturePlayerIds)
+            $legacyRecord = [pscustomobject]@{ status = "not_applicable"; exit_code = ""; evidence_path = "" }
+            $pythonRecord = [pscustomobject]@{ status = "not_applicable"; exit_code = ""; evidence_path = "" }
+            if ($Stack -eq "both" -or $Stack -eq "legacy") {
+                $legacyRecord = Invoke-WebRouteSmoke -StackName "legacy" -BaseUrl "http://127.0.0.1:8181" -LogPath $legacyLogPath -Languages $legacyLanguages -SignaturePlayerIds $legacySignaturePlayerIds
+            }
+            if ($Stack -eq "both" -or $Stack -eq "python") {
+                $pythonRecord = Invoke-WebRouteSmoke -StackName "python" -BaseUrl "http://127.0.0.1:8281" -LogPath $pythonLogPath -Languages $pythonLanguages -SignaturePlayerIds $pythonSignaturePlayerIds
+            }
+            $smokeFailed = $legacyRecord.status -eq "failed" -or $pythonRecord.status -eq "failed"
+            $script:RunState.web_smoke = [ordered]@{
+                status = if ($smokeFailed) { "failed" } else { "passed" }
+                signature_player_ids = @($signaturePlayerIds)
+                legacy_languages = $legacyLanguages
+                legacy_signature_player_ids = $legacySignaturePlayerIds
+                legacy = $legacyRecord
+                python_languages = $pythonLanguages
+                python_signature_player_ids = $pythonSignaturePlayerIds
+                python = $pythonRecord
+            }
+            Save-RunState -State $script:RunState -Path $script:StateFile
+            $summaryPath = Write-MaintenanceSummary -State $script:RunState
+            Set-MaintenanceSummaryPath -State $script:RunState -SummaryPath $summaryPath
+            Save-RunState -State $script:RunState -Path $script:StateFile
+            if ($smokeFailed) {
+                throw "web route smoke failed; inspect evidence in $auditDir"
+            }
+        }
         default {
             throw "Unknown stage: $StageName"
         }
@@ -746,6 +1339,9 @@ function Invoke-Stage {
 }
 
 Validate-StageParamCombination
+if ($ReuseValidLegacy -and -not $SkipMaintenance -and ($Stack -eq "both" -or $Stack -eq "legacy")) {
+    throw "ReuseValidLegacy cannot be combined with maintenance-enabled replay: reused legacy import anchors are not a post-maintenance receipt. Use -SkipMaintenance for raw-only reuse or run a full legacy import."
+}
 $targetStages = Get-StageRange
 if (-not $OnlyStage -and -not $FromStage -and -not $ToStage) {
     if ($SkipLegacyImport) {
@@ -771,6 +1367,8 @@ if ($ReuseValidLegacy -and ($Stack -eq "both" -or $Stack -eq "legacy")) {
 }
 $stateFile = Resolve-StateFilePath
 $runState = Load-RunState -Path $stateFile -Fingerprint $fingerprint
+$script:RunState = $runState
+$script:StateFile = $stateFile
 if (-not $runState.config_fingerprint) {
     $runState.config_fingerprint = $fingerprint
 }
@@ -780,7 +1378,7 @@ if ((Test-Path $stateFile) -and $runState.config_fingerprint -ne $fingerprint) {
 }
 
 foreach ($stageName in $targetStages) {
-    if ($stageName -eq "legacy_import" -or $stageName -eq "python_import" -or $stageName -eq "sql_snapshot") {
+    if ($stageName -eq "legacy_import" -or $stageName -eq "python_import" -or $stageName -eq "maintenance" -or $stageName -eq "sql_snapshot" -or $stageName -eq "logical_compare" -or $stageName -eq "web_smoke") {
         Assert-StageDependenciesSatisfied -State $runState -Stage $stageName -Fingerprint $fingerprint
     }
     Invalidate-DownstreamStages -State $runState -CurrentStage $stageName

@@ -15,7 +15,7 @@ import json
 import subprocess
 import sys
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable
 
 
@@ -54,6 +54,36 @@ class PlayerIdentity:
 
 
 @dataclass(frozen=True)
+class AwardIdentity:
+    game: str
+    award_type: str
+    code: str
+
+    def to_json(self) -> JsonDict:
+        return {
+            "game": self.game,
+            "award_type": self.award_type,
+            "code": self.code,
+        }
+
+
+@dataclass(frozen=True)
+class RibbonIdentity:
+    game: str
+    award_code: str
+    award_count: int
+    special: int
+
+    def to_json(self) -> JsonDict:
+        return {
+            "game": self.game,
+            "award_code": self.award_code,
+            "award_count": self.award_count,
+            "special": self.special,
+        }
+
+
+@dataclass(frozen=True)
 class TableSpec:
     name: str
     sql: str
@@ -65,6 +95,8 @@ class NormalizationContext:
     players: dict[int, PlayerIdentity]
     actions: dict[int, str]
     servers: dict[int, JsonDict]
+    awards: dict[int, AwardIdentity] = field(default_factory=dict)
+    ribbons: dict[int, RibbonIdentity] = field(default_factory=dict)
 
     def player(self, player_id_text: str | None) -> JsonDict:
         if player_id_text is None:
@@ -86,6 +118,24 @@ class NormalizationContext:
             return {"missing_server_id": None}
         server_id = int(server_id_text)
         return self.servers.get(server_id, {"missing_server_id": server_id})
+
+    def award(self, award_id_text: str | None) -> JsonDict:
+        if award_id_text is None:
+            return {"missing_award_id": None}
+        award_id = int(award_id_text)
+        identity = self.awards.get(award_id)
+        if identity is None:
+            return {"missing_award_id": award_id}
+        return identity.to_json()
+
+    def ribbon(self, ribbon_id_text: str | None) -> JsonDict:
+        if ribbon_id_text is None:
+            return {"missing_ribbon_id": None}
+        ribbon_id = int(ribbon_id_text)
+        identity = self.ribbons.get(ribbon_id)
+        if identity is None:
+            return {"missing_ribbon_id": ribbon_id}
+        return identity.to_json()
 
 
 class DockerMysqlClient:
@@ -194,6 +244,44 @@ def fetch_context(client: DockerMysqlClient) -> NormalizationContext:
         )
     }
 
+    awards = {
+        int(require(row, "awardId")): AwardIdentity(
+            game=require(row, "game"),
+            award_type=require(row, "awardType"),
+            code=require(row, "code"),
+        )
+        for row in client.query(
+            """
+            SELECT
+                awardId,
+                game,
+                awardType,
+                code
+            FROM hlstats_Awards
+            """
+        )
+    }
+
+    ribbons = {
+        int(require(row, "ribbonId")): RibbonIdentity(
+            game=require(row, "game"),
+            award_code=require(row, "awardCode"),
+            award_count=int(require(row, "awardCount")),
+            special=int(require(row, "special")),
+        )
+        for row in client.query(
+            """
+            SELECT
+                ribbonId,
+                game,
+                awardCode,
+                awardCount,
+                special
+            FROM hlstats_Ribbons
+            """
+        )
+    }
+
     servers = {
         int(require(row, "serverId")): {
             "address": require(row, "address"),
@@ -215,7 +303,13 @@ def fetch_context(client: DockerMysqlClient) -> NormalizationContext:
         )
     }
 
-    return NormalizationContext(players=players, actions=actions, servers=servers)
+    return NormalizationContext(
+        players=players,
+        actions=actions,
+        servers=servers,
+        awards=awards,
+        ribbons=ribbons,
+    )
 
 
 def normalize_unique_id(value: str) -> str:
@@ -242,6 +336,10 @@ def normalize_player_row(row: dict[str, str | None], ctx: NormalizationContext) 
             "last_address": row.get("lastAddress"),
             "flag": row.get("flag"),
             "country": row.get("country"),
+            "city": row.get("city"),
+            "state": row.get("state"),
+            "lat": to_number(row.get("lat")),
+            "lng": to_number(row.get("lng")),
             "kills": to_int(row.get("kills")),
             "deaths": to_int(row.get("deaths")),
             "suicides": to_int(row.get("suicides")),
@@ -305,6 +403,48 @@ def normalize_players_history_row(
             "kill_streak": to_int(row.get("kill_streak")),
             "death_streak": to_int(row.get("death_streak")),
             "skill_change": to_int(row.get("skill_change")),
+        }
+    )
+
+
+def normalize_award_row(row: dict[str, str | None], ctx: NormalizationContext) -> JsonDict:
+    return compact(
+        {
+            "game": row.get("game"),
+            "award_type": row.get("awardType"),
+            "code": row.get("code"),
+            "name": row.get("name"),
+            "verb": row.get("verb"),
+            "daily_winner": ctx.player(row.get("d_winner_id")),
+            "daily_winner_count": to_int(row.get("d_winner_count")),
+            "global_winner": ctx.player(row.get("g_winner_id")),
+            "global_winner_count": to_int(row.get("g_winner_count")),
+        }
+    )
+
+
+def normalize_player_award_row(
+    row: dict[str, str | None], ctx: NormalizationContext
+) -> JsonDict:
+    return compact(
+        {
+            "award_date": row.get("awardTime"),
+            "award": ctx.award(row.get("awardId")),
+            "player": ctx.player(row.get("playerId")),
+            "count": to_int(row.get("count")),
+            "game": row.get("game"),
+        }
+    )
+
+
+def normalize_player_ribbon_row(
+    row: dict[str, str | None], ctx: NormalizationContext
+) -> JsonDict:
+    return compact(
+        {
+            "player": ctx.player(row.get("playerId")),
+            "ribbon": ctx.ribbon(row.get("ribbonId")),
+            "game": row.get("game"),
         }
     )
 
@@ -615,10 +755,38 @@ TABLE_SPECS: tuple[TableSpec, ...] = (
         SELECT
             playerId, lastAddress, connection_time, kills, deaths, suicides, skill,
             shots, hits, teamkills, headshots, kill_streak, death_streak, activity,
-            hideranking, flag, country
+            hideranking, flag, country, city, state, lat, lng
         FROM hlstats_Players
         """,
         normalize_player_row,
+    ),
+    TableSpec(
+        "hlstats_Awards",
+        """
+        SELECT
+            awardId, awardType, game, code, name, verb,
+            d_winner_id, d_winner_count, g_winner_id, g_winner_count
+        FROM hlstats_Awards
+        """,
+        normalize_award_row,
+    ),
+    TableSpec(
+        "hlstats_Players_Awards",
+        """
+        SELECT
+            awardTime, awardId, playerId, count, game
+        FROM hlstats_Players_Awards
+        """,
+        normalize_player_award_row,
+    ),
+    TableSpec(
+        "hlstats_Players_Ribbons",
+        """
+        SELECT
+            playerId, ribbonId, game
+        FROM hlstats_Players_Ribbons
+        """,
+        normalize_player_ribbon_row,
     ),
     TableSpec(
         "hlstats_PlayerUniqueIds",
