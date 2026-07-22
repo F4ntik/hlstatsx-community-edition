@@ -148,6 +148,7 @@ def test_database_config_from_proxy_config_parses_port() -> None:
         port=27500,
         debug_level=0,
         event_queue_size=10,
+        ingress_queue_size=1000,
         cpanel_hack=False,
         raw=MappingProxyType({}),
     )
@@ -170,6 +171,7 @@ def test_database_config_from_proxy_config_requires_host() -> None:
         port=27500,
         debug_level=0,
         event_queue_size=10,
+        ingress_queue_size=1000,
         cpanel_hack=False,
         raw=MappingProxyType({}),
     )

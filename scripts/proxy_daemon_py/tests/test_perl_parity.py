@@ -334,6 +334,7 @@ def _make_config() -> ProxyConfig:
         port=27500,
         debug_level=0,
         event_queue_size=32,
+        ingress_queue_size=1000,
         cpanel_hack=False,
         raw=MappingProxyType({}),
     )

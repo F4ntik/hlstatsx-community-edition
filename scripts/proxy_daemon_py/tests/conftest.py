@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import os
 import sys
 import threading
 from pathlib import Path
@@ -10,7 +11,15 @@ import pytest
 from _pytest.terminal import TerminalReporter
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SCRIPTS_ROOT = PROJECT_ROOT.parent
 PACKAGE_DIR = PROJECT_ROOT / "proxy_daemon_py"
+SCRIPTS_ROOT_STR = str(SCRIPTS_ROOT)
+if SCRIPTS_ROOT_STR in sys.path:
+    sys.path.remove(SCRIPTS_ROOT_STR)
+sys.path.insert(0, SCRIPTS_ROOT_STR)
+
+PACKAGE_DIR_PREFIX = f"{PACKAGE_DIR.resolve()}{os.sep}".casefold()
+TESTS_DIR_PREFIX = f"{(PROJECT_ROOT / 'tests').resolve()}{os.sep}".casefold()
 EXECUTED_LINES: Dict[str, Set[int]] = {}
 
 
@@ -74,13 +83,13 @@ def pytest_terminal_summary(
 def _trace(frame, event: str, arg):  # type: ignore[no-untyped-def]
     if event != "line":
         return _trace
-    filename = Path(frame.f_code.co_filename).resolve()
-    if "proxy_daemon_py" not in filename.parts:
+    filename = frame.f_code.co_filename
+    normalized_filename = filename.casefold()
+    if not normalized_filename.startswith(PACKAGE_DIR_PREFIX):
         return _trace
-    if "tests" in filename.parts:
+    if normalized_filename.startswith(TESTS_DIR_PREFIX):
         return _trace
-    key = str(filename)
-    EXECUTED_LINES.setdefault(key, set()).add(frame.f_lineno)
+    EXECUTED_LINES.setdefault(filename, set()).add(frame.f_lineno)
     return _trace
 
 
