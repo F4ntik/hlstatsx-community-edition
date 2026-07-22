@@ -404,13 +404,15 @@ function Invoke-PythonFtpImport {
             }
         }
     }
+    $pythonReplayVolume = "hlstatsx-python-replay-" + ([guid]::NewGuid().ToString("N"))
+    $pythonReplayVolumeCreated = $false
 
     if ($UsePythonUdpReplay) {
         $cmd = @(
             "run", "--rm",
             "--network", "python_hlstatsx_python_net",
             "-v", "${repoRoot}\scripts:/app/scripts",
-            "-v", "${pythonFtpWork}:/tmp/ftp_work",
+            "--mount", "type=volume,source=$pythonReplayVolume,target=/tmp/ftp_work",
             "-e", "PYTHONPATH=/app/scripts",
             "python-hlstats-worker",
             "python", "/app/scripts/replay_baseline/replay_python_log.py",
@@ -425,7 +427,7 @@ function Invoke-PythonFtpImport {
             "run", "--rm",
             "--network", "python_hlstatsx_python_net",
             "-v", "${repoRoot}\scripts:/app/scripts",
-            "-v", "${pythonFtpWork}:/tmp/ftp_work",
+            "--mount", "type=volume,source=$pythonReplayVolume,target=/tmp/ftp_work",
             "-e", "PYTHONPATH=/app/scripts",
             "-e", "HLSTATS_FTP_PASSWORD=hlxftp123",
             "python-hlstats-worker",
@@ -448,16 +450,37 @@ function Invoke-PythonFtpImport {
             "--continue-on-parse-error"
         )
     }
-    docker @cmd | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        throw "python ftp import failed"
+    try {
+        $existingDockerVolumes = @(docker volume ls --format '{{.Name}}')
+        if ($LASTEXITCODE -ne 0) { throw "failed to list docker volumes" }
+        if ($existingDockerVolumes -contains $pythonReplayVolume) {
+            throw "python replay volume collision: $pythonReplayVolume"
+        }
+        docker volume create $pythonReplayVolume | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "failed to create python replay volume" }
+        $pythonReplayVolumeCreated = $true
+
+        docker @cmd | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw "python ftp import failed"
+        }
+        docker run --rm `
+            --mount "type=volume,source=$pythonReplayVolume,target=/from,readonly" `
+            -v "${pythonFtpWork}:/to" `
+            --entrypoint sh `
+            python-hlstats-worker -lc "cp /from/$pythonInputManifestName /to/$pythonInputManifestName && cp /from/$pythonIgnoredManifestName /to/$pythonIgnoredManifestName"
+        if ($LASTEXITCODE -ne 0) { throw "failed to copy python replay manifests" }
+        Publish-EvidenceFile `
+            -SourcePath $pythonInputManifestTemp `
+            -DestinationPath (Join-Path $auditDir $pythonInputManifestName)
+        Publish-EvidenceFile `
+            -SourcePath $pythonIgnoredManifestTemp `
+            -DestinationPath (Join-Path $auditDir $pythonIgnoredManifestName)
+    } finally {
+        if ($pythonReplayVolumeCreated) {
+            docker volume rm $pythonReplayVolume | Out-Null
+        }
     }
-    Publish-EvidenceFile `
-        -SourcePath $pythonInputManifestTemp `
-        -DestinationPath (Join-Path $auditDir $pythonInputManifestName)
-    Publish-EvidenceFile `
-        -SourcePath $pythonIgnoredManifestTemp `
-        -DestinationPath (Join-Path $auditDir $pythonIgnoredManifestName)
 }
 
 $allStages = @("infra_updown", "baseline_restore", "preflight", "legacy_import", "python_import", "sql_snapshot")

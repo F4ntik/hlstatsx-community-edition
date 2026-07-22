@@ -50,16 +50,30 @@ def test_python_manifests_publish_only_after_import_success() -> None:
 
     import_call = script.index("    docker @cmd | Out-Null")
     failure_guard = script.index('throw "python ftp import failed"', import_call)
-    publish_input = script.index(
-        "Publish-EvidenceFile `\n        -SourcePath $pythonInputManifestTemp",
-        import_call,
-    )
-    publish_ignored = script.index(
-        "Publish-EvidenceFile `\n        -SourcePath $pythonIgnoredManifestTemp",
-        publish_input,
-    )
+    publish_input = script.index("-SourcePath $pythonInputManifestTemp", import_call)
+    publish_ignored = script.index("-SourcePath $pythonIgnoredManifestTemp", publish_input)
 
     assert import_call < failure_guard < publish_input < publish_ignored
+
+
+def test_python_replay_uses_ephemeral_named_volume_and_restores_manifests() -> None:
+    script = Path("scripts/replay_baseline/comparison/Run-DualContour-1000.ps1").read_text(
+        encoding="utf-8"
+    )
+
+    assert '$pythonReplayVolume = "hlstatsx-python-replay-"' in script
+    assert "docker volume ls --format '{{.Name}}'" in script
+    assert '$existingDockerVolumes -contains $pythonReplayVolume' in script
+    assert 'docker volume create $pythonReplayVolume' in script
+    assert '"--mount", "type=volume,source=$pythonReplayVolume,target=/tmp/ftp_work"' in script
+    assert 'target=/from,readonly' in script
+    assert '--entrypoint sh' in script
+    assert 'python-hlstats-worker -lc' in script
+    assert 'alpine sh' not in script
+    assert 'cp /from/$pythonInputManifestName /to/$pythonInputManifestName' in script
+    assert 'cp /from/$pythonIgnoredManifestName /to/$pythonIgnoredManifestName' in script
+    assert 'if ($pythonReplayVolumeCreated)' in script
+    assert 'docker volume rm $pythonReplayVolume' in script
 
 
 def test_legacy_evidence_is_guarded_before_window_cleanup_and_replay() -> None:
