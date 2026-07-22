@@ -7,6 +7,11 @@ on:
       - '.github/workflows/nightly-parity.yml'
       - 'docs/**'
       - 'scripts/hlstats_py/**'
+      - 'scripts/hlx_core/**'
+      - 'scripts/hlstats_awards_py/**'
+      - 'scripts/hlstats_ftp_py/**'
+      - 'scripts/hlstats_resolve_py/**'
+      - 'scripts/import_bans_py/**'
       - 'scripts/proxy_daemon_py/**'
       - 'scripts/replay_baseline/**'
       - 'scripts/web_i18n_smoke.php'
@@ -17,6 +22,11 @@ on:
       - '.github/workflows/nightly-parity.yml'
       - 'docs/**'
       - 'scripts/hlstats_py/**'
+      - 'scripts/hlx_core/**'
+      - 'scripts/hlstats_awards_py/**'
+      - 'scripts/hlstats_ftp_py/**'
+      - 'scripts/hlstats_resolve_py/**'
+      - 'scripts/import_bans_py/**'
       - 'scripts/proxy_daemon_py/**'
       - 'scripts/replay_baseline/**'
       - 'scripts/web_i18n_smoke.php'
@@ -81,6 +91,34 @@ jobs:
 
       - name: Pytest
         run: python -m pytest scripts/hlstats_py/tests
+
+  shared-python-tools:
+    name: shared Python tool tests
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: scripts
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install pytest==7.4.3 mysqlclient==2.2.0 Pillow==11.2.1
+
+      - name: Pytest shared operational tools
+        run: |
+          python -m pytest \
+            scripts/hlstats_awards_py/tests \
+            scripts/hlstats_ftp_py/tests \
+            scripts/hlstats_resolve_py/tests
+
+      - name: Import bans tool smoke
+        run: python -c "import import_bans_py.cli"
 
   replay-baseline:
     name: replay_baseline helper tests

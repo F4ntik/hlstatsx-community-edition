@@ -56,6 +56,7 @@ jobs:
           python-version: '3.10'
 
       - name: Run Docker-backed dual replay
+        id: dual-replay
         shell: powershell
         run: |
           $maxImportFiles = [int] "${{ github.event.inputs.max_import_files || '1000' }}"
@@ -65,6 +66,7 @@ jobs:
             -MaxImportFiles $maxImportFiles
 
       - name: Run post-replay GeoIP backfill
+        id: geoip-backfill
         shell: powershell
         run: |
           docker exec hlstatsx-python-worker `
@@ -73,43 +75,39 @@ jobs:
             --geoip
 
       - name: Compare replay databases
+        id: database-compare
         shell: powershell
         run: |
           python scripts/replay_baseline/compare_stats_dbs.py --max-examples 20
 
       - name: Smoke replay-backed EN/RU web routes
+        id: web-smoke
         shell: powershell
         run: |
           python scripts/replay_baseline/web_route_smoke.py `
             --base-url http://127.0.0.1:8281 `
             --langs en ru
 
-      - name: Upload parity artifacts
+      - name: Package sanitized parity summary
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: parity-audit-artifacts
-          retention-days: 7
-          if-no-files-found: ignore
-          path: |
-            docs/audits/legacy-python-parity-20260423/**
-            scripts/replay_baseline/artifacts/parity-traces/**
-            scripts/replay_baseline/comparison/.parity-state/**
-            scripts/replay_baseline/artifacts/**/*.json
-            scripts/replay_baseline/artifacts/**/*.txt
+        id: package-summary
+        shell: powershell
+        run: |
+          $artifactDirectory = Join-Path $env:RUNNER_TEMP 'hlstatsx-ci-artifacts'
+          python scripts/replay_baseline/package_ci_artifacts.py `
+            --output-directory $artifactDirectory `
+            --max-import-files ${{ github.event.inputs.max_import_files || '1000' }} `
+            --dual-replay-outcome '${{ steps.dual-replay.outcome }}' `
+            --geoip-backfill-outcome '${{ steps.geoip-backfill.outcome }}' `
+            --database-compare-outcome '${{ steps.database-compare.outcome }}' `
+            --web-smoke-outcome '${{ steps.web-smoke.outcome }}'
+          "artifact_file=$artifactDirectory/nightly-parity-summary.json" >> $env:GITHUB_OUTPUT
 
-      - name: Upload release-readiness artifacts
+      - name: Upload sanitized parity summary
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: release-readiness-artifacts
-          retention-days: 14
-          if-no-files-found: ignore
-          path: |
-            docs/release-readiness.md
-            docs/status.md
-            docs/test-plan.md
-            scripts/replay_baseline/artifacts/**/perf-profile.txt
-            scripts/replay_baseline/artifacts/**/*benchmark*.txt
-            scripts/replay_baseline/artifacts/**/*metrics*.txt
-            scripts/replay_baseline/artifacts/**/*summary.json
+          name: nightly-parity-summary
+          retention-days: 7
+          if-no-files-found: error
+          path: ${{ steps.package-summary.outputs.artifact_file }}
