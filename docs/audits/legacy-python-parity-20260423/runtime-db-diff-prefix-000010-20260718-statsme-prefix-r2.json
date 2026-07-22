@@ -1,0 +1,73 @@
+[
+  {
+    "legacy_only": 1,
+    "legacy_only_examples": [
+      {
+        "_count": 1,
+        "act_map": "cs_assault_1337",
+        "act_players": 2,
+        "bombs_defused": 0,
+        "bombs_planted": 0,
+        "ct_hits": 0,
+        "ct_shots": 0,
+        "ct_wins": 0,
+        "endpoint": "37.230.137.48:27015",
+        "game": "cstrike",
+        "headshots": 0,
+        "kills": 0,
+        "map_changes": 10,
+        "map_ct_hits": 0,
+        "map_ct_shots": 0,
+        "map_ct_wins": 0,
+        "map_rounds": 0,
+        "map_ts_hits": 0,
+        "map_ts_shots": 0,
+        "map_ts_wins": 0,
+        "max_players": 10,
+        "name": "Replay Server 37.230.137.48",
+        "players": 14,
+        "rounds": 0,
+        "suicides": 0,
+        "ts_hits": 0,
+        "ts_shots": 0,
+        "ts_wins": 0
+      }
+    ],
+    "legacy_rows": 2,
+    "python_only": 1,
+    "python_only_examples": [
+      {
+        "_count": 1,
+        "act_map": "cs_assault_1337",
+        "act_players": 0,
+        "bombs_defused": 0,
+        "bombs_planted": 0,
+        "ct_hits": 0,
+        "ct_shots": 0,
+        "ct_wins": 0,
+        "endpoint": "37.230.137.48:27015",
+        "game": "cstrike",
+        "headshots": 0,
+        "kills": 0,
+        "map_changes": 10,
+        "map_ct_hits": 0,
+        "map_ct_shots": 0,
+        "map_ct_wins": 0,
+        "map_rounds": 0,
+        "map_ts_hits": 0,
+        "map_ts_shots": 0,
+        "map_ts_wins": 0,
+        "max_players": 10,
+        "name": "Replay Server 37.230.137.48",
+        "players": 14,
+        "rounds": 0,
+        "suicides": 0,
+        "ts_hits": 0,
+        "ts_shots": 0,
+        "ts_wins": 0
+      }
+    ],
+    "python_rows": 2,
+    "table": "hlstats_Servers"
+  }
+]

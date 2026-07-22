@@ -1,0 +1,11 @@
+EvidenceRunId=20260718-sql-write-opt-r1
+Variant=optimized-history-ensure-cache
+ProductionSource=feature/sql-write-path-optimization from 22cd32ca94c8748a77f779953f6856d9e54aa983
+Input=L0105062.log
+InputSha256=093A8636B9948EAAF149A337BD2E022174C74529D05CB4B3C53D88B81BB4DDF6
+DumpSha256=E8D0BA9E93147EAA15F2993C77D67773565A8DE2AADB4BC183515A2438104252
+Database=independently restored disposable hlstatsxwritebench volume, 127.0.0.1:3328
+Command=direct_import_artifacts.py --profile --max-files 1 --parser-backend native --stdin-transaction-batch-size 1000 --gs-ip 37.230.137.48 --gs-port 27015
+Records=2287
+WallSeconds=2.071
+LogicalSqlCalls=2519

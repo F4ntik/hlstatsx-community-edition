@@ -1,0 +1,6 @@
+EvidenceRunId=20260718-sql-write-opt-r1
+Phase=baseline-unoptimized
+Input=scripts/replay_baseline/artifacts/parity-trace-rakza-window/L0105062.log
+DumpSha256=E8D0BA9E93147EAA15F2993C77D67773565A8DE2AADB4BC183515A2438104252
+Database=disposable docker container hlstatsx-writebench-db port 3328
+InitialHead=22cd32ca94c8748a77f779953f6856d9e54aa983

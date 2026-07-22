@@ -1,0 +1,3 @@
+pid=31264
+started=2026-07-18T20:34:19.8167830+03:00
+arguments=-NoProfile -ExecutionPolicy Bypass -File scripts/replay_baseline/comparison/Run-DualContour-1000.ps1 -MaxImportFiles 10 -ArtifactLabel prefix-000010 -EvidenceRunId 20260718-statsme-prefix-r2 -UseDumpRestore -SkipBuild

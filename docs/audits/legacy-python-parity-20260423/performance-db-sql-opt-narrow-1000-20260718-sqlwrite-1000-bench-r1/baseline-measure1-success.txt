@@ -1,0 +1,3 @@
+container=hlstatsx-sqlwrite-1000-baseline-measure1
+volume=hlstatsx_sqlwrite_1000_baseline_measure1
+port=3338

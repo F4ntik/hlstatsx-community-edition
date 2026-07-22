@@ -1,0 +1,5 @@
+hlstatsxce.hlstats_Players	4247134606
+hlstatsxce.hlstats_Players_History	2031520136
+hlstatsxce.hlstats_Events_Admin	2398995102
+hlstatsxce.hlstats_Events_Statsme	946702910
+hlstatsxce.hlstats_Events_Statsme2	1816040637

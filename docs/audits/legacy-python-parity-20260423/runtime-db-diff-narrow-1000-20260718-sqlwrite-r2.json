@@ -1,0 +1,1013 @@
+[
+  {
+    "legacy_only": 250,
+    "legacy_only_examples": [
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "Russia",
+        "death_streak": 0,
+        "deaths": 0,
+        "flag": "RU",
+        "headshots": 0,
+        "hide_ranking": 0,
+        "hits": 0,
+        "kill_streak": 0,
+        "kills": 0,
+        "last_address": "85.15.175.19",
+        "player": {
+          "game": "cstrike",
+          "name": "bnja[7201]",
+          "unique_ids": [
+            "0:1297163697"
+          ]
+        },
+        "shots": 0,
+        "skill": 1000,
+        "suicides": 0,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "Kazakhstan",
+        "death_streak": 0,
+        "deaths": 0,
+        "flag": "KZ",
+        "headshots": 0,
+        "hide_ranking": 0,
+        "hits": 0,
+        "kill_streak": 0,
+        "kills": 0,
+        "last_address": "109.201.59.100",
+        "player": {
+          "game": "cstrike",
+          "name": "Silver",
+          "unique_ids": [
+            "0:561465711"
+          ]
+        },
+        "shots": 0,
+        "skill": 1000,
+        "suicides": 0,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "Russia",
+        "death_streak": 3,
+        "deaths": 6,
+        "flag": "RU",
+        "headshots": 4,
+        "hide_ranking": 0,
+        "hits": 80,
+        "kill_streak": 2,
+        "kills": 8,
+        "last_address": "185.165.160.142",
+        "player": {
+          "game": "cstrike",
+          "name": "Хёг",
+          "unique_ids": [
+            "0:97609953"
+          ]
+        },
+        "shots": 441,
+        "skill": 1039,
+        "suicides": 0,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "Russia",
+        "death_streak": 0,
+        "deaths": 0,
+        "flag": "RU",
+        "headshots": 0,
+        "hide_ranking": 0,
+        "hits": 0,
+        "kill_streak": 0,
+        "kills": 0,
+        "last_address": "145.255.8.238",
+        "player": {
+          "game": "cstrike",
+          "name": "aXe",
+          "unique_ids": [
+            "0:865569348"
+          ]
+        },
+        "shots": 0,
+        "skill": 1000,
+        "suicides": 0,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "Belarus",
+        "death_streak": 0,
+        "deaths": 0,
+        "flag": "BY",
+        "headshots": 0,
+        "hide_ranking": 0,
+        "hits": 0,
+        "kill_streak": 0,
+        "kills": 0,
+        "last_address": "178.120.7.123",
+        "player": {
+          "game": "cstrike",
+          "name": "UwU",
+          "unique_ids": [
+            "0:1644228241"
+          ]
+        },
+        "shots": 0,
+        "skill": 1000,
+        "suicides": 0,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "Russia",
+        "death_streak": 0,
+        "deaths": 0,
+        "flag": "RU",
+        "headshots": 0,
+        "hide_ranking": 0,
+        "hits": 0,
+        "kill_streak": 0,
+        "kills": 0,
+        "last_address": "94.41.185.89",
+        "player": {
+          "game": "cstrike",
+          "name": "少年儿童",
+          "unique_ids": [
+            "1:590686858"
+          ]
+        },
+        "shots": 0,
+        "skill": 1000,
+        "suicides": 0,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "Russia",
+        "death_streak": 9,
+        "deaths": 132,
+        "flag": "RU",
+        "headshots": 56,
+        "hide_ranking": 0,
+        "hits": 5485,
+        "kill_streak": 3,
+        "kills": 153,
+        "last_address": "193.41.203.6",
+        "player": {
+          "game": "cstrike",
+          "name": "Alenka",
+          "unique_ids": [
+            "0:2032503011"
+          ]
+        },
+        "shots": 26338,
+        "skill": 2118,
+        "suicides": 1,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "Russia",
+        "death_streak": 7,
+        "deaths": 54,
+        "flag": "RU",
+        "headshots": 15,
+        "hide_ranking": 0,
+        "hits": 1556,
+        "kill_streak": 3,
+        "kills": 64,
+        "last_address": "193.233.154.34",
+        "player": {
+          "game": "cstrike",
+          "name": "*психоделия*",
+          "unique_ids": [
+            "0:1828776565"
+          ]
+        },
+        "shots": 4690,
+        "skill": 1475,
+        "suicides": 0,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "Kazakhstan",
+        "death_streak": 8,
+        "deaths": 90,
+        "flag": "KZ",
+        "headshots": 32,
+        "hide_ranking": 0,
+        "hits": 6296,
+        "kill_streak": 4,
+        "kills": 107,
+        "last_address": "188.130.158.179",
+        "player": {
+          "game": "cstrike",
+          "name": "СОСУ ПОЛОВЫЕ ГУБ",
+          "unique_ids": [
+            "1:185726949"
+          ]
+        },
+        "shots": 25061,
+        "skill": 1522,
+        "suicides": 3,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "Russia",
+        "death_streak": 8,
+        "deaths": 107,
+        "flag": "RU",
+        "headshots": 27,
+        "hide_ranking": 0,
+        "hits": 7726,
+        "kill_streak": 4,
+        "kills": 86,
+        "last_address": "94.51.19.139",
+        "player": {
+          "game": "cstrike",
+          "name": "У МЕНЯ ХУЙ В ЖОПЕ",
+          "unique_ids": [
+            "0:457124337"
+          ]
+        },
+        "shots": 33197,
+        "skill": 1444,
+        "suicides": 2,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "Kazakhstan",
+        "death_streak": 5,
+        "deaths": 59,
+        "flag": "KZ",
+        "headshots": 11,
+        "hide_ranking": 0,
+        "hits": 1459,
+        "kill_streak": 2,
+        "kills": 28,
+        "last_address": "79.134.37.89",
+        "player": {
+          "game": "cstrike",
+          "name": "ПИСЯ ПОПА КАКА",
+          "unique_ids": [
+            "0:425578263"
+          ]
+        },
+        "shots": 12738,
+        "skill": 1138,
+        "suicides": 0,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "Russia",
+        "death_streak": 2,
+        "deaths": 10,
+        "flag": "RU",
+        "headshots": 16,
+        "hide_ranking": 0,
+        "hits": 458,
+        "kill_streak": 3,
+        "kills": 34,
+        "last_address": "94.140.141.178",
+        "player": {
+          "game": "cstrike",
+          "name": "dan4eek",
+          "unique_ids": [
+            "1:98511360"
+          ]
+        },
+        "shots": 2212,
+        "skill": 1138,
+        "suicides": 0,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "Kazakhstan",
+        "death_streak": 5,
+        "deaths": 12,
+        "flag": "KZ",
+        "headshots": 6,
+        "hide_ranking": 0,
+        "hits": 269,
+        "kill_streak": 2,
+        "kills": 7,
+        "last_address": "92.47.65.162",
+        "player": {
+          "game": "cstrike",
+          "name": "Dauirkhan",
+          "unique_ids": [
+            "0:769983580"
+          ]
+        },
+        "shots": 1489,
+        "skill": 1041,
+        "suicides": 0,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "Russia",
+        "death_streak": 0,
+        "deaths": 0,
+        "flag": "RU",
+        "headshots": 0,
+        "hide_ranking": 0,
+        "hits": 0,
+        "kill_streak": 0,
+        "kills": 0,
+        "last_address": "46.138.171.222",
+        "player": {
+          "game": "cstrike",
+          "name": "123",
+          "unique_ids": [
+            "0:741347281"
+          ]
+        },
+        "shots": 0,
+        "skill": 1000,
+        "suicides": 0,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "Kazakhstan",
+        "death_streak": 8,
+        "deaths": 85,
+        "flag": "KZ",
+        "headshots": 50,
+        "hide_ranking": 0,
+        "hits": 5554,
+        "kill_streak": 4,
+        "kills": 106,
+        "last_address": "2.135.224.157",
+        "player": {
+          "game": "cstrike",
+          "name": "СПЕРМЫ ПОЛОН РОТ",
+          "unique_ids": [
+            "1:451665858"
+          ]
+        },
+        "shots": 28527,
+        "skill": 1569,
+        "suicides": 1,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "Russia",
+        "death_streak": 5,
+        "deaths": 20,
+        "flag": "RU",
+        "headshots": 1,
+        "hide_ranking": 0,
+        "hits": 352,
+        "kill_streak": 2,
+        "kills": 9,
+        "last_address": "217.168.243.228",
+        "player": {
+          "game": "cstrike",
+          "name": "Marta",
+          "unique_ids": [
+            "1:154070185"
+          ]
+        },
+        "shots": 2729,
+        "skill": 1041,
+        "suicides": 0,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "Russia",
+        "death_streak": 2,
+        "deaths": 19,
+        "flag": "RU",
+        "headshots": 23,
+        "hide_ranking": 0,
+        "hits": 1031,
+        "kill_streak": 3,
+        "kills": 43,
+        "last_address": "176.106.253.188",
+        "player": {
+          "game": "cstrike",
+          "name": "Олег2014",
+          "unique_ids": [
+            "1:815687334"
+          ]
+        },
+        "shots": 6413,
+        "skill": 1175,
+        "suicides": 0,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "Russia",
+        "death_streak": 9,
+        "deaths": 182,
+        "flag": "RU",
+        "headshots": 104,
+        "hide_ranking": 0,
+        "hits": 8462,
+        "kill_streak": 3,
+        "kills": 179,
+        "last_address": "31.40.163.237",
+        "player": {
+          "game": "cstrike",
+          "name": "gatl",
+          "unique_ids": [
+            "0:103103292"
+          ]
+        },
+        "shots": 53207,
+        "skill": 1975,
+        "suicides": 0,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "Russia",
+        "death_streak": 2,
+        "deaths": 3,
+        "flag": "RU",
+        "headshots": 0,
+        "hide_ranking": 0,
+        "hits": 8,
+        "kill_streak": 1,
+        "kills": 2,
+        "last_address": "85.140.161.168",
+        "player": {
+          "game": "cstrike",
+          "name": "NeMo",
+          "unique_ids": [
+            "0:606950014"
+          ]
+        },
+        "shots": 78,
+        "skill": 1016,
+        "suicides": 0,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "Russia",
+        "death_streak": 2,
+        "deaths": 5,
+        "flag": "RU",
+        "headshots": 1,
+        "hide_ranking": 0,
+        "hits": 30,
+        "kill_streak": 2,
+        "kills": 4,
+        "last_address": "77.222.96.40",
+        "player": {
+          "game": "cstrike",
+          "name": "Bespoleznyi_balast",
+          "unique_ids": [
+            "0:1322788668"
+          ]
+        },
+        "shots": 90,
+        "skill": 1016,
+        "suicides": 0,
+        "teamkills": 0
+      }
+    ],
+    "legacy_rows": 323,
+    "python_only": 250,
+    "python_only_examples": [
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "",
+        "death_streak": 0,
+        "deaths": 0,
+        "flag": "",
+        "headshots": 0,
+        "hide_ranking": 0,
+        "hits": 0,
+        "kill_streak": 0,
+        "kills": 0,
+        "last_address": "85.15.175.19",
+        "player": {
+          "game": "cstrike",
+          "name": "bnja[7201]",
+          "unique_ids": [
+            "0:1297163697"
+          ]
+        },
+        "shots": 0,
+        "skill": 1000,
+        "suicides": 0,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "",
+        "death_streak": 0,
+        "deaths": 0,
+        "flag": "",
+        "headshots": 0,
+        "hide_ranking": 0,
+        "hits": 0,
+        "kill_streak": 0,
+        "kills": 0,
+        "last_address": "109.201.59.100",
+        "player": {
+          "game": "cstrike",
+          "name": "Silver",
+          "unique_ids": [
+            "0:561465711"
+          ]
+        },
+        "shots": 0,
+        "skill": 1000,
+        "suicides": 0,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "",
+        "death_streak": 3,
+        "deaths": 6,
+        "flag": "",
+        "headshots": 4,
+        "hide_ranking": 0,
+        "hits": 80,
+        "kill_streak": 2,
+        "kills": 8,
+        "last_address": "185.165.160.142",
+        "player": {
+          "game": "cstrike",
+          "name": "Хёг",
+          "unique_ids": [
+            "0:97609953"
+          ]
+        },
+        "shots": 441,
+        "skill": 1039,
+        "suicides": 0,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "",
+        "death_streak": 0,
+        "deaths": 0,
+        "flag": "",
+        "headshots": 0,
+        "hide_ranking": 0,
+        "hits": 0,
+        "kill_streak": 0,
+        "kills": 0,
+        "last_address": "145.255.8.238",
+        "player": {
+          "game": "cstrike",
+          "name": "aXe",
+          "unique_ids": [
+            "0:865569348"
+          ]
+        },
+        "shots": 0,
+        "skill": 1000,
+        "suicides": 0,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "",
+        "death_streak": 0,
+        "deaths": 0,
+        "flag": "",
+        "headshots": 0,
+        "hide_ranking": 0,
+        "hits": 0,
+        "kill_streak": 0,
+        "kills": 0,
+        "last_address": "178.120.7.123",
+        "player": {
+          "game": "cstrike",
+          "name": "UwU",
+          "unique_ids": [
+            "0:1644228241"
+          ]
+        },
+        "shots": 0,
+        "skill": 1000,
+        "suicides": 0,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "",
+        "death_streak": 0,
+        "deaths": 0,
+        "flag": "",
+        "headshots": 0,
+        "hide_ranking": 0,
+        "hits": 0,
+        "kill_streak": 0,
+        "kills": 0,
+        "last_address": "185.8.126.75",
+        "player": {
+          "game": "cstrike",
+          "name": "spn",
+          "unique_ids": [
+            "1:516686979"
+          ]
+        },
+        "shots": 0,
+        "skill": 1000,
+        "suicides": 0,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "",
+        "death_streak": 0,
+        "deaths": 0,
+        "flag": "",
+        "headshots": 0,
+        "hide_ranking": 0,
+        "hits": 0,
+        "kill_streak": 0,
+        "kills": 0,
+        "last_address": "94.41.185.89",
+        "player": {
+          "game": "cstrike",
+          "name": "少年儿童",
+          "unique_ids": [
+            "1:590686858"
+          ]
+        },
+        "shots": 0,
+        "skill": 1000,
+        "suicides": 0,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "",
+        "death_streak": 9,
+        "deaths": 132,
+        "flag": "",
+        "headshots": 56,
+        "hide_ranking": 0,
+        "hits": 5485,
+        "kill_streak": 3,
+        "kills": 153,
+        "last_address": "193.41.203.6",
+        "player": {
+          "game": "cstrike",
+          "name": "Alenka",
+          "unique_ids": [
+            "0:2032503011"
+          ]
+        },
+        "shots": 26338,
+        "skill": 2118,
+        "suicides": 1,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "",
+        "death_streak": 7,
+        "deaths": 54,
+        "flag": "",
+        "headshots": 15,
+        "hide_ranking": 0,
+        "hits": 1556,
+        "kill_streak": 3,
+        "kills": 64,
+        "last_address": "193.233.154.34",
+        "player": {
+          "game": "cstrike",
+          "name": "*психоделия*",
+          "unique_ids": [
+            "0:1828776565"
+          ]
+        },
+        "shots": 4690,
+        "skill": 1475,
+        "suicides": 0,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "",
+        "death_streak": 8,
+        "deaths": 90,
+        "flag": "",
+        "headshots": 32,
+        "hide_ranking": 0,
+        "hits": 6296,
+        "kill_streak": 4,
+        "kills": 107,
+        "last_address": "188.130.158.179",
+        "player": {
+          "game": "cstrike",
+          "name": "СОСУ ПОЛОВЫЕ ГУБ",
+          "unique_ids": [
+            "1:185726949"
+          ]
+        },
+        "shots": 25061,
+        "skill": 1522,
+        "suicides": 3,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "",
+        "death_streak": 8,
+        "deaths": 107,
+        "flag": "",
+        "headshots": 27,
+        "hide_ranking": 0,
+        "hits": 7726,
+        "kill_streak": 4,
+        "kills": 86,
+        "last_address": "94.51.19.139",
+        "player": {
+          "game": "cstrike",
+          "name": "У МЕНЯ ХУЙ В ЖОПЕ",
+          "unique_ids": [
+            "0:457124337"
+          ]
+        },
+        "shots": 33197,
+        "skill": 1444,
+        "suicides": 2,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "",
+        "death_streak": 5,
+        "deaths": 59,
+        "flag": "",
+        "headshots": 11,
+        "hide_ranking": 0,
+        "hits": 1459,
+        "kill_streak": 2,
+        "kills": 28,
+        "last_address": "79.134.37.89",
+        "player": {
+          "game": "cstrike",
+          "name": "ПИСЯ ПОПА КАКА",
+          "unique_ids": [
+            "0:425578263"
+          ]
+        },
+        "shots": 12738,
+        "skill": 1138,
+        "suicides": 0,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "",
+        "death_streak": 2,
+        "deaths": 10,
+        "flag": "",
+        "headshots": 16,
+        "hide_ranking": 0,
+        "hits": 458,
+        "kill_streak": 3,
+        "kills": 34,
+        "last_address": "94.140.141.178",
+        "player": {
+          "game": "cstrike",
+          "name": "dan4eek",
+          "unique_ids": [
+            "1:98511360"
+          ]
+        },
+        "shots": 2212,
+        "skill": 1138,
+        "suicides": 0,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "",
+        "death_streak": 5,
+        "deaths": 12,
+        "flag": "",
+        "headshots": 6,
+        "hide_ranking": 0,
+        "hits": 269,
+        "kill_streak": 2,
+        "kills": 7,
+        "last_address": "92.47.65.162",
+        "player": {
+          "game": "cstrike",
+          "name": "Dauirkhan",
+          "unique_ids": [
+            "0:769983580"
+          ]
+        },
+        "shots": 1489,
+        "skill": 1041,
+        "suicides": 0,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "",
+        "death_streak": 0,
+        "deaths": 0,
+        "flag": "",
+        "headshots": 0,
+        "hide_ranking": 0,
+        "hits": 0,
+        "kill_streak": 0,
+        "kills": 0,
+        "last_address": "46.138.171.222",
+        "player": {
+          "game": "cstrike",
+          "name": "123",
+          "unique_ids": [
+            "0:741347281"
+          ]
+        },
+        "shots": 0,
+        "skill": 1000,
+        "suicides": 0,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "",
+        "death_streak": 8,
+        "deaths": 85,
+        "flag": "",
+        "headshots": 50,
+        "hide_ranking": 0,
+        "hits": 5554,
+        "kill_streak": 4,
+        "kills": 106,
+        "last_address": "2.135.224.157",
+        "player": {
+          "game": "cstrike",
+          "name": "СПЕРМЫ ПОЛОН РОТ",
+          "unique_ids": [
+            "1:451665858"
+          ]
+        },
+        "shots": 28527,
+        "skill": 1569,
+        "suicides": 1,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "",
+        "death_streak": 5,
+        "deaths": 20,
+        "flag": "",
+        "headshots": 1,
+        "hide_ranking": 0,
+        "hits": 352,
+        "kill_streak": 2,
+        "kills": 9,
+        "last_address": "217.168.243.228",
+        "player": {
+          "game": "cstrike",
+          "name": "Marta",
+          "unique_ids": [
+            "1:154070185"
+          ]
+        },
+        "shots": 2729,
+        "skill": 1041,
+        "suicides": 0,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "",
+        "death_streak": 2,
+        "deaths": 19,
+        "flag": "",
+        "headshots": 23,
+        "hide_ranking": 0,
+        "hits": 1031,
+        "kill_streak": 3,
+        "kills": 43,
+        "last_address": "176.106.253.188",
+        "player": {
+          "game": "cstrike",
+          "name": "Олег2014",
+          "unique_ids": [
+            "1:815687334"
+          ]
+        },
+        "shots": 6413,
+        "skill": 1175,
+        "suicides": 0,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "",
+        "death_streak": 9,
+        "deaths": 182,
+        "flag": "",
+        "headshots": 104,
+        "hide_ranking": 0,
+        "hits": 8462,
+        "kill_streak": 3,
+        "kills": 179,
+        "last_address": "31.40.163.237",
+        "player": {
+          "game": "cstrike",
+          "name": "gatl",
+          "unique_ids": [
+            "0:103103292"
+          ]
+        },
+        "shots": 53207,
+        "skill": 1975,
+        "suicides": 0,
+        "teamkills": 0
+      },
+      {
+        "_count": 1,
+        "activity": 100,
+        "country": "",
+        "death_streak": 2,
+        "deaths": 3,
+        "flag": "",
+        "headshots": 0,
+        "hide_ranking": 0,
+        "hits": 8,
+        "kill_streak": 1,
+        "kills": 2,
+        "last_address": "85.140.161.168",
+        "player": {
+          "game": "cstrike",
+          "name": "NeMo",
+          "unique_ids": [
+            "0:606950014"
+          ]
+        },
+        "shots": 78,
+        "skill": 1016,
+        "suicides": 0,
+        "teamkills": 0
+      }
+    ],
+    "python_rows": 323,
+    "table": "hlstats_Players"
+  }
+]

@@ -1,0 +1,4 @@
+pid=40780
+started=2026-07-18T21:20:46.4639218+03:00
+state=D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\replay_baseline\comparison\.parity-state\20260718-statsme-product-timing-r1.json
+arguments=-NoProfile -ExecutionPolicy Bypass -File scripts/replay_baseline/comparison/Run-DualContour-1000.ps1 -MaxImportFiles 1000 -ArtifactLabel narrow-1000 -EvidenceRunId 20260718-statsme-product-timing-r1 -Stack both -ReuseValidLegacy -UseDumpRestore -SkipBuild -OnlyStage python_import -StatePath "D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\replay_baseline\comparison\.parity-state\20260718-statsme-product-timing-r1.json"

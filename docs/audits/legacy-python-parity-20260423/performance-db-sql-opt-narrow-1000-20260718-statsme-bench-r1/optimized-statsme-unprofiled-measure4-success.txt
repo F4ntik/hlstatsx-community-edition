@@ -1,0 +1,3 @@
+container=hlstatsx-sqlwrite-1000-optimized-statsme-unprofiled-measure4
+volume=hlstatsx_sqlwrite_1000_optimized-statsme-unprofiled_measure4
+port=3338

@@ -1,0 +1,8 @@
+Key=hlstats_Players.playerId
+Rows=6092 baseline=6092 optimized=6092
+RawRowsDiffer=6092 because Players.last_event is a processing wall-clock value.
+BaselineLastEvent=1784380269
+OptimizedLastEvent=1784379508
+NormalizedComparison=exclude column last_event
+NormalizedDiffCount=0
+Classification=processing-time-only; no other Players field drift.
