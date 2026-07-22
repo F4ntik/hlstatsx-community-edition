@@ -32,9 +32,10 @@ The accepted implementation provides:
 
 ## Deployment prerequisites
 
-- Apply `sql/migrations/2026_07_22_ftp_checkpoint.sql` before enabling the
-  default durable FTP path. Convert the same 22 importer-write tables to
-  InnoDB first; the CLI intentionally refuses durable operation otherwise.
+- Apply `sql/migrations/2026_07_22_ftp_checkpoint.sql`, then the legacy-style
+  `sql/migrations/2026_07_22_0500.sql`, before enabling the default durable
+  FTP path. The second file converts the exact 22 importer-write tables to
+  InnoDB; the CLI intentionally refuses durable operation otherwise.
 - Use `scripts/run_proxy_py` and `scripts/run_hlstats_py` only on supported
   Linux/systemd hosts with procfs and Python pidfd support. Non-Linux hosts use
   foreground Python processes under a platform-native supervisor, without

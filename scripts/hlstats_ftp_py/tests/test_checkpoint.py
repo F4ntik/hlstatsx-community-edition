@@ -136,3 +136,21 @@ def test_transactional_schema_gate_covers_every_event_storage_write_table() -> N
     )
 
     assert written_tables <= set(DurableFtpCheckpoint._MUTATED_TABLES)
+
+
+def test_innodb_migration_matches_checkpoint_mutation_contract() -> None:
+    migration_path = Path(__file__).parents[3] / "sql" / "migrations" / "2026_07_22_0500.sql"
+    migration = migration_path.read_text(encoding="utf-8")
+
+    for marker in (":? Reason", ":i Info", ":! Change"):
+        assert marker in migration
+
+    altered_tables = re.findall(
+        r"(?im)^\s*ALTER\s+TABLE\s+`([^`]+)`\s+ENGINE\s*=\s*InnoDB\s*;\s*$",
+        migration,
+    )
+    all_alter_tables = re.findall(r"(?im)^\s*ALTER\s+TABLE\s+`([^`]+)`", migration)
+    assert altered_tables == list(DurableFtpCheckpoint._MUTATED_TABLES)
+    assert all_alter_tables == list(DurableFtpCheckpoint._MUTATED_TABLES)
+    assert not re.search(r"(?im)^\s*CREATE\s+TABLE", migration)
+    assert DurableFtpCheckpoint._CHECKPOINT_TABLE not in migration

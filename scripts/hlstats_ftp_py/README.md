@@ -8,10 +8,55 @@ incremental `*.log` fetch over FTP and import via
 
 - Python 3.10+
 - Working HLstats DB and a readable `hlstats.conf` (same file the PHP stack uses)
-- The P1 migration `sql/migrations/2026_07_22_ftp_checkpoint.sql` applied to
-  the target database (the new checkpoint table must be InnoDB)
+- For the default durable FTP mode, the P1 migrations applied to the target
+  database in order:
+  `sql/migrations/2026_07_22_ftp_checkpoint.sql`, then
+  `sql/migrations/2026_07_22_0500.sql`
 - Install `hlstats_py`/`hlx_core` in the Python environment used by the FTP
   runner and worker subprocess.
+
+## Enabling durable FTP on an existing database
+
+The migration follows the native HLstatsX `sql/migrations/` convention: it is
+an attended, operator-applied SQL file rather than an application-startup
+migration runner. Schedule a maintenance window because `ALTER TABLE` can lock
+or rebuild tables. Take a verified backup first and do not use `mysql --force`:
+an interrupted conversion must be inspected before continuing.
+
+From the repository root, apply the files in this exact order (substitute the
+normal database connection arguments and database name):
+
+```sh
+mysql -h DB_HOST -u DB_USER -p DB_NAME < sql/migrations/2026_07_22_ftp_checkpoint.sql
+mysql -h DB_HOST -u DB_USER -p DB_NAME < sql/migrations/2026_07_22_0500.sql
+```
+
+Before enabling the default FTP mode, verify that the checkpoint plus all
+importer write tables use InnoDB:
+
+```sql
+SELECT TABLE_NAME, ENGINE
+FROM information_schema.TABLES
+WHERE TABLE_SCHEMA = DATABASE()
+  AND TABLE_NAME IN (
+    'hlstats_FTP_Checkpoints', 'hlstats_Actions', 'hlstats_Events_Admin',
+    'hlstats_Events_ChangeTeam', 'hlstats_Events_Chat',
+    'hlstats_Events_Connects', 'hlstats_Events_Disconnects',
+    'hlstats_Events_Entries', 'hlstats_Events_Frags',
+    'hlstats_Events_PlayerActions', 'hlstats_Events_PlayerPlayerActions',
+    'hlstats_Events_Statsme', 'hlstats_Events_Statsme2',
+    'hlstats_Events_Suicides', 'hlstats_Events_TeamBonuses',
+    'hlstats_Events_Teamkills', 'hlstats_Maps_Counts',
+    'hlstats_PlayerNames', 'hlstats_Players', 'hlstats_Players_History',
+    'hlstats_PlayerUniqueIds', 'hlstats_Servers', 'hlstats_Weapons'
+  )
+ORDER BY TABLE_NAME;
+```
+
+The query must return 23 rows, all with `ENGINE = InnoDB`. The FTP runner
+repeats this check at startup and fails closed if a table is missing or has a
+different engine. Use `--legacy-file-marker` only when deliberately retaining
+the old non-atomic behavior.
 
 ## Flags (Perl → Python)
 
