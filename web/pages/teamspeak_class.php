@@ -306,7 +306,7 @@ class teamspeakDisplayClass
 		else if ($codec == 10) { return "Speex 16.3 Kbit"; }
 		else if ($codec == 11) { return "Speex 19.5 Kbit"; }
 		else if ($codec == 12) { return "Speex 25.9 Kbit"; }
-		else { return "Unknown (" . $codec . ")"; }
+		else { return t('literal.unknown') . " (" . $codec . ")"; }
 	}
 	
 	function getDefaultSettings() {
@@ -327,16 +327,16 @@ class teamspeakDisplayClass
 		
 		echo("<div id=\"teamspeakdisplay\">\n");
 		if ($serverInfo["queryerror"] != 0) {
-			$popupInfo = "Server address: " . $settings["serveraddress"] . (($settings["serverudpport"] != 8767) ? (":" . $settings["serverudpport"]): "");
+			$popupInfo = t('voice.server_address') . ": " . $settings["serveraddress"] . (($settings["serverudpport"] != 8767) ? (":" . $settings["serverudpport"]): "");
 			if ($serverInfo["queryerror"] == 1) {
-				$popupInfo .= ", Error: could not connect to query port";
+				$popupInfo .= ", " . t('voice.error') . ": " . t('voice.query_port_error');
 			} else {
-				$popupInfo .= ", Error: no server running on port " . $settings["serverudpport"];
+				$popupInfo .= ", " . t('voice.error') . ": " . t('voice.server_port_error', array('port' => $settings["serverudpport"]));
 			}
 			echo("<table><tr><td>");
 			echo("<img src=\"teamspeakdisplay/teamspeak_offline.png\" alt=\"\" title=\"" . $popupInfo . "\">");
 			echo("</td><td class=\"teamspeakserver\" title=\"" . $popupInfo . "\">");
-			echo("Server offline");
+			echo(t('voice.server_offline'));
 			echo("</td></tr></table>\n");
 		} else {
 			$this->sortServerInfo($serverInfo);
@@ -360,34 +360,34 @@ class teamspeakDisplayClass
 			echo("}\n");
 			echo("function enterSubChannel_" . $jsTeamspeakId . "(channelName, channelPassworded, subChannelName) {\n");
 			echo("	var serveraddress = 'teamspeak://" . $settings["serveraddress"] . ":" . $settings["serverudpport"] . "';\n");
-			echo("	var nickname=window.prompt('Enter your nickname', '');\n");
+			echo("	var nickname=window.prompt(" . json_encode(t('voice.enter_nickname'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) . ", '');\n");
 			echo("	if (nickname == null) {\n");
 			echo("		return;\n");
 			echo("	} else if (! stringOk_" . $jsTeamspeakId . "(nickname, '" . str_replace("'", "\\'", $settings["forbiddennicknamechars"]) . "')) {\n");
-			echo("		window.alert('Could not enter the teamspeak server because the nickname you entered contains one or more of these forbidden characters: " . str_replace("'", "\\'", $settings["forbiddennicknamechars"]) . "');\n");
+			echo("		window.alert(" . json_encode(t('voice.forbidden_nickname', array('characters' => $settings["forbiddennicknamechars"])), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) . ");\n");
 			echo("		return;\n");
 			echo("	} else if (nickname == \"\") {\n");
-			echo("		window.alert('Could not enter the teamspeak server because you did not enter your nickname');\n");
+			echo("		window.alert(" . json_encode(t('voice.nickname_required'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) . ");\n");
 			echo("		return;\n");
 			echo("	}\n");
 			echo("	serveraddress = serveraddress + \"/nickname=\" + escape(nickname);\n");
 			if ($serverInfo["serverinfo"]["server_password"] == "1") {
-				echo("	var password=window.prompt('Enter the teamspeak server password for " . $serverInfo["serverinfo"]["server_name"] . "', '');\n");
+				echo("	var password=window.prompt(" . json_encode(t('voice.enter_server_password', array('server' => $serverInfo["serverinfo"]["server_name"])), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) . ", '');\n");
 				echo("	if (password == null) {\n");
 				echo("		return;\n");
 				echo("	} else if (password == \"\") {\n");
-				echo("		window.alert('Could not enter the teamspeak server because you did not enter a server password');\n");
+				echo("		window.alert(" . json_encode(t('voice.server_password_required'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) . ");\n");
 				echo("		return;\n");
 				echo("	}\n");
 				echo("	serveraddress = serveraddress + \"?password=\" + escape(password);\n");
 			}
 			echo("	if (channelName != null) { serveraddress = serveraddress + \"?channel=\" + escape(channelName); }\n");
 			echo("	if (channelPassworded) {\n");
-			echo("		var channelpassword=window.prompt('Enter the channel password for channel ' + channelName, '');\n");
+			echo("		var channelpassword=window.prompt(" . json_encode(t('voice.enter_channel_password', array('channel' => '')), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) . " + channelName, '');\n");
 			echo("		if (channelpassword == null) {\n");
 			echo("			return;\n");
 			echo("		} else if (channelpassword == \"\") {\n");
-			echo("			window.alert('Could not enter the teamspeak server because you did not enter a channel password');\n");
+			echo("			window.alert(" . json_encode(t('voice.channel_password_required'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT) . ");\n");
 			echo("			return;\n");
 			echo("		}\n");
 			echo("		serveraddress = serveraddress + \"?channelpassword=\" + escape(channelpassword);\n");
@@ -397,7 +397,7 @@ class teamspeakDisplayClass
 			echo("}\n");
 			echo("//--></script>\n");
 			
-			$popupInfo = "Server address: " . $settings["serveraddress"] . (($settings["serverudpport"] != 8767) ? (":" . $settings["serverudpport"]): "") . ", Max players: " . $serverInfo["serverinfo"]["server_maxusers"] . ", Uptime: " . $this->_formatTime($serverInfo["serverinfo"]["server_uptime"]);
+			$popupInfo = t('voice.server_address') . ": " . $settings["serveraddress"] . (($settings["serverudpport"] != 8767) ? (":" . $settings["serverudpport"]): "") . ", " . t('voice.max_players') . ": " . $serverInfo["serverinfo"]["server_maxusers"] . ", " . t('voice.uptime') . ": " . $this->_formatTime($serverInfo["serverinfo"]["server_uptime"]);
 			
 			// Print the topmost element of the teamspeak tree
 			echo("<table><tr><td>");
@@ -436,8 +436,8 @@ class teamspeakDisplayClass
 					}
 				}
 				
-				$popupInfo = "Max players: " . $channelInfo["maxplayers"] . ", Codec: " . $this->_getCodecName($channelInfo["codec"]);
-				if ($channelInfo["topic"] != "") { $popupInfo = $popupInfo . ", Topic: " . $channelInfo["topic"]; }
+				$popupInfo = t('voice.max_players') . ": " . $channelInfo["maxplayers"] . ", " . t('voice.codec') . ": " . $this->_getCodecName($channelInfo["codec"]);
+				if ($channelInfo["topic"] != "") { $popupInfo = $popupInfo . ", " . t('voice.topic') . ": " . $channelInfo["topic"]; }
 				
 				// Display channel:
 				echo("<table><tr><td>");
@@ -458,7 +458,7 @@ class teamspeakDisplayClass
 					// Is the current player in the current channel?
 					if ($playerInfo["channelid"] == $channelInfo["channelid"]) {
 						
-						$popupInfo = "Time online: " . $this->_formatTime($playerInfo["totaltime"]) . ", Time idle: " . $this->_formatTime($playerInfo["idletime"]) . ", Ping: " . $playerInfo["pingtime"] . "ms";
+						$popupInfo = t('voice.time_online') . ": " . $this->_formatTime($playerInfo["totaltime"]) . ", " . t('voice.time_idle') . ": " . $this->_formatTime($playerInfo["idletime"]) . ", " . t('voice.ping') . ": " . $playerInfo["pingtime"] . "ms";
 						
 						// Display player:
 						echo("<table><tr><td>");
@@ -482,8 +482,8 @@ class teamspeakDisplayClass
 						if($playerInfo["channelid"] == $subchannelInfo["channelid"]) $currentplayers++;
 					}
 					
-					$popupInfo = "Max players: " . $subchannelInfo["maxplayers"] . ", Codec: " . $this->_getCodecName($subchannelInfo["codec"]);
-					if ($subchannelInfo["topic"] != "") { $popupInfo = $popupInfo . ", Topic: " . $subchannelInfo["topic"]; }
+					$popupInfo = t('voice.max_players') . ": " . $subchannelInfo["maxplayers"] . ", " . t('voice.codec') . ": " . $this->_getCodecName($subchannelInfo["codec"]);
+					if ($subchannelInfo["topic"] != "") { $popupInfo = $popupInfo . ", " . t('voice.topic') . ": " . $subchannelInfo["topic"]; }
 					
 					// Display channel:
 					echo("<table><tr><td>");
@@ -505,7 +505,7 @@ class teamspeakDisplayClass
 						// Is the current player in the current channel?
 						if ($playerInfo["channelid"] == $subchannelInfo["channelid"]) {
 							
-							$popupInfo = "Time online: " . $this->_formatTime($playerInfo["totaltime"]) . ", Time idle: " . $this->_formatTime($playerInfo["idletime"]) . ", Ping: " . $playerInfo["pingtime"] . "ms";
+							$popupInfo = t('voice.time_online') . ": " . $this->_formatTime($playerInfo["totaltime"]) . ", " . t('voice.time_idle') . ": " . $this->_formatTime($playerInfo["idletime"]) . ", " . t('voice.ping') . ": " . $playerInfo["pingtime"] . "ms";
 							
 							// Display player:
 							echo("<table><tr><td>");

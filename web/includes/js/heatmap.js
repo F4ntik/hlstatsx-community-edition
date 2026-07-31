@@ -58,6 +58,11 @@ if (typeof module !== 'undefined' && module.exports) {
 	module.exports.HeatmapAdminPayload = HeatmapAdminPayload;
 }
 
+var heatmapI18n = (typeof window !== 'undefined' && window.HLX_I18N) || {};
+function heatmapText(name, fallback) {
+	return heatmapI18n[name] || fallback;
+}
+
 window.addEvent('domready', function() {
  
 	/**
@@ -379,11 +384,11 @@ function setupInlineHeatmap(viewer) {
 		}
 
 		tooltip.innerHTML =
-			'<div><b>' + escapeHtml(nearest.value || 0) + '</b> events</div>' +
-			'<div>Kills: ' + escapeHtml(nearest.killValue || 0) + ' / Deaths: ' + escapeHtml(nearest.deathValue || 0) + '</div>' +
-			formatActors('Killers', nearest.topKillers) +
-			formatActors('Victims', nearest.topVictims) +
-			formatActors('Players', nearest.topPlayers);
+			'<div><b>' + escapeHtml(nearest.value || 0) + '</b> ' + escapeHtml(heatmapText('heatmapEvents', 'events')) + '</div>' +
+			'<div>' + escapeHtml(heatmapText('kills', 'Kills')) + ': ' + escapeHtml(nearest.killValue || 0) + ' / ' + escapeHtml(heatmapText('deaths', 'Deaths')) + ': ' + escapeHtml(nearest.deathValue || 0) + '</div>' +
+			formatActors(heatmapText('heatmapKillers', 'Killers'), nearest.topKillers) +
+			formatActors(heatmapText('heatmapVictims', 'Victims'), nearest.topVictims) +
+			formatActors(heatmapText('players', 'Players'), nearest.topPlayers);
 		tooltip.style.left = Math.min(rect.width - 12, Math.max(8, event.clientX - rect.left + 12)) + 'px';
 		tooltip.style.top = Math.min(rect.height - 12, Math.max(8, event.clientY - rect.top + 12)) + 'px';
 		tooltip.style.display = 'block';
@@ -401,7 +406,7 @@ function setupInlineHeatmap(viewer) {
 			var warning = payload.diagnostics.manualRequired || payload.diagnostics.inBounds === 0 || ratio < 0.3;
 			if (payload.diagnostics.outOfBounds > 0 || warning) {
 				setStatus(
-					payload.diagnostics.inBounds + '/' + payload.diagnostics.queried + ' in bounds',
+					payload.diagnostics.inBounds + '/' + payload.diagnostics.queried + ' ' + heatmapText('heatmapInBounds', 'in bounds'),
 					warning
 				);
 			} else {
@@ -435,7 +440,7 @@ function setupInlineHeatmap(viewer) {
 		fetch(endpoint, {credentials: 'same-origin'})
 		.then(function(response) {
 			if (!response.ok) {
-				throw new Error('heatmap request failed');
+				throw new Error(heatmapText('heatmapRequestFailed', 'Heatmap request failed'));
 			}
 			return response.json();
 		})
@@ -444,7 +449,7 @@ function setupInlineHeatmap(viewer) {
 				var warningText = '';
 				var warning = false;
 				if (payload.diagnostics && payload.diagnostics.queried > 0) {
-					warningText = payload.diagnostics.inBounds + '/' + payload.diagnostics.queried + ' in bounds';
+					warningText = payload.diagnostics.inBounds + '/' + payload.diagnostics.queried + ' ' + heatmapText('heatmapInBounds', 'in bounds');
 					warning = true;
 				}
 				lastPayload = payload;
@@ -676,7 +681,7 @@ function setupHeatmapAdminWizard(wizard) {
 		}
 		for (i = 0; i < rotateButtons.length; i++) {
 			rotateButtons[i].className = rotationSteps() ? 'heatmap-transform-button is-active' : 'heatmap-transform-button';
-			rotateButtons[i].innerHTML = rotationSteps() ? 'Rotate ' + (rotationSteps() * 90) + '&deg;' : 'Rotate 90&deg;';
+			rotateButtons[i].innerHTML = heatmapText('heatmapRotate', 'Rotate') + ' ' + (rotationSteps() ? (rotationSteps() * 90) : 90) + '&deg;';
 		}
 	}
 
@@ -752,8 +757,8 @@ function setupHeatmapAdminWizard(wizard) {
 			'<span class="heatmap-layer-handle heatmap-layer-handle-sw" data-heatmap-resize="sw"></span>' +
 			'<span class="heatmap-layer-handle heatmap-layer-handle-w" data-heatmap-resize="w"></span>' +
 			'<span class="heatmap-layer-rotate-controls">' +
-			'<button type="button" class="heatmap-layer-rotate-button" data-heatmap-rotate-step="-1" title="Rotate left 90 degrees">&#8635;</button>' +
-			'<button type="button" class="heatmap-layer-rotate-button" data-heatmap-rotate-step="1" title="Rotate right 90 degrees">&#8634;</button>' +
+			'<button type="button" class="heatmap-layer-rotate-button" data-heatmap-rotate-step="-1" title="' + heatmapText('heatmapRotateLeft90', 'Rotate left 90 degrees') + '">&#8635;</button>' +
+			'<button type="button" class="heatmap-layer-rotate-button" data-heatmap-rotate-step="1" title="' + heatmapText('heatmapRotateRight90', 'Rotate right 90 degrees') + '">&#8634;</button>' +
 			'</span>';
 		var frameRotateButtons = layerGuide.querySelectorAll('.heatmap-layer-rotate-button');
 		for (var rb = 0; rb < frameRotateButtons.length; rb++) {
@@ -770,9 +775,9 @@ function setupHeatmapAdminWizard(wizard) {
 		transformToolbar = document.createElement('div');
 		transformToolbar.className = 'heatmap-transform-overlay';
 		transformToolbar.innerHTML =
-			'<button type="button" class="heatmap-transform-button" data-heatmap-toggle-check="flipx">Flip X</button>' +
-			'<button type="button" class="heatmap-transform-button" data-heatmap-toggle-check="flipy">Flip Y</button>' +
-			'<button type="button" class="heatmap-transform-button" data-heatmap-rotate-step="1">Rotate 90&deg;</button>';
+			'<button type="button" class="heatmap-transform-button" data-heatmap-toggle-check="flipx">' + heatmapText('heatmapFlipX', 'Flip X') + '</button>' +
+			'<button type="button" class="heatmap-transform-button" data-heatmap-toggle-check="flipy">' + heatmapText('heatmapFlipY', 'Flip Y') + '</button>' +
+			'<button type="button" class="heatmap-transform-button" data-heatmap-rotate-step="1">' + heatmapText('heatmapRotate', 'Rotate') + ' 90&deg;</button>';
 		originMarker = document.createElement('div');
 		originMarker.className = 'heatmap-origin-marker';
 		cropGuide = document.createElement('div');
@@ -1134,7 +1139,7 @@ function setupHeatmapAdminWizard(wizard) {
 			}
 		}
 		if (status && payload.diagnostics) {
-			status.textContent = payload.diagnostics.inBounds + '/' + payload.diagnostics.queried + ' in bounds';
+			status.textContent = payload.diagnostics.inBounds + '/' + payload.diagnostics.queried + ' ' + heatmapText('heatmapInBounds', 'in bounds');
 			status.className = payload.diagnostics.manualRequired ? 'heatmap-status is-warning' : 'heatmap-status';
 		}
 		setLog(JSON.stringify({
@@ -1153,7 +1158,7 @@ function setupHeatmapAdminWizard(wizard) {
 			clearTimeout(previewTimer);
 			previewTimer = null;
 		}
-		setLog('Loading...');
+		setLog(heatmapText('loading', 'Loading...'));
 		return fetch('heatmap_admin.php', {
 			method: 'POST',
 			credentials: 'same-origin',
@@ -1202,7 +1207,7 @@ function setupHeatmapAdminWizard(wizard) {
 		if (overviewText && overviewText.value) {
 			form.append('overviewText', overviewText.value);
 		}
-		setLog('Uploading...');
+		setLog(heatmapText('uploading', 'Uploading...'));
 		fetch('heatmap_admin.php', {
 			method: 'POST',
 			credentials: 'same-origin',

@@ -395,9 +395,9 @@ function time_convert($time)
 	$minutes = floor(($time%3600)/60);
 	$seconds = floor(($time%3600)%60);
 	
-	if($hours>0) $time = $hours."h $minutes"."m $seconds".'s';
-	else if($minutes>0) $time = $minutes."m $seconds".'s';
-	else $time = $seconds.'s';
+	if($hours>0) $time = $hours.t('time.compact.h').' '.$minutes.t('time.compact.m').' '.$seconds.t('time.compact.s');
+	else if($minutes>0) $time = $minutes.t('time.compact.m').' '.$seconds.t('time.compact.s');
+	else $time = $seconds.t('time.compact.s');
 	 
   	return $time;
 } 
@@ -649,7 +649,7 @@ function indexOf($str,$strChar)
 }
 function getChannelName($cid,$ip,$port,$tPort)
 {		
-	$name = 'Unknown';
+	$name = localized_text('literal.unknown', 'Unknown');
 	$cArray = getChannels($ip,$port,$tPort);
 	
 	for($i=0;$i<count($cArray);$i++)
@@ -776,18 +776,18 @@ function defaultInfo($ip,$tPort,$port)
 		$welcomeMsg=convertCharset(substr($welcomeMsg,0,indexOf($welcomeMsg,"server_webpost_linkurl=")-strlen("server_webpost_linkurl=")));
 				
 		
-		if($tsType[0]==1) $tsTypeText = "Freeware Clan Server";
-		else $tsTypeText = "Freeware Public Server";		
+		if($tsType[0]==1) $tsTypeText = t('voice.freeware_clan_server');
+		else $tsTypeText = t('voice.freeware_public_server');
 
-		$html = "<tr class=\"bg1\"><td id=\"contentMainFirst\" style=\"border:0\" class=\"fHeading\">Server:</td></tr>\n";
+		$html = "<tr class=\"bg1\"><td id=\"contentMainFirst\" style=\"border:0\" class=\"fHeading\">" . eHtml(t('literal.server')) . ":</td></tr>\n";
 		$html .= "<tr class=\"bg1\"><td id=\"contentMainFirst\" style=\"border:0\">$name<br /><br /></td></tr>\n";
-		$html .= "<tr class=\"bg1\"><td id=\"contentMainFirst\" style=\"border:0\" class=\"fHeading\">Server IP:</td></tr>\n";
+		$html .= "<tr class=\"bg1\"><td id=\"contentMainFirst\" style=\"border:0\" class=\"fHeading\">" . eHtml(t('voice.server_ip')) . ":</td></tr>\n";
 		$html .= "<tr class=\"bg1\"><td id=\"contentMainFirst\" style=\"border:0\">$ip:$port<br /><br /></td></tr>\n";
-		$html .= "<tr class=\"bg1\"><td id=\"contentMainFirst\" style=\"border:0\" class=\"fHeading\">Version:</td></tr>\n";
+		$html .= "<tr class=\"bg1\"><td id=\"contentMainFirst\" style=\"border:0\" class=\"fHeading\">" . eHtml(t('voice.version')) . ":</td></tr>\n";
 		$html .= "<tr class=\"bg1\"><td id=\"contentMainFirst\" style=\"border:0\">".getTSVersion($ip,$tPort,$port)."<br /><br /></td></tr>\n";
-		$html .= "<tr class=\"bg1\"><td id=\"contentMainFirst\" style=\"border:0\" class=\"fHeading\">Type:</td></tr>\n";
+		$html .= "<tr class=\"bg1\"><td id=\"contentMainFirst\" style=\"border:0\" class=\"fHeading\">" . eHtml(t('voice.type')) . ":</td></tr>\n";
 		$html .= "<tr class=\"bg1\"><td id=\"contentMainFirst\" style=\"border:0\">$tsTypeText<br /><br /></td></tr>\n";
-		$html .= "<tr class=\"bg1\"><td id=\"contentMainFirst\" style=\"border:0\" class=\"fHeading\">Welcome Message:</td></tr>\n";
+		$html .= "<tr class=\"bg1\"><td id=\"contentMainFirst\" style=\"border:0\" class=\"fHeading\">" . eHtml(t('voice.welcome_message')) . ":</td></tr>\n";
 		$html .= "<tr class=\"bg1\"><td id=\"contentMainFirst\" style=\"border:0\">$welcomeMsg<br /><br /></td></tr>";
 		
 		fclose($fp);
@@ -823,18 +823,18 @@ function channelInfo($ip,$tPort,$port,$cID)
 	}	
 	if($ok) 
 	{
-		$html = "<tr class=\"bg1\"><td>Channel:</td></tr>\n";
+		$html = "<tr class=\"bg1\"><td>" . eHtml(t('literal.channel')) . ":</td></tr>\n";
 		$html .= "<tr class=\"bg1\"><td>".removeChar($name)."<br /><br /></td></tr>\n";
-		$html .= "<tr class=\"bg1\"><td>Topic:</td></tr>\n";
+		$html .= "<tr class=\"bg1\"><td>" . eHtml(t('voice.topic')) . ":</td></tr>\n";
 		$html .= "<tr class=\"bg1\"><td>".utf8_encode(removeChar($topic))."<br /><br /></td></tr>\n";
-		$html .= "<tr class=\"bg1\"><td>User in channel:</td></tr>\n";
+		$html .= "<tr class=\"bg1\"><td>" . eHtml(t('voice.users_in_channel')) . ":</td></tr>\n";
 		$html .= "<tr class=\"bg1\"><td>".$cUser."/".removeChar($max)."<br /><br /></td></tr>\n";
-		$html .= "<tr class=\"bg1\"><td>Codec:</td></tr>\n";
+		$html .= "<tr class=\"bg1\"><td>" . eHtml(t('voice.codec')) . ":</td></tr>\n";
 		$html .= "<tr class=\"bg1\"><td>".getCodec($codec)."<br /><br /></td></tr>\n";
 		$name = str_replace("'","¶",$name);
 //		$html .= "<tr><td><br /><input type=\"button\" id=\"submit\" onclick=\"javascript:w('login.php?cName=".removeChar($name)."', 'TS2', '420', '150');\" value=\"Join Channel\" class=\"submit\" /></td></tr>\n";
 	} else {
-		$html = "<tr class=\"bg1\"><td>Channel is deleted!</td></tr>\n";
+		$html = "<tr class=\"bg1\"><td>" . eHtml(t('voice.channel_deleted')) . "</td></tr>\n";
 	}
 	
 	return $html;	

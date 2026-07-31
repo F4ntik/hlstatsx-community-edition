@@ -1,6 +1,11 @@
 (function (global) {
   "use strict";
 
+  var HITBOX_I18N = (global.HLX_I18N && global.HLX_I18N.hitbox) || {};
+  function hitboxText(name, fallback) {
+    return HITBOX_I18N[name] || fallback;
+  }
+
   function toNumber(value) {
     var parsed = Number(value);
     return isFinite(parsed) ? parsed : 0;
@@ -60,13 +65,13 @@
   // Body-part definitions. Colors + label order. Anchor fractions are resolved
   // from one of two anchor sets depending on the model image aspect ratio.
   var PARTS = [
-    { id: "head",     label: "Head",      color: "#F59E0B" },
-    { id: "chest",    label: "Chest",     color: "#EF4444" },
-    { id: "leftarm",  label: "Left Arm",  color: "#38BDF8" },
-    { id: "rightarm", label: "Right Arm", color: "#06B6D4" },
-    { id: "stomach",  label: "Stomach",   color: "#EAB308" },
-    { id: "leftleg",  label: "Left Leg",  color: "#A78BFA" },
-    { id: "rightleg", label: "Right Leg", color: "#8B5CF6" }
+    { id: "head",     label: hitboxText("head", "Head"),      color: "#F59E0B" },
+    { id: "chest",    label: hitboxText("chest", "Chest"),     color: "#EF4444" },
+    { id: "leftarm",  label: hitboxText("leftarm", "Left Arm"),  color: "#38BDF8" },
+    { id: "rightarm", label: hitboxText("rightarm", "Right Arm"), color: "#06B6D4" },
+    { id: "stomach",  label: hitboxText("stomach", "Stomach"),   color: "#EAB308" },
+    { id: "leftleg",  label: hitboxText("leftleg", "Left Leg"),  color: "#A78BFA" },
+    { id: "rightleg", label: hitboxText("rightleg", "Right Leg"), color: "#8B5CF6" }
   ];
 
   // Wide / landscape models (CS, DoD, HL2MP, TFC) keep the figure in a narrow
@@ -448,7 +453,7 @@
             '<span style="width:10px;height:2px;background:currentColor;border-radius:1px;"></span>' +
           '</span>' +
           '<span style="font-size:12px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;color:#22d3ee;">' +
-            'Hitbox Tuning ' +
+            hitboxText("tuning", "Hitbox Tuning") + ' ' +
             '<span id="hlxhb-tune-mode" style="color:#64748b;font-size:10px;font-weight:400;">(wide)</span>' +
           '</span>' +
         '</div>' +
@@ -457,13 +462,13 @@
         '</div>' +
       '</div>' +
       '<div id="hlxhb-tune-body" style="user-select:auto;">' +
-        '<div style="margin:4px 0 2px;color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:1px;">Model</div>' +
+        '<div style="margin:4px 0 2px;color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:1px;">' + hitboxText("model", "Model") + '</div>' +
         '<div id="hlxhb-tune-model"></div>' +
-        '<div style="margin:10px 0 2px;color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:1px;">Anchors</div>' +
+        '<div style="margin:10px 0 2px;color:#64748b;font-size:10px;text-transform:uppercase;letter-spacing:1px;">' + hitboxText("anchors", "Anchors") + '</div>' +
         '<div id="hlxhb-tune-anchors"></div>' +
         '<div style="display:flex;gap:6px;margin-top:12px;">' +
-          '<button id="hlxhb-tune-copy" style="flex:1;background:#0ea5e9;border:none;color:#fff;padding:7px;border-radius:3px;cursor:pointer;font-weight:600;font-size:11px;">Copy config</button>' +
-          '<button id="hlxhb-tune-reset" style="background:#1e293b;border:1px solid #334155;color:#cbd5e1;padding:7px 10px;border-radius:3px;cursor:pointer;font-size:11px;">Reset</button>' +
+          '<button id="hlxhb-tune-copy" style="flex:1;background:#0ea5e9;border:none;color:#fff;padding:7px;border-radius:3px;cursor:pointer;font-weight:600;font-size:11px;">' + hitboxText("copyConfig", "Copy config") + '</button>' +
+          '<button id="hlxhb-tune-reset" style="background:#1e293b;border:1px solid #334155;color:#cbd5e1;padding:7px 10px;border-radius:3px;cursor:pointer;font-size:11px;">' + hitboxText("reset", "Reset") + '</button>' +
         '</div>' +
         '<div id="hlxhb-tune-status" style="margin-top:6px;color:#64748b;font-size:10px;min-height:14px;"></div>' +
       '</div>';
@@ -491,14 +496,15 @@
     });
 
     document.getElementById("hlxhb-tune-reset").addEventListener("click", function () {
-      if (!window.confirm("Reset tuning for the \"" + CURRENT_MODE + "\" mode to its default values?")) return;
+      var resetMessage = hitboxText("resetConfirmation", 'Reset tuning for the "' + CURRENT_MODE + '" mode to its default values?').replace(":mode", CURRENT_MODE);
+      if (!window.confirm(resetMessage)) return;
       var defaults = makeDefaultTuning();
       TUNING[CURRENT_MODE] = defaults[CURRENT_MODE];
       saveTuning();
       TUNING_PANEL_BUILT_FOR_MODE = null;
       rebuildTuningPanelIfNeeded(CURRENT_MODE, true);
       triggerRefreshAll();
-      setTuningStatus("Reset applied");
+      setTuningStatus(hitboxText("resetApplied", "Reset applied"));
     });
   }
 
@@ -514,9 +520,9 @@
     var t = getActiveTuning(mode);
 
     var modelHtml = '' +
-      slider("modelScale", "scale", 0.50, 1.60, 0.01, t.model.modelScale, 2) +
-      slider("modelOffsetX", "offsetX", -120, 120, 1, t.model.modelOffsetX, 0) +
-      slider("modelOffsetY", "offsetY", -120, 120, 1, t.model.modelOffsetY, 0);
+      slider("modelScale", hitboxText("scale", "scale"), 0.50, 1.60, 0.01, t.model.modelScale, 2) +
+      slider("modelOffsetX", hitboxText("offsetX", "offsetX"), -120, 120, 1, t.model.modelOffsetX, 0) +
+      slider("modelOffsetY", hitboxText("offsetY", "offsetY"), -120, 120, 1, t.model.modelOffsetY, 0);
     document.getElementById("hlxhb-tune-model").innerHTML = modelHtml;
 
     var anchorsHtml = "";
@@ -618,7 +624,7 @@
   function copyConfigToClipboard() {
     var payload = formatConfigOutput();
     var done = function (ok) {
-      setTuningStatus(ok ? "Copied to clipboard" : "Copy failed — see console");
+      setTuningStatus(ok ? hitboxText("copiedToClipboard", "Copied to clipboard") : hitboxText("copyFailed", "Copy failed — see console"));
       if (!ok) {
         try { console.log("[HLXHitboxModern tuning]\n" + payload); } catch (e) {}
       }
@@ -695,7 +701,7 @@
 
     // i18n: callers can override labels via opts.i18n. Falls back to English
     // defaults so the renderer works standalone without a translation layer.
-    var i18n = opts.i18n || {};
+    var i18n = opts.i18n || (window.HLX_I18N && window.HLX_I18N.hitbox) || {};
     function label(id, fallback) {
       return i18n[id] ? String(i18n[id]) : fallback;
     }

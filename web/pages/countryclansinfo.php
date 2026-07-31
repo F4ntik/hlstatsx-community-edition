@@ -155,7 +155,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 				</tr>
             
 				<tr class="bg2">
-					<td>Avg. Kills:</td>
+					<td><?php echo eHtml(t('literal.avg_kills')); ?>:</td>
 					<td colspan="2"><?php
 						echo number_format($clandata['kills'] / ($clandata['nummembers']));
 					?></td>

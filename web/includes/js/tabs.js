@@ -82,7 +82,8 @@ var Tabs = new Class({
 		}
 		
 		//Create the loading image (May change in the future)
-		this.loading = new Element('div').set('html', '<br /><br /><center><b>Loading...</b><br /><img src="' + this.options.loadingImage + '" alt="Loading..." /></center>').injectInside($(this.container));
+		var loadingLabel = (window.HLX_I18N && window.HLX_I18N.loading) || 'Loading...';
+		this.loading = new Element('div').set('html', '<br /><br /><center><b>' + loadingLabel + '</b><br /><img src="' + this.options.loadingImage + '" alt="' + loadingLabel + '" /></center>').injectInside($(this.container));
 		//AJAX FTW
 		this.currentRequest = new Request({
 			url: 'hlstats.php?mode=' + this.options.mode + '&type=ajax&game=' + this.options.game + '&tab=' + tab + '&' + Hash.toQueryString(this.options.extra),

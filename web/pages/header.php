@@ -105,6 +105,49 @@ For support and installation notes visit http://www.hlxcommunity.com
 	<!-- U R A SMACKHEAD -->
 
 	<link rel="SHORTCUT ICON" href="favicon.ico" />
+	<script type="text/javascript">
+	window.HLX_I18N = <?php echo json_encode(array(
+		'loading' => t('ui.loading'),
+		'uploading' => t('ui.uploading'),
+		'errorOccurred' => t('ui.error_occurred'),
+		'kills' => t('literal.kills'),
+		'deaths' => t('literal.deaths'),
+		'players' => t('literal.players'),
+		'heatmapEvents' => t('heatmap.events'),
+		'heatmapKillers' => t('heatmap.killers'),
+		'heatmapVictims' => t('heatmap.victims'),
+		'heatmapInBounds' => t('heatmap.in_bounds'),
+		'heatmapRequestFailed' => t('heatmap.request_failed', array(), 'Heatmap request failed'),
+		'heatmapFlipX' => t('heatmap.flip_x'),
+		'heatmapFlipY' => t('heatmap.flip_y'),
+		'heatmapRotate' => t('heatmap.rotate'),
+		'heatmapRotateLeft90' => t('heatmap.rotate_left_90'),
+		'heatmapRotateRight90' => t('heatmap.rotate_right_90'),
+		'hitbox' => array(
+			'head' => t('literal.head'),
+			'chest' => t('literal.chest'),
+			'leftarm' => t('literal.left_arm'),
+			'rightarm' => t('literal.right_arm'),
+			'stomach' => t('literal.stomach'),
+			'leftleg' => t('literal.left_leg'),
+			'rightleg' => t('literal.right_leg'),
+			'totalHits' => t('literal.total_hits'),
+			'targets' => t('literal.targets'),
+			'tuning' => t('hitbox.tuning'),
+			'model' => t('hitbox.model'),
+			'anchors' => t('hitbox.anchors'),
+			'copyConfig' => t('hitbox.copy_config'),
+			'reset' => t('hitbox.reset'),
+			'resetConfirmation' => t('hitbox.reset_confirmation'),
+			'resetApplied' => t('hitbox.reset_applied'),
+			'copiedToClipboard' => t('hitbox.copied_to_clipboard'),
+			'copyFailed' => t('hitbox.copy_failed'),
+			'scale' => t('hitbox.scale'),
+			'offsetX' => t('hitbox.offset_x'),
+			'offsetY' => t('hitbox.offset_y'),
+		),
+	), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>;
+	</script>
 	<script type="text/javascript" src="<?php echo INCLUDE_PATH; ?>/js/mootools.js"></script>
 	<script type="text/javascript" src="<?php echo INCLUDE_PATH; ?>/js/SqueezeBox.js"></script>
 	<script type="text/javascript" src="<?php echo INCLUDE_PATH; ?>/js/heatmap.js?v=<?php echo intval(@filemtime(INCLUDE_PATH . '/js/heatmap.js')); ?>"></script>

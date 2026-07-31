@@ -180,7 +180,8 @@ var SqueezeBox = {
 
 	onError: function() {
 		this.asset = null;
-		this.setContent('string', this.options.errorMsg || 'An error occurred');
+		var errorLabel = (window.HLX_I18N && window.HLX_I18N.errorOccurred) || 'An error occurred';
+		this.setContent('string', this.options.errorMsg || errorLabel);
 	},
 
 	setContent: function(handler, content) {

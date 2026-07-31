@@ -515,6 +515,12 @@ Current parity state:
   `sig.php` as a PNG route for both EN and RU.
 - Frontend i18n backlog (`P6a`/`P6b`/`P6c`) remains complete for the supported
   EN/RU product contour.
+- Supplemental frontend i18n sweep completed on 2026-07-26: standalone error
+  routes, TeamSpeak labels/fallbacks, heatmap and hitbox controls, graph
+  summaries, tabs, and shared JavaScript loading/error text now use the EN/RU
+  dictionaries. The dictionaries have matching 1117-key and placeholder
+  sets; remaining English literals are guarded fallbacks or technical/logging
+  text rather than untranslated Russian UI.
 
 ## Next
 

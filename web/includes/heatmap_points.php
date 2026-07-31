@@ -57,7 +57,7 @@ function heatmap_actor_name($name)
     $name = str_replace("\xE2\x80\xAE", '', $name);
     $name = trim($name);
 
-    return $name === '' ? 'Unknown' : $name;
+    return $name === '' ? localized_text('literal.unknown', 'Unknown') : $name;
 }
 
 function heatmap_bool($value)

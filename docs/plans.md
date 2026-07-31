@@ -225,7 +225,10 @@ were retired for the supported product contour.
 
 Outcome:
 Release-style frontend and language-persistence revalidation was completed for
-the remediated product contour.
+the remediated product contour. A supplemental 2026-07-26 sweep also closed
+remaining visible English fallbacks in standalone error paths, TeamSpeak,
+heatmap/hitbox controls, graph summaries, and shared JavaScript widgets. EN/RU
+now have the same 1117 message keys and placeholder sets.
 
 ### [x] P6d. Full legacy-vs-Python product parity audit
 

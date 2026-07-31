@@ -147,16 +147,16 @@
 ?>
 	<ul class="subsection_tabs" id="tabs_claninfo">
 		<li>
-			<a href="#" id="tab_general" id="general">General</a>
+			<a href="#" id="tab_general" id="general"><?php echo eHtml(t('literal.general_tab')); ?></a>
 		</li>
 		<li>
-			<a href="#" id="tab_actions|teams">Teams &amp; Actions</a>
+			<a href="#" id="tab_actions|teams"><?php echo eHtml(t('literal.teams_actions_tab')); ?></a>
 		</li>
 		<li>
-			<a href="#" id="tab_weapons">Weapons</a>
+			<a href="#" id="tab_weapons"><?php echo eHtml(t('literal.weapons')); ?></a>
 		</li>
 		<li>
-			<a href="#" id="tab_mapperformance">Maps</a>
+			<a href="#" id="tab_mapperformance"><?php echo eHtml(t('literal.maps')); ?></a>
 		</li>
 	</ul><br />
 	<div id="main_content"></div>

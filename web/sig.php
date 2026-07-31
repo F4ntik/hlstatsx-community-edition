@@ -92,12 +92,12 @@ if (class_exists($db_classname))
 }
 else
 {
-	error('Database class does not exist.  Please check your config.php file for DB_TYPE');
+	error(localized_text('error.database_class_missing'));
 }
 
 $g_options = $optionService->getAllOptions();
 if (empty($g_options)) {
-	error('Warning: Could not find any options in the database. Check HLStats configuration.');
+	error(localized_text('error.options_missing'));
 }
 
 @error_reporting(E_ALL ^ E_NOTICE);
@@ -177,7 +177,7 @@ function f_num($number) {
 		");
 		
 		if ($db->num_rows() != 1)
-		error("No such player '$player'.");
+		error(localized_no_such_player_message($player));
 		list($player_id) = $db->fetch_row();
 	}
 	
@@ -254,7 +254,7 @@ if ($player_id > 0) {
 			playerId='$player_id'
 	");
 	if ($db->num_rows() != 1)
-		error("No such player '$player'.");
+		error(localized_no_such_player_message($player));
 
 	$playerdata = $db->fetch_array();
 	$db->free_result();
@@ -286,7 +286,7 @@ if ($player_id > 0) {
 	$pl_count = $db->fetch_array();
 	$db->free_result();
 
-	$rank = 'Unknown';
+	$rank = t('literal.unknown');
 
 	if ($playerdata['activity'] > 0 && $playerdata['hideranking'] == 0) {
 		$plGame = $playerdata['game'];
@@ -298,11 +298,11 @@ if ($player_id > 0) {
 		$rank = $playerRepo->getPlayerRank($plGame, $rankType, $plValue, $plKills, $playerDeaths);
 
 		if (is_null($rank)) {
-			$rank = 'Unknown';
+			$rank = t('literal.unknown');
 		}
 	} else {
 		if ($playerdata['hideranking'] == 1) {
-			$rank = 'Hidden';
+			$rank = t('literal.hidden');
 		} elseif ($playerdata['hideranking'] == 2) {
 			$rank = 'Banned';
 		} else {

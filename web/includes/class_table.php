@@ -166,7 +166,7 @@ class Table
 <?php
 		if ($totalwidth != 100)
 		{
-			error(t('ui.warning') . ": Column widths do not add to 100%! (=$totalwidth%)", false);
+			error(t('ui.warning') . ': ' . t('ui.column_widths_warning', array('total' => $totalwidth)), false);
 		}
 
 		$rank = ($this->page - 1) * $this->numperpage + 1;
@@ -215,7 +215,7 @@ class Table
 <?php
 		if ($totalwidth != 100)
 		{
-			error(t('ui.warning') . ": Column widths do not add to 100%! (=$totalwidth%)", false);
+			error(t('ui.warning') . ': ' . t('ui.column_widths_warning', array('total' => $totalwidth)), false);
 		}
 
 		$rank = ($this->page - 1) * $this->numperpage + 1;

@@ -54,20 +54,20 @@ $defaultMap = count($maps) ? $maps[0] : '';
 		</div>
 
 		<div class="heatmap-admin-panel">
-			<label>xoffset <input type="range" min="-16000" max="16000" step="1" data-heatmap-field="xoffset" /><input type="number" data-heatmap-number="xoffset" /></label>
-			<label>yoffset <input type="range" min="-16000" max="16000" step="1" data-heatmap-field="yoffset" /><input type="number" data-heatmap-number="yoffset" /></label>
-			<label>scale <input type="range" min="-332" max="600" step="1" data-heatmap-field="scale" data-heatmap-scale-slider="1" /><input type="number" min="0.1" max="64" step="0.01" data-heatmap-number="scale" /></label>
-			<label>crop x <input type="number" data-heatmap-number="cropx1" /></label>
-			<label>crop y <input type="number" data-heatmap-number="cropy1" /></label>
-			<label>crop w <input type="number" data-heatmap-number="cropx2" /></label>
-			<label>crop h <input type="number" data-heatmap-number="cropy2" /></label>
+			<label><?php echo eHtml(t('heatmap.x_offset')); ?> <input type="range" min="-16000" max="16000" step="1" data-heatmap-field="xoffset" /><input type="number" data-heatmap-number="xoffset" /></label>
+			<label><?php echo eHtml(t('heatmap.y_offset')); ?> <input type="range" min="-16000" max="16000" step="1" data-heatmap-field="yoffset" /><input type="number" data-heatmap-number="yoffset" /></label>
+			<label><?php echo eHtml(t('heatmap.scale')); ?> <input type="range" min="-332" max="600" step="1" data-heatmap-field="scale" data-heatmap-scale-slider="1" /><input type="number" min="0.1" max="64" step="0.01" data-heatmap-number="scale" /></label>
+			<label><?php echo eHtml(t('heatmap.crop_x')); ?> <input type="number" data-heatmap-number="cropx1" /></label>
+			<label><?php echo eHtml(t('heatmap.crop_y')); ?> <input type="number" data-heatmap-number="cropy1" /></label>
+			<label><?php echo eHtml(t('heatmap.crop_width')); ?> <input type="number" data-heatmap-number="cropx2" /></label>
+			<label><?php echo eHtml(t('heatmap.crop_height')); ?> <input type="number" data-heatmap-number="cropy2" /></label>
 			<div class="heatmap-transform-controls">
 				<input type="checkbox" class="heatmap-transform-state" data-heatmap-check="flipx" />
 				<input type="checkbox" class="heatmap-transform-state" data-heatmap-check="flipy" />
 				<input type="hidden" data-heatmap-number="rotate" />
-				<button type="button" class="heatmap-transform-button" data-heatmap-toggle-check="flipx">Flip X</button>
-				<button type="button" class="heatmap-transform-button" data-heatmap-toggle-check="flipy">Flip Y</button>
-				<button type="button" class="heatmap-transform-button" data-heatmap-rotate-step="1">Rotate 90&deg;</button>
+				<button type="button" class="heatmap-transform-button" data-heatmap-toggle-check="flipx"><?php echo eHtml(t('heatmap.flip_x')); ?></button>
+				<button type="button" class="heatmap-transform-button" data-heatmap-toggle-check="flipy"><?php echo eHtml(t('heatmap.flip_y')); ?></button>
+				<button type="button" class="heatmap-transform-button" data-heatmap-rotate-step="1"><?php echo eHtml(t('heatmap.rotate')); ?> 90&deg;</button>
 			</div>
 			<label><?php echo eHtml(t('admin.task.heatmaps.renderer')); ?>
 				<select data-heatmap-number="renderer">
@@ -82,7 +82,7 @@ $defaultMap = count($maps) ? $maps[0] : '';
 					<option value="log">log</option>
 				</select>
 			</label>
-			<textarea data-heatmap-overview="1" placeholder="overview .txt"></textarea>
+			<textarea data-heatmap-overview="1" placeholder="<?php echo eHtml(t('heatmap.overview_placeholder')); ?>"></textarea>
 			<div class="heatmap-admin-buttons">
 				<input type="file" accept="image/jpeg" data-heatmap-map-image="1" />
 				<input type="file" accept=".txt,text/plain" data-heatmap-overview-file="1" />

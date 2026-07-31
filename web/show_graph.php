@@ -69,6 +69,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 	// Load database classes
 	require ('config.php');
+	require (INCLUDE_PATH . '/i18n.php');
+	if (session_status() !== PHP_SESSION_ACTIVE) {
+		session_start();
+	}
+	init_i18n();
 	require (INCLUDE_PATH . '/class_db.php');
 	require (INCLUDE_PATH . '/functions.php');
 	require (INCLUDE_PATH . '/functions_graph.php');
@@ -77,7 +82,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	if (class_exists($db_classname)) {
 		$db = new $db_classname(DB_ADDR, DB_USER, DB_PASS, DB_NAME, DB_PCONNECT);
 	} else {
-		error('Database class does not exist.  Please check your config.php file for DB_TYPE');
+		error(localized_text('error.database_class_missing'));
 	}
 
 	$container = require ROOT_PATH . '/bootstrap.php';
@@ -85,7 +90,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 
 	$g_options = $optionService->getAllOptions();
 	if (empty($g_options)) {
-		error('Warning: Could not find any options in the database. Check HLStats configuration.');
+		error(localized_text('error.options_missing'));
 	}
 
 	$width = 500;
@@ -387,7 +392,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 			$rowdata = $db->fetch_array($result);
 			$players_last_day = $total_players - $rowdata['players'];
 
-			$str = 'New Players Last 24h: ' . $players_last_day . ' Last 1h: ' . $players_last_hour;
+			$str = t(
+				'show_graph.new_players_summary',
+				array(
+					'day' => $players_last_day,
+					'hour' => $players_last_hour,
+				)
+			);
 			$str_width = (imagefontwidth(1) * strlen($str)) + 2;
 			imagestring($image, 1, $width - $indent_x[1] - $str_width, $indent_y[0] - 11, $str, $font_color);
 		}

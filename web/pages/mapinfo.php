@@ -201,14 +201,14 @@ error(t('literal.invalid_game'));
 				$map_dlurl = str_replace("%GAME%", $game, $map_dlurl);
 				$mapdlheader = @get_headers($map_dlurl);
 				if (preg_match("|200|", $mapdlheader[0])) {
-					echo "<p><a href=\"$map_dlurl\">Download this map...</a></p>";
+					echo '<p><a href="' . eHtml($map_dlurl) . '">' . eHtml(t('literal.download_map')) . '</a></p>';
 				}
 			}
 
 			if ($heatmap)
 			{
 				$thumburl = $heatmapthumb ? $heatmapthumb['url'] : $heatmap['url'];
-				echo "<a href=\"" . eHtml($heatmap['url']) . "\" rel=\"boxed\" title=\"Heatmap: " . eHtml($map) . "\"><br /><img src=\"" . eHtml($thumburl) . "\" alt=\"" . eHtml($map) . "\" /></a>";
+				echo '<a href="' . eHtml($heatmap['url']) . '" rel="boxed" title="' . eHtml(t('literal.heatmap')) . ': ' . eHtml($map) . '"><br /><img src="' . eHtml($thumburl) . '" alt="' . eHtml($map) . '" /></a>';
 			}
 ?>
 		</div>
