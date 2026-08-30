@@ -177,8 +177,7 @@ request. Add one optional versioned text field to the existing
     "label_en": "Lower",
     "label_ru": "Нижний",
     "z_min": -256,
-    "z_max": 32,
-    "image": null
+    "z_max": 32
   }
 ]
 ```
@@ -190,8 +189,8 @@ Rules:
 - Z ranges may not overlap;
 - the upper/lower boundary convention is defined once and tested;
 - unmatched events are `unassigned`, not guessed;
-- an optional floor image uses the existing source-image serving path;
-- otherwise every floor uses the common map image and common projection;
+- every floor uses the common map image and common projection in the initial
+  release;
 - maps without reviewed floor metadata remain valid single-floor maps;
 - weak Z coverage or projection quality disables floor-specific public views
   while retaining the all-floors view.
@@ -350,7 +349,7 @@ for the new contract:
 - actual data coverage and in/out-of-bounds diagnostics;
 - Z histogram and suggested floor bands;
 - editable EN/RU floor labels and non-overlapping ranges;
-- optional per-floor image selection;
+- one common projected map image for every floor in the initial release;
 - preview of all/floor-specific layers;
 - compare-and-save using the config hash;
 - cache invalidation after successful readback.
@@ -361,6 +360,11 @@ atomically renamed. The HTTP path must not invoke the Python JPEG generator or
 another subprocess. JPEG regeneration remains an explicit CLI/deployment step.
 
 The UI reports human-readable results, not raw JSON or command output.
+
+Per-floor image variants are deliberately deferred. They require a new,
+security-sensitive public asset-resolution seam and operator evidence that one
+shared map projection is insufficient; neither is justified for the initial
+release.
 
 ## Security and privacy
 
@@ -484,4 +488,3 @@ operational logging, migration/upgrade coverage, and final release review.
 - external analytics storage without evidence;
 - automatic publication of guessed floor definitions;
 - removal of JPEG compatibility.
-
