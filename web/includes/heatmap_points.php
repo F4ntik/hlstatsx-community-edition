@@ -562,6 +562,12 @@ function heatmap_scene_prepare_state(array &$state): void
     $baseWidth = heatmap_scene_dimension($state['image']['sourceWidth'] ?? $state['image']['width'] ?? null);
     $baseHeight = heatmap_scene_dimension($state['image']['sourceHeight'] ?? $state['image']['height'] ?? null);
     $config = heatmap_normalize_crop($config, $baseWidth, $baseHeight);
+    if (strval($state['image']['source'] ?? '') !== 'heatmaps/src') {
+        $config['cropx1'] = 0;
+        $config['cropy1'] = 0;
+        $config['cropx2'] = 0;
+        $config['cropy2'] = 0;
+    }
     $config['floors'] = $floors;
     $width = heatmap_scene_dimension($state['image']['width'] ?? null);
     $height = heatmap_scene_dimension($state['image']['height'] ?? null);

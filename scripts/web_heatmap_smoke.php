@@ -793,6 +793,42 @@ assert_same(32, $largeScenePayload['grid']['bucketSize'], '4096-pixel images sho
 assert_same(128, $largeScenePayload['grid']['width'], '4096-pixel images should cap the horizontal grid axis at 128');
 assert_same(64, $largeScenePayload['grid']['height'], '2048-pixel images should retain the bounded vertical grid axis');
 
+$sourceCropConfig = scene_config(array(
+    'cropx1' => 100,
+    'cropy1' => 50,
+    'cropx2' => 128,
+    'cropy2' => 128,
+));
+$sourceCropRow = scene_row(array('attackerX' => '104', 'attackerY' => '56', 'attackerZ' => '5'));
+$sourceCropCases = array(
+    array(
+        'name' => 'hlstatsimg keeps full-image scene coordinates',
+        'image' => scene_image(array('source' => 'hlstatsimg', 'width' => 256, 'height' => 256)),
+        'cell' => array('c26.14', 26, 14, 1, 0),
+    ),
+    array(
+        'name' => 'heatmaps source applies its configured crop',
+        'image' => scene_image(array(
+            'source' => 'heatmaps/src',
+            'sourceWidth' => 256,
+            'sourceHeight' => 256,
+            'width' => 128,
+            'height' => 128,
+        )),
+        'cell' => array('c1.1', 1, 1, 1, 0),
+    ),
+);
+foreach ($sourceCropCases as $case) {
+    $payload = scene_payload(
+        array($sourceCropRow),
+        scene_query(array('event' => 'kills')),
+        $sourceCropConfig,
+        $case['image']
+    );
+    assert_same('ok', $payload['state'], 'source-specific crop fixture should produce an ok scene: ' . $case['name']);
+    assert_same($case['cell'], $payload['layers']['total'][0], 'scene crop behavior should mirror v1: ' . $case['name']);
+}
+
 $comparisonRows = array(
     scene_row(array('eventId' => '1', 'killerId' => '42', 'attackerX' => '4', 'attackerY' => '4', 'attackerZ' => '5')),
     scene_row(array('eventId' => '2', 'killerId' => '42', 'attackerX' => '4', 'attackerY' => '4', 'attackerZ' => '5')),
