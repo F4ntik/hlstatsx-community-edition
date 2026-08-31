@@ -1,6 +1,132 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from scripts.replay_baseline import web_route_smoke
+
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
+
+
+def test_heatmap_explorer_mount_contract_has_a_shared_strict_rollout_helper() -> None:
+    """A wrong rollout branch must never emit both interactive mounts."""
+
+    helper = (REPOSITORY_ROOT / "web/includes/heatmap_points.php").read_text(
+        encoding="utf-8"
+    )
+    mapinfo = (REPOSITORY_ROOT / "web/pages/mapinfo.php").read_text(
+        encoding="utf-8"
+    )
+    player = (
+        REPOSITORY_ROOT / "web/pages/playerinfo_mapperformance.php"
+    ).read_text(encoding="utf-8")
+
+    assert "function heatmap_should_render_explorer" in helper
+    assert "heatmap_explorer=1" in helper
+    assert "heatmap_legacy=1" in helper
+    assert "function heatmap_render_explorer_workspace" in helper
+    assert "data-heatmap-interactive" in helper
+    assert "data-heatmap-static" in helper
+    assert "<noscript>" in helper
+    assert "heatmap_should_render_explorer" in mapinfo
+    assert "heatmap_should_render_explorer" in player
+
+
+def test_heatmap_explorer_public_contract_keeps_i18n_controls_and_safe_shells_in_sync() -> None:
+    """The two public mounts, dictionaries, and responsive shell stay one contract."""
+
+    helper = (REPOSITORY_ROOT / "web/includes/heatmap_points.php").read_text(
+        encoding="utf-8"
+    )
+    header = (REPOSITORY_ROOT / "web/pages/header.php").read_text(encoding="utf-8")
+    mapinfo = (REPOSITORY_ROOT / "web/pages/mapinfo.php").read_text(
+        encoding="utf-8"
+    )
+    player = (
+        REPOSITORY_ROOT / "web/pages/playerinfo_mapperformance.php"
+    ).read_text(encoding="utf-8")
+    css = (REPOSITORY_ROOT / "web/hlstats.css").read_text(encoding="utf-8")
+    explorer_js = (
+        REPOSITORY_ROOT / "web/includes/js/heatmap-explorer.js"
+    ).read_text(encoding="utf-8")
+    options = (REPOSITORY_ROOT / "web/pages/admintasks/options.php").read_text(
+        encoding="utf-8"
+    )
+    en = (REPOSITORY_ROOT / "web/lang/en.php").read_text(encoding="utf-8")
+    ru = (REPOSITORY_ROOT / "web/lang/ru.php").read_text(encoding="utf-8")
+
+    required_hooks = {
+        "data-heatmap-interactive",
+        "data-heatmap-stage",
+        "data-heatmap-camera",
+        "data-heatmap-image",
+        "data-heatmap-canvas",
+        "data-heatmap-static",
+        "data-heatmap-status",
+    }
+    for hook in required_hooks:
+        assert hook in helper
+    assert "data-heatmap-lang" in helper
+    assert "data-heatmap-sheet-toggle" in helper
+    assert "data-heatmap-range" in helper
+    assert "data-heatmap-floor-options" in helper
+    assert "'lang' => current_lang()" in mapinfo
+    assert "'lang' => current_lang()" in player
+    assert header.index("/js/heatmap.js") < header.index("/js/heatmap-explorer.js")
+    assert "'heatmapExplorer' => array(" in header
+
+    en_keys = {
+        line.split("' =>", 1)[0].strip().strip("'")
+        for line in en.splitlines()
+        if line.strip().startswith("'heatmapExplorer.")
+    }
+    ru_keys = {
+        line.split("' =>", 1)[0].strip().strip("'")
+        for line in ru.splitlines()
+        if line.strip().startswith("'heatmapExplorer.")
+    }
+    assert en_keys == ru_keys
+    assert {
+        "heatmapExplorer.loading",
+        "heatmapExplorer.failed",
+        "heatmapExplorer.differenceBothCorrected",
+        "heatmapExplorer.noscript",
+        "heatmapExplorer.staticJpeg",
+        "heatmapExplorer.navigation",
+    } <= en_keys
+    assert "HeatmapExplorerBeta" in options
+    assert "choice.heatmap_explorer.off" in options
+    assert "choice.heatmap_explorer.opt_in" in options
+    assert "choice.heatmap_explorer.default" in options
+    for token in (
+        "--hm-bg:#0d1117",
+        "--hm-panel:#151b24",
+        "--hm-panel-raised:#1b2430",
+        "--hm-border:#2a3544",
+        "--hm-text:#eef3f8",
+        "--hm-muted:#9eabb8",
+        "--hm-kill:#ff9f2f",
+        "--hm-death:#35c6e8",
+        "--hm-focus:#f5c451",
+        "grid-template-columns: 220px minmax(0, 1fr) 300px",
+        "min-height: 620px",
+        "@media (max-width: 900px)",
+        ".heatmap-explorer__floors.is-open",
+        ".heatmap-explorer__inspector.is-open",
+        "@media (max-width: 540px)",
+        "min-height: 44px",
+        ":focus-visible",
+        "prefers-reduced-motion: reduce",
+    ):
+        assert token in css
+    assert "HeatmapExplorerWorkspace" in explorer_js
+    assert "sceneUrl" in explorer_js
+    assert "_renderFloors" in explorer_js
+    assert "DOMContentLoaded" in explorer_js
+    assert "data-heatmap-alert" in explorer_js
+    assert "pointermove" in explorer_js
+    assert "invalid_heatmap_url_state" in explorer_js
+    assert "innerHTML" not in explorer_js
 
 
 def test_representative_routes_include_populated_cstrike_award_tabs() -> None:

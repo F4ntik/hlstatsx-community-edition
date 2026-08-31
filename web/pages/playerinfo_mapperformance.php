@@ -40,6 +40,8 @@ For support and installation notes visit http://www.hlxcommunity.com
         die('Do not access this file directly.');
     }
 
+    require_once dirname(__DIR__) . '/includes/heatmap_points.php';
+
 	flush();
 	$tblMaps = new Table(
 		array
@@ -234,9 +236,32 @@ For support and installation notes visit http://www.hlxcommunity.com
 		$defaultMap = $heatmapMaps[0]['map'];
 		$defaultImage = $heatmapMaps[0]['image'];
 		$endpoint = "heatmap_points.php?game=" . rawurlencode($game) . "&map=" . rawurlencode($defaultMap) . "&player=" . intval($player) . "&event=kills";
+		$heatmapUseExplorer = heatmap_should_render_explorer($g_options, $_GET);
+		$heatmapJpeg = './hlstatsimg/games/' . rawurlencode($game) . '/heatmaps/' . rawurlencode($defaultMap) . '-kill.jpg';
+		$heatmapExplorerMaps = array();
+		foreach ($heatmapMaps as $heatmapMap) {
+			$heatmapExplorerMaps[] = array(
+				'map' => $heatmapMap['map'],
+				'label' => $heatmapMap['map'] . ' (' . intval($heatmapMap['kills']) . '/' . intval($heatmapMap['deaths']) . ')',
+			);
+		}
 ?>
 <div style="clear:both;padding-top:20px;"></div>
 <?php printSectionTitle(eHtml(t('literal.heatmap')) . ': ' . eHtml(t('literal.maps'))); ?>
+<?php if ($heatmapUseExplorer) { ?>
+<?php echo heatmap_render_explorer_workspace(array(
+	'game' => $game,
+	'map' => $defaultMap,
+	'player' => intval($player),
+	'image' => $defaultImage['url'],
+	'imageAlt' => $defaultMap,
+	'endpoint' => 'heatmap_points.php',
+	'jpeg' => $heatmapJpeg,
+	'lang' => current_lang(),
+	'lenses' => array('overview', 'me', 'difference'),
+	'maps' => $heatmapExplorerMaps,
+)); ?>
+<?php } else { ?>
 <div class="heatmap-player-panel" data-heatmap-game="<?php echo eHtml($game); ?>" data-heatmap-player="<?php echo intval($player); ?>" data-heatmap-map="<?php echo eHtml($defaultMap); ?>" data-heatmap-current-event="kills">
 	<div class="heatmap-player-controls">
 		<label>
@@ -273,6 +298,7 @@ if (typeof setupInlineHeatmaps == 'function') {
 	setupInlineHeatmaps();
 }
 </script>
+<?php } ?>
 <?php
 	}
 ?>

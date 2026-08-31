@@ -64,8 +64,8 @@ vm.runInNewContext(explorerSource, explorerContext, {filename: 'heatmap-explorer
 const explorerApi = explorerContext.module.exports;
 assert.deepStrictEqual(
   Object.keys(explorerApi).sort(),
-  ['HeatmapExplorerCamera', 'HeatmapExplorerScene', 'HeatmapExplorerUrlState', 'HeatmapGlRenderer'].sort(),
-  'heatmap explorer should expose the four frozen constructors'
+  ['HeatmapExplorerCamera', 'HeatmapExplorerScene', 'HeatmapExplorerUrlState', 'HeatmapExplorerWorkspace', 'HeatmapGlRenderer'].sort(),
+  'heatmap explorer should expose the workspace constructor alongside the frozen scene, camera, URL, and renderer APIs'
 );
 for (const name of Object.keys(explorerApi)) {
   assert.strictEqual(explorerContext.window[name], explorerApi[name], `${name} should attach to window`);
@@ -77,6 +77,7 @@ const {
   HeatmapExplorerScene,
   HeatmapExplorerCamera,
   HeatmapExplorerUrlState,
+  HeatmapExplorerWorkspace,
   HeatmapGlRenderer,
 } = explorerApi;
 
@@ -155,6 +156,25 @@ function explorerSceneFixture(overrides = {}) {
 }
 
 const validScene = new HeatmapExplorerScene(explorerSceneFixture());
+assert.deepStrictEqual(
+  plain(validScene.coverage),
+  {sourceRows: 8, candidate: 8, validXY: 8},
+  'workspace summaries should use the validated server coverage instead of reconstructing it'
+);
+assert.deepStrictEqual(
+  plain(validScene.summary),
+  {rowsRead: 8, sourceRows: 8, personalSample: 5, otherSample: 3},
+  'workspace summaries should use the validated server sample metadata'
+);
+assert.deepStrictEqual(
+  plain(validScene.fallback),
+  {
+    v1: 'heatmap_points.php?game=cstrike&map=de_dust2',
+    jpeg: './map-kill.jpg',
+    thumbnail: './map-kill-thumb.jpg',
+  },
+  'fallback URLs must remain authoritative server data'
+);
 const totalKills = validScene.dense('total', 'kills');
 assert.strictEqual(Object.prototype.toString.call(totalKills.values), '[object Float32Array]', 'dense values should be Float32Array');
 assert.strictEqual(totalKills.values.length, 12, 'dense values should cover the full grid');
@@ -627,5 +647,154 @@ assert.match(explorerSource, /for \(var offsetY = -1; offsetY <= 1; offsetY\+\+\
 assert.match(explorerSource, /amber|orange/i);
 assert.match(explorerSource, /cyan|blue/i);
 assert.match(explorerSource, /contour/i);
+
+function workspaceElement(attributes = {}) {
+  const listeners = Object.create(null);
+  return {
+    attributes: Object.assign({}, attributes),
+    style: {},
+    hidden: false,
+    clientWidth: 320,
+    clientHeight: 240,
+    textContent: '',
+    value: '',
+    setAttribute(name, value) { this.attributes[name] = String(value); },
+    getAttribute(name) { return this.attributes[name]; },
+    addEventListener(type, handler) { (listeners[type] || (listeners[type] = [])).push(handler); },
+    removeEventListener(type, handler) {
+      if (listeners[type]) listeners[type] = listeners[type].filter(candidate => candidate !== handler);
+    },
+  };
+}
+
+function workspaceRoot(attributes) {
+  const root = workspaceElement(attributes);
+  root.querySelector = () => null;
+  root.querySelectorAll = () => [];
+  return root;
+}
+
+function mountedWorkspaceRoot(attributes, nodes) {
+  const root = workspaceRoot(attributes);
+  root.querySelector = selector => nodes[selector] || null;
+  return root;
+}
+
+const workspaceMessages = {
+  loading: 'Loading', loaded: 'Loaded', failed: 'Failed', invalidUrl: 'Invalid URL',
+  retry: 'Retry', fallback: 'Fallback', differenceBothCorrected: 'Kills selected',
+  period: 'Period', sample: 'Sample', xyCoverage: 'XY', zCoverage: 'Z',
+  projectionCoverage: 'Projection', coverage: 'Coverage', freshness: 'Freshness',
+  empty: 'Empty', pinned: 'Pinned', unpinned: 'Unpinned', noCell: 'No cell',
+  inspect: 'Inspect', kills: 'Kills', deaths: 'Deaths', pan: 'Pan', navigation: 'Navigation',
+};
+const workspaceState = new HeatmapExplorerWorkspace(
+  workspaceRoot({
+    'data-heatmap-game': 'cstrike',
+    'data-heatmap-map': 'de_dust2',
+    'data-heatmap-player': '42',
+    'data-heatmap-endpoint': 'heatmap_points.php?legacy=1',
+    'data-heatmap-lang': 'ru',
+    'data-heatmap-allow-me': '1',
+    'data-heatmap-allow-difference': '1',
+  }),
+  {search: '?page=4&hm_range=7d&hm_lens=difference&hm_event=kills&hm_floor=all', messages: workspaceMessages}
+);
+assert.strictEqual(
+  workspaceState.sceneUrl(),
+  'heatmap_points.php?v=2&game=cstrike&map=de_dust2&player=42&range=7d&event=kills&lens=difference&floor=all&lang=ru',
+  'scene requests should contain only the strict v2 allowlist in a stable order'
+);
+assert.strictEqual(workspaceState._message('static_fallback'), 'Fallback', 'renderer fallback states should use the localized Explorer fallback message');
+workspaceState.state.event = 'both';
+workspaceState._normalizeSelection(true);
+assert.strictEqual(workspaceState.state.event, 'kills', 'difference plus both should correct to kills');
+workspaceState._scene = validScene;
+workspaceState.state.focusedCell = 'c0.0';
+let navigationPrevented = false;
+workspaceState._handleStageKey({key: 'ArrowRight', preventDefault() { navigationPrevented = true; }});
+assert.strictEqual(workspaceState.state.focusedCell, 'c2.0', 'navigation-mode arrows should select the nearest occupied cell');
+assert.strictEqual(navigationPrevented, true);
+workspaceState._handleStageKey({key: 'Enter', preventDefault() {}});
+assert.strictEqual(workspaceState.state.cell, 'c2.0', 'Enter should pin the selected cell');
+assert.match(workspaceState.sceneUrl(), /&inspect=c2.0$/, 'pinning should request strict v2 inspect=cX.Y');
+workspaceState._handleStageKey({key: 'Escape', preventDefault() {}});
+assert.strictEqual(workspaceState.state.cell, null, 'Escape should clear the pinned cell');
+workspaceState._camera = new HeatmapExplorerCamera({viewportWidth: 200, viewportHeight: 150, contentWidth: 400, contentHeight: 300});
+workspaceState._camera.zoomAt(2, 100, 75);
+workspaceState._renderer = {setCamera() {}};
+workspaceState._panMode = true;
+const panBefore = workspaceState._camera.state.panX;
+workspaceState._handleStageKey({key: 'ArrowRight', preventDefault() {}});
+assert.notStrictEqual(workspaceState._camera.state.panX, panBefore, 'Pan mode should give arrow keys to the camera instead of cell navigation');
+
+function WorkspaceRenderer() {}
+WorkspaceRenderer.prototype.mount = function () {};
+WorkspaceRenderer.prototype.destroy = function () {};
+WorkspaceRenderer.prototype.setCamera = function () {};
+const imageNode = workspaceElement({src: './client.jpg', alt: 'client map'});
+const staticLinkNode = workspaceElement({href: './client-kill.jpg'});
+const staticImageNode = workspaceElement({src: './client-kill.jpg', alt: 'client map'});
+const shareNode = workspaceElement();
+const workspaceRootForScene = workspaceRoot({
+  'data-heatmap-game': 'cstrike',
+  'data-heatmap-map': 'de_dust2',
+  'data-heatmap-player': '42',
+  'data-heatmap-endpoint': 'heatmap_points.php',
+  'data-heatmap-lang': 'en',
+  'data-heatmap-allow-me': '1',
+  'data-heatmap-allow-difference': '1',
+});
+const historyWrites = [];
+const workspaceForScene = new HeatmapExplorerWorkspace(workspaceRootForScene, {
+  search: '?page=4',
+  messages: workspaceMessages,
+  Renderer: WorkspaceRenderer,
+  window: {
+    location: {search: '?page=4', pathname: '/hlstats.php'},
+    history: {replaceState(_state, _title, href) { historyWrites.push(href); }},
+  },
+});
+workspaceForScene._nodes = {
+  interactive: workspaceElement(), stage: workspaceElement(), image: imageNode, canvas: workspaceElement(),
+  static: workspaceElement(), staticLink: staticLinkNode, staticImage: staticImageNode, jpegLink: workspaceElement(),
+  status: workspaceElement(), alert: workspaceElement(), summary: workspaceElement(), period: workspaceElement(),
+  window: workspaceElement(), sample: workspaceElement(), coverage: workspaceElement(), freshness: workspaceElement(),
+  inspectOutput: workspaceElement(), mapTitle: workspaceElement(), mapSelect: workspaceElement(),
+  zoomIn: workspaceElement(), zoomOut: workspaceElement(), reset: workspaceElement(), pan: workspaceElement(), share: shareNode,
+};
+workspaceForScene._applyScene(validScene, 'map');
+assert.strictEqual(imageNode.attributes.src, './map.jpg', 'server-validated map image URL should replace client assumptions');
+assert.strictEqual(imageNode.attributes.alt, 'de_dust2', 'server map identity should update image alt text together with the image');
+assert.strictEqual(staticLinkNode.attributes.href, './map-kill.jpg', 'server fallback JPEG should update with the scene');
+assert.strictEqual(workspaceForScene._nodes.mapSelect.value, 'de_dust2', 'server map identity should keep the map control synchronized');
+assert.match(workspaceForScene._nodes.summary.textContent, /Period: 1785456000–1788048000 UTC/, 'every scene query should refresh a textual summary');
+assert.match(workspaceForScene._nodes.status.textContent, /Loaded: Coverage/, 'the live status should communicate completed coverage, not only a generic loaded state');
+assert.strictEqual(workspaceForScene.state.lens, 'difference', 'authoritative scene state should keep the share lens synchronized');
+assert.strictEqual(workspaceForScene.state.event, 'kills', 'authoritative scene state should keep the share channel synchronized');
+assert.match(shareNode.attributes.href, /hm_lens=difference/);
+assert.match(shareNode.attributes.href, /hm_event=kills/);
+assert.deepStrictEqual(historyWrites.at(-1), shareNode.attributes.href, 'share URL and history should update together');
+
+const noFetchNodes = {
+  '[data-heatmap-interactive]': workspaceElement(),
+  '[data-heatmap-stage]': workspaceElement(),
+  '[data-heatmap-image]': workspaceElement(),
+  '[data-heatmap-canvas]': workspaceElement(),
+  '[data-heatmap-static]': workspaceElement(),
+  '[data-heatmap-status]': workspaceElement(),
+  '[data-heatmap-alert]': workspaceElement(),
+  '[data-heatmap-summary]': workspaceElement(),
+};
+const noFetchWorkspace = new HeatmapExplorerWorkspace(
+  mountedWorkspaceRoot({
+    'data-heatmap-game': 'cstrike', 'data-heatmap-map': 'de_dust2',
+    'data-heatmap-player': '0', 'data-heatmap-endpoint': 'heatmap_points.php',
+  }, noFetchNodes),
+  {messages: workspaceMessages}
+);
+noFetchWorkspace.mount();
+assert.strictEqual(noFetchNodes['[data-heatmap-status]'].textContent, 'Fallback', 'no-fetch environments should immediately expose the usable static fallback');
+assert.strictEqual(noFetchNodes['[data-heatmap-interactive]'].style.display, 'none');
 
 console.log('heatmap explorer contract smoke ok');

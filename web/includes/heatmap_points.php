@@ -39,6 +39,155 @@ function heatmap_explorer_mode(array $options): int
     return intval($value);
 }
 
+function heatmap_explorer_exact_flag(array $query, string $key): bool
+{
+    return array_key_exists($key, $query) && is_string($query[$key]) && $query[$key] === '1';
+}
+
+function heatmap_should_render_explorer(array $options, array $query): bool
+{
+    // `heatmap_legacy=1` wins whenever both flags are present.
+    if (heatmap_explorer_exact_flag($query, 'heatmap_legacy')) {
+        return false;
+    }
+
+    $mode = heatmap_explorer_mode($options);
+    if ($mode === 1) {
+        // Mode 1 is the explicit `heatmap_explorer=1` opt-in only.
+        return heatmap_explorer_exact_flag($query, 'heatmap_explorer');
+    }
+
+    // Mode 0 stays legacy; mode 2 makes Explorer the default.
+    return $mode === 2;
+}
+
+function heatmap_explorer_html($value): string
+{
+    return htmlspecialchars(strval($value), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+
+function heatmap_explorer_label(string $key): string
+{
+    return t('heatmapExplorer.' . $key);
+}
+
+function heatmap_render_explorer_workspace(array $context): string
+{
+    $context = array_merge(array(
+        'game' => '',
+        'map' => '',
+        'player' => 0,
+        'image' => '',
+        'imageAlt' => '',
+        'endpoint' => 'heatmap_points.php',
+        'jpeg' => '',
+        'lang' => 'en',
+        'lenses' => array('overview'),
+        'maps' => array(),
+    ), $context);
+
+    $game = heatmap_explorer_html($context['game']);
+    $map = heatmap_explorer_html($context['map']);
+    $player = max(0, intval($context['player']));
+    $floorSheetId = 'heatmap-floor-sheet-' . $player;
+    $inspectorSheetId = 'heatmap-inspector-sheet-' . $player;
+    $image = heatmap_explorer_html($context['image']);
+    $imageAlt = heatmap_explorer_html($context['imageAlt'] === '' ? $context['map'] : $context['imageAlt']);
+    $endpoint = heatmap_explorer_html($context['endpoint']);
+    $jpeg = heatmap_explorer_html($context['jpeg']);
+    $lang = $context['lang'] === 'ru' ? 'ru' : 'en';
+    $lenses = is_array($context['lenses']) ? $context['lenses'] : array('overview');
+    $hasMe = in_array('me', $lenses, true);
+    $hasDifference = in_array('difference', $lenses, true);
+
+    $mapOptions = '';
+    $maps = is_array($context['maps']) ? $context['maps'] : array();
+    if (count($maps) === 0) {
+        $maps[] = array('map' => $context['map'], 'label' => $context['map']);
+    }
+    foreach ($maps as $mapOption) {
+        if (!is_array($mapOption) || !isset($mapOption['map'])) {
+            continue;
+        }
+        $mapValue = heatmap_explorer_html($mapOption['map']);
+        $mapLabel = heatmap_explorer_html($mapOption['label'] ?? $mapOption['map']);
+        $selected = strval($mapOption['map']) === strval($context['map']) ? ' selected="selected"' : '';
+        $mapOptions .= '<option value="' . $mapValue . '"' . $selected . '>' . $mapLabel . '</option>';
+    }
+
+    $overviewPressed = 'true';
+    $meControl = $hasMe
+        ? '<button type="button" class="heatmap-explorer__control" data-heatmap-lens="me" aria-pressed="false">'
+            . heatmap_explorer_html(heatmap_explorer_label('me')) . '</button>'
+        : '';
+    $differenceControl = $hasDifference
+        ? '<button type="button" class="heatmap-explorer__control" data-heatmap-lens="difference" aria-pressed="false">'
+            . heatmap_explorer_html(heatmap_explorer_label('difference')) . '</button>'
+        : '';
+
+    $html = '<section class="heatmap-explorer" data-heatmap-explorer="1"'
+        . ' data-heatmap-game="' . $game . '" data-heatmap-map="' . $map . '"'
+        . ' data-heatmap-player="' . $player . '" data-heatmap-endpoint="' . $endpoint . '"'
+        . ' data-heatmap-lang="' . $lang . '"'
+        . ' data-heatmap-initial-lens="overview" data-heatmap-allow-me="' . ($hasMe ? '1' : '0') . '"'
+        . ' data-heatmap-allow-difference="' . ($hasDifference ? '1' : '0') . '">';
+    $html .= '<header class="heatmap-explorer__header">';
+    $html .= '<div><h2 data-heatmap-map-title="1">' . $map . '</h2>';
+    $html .= '<p data-heatmap-period="1">' . heatmap_explorer_html(heatmap_explorer_label('loading')) . '</p></div>';
+    $html .= '<label class="heatmap-explorer__map-label">' . heatmap_explorer_html(heatmap_explorer_label('map'));
+    $html .= '<select data-heatmap-map-select="1">' . $mapOptions . '</select></label>';
+    $html .= '<label class="heatmap-explorer__map-label">' . heatmap_explorer_html(heatmap_explorer_label('period'));
+    $html .= '<select data-heatmap-range="1"><option value="7d">' . heatmap_explorer_html(heatmap_explorer_label('range7d')) . '</option>';
+    $html .= '<option value="30d" selected="selected">' . heatmap_explorer_html(heatmap_explorer_label('range30d')) . '</option>';
+    $html .= '<option value="90d">' . heatmap_explorer_html(heatmap_explorer_label('range90d')) . '</option>';
+    $html .= '<option value="365d">' . heatmap_explorer_html(heatmap_explorer_label('range365d')) . '</option></select></label>';
+    $html .= '<button type="button" class="heatmap-explorer__sheet-toggle" data-heatmap-sheet-toggle="floors"'
+        . ' aria-controls="' . $floorSheetId . '" aria-expanded="false">' . heatmap_explorer_html(heatmap_explorer_label('floor')) . '</button>';
+    $html .= '<button type="button" class="heatmap-explorer__sheet-toggle" data-heatmap-sheet-toggle="inspector"'
+        . ' aria-controls="' . $inspectorSheetId . '" aria-expanded="false">' . heatmap_explorer_html(heatmap_explorer_label('inspector')) . '</button>';
+    $html .= '<fieldset class="heatmap-explorer__group"><legend>' . heatmap_explorer_html(heatmap_explorer_label('lens')) . '</legend>';
+    $html .= '<button type="button" class="heatmap-explorer__control is-selected" data-heatmap-lens="overview" aria-pressed="' . $overviewPressed . '">'
+        . heatmap_explorer_html(heatmap_explorer_label('overview')) . '</button>' . $meControl . $differenceControl . '</fieldset>';
+    $html .= '<fieldset class="heatmap-explorer__group"><legend>' . heatmap_explorer_html(heatmap_explorer_label('channel')) . '</legend>';
+    $html .= '<button type="button" class="heatmap-explorer__control" data-heatmap-event="kills" aria-pressed="false">'
+        . heatmap_explorer_html(heatmap_explorer_label('kills')) . '</button>';
+    $html .= '<button type="button" class="heatmap-explorer__control" data-heatmap-event="deaths" aria-pressed="false">'
+        . heatmap_explorer_html(heatmap_explorer_label('deaths')) . '</button>';
+    $html .= '<button type="button" class="heatmap-explorer__control is-selected" data-heatmap-event="both" aria-pressed="true">'
+        . heatmap_explorer_html(heatmap_explorer_label('both')) . '</button></fieldset></header>';
+    $html .= '<aside id="' . $floorSheetId . '" class="heatmap-explorer__floors" data-heatmap-floor-sheet="1" aria-label="' . heatmap_explorer_html(heatmap_explorer_label('floor')) . '">';
+    $html .= '<span class="heatmap-explorer__label">' . heatmap_explorer_html(heatmap_explorer_label('floor')) . '</span>';
+    $html .= '<div data-heatmap-floor-options="1"><label><input type="radio" name="heatmap-floor-' . $player . '" value="all" data-heatmap-floor="all" checked="checked" />'
+        . heatmap_explorer_html(heatmap_explorer_label('allFloors')) . '</label></div></aside>';
+    $html .= '<main class="heatmap-explorer__stage-column">';
+    $html .= '<div class="heatmap-explorer__interactive" data-heatmap-interactive="1">';
+    $html .= '<div class="heatmap-explorer__stage" data-heatmap-stage="1" tabindex="0" aria-describedby="heatmap-summary-' . $player . '">';
+    $html .= '<div data-heatmap-camera="1"><img data-heatmap-image="1" src="' . $image . '" alt="' . $imageAlt . '" />';
+    $html .= '<canvas data-heatmap-canvas="1" aria-label="' . heatmap_explorer_html(heatmap_explorer_label('mapControls')) . '"></canvas></div></div></div>';
+    $html .= '<div class="heatmap-explorer__controls" aria-label="' . heatmap_explorer_html(heatmap_explorer_label('mapControls')) . '">';
+    $html .= '<button type="button" data-heatmap-zoom="in">+</button><button type="button" data-heatmap-zoom="out">−</button>';
+    $html .= '<button type="button" data-heatmap-reset="1">' . heatmap_explorer_html(heatmap_explorer_label('reset')) . '</button>';
+    $html .= '<button type="button" data-heatmap-pan="1" aria-pressed="false">' . heatmap_explorer_html(heatmap_explorer_label('pan')) . '</button>';
+    $html .= '<a data-heatmap-share="1" href="">' . heatmap_explorer_html(heatmap_explorer_label('share')) . '</a></div>';
+    $html .= '<div class="heatmap-explorer__static" data-heatmap-static="1"><a href="' . $jpeg . '" rel="boxed"><img src="' . $jpeg . '" alt="' . $imageAlt . '" /></a></div>';
+    $html .= '<noscript><p>' . heatmap_explorer_html(heatmap_explorer_label('noscript')) . ' <a href="' . $jpeg . '">'
+        . heatmap_explorer_html(heatmap_explorer_label('staticJpeg')) . '</a></p></noscript>';
+    $html .= '<p class="heatmap-explorer__status" data-heatmap-status="1" role="status" aria-live="polite">'
+        . heatmap_explorer_html(heatmap_explorer_label('loading')) . '</p>';
+    $html .= '<p class="heatmap-explorer__alert" data-heatmap-alert="1" role="alert" hidden="hidden"></p>';
+    $html .= '<p id="heatmap-summary-' . $player . '" class="heatmap-explorer__summary" data-heatmap-summary="1">'
+        . heatmap_explorer_html(heatmap_explorer_label('loading')) . '</p></main>';
+    $html .= '<aside id="' . $inspectorSheetId . '" class="heatmap-explorer__inspector" data-heatmap-inspector="1"><h3>'
+        . heatmap_explorer_html(heatmap_explorer_label('inspector')) . '</h3><div data-heatmap-inspect-output="1">'
+        . heatmap_explorer_html(heatmap_explorer_label('noCell')) . '</div></aside>';
+    $html .= '<footer class="heatmap-explorer__footer"><span data-heatmap-window="1"></span><span data-heatmap-sample="1"></span>';
+    $html .= '<span data-heatmap-coverage="1"></span><span data-heatmap-freshness="1"></span>';
+    $html .= '<a data-heatmap-jpeg-link="1" href="' . $jpeg . '">' . heatmap_explorer_html(heatmap_explorer_label('staticJpeg')) . '</a></footer>';
+    $html .= '</section>';
+
+    return $html;
+}
+
 function heatmap_cache_identity_value($value)
 {
     if (!is_array($value)) {

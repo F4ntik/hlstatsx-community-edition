@@ -247,6 +247,11 @@ For support and installation notes visit http://www.hlxcommunity.com
 				'1' => 'literal.yes',
 				'0' => 'literal.no',
 			),
+			'HeatmapExplorerBeta' => array(
+				'0' => 'choice.heatmap_explorer.off',
+				'1' => 'choice.heatmap_explorer.opt_in',
+				'2' => 'choice.heatmap_explorer.default',
+			),
 		);
 
 		if (isset($choiceKeys[$optionName][$value])) {
@@ -418,6 +423,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	$optiongroups[0]->options[] = new Option('bannerdisplay', 'Show Banner', 'select');
 	$optiongroups[0]->options[] = new Option('bannerfile', 'Banner file name (in hlstatsimg/) or full banner URL', 'text');
 	$optiongroups[0]->options[] = new Option('playerinfo_tabs', 'Use tabs in playerinfo to show/hide sections current page or just show all at once', 'select');
+	$optiongroups[0]->options[] = new Option('HeatmapExplorerBeta', 'Heatmap Explorer rollout', 'select');
 	$optiongroups[0]->options[] = new Option('slider', 'Enable AJAX gliding server list (accordion effect) on homepage of each game (only affects games with more than one server)', 'select');
 	$optiongroups[0]->options[] = new Option('nav_globalchat', 'Show Chat nav-link', 'select');
 	$optiongroups[0]->options[] = new Option('nav_cheaters', 'Show Banned Players nav-link', 'select');

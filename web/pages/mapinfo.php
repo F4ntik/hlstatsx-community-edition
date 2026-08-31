@@ -40,6 +40,8 @@ For support and installation notes visit http://www.hlxcommunity.com
         die('Do not access this file directly.');
     }
 
+    require_once dirname(__DIR__) . '/includes/heatmap_points.php';
+
 	// Map Details
 	
 	$map = valid_request($_GET['map'], false) or error(t('literal.no_map_specified'));
@@ -173,6 +175,8 @@ error(t('literal.invalid_game'));
 		$heatmapthumb = getImage("/games/$realgame/heatmaps/$map-kill-thumb");
 	}
 	$heatmapendpoint = "heatmap_points.php?game=" . rawurlencode($game) . "&map=" . rawurlencode($map);
+	$heatmapUseExplorer = heatmap_should_render_explorer($g_options, $_GET);
+	$heatmapJpeg = $heatmap ? $heatmap['url'] : './hlstatsimg/games/' . rawurlencode($game) . '/heatmaps/' . rawurlencode($map) . '-kill.jpg';
 
 	if ($mapimg || $g_options['map_dlurl'] || $heatmap)
 	{
@@ -182,17 +186,32 @@ error(t('literal.invalid_game'));
 <?php
 			if ($mapimg)
 			{
-				echo "<div class=\"heatmap-viewer\" data-heatmap-endpoint=\"" . eHtml($heatmapendpoint) . "\">";
-				echo "<div class=\"heatmap-canvas-wrap\">";
-				echo "<img class=\"heatmap-map-base\" src=\"" . eHtml($mapimg) . "\" alt=\"" . eHtml($map) . "\" />";
-				echo "<canvas class=\"heatmap-overlay\" aria-hidden=\"true\"></canvas>";
-				echo "<div class=\"heatmap-status\" aria-live=\"polite\"></div>";
-				echo "<div class=\"heatmap-tooltip\"></div>";
-				echo "</div>";
-				echo "<div class=\"heatmap-actions\">";
-				echo "<button type=\"button\" class=\"heatmap-toggle\" data-heatmap-toggle=\"1\">" . eHtml(t('literal.heatmap')) . "</button>";
-				echo "</div>";
-				echo "</div>";
+				if ($heatmapUseExplorer) {
+					echo heatmap_render_explorer_workspace(array(
+						'game' => $game,
+						'map' => $map,
+						'player' => 0,
+						'image' => $mapimg,
+						'imageAlt' => $map,
+						'endpoint' => 'heatmap_points.php',
+						'jpeg' => $heatmapJpeg,
+						'lang' => current_lang(),
+						'lenses' => array('overview'),
+						'maps' => array(array('map' => $map, 'label' => $map)),
+					));
+				} else {
+					echo "<div class=\"heatmap-viewer\" data-heatmap-endpoint=\"" . eHtml($heatmapendpoint) . "\">";
+					echo "<div class=\"heatmap-canvas-wrap\">";
+					echo "<img class=\"heatmap-map-base\" src=\"" . eHtml($mapimg) . "\" alt=\"" . eHtml($map) . "\" />";
+					echo "<canvas class=\"heatmap-overlay\" aria-hidden=\"true\"></canvas>";
+					echo "<div class=\"heatmap-status\" aria-live=\"polite\"></div>";
+					echo "<div class=\"heatmap-tooltip\"></div>";
+					echo "</div>";
+					echo "<div class=\"heatmap-actions\">";
+					echo "<button type=\"button\" class=\"heatmap-toggle\" data-heatmap-toggle=\"1\">" . eHtml(t('literal.heatmap')) . "</button>";
+					echo "</div>";
+					echo "</div>";
+				}
 			}
 
 			if ($g_options['map_dlurl'])
@@ -205,7 +224,7 @@ error(t('literal.invalid_game'));
 				}
 			}
 
-			if ($heatmap)
+			if ($heatmap && !$heatmapUseExplorer)
 			{
 				$thumburl = $heatmapthumb ? $heatmapthumb['url'] : $heatmap['url'];
 				echo '<a href="' . eHtml($heatmap['url']) . '" rel="boxed" title="' . eHtml(t('literal.heatmap')) . ': ' . eHtml($map) . '"><br /><img src="' . eHtml($thumburl) . '" alt="' . eHtml($map) . '" /></a>';

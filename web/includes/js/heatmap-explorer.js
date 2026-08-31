@@ -9,7 +9,18 @@
     root.HeatmapExplorerScene = api.HeatmapExplorerScene;
     root.HeatmapExplorerCamera = api.HeatmapExplorerCamera;
     root.HeatmapExplorerUrlState = api.HeatmapExplorerUrlState;
+    root.HeatmapExplorerWorkspace = api.HeatmapExplorerWorkspace;
     root.HeatmapGlRenderer = api.HeatmapGlRenderer;
+    if (root.document && api.HeatmapExplorerWorkspace) {
+      var mountExplorerWorkspaces = function () {
+        api.HeatmapExplorerWorkspace.mountAll(root.document, {window: root});
+      };
+      if (root.document.readyState === 'loading' && typeof root.addEventListener === 'function') {
+        root.addEventListener('DOMContentLoaded', mountExplorerWorkspaces);
+      } else {
+        mountExplorerWorkspaces();
+      }
+    }
   }
 }(typeof window !== 'undefined' ? window : null, function () {
   'use strict';
@@ -373,6 +384,15 @@
     }
   }
 
+  function cloneMetricObject(metrics) {
+    var output = {};
+    var keys = Object.keys(metrics);
+    for (var index = 0; index < keys.length; index += 1) {
+      output[keys[index]] = metrics[keys[index]];
+    }
+    return output;
+  }
+
   function validateWarnings(warnings) {
     if (!compactArray(warnings)) {
       invalidScene();
@@ -448,6 +468,22 @@
       height: payload.grid.height
     };
     this.activeFloor = payload.activeFloor;
+    this.floors = payload.floors.map(function (floor) {
+      return {
+        id: floor.id,
+        label: floor.label,
+        count: floor.count,
+        available: floor.available
+      };
+    });
+    this.coverage = cloneMetricObject(payload.coverage);
+    this.summary = cloneMetricObject(payload.summary);
+    this.warnings = payload.warnings.slice();
+    this.fallback = {
+      v1: payload.fallback.v1,
+      jpeg: payload.fallback.jpeg,
+      thumbnail: payload.fallback.thumbnail
+    };
     this._layers = {total: total, me: me, others: others};
     this._comparison = comparison;
   }
@@ -1418,6 +1454,9 @@
       }
     });
     this._listen(canvas, 'pointerdown', function (event) {
+      if (self.options.pointerPan === false) {
+        return;
+      }
       if (!self._camera || !event) {
         return;
       }
@@ -1427,6 +1466,9 @@
       }
     });
     this._listen(canvas, 'pointermove', function (event) {
+      if (self.options.pointerPan === false) {
+        return;
+      }
       if (!self._pointer || !self._camera || !event || typeof self._camera.panBy !== 'function') {
         return;
       }
@@ -1440,6 +1482,9 @@
       self._pointer = null;
     });
     this._listen(target, 'keydown', function (event) {
+      if (self.options.cameraKeys === false) {
+        return;
+      }
       if (!self._camera || !event || typeof self._camera.handleKey !== 'function') {
         return;
       }
@@ -1507,10 +1552,871 @@
     this._gl = null;
   };
 
+  function workspaceAttribute(rootElement, name, fallback) {
+    if (!rootElement || typeof rootElement.getAttribute !== 'function') {
+      return fallback;
+    }
+    var value = rootElement.getAttribute(name);
+    return typeof value === 'string' && value !== '' ? value : fallback;
+  }
+
+  function workspaceInteger(value, fallback) {
+    if (typeof value === 'number' && safeInteger(value)) {
+      return value;
+    }
+    if (typeof value === 'string' && /^(?:0|[1-9][0-9]*)$/.test(value)) {
+      var parsed = Number(value);
+      return safeInteger(parsed) ? parsed : fallback;
+    }
+    return fallback;
+  }
+
+  function workspaceNode(rootElement, selector) {
+    return rootElement && typeof rootElement.querySelector === 'function'
+      ? rootElement.querySelector(selector)
+      : null;
+  }
+
+  function workspaceNodes(rootElement, selector) {
+    if (!rootElement || typeof rootElement.querySelectorAll !== 'function') {
+      return [];
+    }
+    var selected = rootElement.querySelectorAll(selector);
+    return selected && typeof selected.length === 'number' ? selected : [];
+  }
+
+  function workspaceSetText(node, value) {
+    if (node) {
+      node.textContent = typeof value === 'string' ? value : '';
+    }
+  }
+
+  function workspaceSetAttribute(node, name, value) {
+    if (node && typeof node.setAttribute === 'function') {
+      node.setAttribute(name, String(value));
+    }
+  }
+
+  function workspaceUrlBase(endpoint) {
+    if (typeof endpoint !== 'string' || endpoint === '') {
+      return 'heatmap_points.php';
+    }
+    var question = endpoint.indexOf('?');
+    return question >= 0 ? endpoint.slice(0, question) : endpoint;
+  }
+
+  function workspaceTextValue(value) {
+    return typeof value === 'string' && value.length > 0 ? value : null;
+  }
+
+  function HeatmapExplorerWorkspace(rootElement, options) {
+    this.root = rootElement;
+    this.options = isRecord(options) ? options : {};
+    this.window = this.options.window || (typeof window !== 'undefined' ? window : null);
+    this.document = this.options.document || (this.window && this.window.document ? this.window.document : null);
+    this.Scene = typeof this.options.Scene === 'function' ? this.options.Scene : HeatmapExplorerScene;
+    this.Renderer = typeof this.options.Renderer === 'function' ? this.options.Renderer : HeatmapGlRenderer;
+    this.fetch = typeof this.options.fetch === 'function'
+      ? this.options.fetch
+      : (this.window && typeof this.window.fetch === 'function' ? this.window.fetch.bind(this.window) : null);
+    this.messages = isRecord(this.options.messages)
+      ? this.options.messages
+      : (this.window && this.window.HLX_I18N && isRecord(this.window.HLX_I18N.heatmapExplorer)
+        ? this.window.HLX_I18N.heatmapExplorer : {});
+    this.endpoint = workspaceUrlBase(workspaceAttribute(rootElement, 'data-heatmap-endpoint', 'heatmap_points.php'));
+    this.lang = workspaceAttribute(rootElement, 'data-heatmap-lang', 'en') === 'ru' ? 'ru' : 'en';
+    this.allowMe = workspaceAttribute(rootElement, 'data-heatmap-allow-me', '0') === '1';
+    this.allowDifference = workspaceAttribute(rootElement, 'data-heatmap-allow-difference', '0') === '1';
+    this.state = {
+      game: workspaceAttribute(rootElement, 'data-heatmap-game', ''),
+      map: workspaceAttribute(rootElement, 'data-heatmap-map', ''),
+      player: workspaceInteger(workspaceAttribute(rootElement, 'data-heatmap-player', '0'), 0),
+      range: '30d',
+      from: null,
+      to: null,
+      lens: workspaceAttribute(rootElement, 'data-heatmap-initial-lens', 'overview'),
+      event: 'both',
+      floor: 'all',
+      cell: null,
+      focusedCell: null
+    };
+    this._nodes = null;
+    this._listeners = [];
+    this._renderer = null;
+    this._camera = null;
+    this._scene = null;
+    this._lastRequestUrl = null;
+    this._lastReason = null;
+    this._panMode = false;
+    this._mounted = false;
+    this._destroyed = false;
+    this._loading = false;
+    this._initialUrlError = false;
+    this._readUrlState();
+    this._normalizeSelection(false);
+  }
+
+  HeatmapExplorerWorkspace.prototype._message = function (key) {
+    if (key === 'static_fallback' || key === 'context_lost') {
+      key = 'fallback';
+    }
+    var value = this.messages && this.messages[key];
+    return typeof value === 'string' && value !== '' ? value : key;
+  };
+
+  HeatmapExplorerWorkspace.prototype._listen = function (target, type, handler) {
+    if (target && typeof target.addEventListener === 'function') {
+      target.addEventListener(type, handler);
+      this._listeners.push({target: target, type: type, handler: handler});
+    }
+  };
+
+  HeatmapExplorerWorkspace.prototype._removeListeners = function () {
+    for (var index = 0; index < this._listeners.length; index += 1) {
+      var item = this._listeners[index];
+      if (item.target && typeof item.target.removeEventListener === 'function') {
+        item.target.removeEventListener(item.type, item.handler);
+      }
+    }
+    this._listeners = [];
+  };
+
+  HeatmapExplorerWorkspace.prototype._search = function () {
+    if (typeof this.options.search === 'string') {
+      return this.options.search;
+    }
+    if (this.window && this.window.location && typeof this.window.location.search === 'string') {
+      return this.window.location.search;
+    }
+    return '';
+  };
+
+  HeatmapExplorerWorkspace.prototype._readUrlState = function () {
+    try {
+      var parsed = parseUrlState(this._search());
+      var keys = ['range', 'from', 'to', 'lens', 'event', 'floor', 'cell'];
+      for (var index = 0; index < keys.length; index += 1) {
+        var key = keys[index];
+        if (own(parsed, key)) {
+          this.state[key] = parsed[key];
+        }
+      }
+      this.state.focusedCell = this.state.cell;
+      if (own(parsed, 'range')) {
+        this.state.from = null;
+        this.state.to = null;
+      }
+      if (own(parsed, 'from')) {
+        this.state.range = null;
+      }
+    } catch (error) {
+      this._initialUrlError = true;
+    }
+  };
+
+  HeatmapExplorerWorkspace.prototype._urlState = function () {
+    var state = {
+      lens: this.state.lens,
+      event: this.state.event,
+      floor: this.state.floor,
+      cell: this.state.cell
+    };
+    if (this.state.range) {
+      state.range = this.state.range;
+    } else if (safeInteger(this.state.from) && safeInteger(this.state.to)) {
+      state.from = this.state.from;
+      state.to = this.state.to;
+    }
+    return state;
+  };
+
+  HeatmapExplorerWorkspace.prototype._writeUrl = function () {
+    var serialized;
+    try {
+      serialized = serializeUrlState(this._search(), this._urlState());
+    } catch (error) {
+      this._showAlert('invalidUrl');
+      return '';
+    }
+    var pathname = this.window && this.window.location && typeof this.window.location.pathname === 'string'
+      ? this.window.location.pathname : '';
+    var href = pathname + serialized;
+    if (this._nodes && this._nodes.share) {
+      workspaceSetAttribute(this._nodes.share, 'href', href);
+    }
+    if (this.window && this.window.history && typeof this.window.history.replaceState === 'function') {
+      try {
+        this.window.history.replaceState(null, '', href);
+      } catch (error) {
+        // The visible share URL remains useful if history is unavailable.
+      }
+    }
+    return href;
+  };
+
+  HeatmapExplorerWorkspace.prototype._sceneState = function () {
+    var state = {
+      v: '2',
+      game: this.state.game,
+      map: this.state.map,
+      event: this.state.event,
+      lens: this.state.lens,
+      floor: this.state.floor,
+      lang: this.lang
+    };
+    if (this.state.player > 0) {
+      state.player = String(this.state.player);
+    }
+    if (this.state.range) {
+      state.range = this.state.range;
+    } else {
+      state.from = String(this.state.from);
+      state.to = String(this.state.to);
+    }
+    if (this.state.cell) {
+      state.inspect = this.state.cell;
+    }
+    return state;
+  };
+
+  HeatmapExplorerWorkspace.prototype.sceneUrl = function () {
+    var state = this._sceneState();
+    var order = ['v', 'game', 'map', 'player', 'range', 'from', 'to', 'event', 'lens', 'floor', 'lang', 'inspect'];
+    var pairs = [];
+    for (var index = 0; index < order.length; index += 1) {
+      var key = order[index];
+      if (own(state, key)) {
+        pairs.push(encodeURIComponent(key) + '=' + encodeURIComponent(state[key]));
+      }
+    }
+    return this.endpoint + '?' + pairs.join('&');
+  };
+
+  HeatmapExplorerWorkspace.prototype._setStatus = function (key) {
+    if (this._nodes && this._nodes.status) {
+      workspaceSetText(this._nodes.status, this._message(key));
+    }
+  };
+
+  HeatmapExplorerWorkspace.prototype._clearAlert = function () {
+    if (!this._nodes || !this._nodes.alert) {
+      return;
+    }
+    workspaceSetText(this._nodes.alert, '');
+    this._nodes.alert.hidden = true;
+    while (this._nodes.alert.firstChild && typeof this._nodes.alert.removeChild === 'function') {
+      this._nodes.alert.removeChild(this._nodes.alert.firstChild);
+    }
+  };
+
+  HeatmapExplorerWorkspace.prototype._showAlert = function (key) {
+    if (!this._nodes || !this._nodes.alert) {
+      return;
+    }
+    workspaceSetText(this._nodes.alert, this._message(key));
+    this._nodes.alert.hidden = false;
+  };
+
+  HeatmapExplorerWorkspace.prototype._showFailureActions = function () {
+    if (!this._nodes || !this._nodes.alert || !this.document || typeof this.document.createElement !== 'function') {
+      return;
+    }
+    var alert = this._nodes.alert;
+    var self = this;
+    var retry = this.document.createElement('button');
+    retry.type = 'button';
+    retry.textContent = this._message('retry');
+    this._listen(retry, 'click', function () {
+      self.retry();
+    });
+    var fallback = this.document.createElement('button');
+    fallback.type = 'button';
+    fallback.textContent = this._message('fallback');
+    this._listen(fallback, 'click', function () {
+      self.showFallback();
+    });
+    if (typeof alert.appendChild === 'function') {
+      alert.appendChild(retry);
+      alert.appendChild(fallback);
+    }
+  };
+
+  HeatmapExplorerWorkspace.prototype._normalizeSelection = function (announce) {
+    if (!this.allowMe && (this.state.lens === 'me' || this.state.lens === 'difference')) {
+      this.state.lens = 'overview';
+    }
+    if (!this.allowDifference && this.state.lens === 'difference') {
+      this.state.lens = 'overview';
+    }
+    if (this.state.lens === 'difference' && this.state.event === 'both') {
+      this.state.event = 'kills';
+      if (announce) {
+        this._setStatus('differenceBothCorrected');
+      }
+    }
+  };
+
+  HeatmapExplorerWorkspace.prototype._renderFloors = function (scene) {
+    if (!this._nodes || !this._nodes.floorOptions || !this.document
+      || typeof this.document.createElement !== 'function' || typeof this._nodes.floorOptions.appendChild !== 'function') {
+      return;
+    }
+    var options = this._nodes.floorOptions;
+    while (options.firstChild && typeof options.removeChild === 'function') {
+      options.removeChild(options.firstChild);
+    }
+    var self = this;
+    function appendFloor(id, label) {
+      var control = self.document.createElement('input');
+      var wrapper = self.document.createElement('label');
+      control.type = 'radio';
+      control.name = 'heatmap-floor-' + self.state.player;
+      control.value = id;
+      workspaceSetAttribute(control, 'data-heatmap-floor', id);
+      control.checked = id === self.state.floor;
+      wrapper.appendChild(control);
+      if (typeof self.document.createTextNode === 'function') {
+        wrapper.appendChild(self.document.createTextNode(label));
+      } else {
+        workspaceSetText(wrapper, label);
+      }
+      options.appendChild(wrapper);
+    }
+    appendFloor('all', this._message('allFloors'));
+    for (var index = 0; index < scene.floors.length; index += 1) {
+      var floor = scene.floors[index];
+      if (floor.available) {
+        appendFloor(floor.id, floor.label);
+      }
+    }
+  };
+
+  HeatmapExplorerWorkspace.prototype._syncControls = function () {
+    if (!this.root) {
+      return;
+    }
+    var lensControls = workspaceNodes(this.root, '[data-heatmap-lens]');
+    var eventControls = workspaceNodes(this.root, '[data-heatmap-event]');
+    var floorControls = workspaceNodes(this.root, '[data-heatmap-floor]');
+    var index;
+    for (index = 0; index < lensControls.length; index += 1) {
+      var lens = lensControls[index].getAttribute ? lensControls[index].getAttribute('data-heatmap-lens') : '';
+      var selectedLens = lens === this.state.lens;
+      workspaceSetAttribute(lensControls[index], 'aria-pressed', selectedLens ? 'true' : 'false');
+      if (lensControls[index].classList && typeof lensControls[index].classList.toggle === 'function') {
+        lensControls[index].classList.toggle('is-selected', selectedLens);
+      }
+    }
+    for (index = 0; index < eventControls.length; index += 1) {
+      var event = eventControls[index].getAttribute ? eventControls[index].getAttribute('data-heatmap-event') : '';
+      var selectedEvent = event === this.state.event;
+      var disabled = this.state.lens === 'difference' && event === 'both';
+      eventControls[index].disabled = disabled;
+      workspaceSetAttribute(eventControls[index], 'aria-pressed', selectedEvent ? 'true' : 'false');
+      if (eventControls[index].classList && typeof eventControls[index].classList.toggle === 'function') {
+        eventControls[index].classList.toggle('is-selected', selectedEvent);
+      }
+    }
+    for (index = 0; index < floorControls.length; index += 1) {
+      var floor = floorControls[index].getAttribute ? floorControls[index].getAttribute('data-heatmap-floor') : '';
+      floorControls[index].checked = floor === this.state.floor;
+    }
+    if (this._nodes && this._nodes.range && this.state.range) {
+      this._nodes.range.value = this.state.range;
+    }
+    if (this._nodes && this._nodes.pan) {
+      workspaceSetAttribute(this._nodes.pan, 'aria-pressed', this._panMode ? 'true' : 'false');
+      workspaceSetText(this._nodes.pan, this._message(this._panMode ? 'pan' : 'navigation'));
+    }
+  };
+
+  HeatmapExplorerWorkspace.prototype._formatPercent = function (value) {
+    if (!finiteNumber(value)) {
+      return '0%';
+    }
+    return Math.round(value * 100) + '%';
+  };
+
+  HeatmapExplorerWorkspace.prototype._summaryText = function (scene) {
+    var query = scene.query || {};
+    var coverage = scene.coverage || {};
+    var summary = scene.summary || {};
+    return this._message('period') + ': ' + String(query.from) + '–' + String(query.to) + ' UTC; '
+      + this._message('sample') + ': ' + String(summary.sourceRows || 0) + '; '
+      + this._message('xyCoverage') + ': ' + this._formatPercent(coverage.validXY / Math.max(1, coverage.sourceRows || 0));
+  };
+
+  HeatmapExplorerWorkspace.prototype._updateSceneText = function (scene) {
+    var summary = this._summaryText(scene);
+    workspaceSetText(this._nodes.summary, summary);
+    workspaceSetText(this._nodes.period, this._message('period') + ': ' + String(scene.query.from) + '–' + String(scene.query.to) + ' UTC');
+    workspaceSetText(this._nodes.window, this._message('utcWindow') + ': ' + String(scene.query.from) + '–' + String(scene.query.to));
+    workspaceSetText(this._nodes.sample, this._message('sample') + ': ' + String(scene.summary.sourceRows || 0));
+    workspaceSetText(this._nodes.coverage, this._message('coverage') + ': '
+      + this._message('xyCoverage') + ' ' + this._formatPercent((scene.coverage.validXY || 0) / Math.max(1, scene.coverage.sourceRows || 0))
+      + '; ' + this._message('zCoverage') + ' ' + this._formatPercent((scene.coverage.validZ || 0) / Math.max(1, scene.coverage.sourceRows || 0))
+      + '; ' + this._message('projectionCoverage') + ' ' + this._formatPercent((scene.coverage.projected || 0) / Math.max(1, scene.coverage.sourceRows || 0)));
+    workspaceSetText(this._nodes.freshness, this._message('freshness') + ': ' + this._message('loaded'));
+  };
+
+  HeatmapExplorerWorkspace.prototype._setCoverageStatus = function (scene) {
+    if (!this._nodes || !this._nodes.status) {
+      return;
+    }
+    var coverage = scene.coverage || {};
+    workspaceSetText(
+      this._nodes.status,
+      this._message('loaded') + ': ' + this._message('coverage') + ' '
+        + this._formatPercent((coverage.validXY || 0) / Math.max(1, coverage.sourceRows || 0))
+    );
+  };
+
+  HeatmapExplorerWorkspace.prototype._syncAuthoritativeMap = function (scene, reason) {
+    var changedMap = !this._scene || this._scene.map.name !== scene.map.name || this._scene.map.game !== scene.map.game;
+    if (reason !== 'floor' || changedMap) {
+      workspaceSetAttribute(this._nodes.image, 'src', scene.map.image.url);
+      workspaceSetAttribute(this._nodes.image, 'alt', scene.map.name);
+      workspaceSetAttribute(this._nodes.staticLink, 'href', scene.fallback.jpeg);
+      workspaceSetAttribute(this._nodes.jpegLink, 'href', scene.fallback.jpeg);
+      workspaceSetAttribute(this._nodes.staticImage, 'src', scene.fallback.jpeg);
+      workspaceSetAttribute(this._nodes.staticImage, 'alt', scene.map.name);
+    }
+    workspaceSetAttribute(this.root, 'data-heatmap-game', scene.map.game);
+    workspaceSetAttribute(this.root, 'data-heatmap-map', scene.map.name);
+    workspaceSetText(this._nodes.mapTitle, scene.map.name);
+    if (this._nodes.mapSelect) {
+      this._nodes.mapSelect.value = scene.map.name;
+    }
+  };
+
+  HeatmapExplorerWorkspace.prototype._destroyRenderer = function () {
+    if (this._renderer && typeof this._renderer.destroy === 'function') {
+      this._renderer.destroy();
+    }
+    this._renderer = null;
+  };
+
+  HeatmapExplorerWorkspace.prototype._createRenderer = function (scene) {
+    this._destroyRenderer();
+    var stage = this._nodes.stage;
+    var image = this._nodes.image;
+    var width = workspaceInteger(image && image.getAttribute ? image.getAttribute('width') : null, scene.map.image.width);
+    var height = workspaceInteger(image && image.getAttribute ? image.getAttribute('height') : null, scene.map.image.height);
+    this._camera = new HeatmapExplorerCamera({
+      viewportWidth: stage && finiteNumber(stage.clientWidth) ? stage.clientWidth : scene.map.image.width,
+      viewportHeight: stage && finiteNumber(stage.clientHeight) ? stage.clientHeight : scene.map.image.height,
+      contentWidth: width > 0 ? width : scene.map.image.width,
+      contentHeight: height > 0 ? height : scene.map.image.height,
+      reducedMotion: !!(this.window && this.window.matchMedia && this.window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+    });
+    this._renderer = new this.Renderer(this.root, scene, {
+      window: this.window,
+      cameraKeys: false,
+      pointerPan: false,
+      message: this._message.bind(this)
+    });
+    this._renderer.mount();
+    if (typeof this._renderer.setCamera === 'function') {
+      this._renderer.setCamera(this._camera);
+    }
+  };
+
+  HeatmapExplorerWorkspace.prototype._applyScene = function (scene, reason) {
+    this._syncAuthoritativeMap(scene, reason);
+    this.state.game = scene.map.game;
+    this.state.map = scene.map.name;
+    this.state.player = scene.query.player;
+    this.state.lens = scene.query.lens;
+    this.state.event = scene.query.event;
+    this.state.floor = scene.activeFloor;
+    if (!this.state.range) {
+      this.state.from = scene.query.from;
+      this.state.to = scene.query.to;
+    }
+    this._createRenderer(scene);
+    this._scene = scene;
+    this._renderFloors(scene);
+    this._updateSceneText(scene);
+    this._syncControls();
+    this._writeUrl();
+    this._clearAlert();
+    if (scene.state === 'empty') {
+      this._setStatus('empty');
+    } else {
+      this._setCoverageStatus(scene);
+    }
+    if (this.state.cell) {
+      this._renderPinnedCell(this.state.cell);
+    }
+  };
+
+  HeatmapExplorerWorkspace.prototype._load = function (reason, exactUrl) {
+    var self = this;
+    if (this._destroyed || !this.fetch || this._loading) {
+      return Promise.resolve(false);
+    }
+    var requestUrl = typeof exactUrl === 'string' ? exactUrl : this.sceneUrl();
+    this._lastRequestUrl = requestUrl;
+    this._lastReason = reason;
+    this._loading = true;
+    this._setStatus('loading');
+    this._clearAlert();
+    return Promise.resolve().then(function () {
+      return self.fetch(requestUrl, {credentials: 'same-origin'});
+    }).then(function (response) {
+      if (!response || response.ok === false || typeof response.json !== 'function') {
+        throw new Error('request_failed');
+      }
+      return response.json();
+    }).then(function (payload) {
+      var scene = new self.Scene(payload);
+      self._loading = false;
+      self._applyScene(scene, reason);
+      return true;
+    }, function () {
+      self._loading = false;
+      self._showAlert('failed');
+      self._showFailureActions();
+      self._setStatus('failed');
+      return false;
+    });
+  };
+
+  HeatmapExplorerWorkspace.prototype.retry = function () {
+    return this._load(this._lastReason || 'retry', this._lastRequestUrl || this.sceneUrl());
+  };
+
+  HeatmapExplorerWorkspace.prototype.showFallback = function () {
+    this._destroyRenderer();
+    if (this._nodes && this._nodes.static && this._nodes.static.style) {
+      this._nodes.static.style.display = '';
+    }
+    if (this._nodes && this._nodes.interactive && this._nodes.interactive.style) {
+      this._nodes.interactive.style.display = 'none';
+    }
+    this._setStatus('fallback');
+  };
+
+  HeatmapExplorerWorkspace.prototype._renderPinnedCell = function (cell) {
+    if (!this._scene || !this._nodes || !this._nodes.inspectOutput) {
+      return;
+    }
+    var summary = this._scene.cellSummary(cell);
+    if (!summary) {
+      workspaceSetText(this._nodes.inspectOutput, this._message('noCell'));
+      return;
+    }
+    workspaceSetText(
+      this._nodes.inspectOutput,
+      this._message('inspect') + ' ' + summary.cell + ': '
+        + this._message('kills') + ' ' + summary.total.kills + ', '
+        + this._message('deaths') + ' ' + summary.total.deaths
+    );
+  };
+
+  HeatmapExplorerWorkspace.prototype.pin = function (cell) {
+    var parsed = parseCellId(cell);
+    if (!parsed) {
+      return false;
+    }
+    this.state.cell = parsed.cell;
+    this.state.focusedCell = parsed.cell;
+    this._renderPinnedCell(parsed.cell);
+    this._writeUrl();
+    this._setStatus('pinned');
+    this._load('inspect');
+    return true;
+  };
+
+  HeatmapExplorerWorkspace.prototype.clearPin = function () {
+    this.state.cell = null;
+    this.state.focusedCell = null;
+    if (this._nodes && this._nodes.inspectOutput) {
+      workspaceSetText(this._nodes.inspectOutput, this._message('noCell'));
+    }
+    this._writeUrl();
+    this._setStatus('unpinned');
+  };
+
+  HeatmapExplorerWorkspace.prototype._setState = function (changes, reason) {
+    if (!isRecord(changes)) {
+      return;
+    }
+    var keys = Object.keys(changes);
+    for (var index = 0; index < keys.length; index += 1) {
+      this.state[keys[index]] = changes[keys[index]];
+    }
+    this._normalizeSelection(reason === 'lens');
+    this._syncControls();
+    this._load(reason);
+  };
+
+  HeatmapExplorerWorkspace.prototype._selectFocusedCell = function (direction) {
+    if (!this._scene) {
+      return false;
+    }
+    var layer = this.state.lens === 'overview' ? 'total' : this.state.lens;
+    var channel = this.state.event;
+    var next = this._scene.nextOccupied(this.state.focusedCell, direction, layer, channel);
+    if (!next) {
+      return false;
+    }
+    this.state.focusedCell = next.cell;
+    this._renderPinnedCell(next.cell);
+    return true;
+  };
+
+  HeatmapExplorerWorkspace.prototype._toggleSheet = function (name) {
+    if (!this._nodes) {
+      return;
+    }
+    var target = name === 'floors' ? this._nodes.floors : this._nodes.inspector;
+    var other = name === 'floors' ? this._nodes.inspector : this._nodes.floors;
+    if (!target || !target.classList || typeof target.classList.toggle !== 'function') {
+      return;
+    }
+    var opening = !target.classList.contains('is-open');
+    if (other && other.classList && typeof other.classList.remove === 'function') {
+      other.classList.remove('is-open');
+    }
+    target.classList.toggle('is-open', opening);
+    var toggles = workspaceNodes(this.root, '[data-heatmap-sheet-toggle]');
+    for (var index = 0; index < toggles.length; index += 1) {
+      var toggleName = toggles[index].getAttribute ? toggles[index].getAttribute('data-heatmap-sheet-toggle') : '';
+      workspaceSetAttribute(toggles[index], 'aria-expanded', toggleName === name && opening ? 'true' : 'false');
+    }
+  };
+
+  HeatmapExplorerWorkspace.prototype._handleStageKey = function (event) {
+    if (!event) {
+      return;
+    }
+    var key = event.key;
+    var handled = false;
+    if (key === '+' || key === '=' || key === '-' || key === 'Home') {
+      if (this._camera && typeof this._camera.handleKey === 'function') {
+        handled = this._camera.handleKey(key);
+      }
+    } else if (key === 'Escape') {
+      this.clearPin();
+      handled = true;
+    } else if (key === 'Enter' || key === ' ') {
+      if (this.state.focusedCell) {
+        this.pin(this.state.focusedCell);
+        handled = true;
+      }
+    } else if (key === 'ArrowLeft' || key === 'ArrowRight' || key === 'ArrowUp' || key === 'ArrowDown') {
+      if (this._panMode && this._camera && typeof this._camera.handleKey === 'function') {
+        handled = this._camera.handleKey(key);
+      } else {
+        var direction = key === 'ArrowLeft' ? 'left' : key === 'ArrowRight' ? 'right' : key === 'ArrowUp' ? 'up' : 'down';
+        handled = this._selectFocusedCell(direction);
+      }
+    }
+    if (handled && event.preventDefault) {
+      event.preventDefault();
+    }
+    if (handled && this._renderer && this._camera && typeof this._renderer.setCamera === 'function') {
+      this._renderer.setCamera(this._camera);
+    }
+  };
+
+  HeatmapExplorerWorkspace.prototype._pointerCell = function (event) {
+    if (!this._scene || !this._nodes || !this._nodes.canvas || !event
+      || typeof this._nodes.canvas.getBoundingClientRect !== 'function') {
+      return null;
+    }
+    return this._scene.cellFromPointer(
+      numeric(event.clientX, -1), numeric(event.clientY, -1),
+      this._nodes.canvas.getBoundingClientRect(), this._camera
+    );
+  };
+
+  HeatmapExplorerWorkspace.prototype._bindEvents = function () {
+    var self = this;
+    var index;
+    var lensControls = workspaceNodes(this.root, '[data-heatmap-lens]');
+    var eventControls = workspaceNodes(this.root, '[data-heatmap-event]');
+    var sheetControls = workspaceNodes(this.root, '[data-heatmap-sheet-toggle]');
+    for (index = 0; index < lensControls.length; index += 1) {
+      this._listen(lensControls[index], 'click', function (event) {
+        var lens = event && event.currentTarget && event.currentTarget.getAttribute
+          ? event.currentTarget.getAttribute('data-heatmap-lens') : null;
+        if (lens) {
+          self._setState({lens: lens, cell: null}, 'lens');
+        }
+      });
+    }
+    for (index = 0; index < eventControls.length; index += 1) {
+      this._listen(eventControls[index], 'click', function (event) {
+        var channel = event && event.currentTarget && event.currentTarget.getAttribute
+          ? event.currentTarget.getAttribute('data-heatmap-event') : null;
+        if (channel && !(self.state.lens === 'difference' && channel === 'both')) {
+          self._setState({event: channel, cell: null}, 'channel');
+        }
+      });
+    }
+    this._listen(this._nodes.floors, 'change', function (event) {
+      var target = event && event.target;
+      var floor = target && target.getAttribute ? target.getAttribute('data-heatmap-floor') : null;
+      if (floor) {
+        self._setState({floor: floor, cell: null}, 'floor');
+      }
+    });
+    for (index = 0; index < sheetControls.length; index += 1) {
+      this._listen(sheetControls[index], 'click', function (event) {
+        var sheet = event && event.currentTarget && event.currentTarget.getAttribute
+          ? event.currentTarget.getAttribute('data-heatmap-sheet-toggle') : null;
+        if (sheet === 'floors' || sheet === 'inspector') {
+          self._toggleSheet(sheet);
+        }
+      });
+    }
+    this._listen(this._nodes.mapSelect, 'change', function (event) {
+      var map = event && event.currentTarget ? workspaceTextValue(event.currentTarget.value) : null;
+      if (map) {
+        self._setState({map: map, floor: 'all', cell: null}, 'map');
+      }
+    });
+    this._listen(this._nodes.range, 'change', function (event) {
+      var range = event && event.currentTarget ? workspaceTextValue(event.currentTarget.value) : null;
+      if (range && own(RANGE_SECONDS, range)) {
+        self._setState({range: range, from: null, to: null, cell: null}, 'range');
+      }
+    });
+    this._listen(this._nodes.zoomIn, 'click', function () {
+      if (self._camera) {
+        self._camera.zoomAt(self._camera.state.zoom * 1.25, 0, 0);
+        if (self._renderer) self._renderer.setCamera(self._camera);
+      }
+    });
+    this._listen(this._nodes.zoomOut, 'click', function () {
+      if (self._camera) {
+        self._camera.zoomAt(self._camera.state.zoom / 1.25, 0, 0);
+        if (self._renderer) self._renderer.setCamera(self._camera);
+      }
+    });
+    this._listen(this._nodes.reset, 'click', function () {
+      if (self._camera) {
+        self._camera.reset();
+        if (self._renderer) self._renderer.setCamera(self._camera);
+      }
+    });
+    this._listen(this._nodes.pan, 'click', function () {
+      self._panMode = !self._panMode;
+      self._syncControls();
+    });
+    this._listen(this._nodes.stage, 'keydown', function (event) {
+      self._handleStageKey(event);
+    });
+    this._listen(this._nodes.canvas, 'pointermove', function (event) {
+      var cell = self._pointerCell(event);
+      if (cell) {
+        self.state.focusedCell = cell.cell;
+        self._renderPinnedCell(cell.cell);
+      }
+    });
+    this._listen(this._nodes.canvas, 'click', function (event) {
+      var cell = self._pointerCell(event);
+      if (cell) {
+        self.pin(cell.cell);
+      }
+    });
+  };
+
+  HeatmapExplorerWorkspace.prototype.mount = function () {
+    if (this._mounted || this._destroyed || !this.root) {
+      return this;
+    }
+    this._nodes = {
+      interactive: workspaceNode(this.root, '[data-heatmap-interactive]'),
+      stage: workspaceNode(this.root, '[data-heatmap-stage]'),
+      image: workspaceNode(this.root, '[data-heatmap-image]'),
+      canvas: workspaceNode(this.root, '[data-heatmap-canvas]'),
+      static: workspaceNode(this.root, '[data-heatmap-static]'),
+      staticLink: workspaceNode(this.root, '[data-heatmap-static] a'),
+      staticImage: workspaceNode(this.root, '[data-heatmap-static] img'),
+      jpegLink: workspaceNode(this.root, '[data-heatmap-jpeg-link]'),
+      status: workspaceNode(this.root, '[data-heatmap-status]'),
+      alert: workspaceNode(this.root, '[data-heatmap-alert]'),
+      summary: workspaceNode(this.root, '[data-heatmap-summary]'),
+      period: workspaceNode(this.root, '[data-heatmap-period]'),
+      window: workspaceNode(this.root, '[data-heatmap-window]'),
+      sample: workspaceNode(this.root, '[data-heatmap-sample]'),
+      coverage: workspaceNode(this.root, '[data-heatmap-coverage]'),
+      freshness: workspaceNode(this.root, '[data-heatmap-freshness]'),
+      inspectOutput: workspaceNode(this.root, '[data-heatmap-inspect-output]'),
+      floors: workspaceNode(this.root, '[data-heatmap-floor-sheet]'),
+      floorOptions: workspaceNode(this.root, '[data-heatmap-floor-options]'),
+      inspector: workspaceNode(this.root, '[data-heatmap-inspector]'),
+      mapTitle: workspaceNode(this.root, '[data-heatmap-map-title]'),
+      mapSelect: workspaceNode(this.root, '[data-heatmap-map-select]'),
+      range: workspaceNode(this.root, '[data-heatmap-range]'),
+      zoomIn: workspaceNode(this.root, '[data-heatmap-zoom="in"]'),
+      zoomOut: workspaceNode(this.root, '[data-heatmap-zoom="out"]'),
+      reset: workspaceNode(this.root, '[data-heatmap-reset]'),
+      pan: workspaceNode(this.root, '[data-heatmap-pan]'),
+      share: workspaceNode(this.root, '[data-heatmap-share]')
+    };
+    if (!this._nodes.interactive || !this._nodes.stage || !this._nodes.image || !this._nodes.canvas
+      || !this._nodes.static || !this._nodes.status || !this._nodes.alert || !this._nodes.summary) {
+      this.showFallback();
+      return this;
+    }
+    this._mounted = true;
+    this._bindEvents();
+    this._syncControls();
+    this._writeUrl();
+    if (!this.fetch) {
+      this.showFallback();
+      return this;
+    }
+    if (this._initialUrlError) {
+      this._showAlert('invalidUrl');
+      this._setStatus('invalidUrl');
+      return this;
+    }
+    this._load('initial');
+    return this;
+  };
+
+  HeatmapExplorerWorkspace.prototype.destroy = function () {
+    if (this._destroyed) {
+      return;
+    }
+    this._destroyed = true;
+    this._mounted = false;
+    this._removeListeners();
+    this._destroyRenderer();
+    if (this._camera && typeof this._camera.destroy === 'function') {
+      this._camera.destroy();
+    }
+    this._camera = null;
+  };
+
+  HeatmapExplorerWorkspace.mountAll = function (documentRef, options) {
+    if (!documentRef || typeof documentRef.querySelectorAll !== 'function') {
+      return [];
+    }
+    var roots = documentRef.querySelectorAll('[data-heatmap-explorer]');
+    var mounted = [];
+    for (var index = 0; index < roots.length; index += 1) {
+      if (roots[index] && roots[index].getAttribute && roots[index].getAttribute('data-heatmap-mounted') === '1') {
+        continue;
+      }
+      var workspace = new HeatmapExplorerWorkspace(roots[index], options);
+      workspace.mount();
+      workspaceSetAttribute(roots[index], 'data-heatmap-mounted', '1');
+      mounted.push(workspace);
+    }
+    return mounted;
+  };
+
   return {
     HeatmapExplorerScene: HeatmapExplorerScene,
     HeatmapExplorerCamera: HeatmapExplorerCamera,
     HeatmapExplorerUrlState: HeatmapExplorerUrlState,
+    HeatmapExplorerWorkspace: HeatmapExplorerWorkspace,
     HeatmapGlRenderer: HeatmapGlRenderer
   };
 }));
