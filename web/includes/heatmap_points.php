@@ -10,6 +10,7 @@ const HEATMAP_MAX_WINDOW_SECONDS = 315360000;
 const HEATMAP_MAX_FLOORS = 8;
 const HEATMAP_MEDIUMINT_MIN = -8388608;
 const HEATMAP_MEDIUMINT_MAX = 8388607;
+const HEATMAP_MYSQL_UNSIGNED_INT_MAX = 4294967295;
 const HEATMAP_FLOOR_PARSER_SCHEMA = 1;
 
 function heatmap_clean_token($value)
@@ -147,7 +148,7 @@ function heatmap_parse_v2_query(array $input, int $now): array
     $player = 0;
     if (array_key_exists('player', $input)) {
         $player = heatmap_parse_canonical_integer($input['player'], 'invalid_player');
-        if ($player <= 0) {
+        if ($player <= 0 || $player > HEATMAP_MYSQL_UNSIGNED_INT_MAX) {
             throw new InvalidArgumentException('invalid_player');
         }
     }
@@ -248,7 +249,7 @@ function heatmap_parse_floor_config($json): array
         foreach (array($labelEn, $labelRu) as $label) {
             if ($label === '' || preg_match('/^\s|\s$/u', $label) === 1
                 || preg_match('//u', $label) !== 1
-                || preg_match('/\p{Cc}/u', $label) === 1) {
+                || preg_match('/\p{Cc}|\p{Cf}/u', $label) === 1) {
                 throw new InvalidArgumentException('invalid_floor_config');
             }
             $codePointCount = preg_match_all('/./u', $label, $matches);

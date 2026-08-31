@@ -344,6 +344,11 @@ assert_same(
     heatmap_parse_v2_query(v2_query_input(), $queryNow),
     'v2 query should be deterministic for an injected historical now'
 );
+$maximumPublicPlayerQuery = heatmap_parse_v2_query(
+    v2_query_input(array('player' => '4294967295', 'lens' => 'me')),
+    $queryNow
+);
+assert_same(4294967295, $maximumPublicPlayerQuery['player'], 'maximum MySQL unsigned player id should remain valid');
 
 $customQuery = heatmap_parse_v2_query(
     v2_query_input(array('from' => '1699990000', 'to' => '1700000001')),
@@ -379,6 +384,8 @@ $v2InvalidCases = array(
     array('name' => 'custom window integers must be canonical', 'input' => v2_query_input(array('from' => '01699990000', 'to' => '1700000001')), 'code' => 'invalid_window'),
     array('name' => 'explicit zero player is rejected', 'input' => v2_query_input(array('player' => '0')), 'code' => 'invalid_player'),
     array('name' => 'player integer cannot have a leading zero', 'input' => v2_query_input(array('player' => '01')), 'code' => 'invalid_player'),
+    array('name' => 'player cannot exceed MySQL unsigned int', 'input' => v2_query_input(array('player' => '4294967296')), 'code' => 'invalid_player'),
+    array('name' => 'PHP integer maximum is not a public player id', 'input' => v2_query_input(array('player' => strval(PHP_INT_MAX))), 'code' => 'invalid_player'),
     array('name' => 'me lens needs a player', 'input' => v2_query_input(array('lens' => 'me')), 'code' => 'player_required'),
     array('name' => 'difference lens needs a player', 'input' => v2_query_input(array('lens' => 'difference', 'event' => 'kills')), 'code' => 'player_required'),
     array('name' => 'difference lens cannot combine channels', 'input' => v2_query_input(array('player' => '4', 'lens' => 'difference', 'event' => 'both')), 'code' => 'difference_channel_required'),
@@ -442,6 +449,8 @@ $floorInvalidCases = array(
     array('name' => 'too long label', 'json' => floor_fixture_json(array(floor_fixture('ground', 0, 10, str_repeat('x', 65))))),
     array('name' => 'invalid UTF-8 label', 'json' => "[{\"id\":\"ground\",\"label_en\":\"\xC3\x28\",\"label_ru\":\"Зал\",\"z_min\":0,\"z_max\":10}]"),
     array('name' => 'control character label', 'json' => '[{"id":"ground","label_en":"Ground\\u0001","label_ru":"Зал","z_min":0,"z_max":10}]'),
+    array('name' => 'right-to-left override format control label', 'json' => '[{"id":"ground","label_en":"Ground\\u202E","label_ru":"Зал","z_min":0,"z_max":10}]'),
+    array('name' => 'left-to-right isolate format control label', 'json' => '[{"id":"ground","label_en":"Ground","label_ru":"Зал\\u2066","z_min":0,"z_max":10}]'),
     array('name' => 'unknown floor field', 'json' => floor_fixture_json(array(array_merge(floor_fixture(), array('image' => 'client.png'))))),
     array('name' => 'duplicate id', 'json' => floor_fixture_json(array(floor_fixture('ground', 0, 10), floor_fixture('ground', 10, 20)))),
     array('name' => 'string z bound', 'json' => floor_fixture_json(array(floor_fixture('ground', '0', 10)))),
