@@ -2,7 +2,7 @@
 
 -- This file is only needed for new installations.
 
-SET @DBVERSION="80";
+SET @DBVERSION="81";
 SET @VERSION="1.7.0";
 
 -- --------------------------------------------------------
@@ -3291,9 +3291,10 @@ CREATE TABLE IF NOT EXISTS `hlstats_Heatmap_Config` (
   `cropy1` int(11) NOT NULL default '0',
   `cropx2` int(11) NOT NULL default '0',
   `cropy2` int(11) NOT NULL default '0',
+  `floors_json` TEXT NULL,
   PRIMARY KEY  (`id`),
   UNIQUE KEY `gamemap` (`map`, `game`)
-) ENGINE=MyISAM  DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB  DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `hlstats_Heatmap_Config`
@@ -3961,6 +3962,7 @@ INSERT INTO `hlstats_Options` (`keyname`, `value`, `opttype`) VALUES
 ('sourcebans_address', '', 2),
 ('forum_address', '', 2),
 ('display_gamelist', '1', 2),
+('HeatmapExplorerBeta', '0',2),
 ('display_style_selector', '0', 2);
 
 
@@ -4071,6 +4073,9 @@ INSERT INTO `hlstats_Options_Choices` (`keyname`, `value`, `text`, `isDefault`) 
 ('showqueries', '1', 'Yes', 0),
 ('display_gamelist', '1', 'Yes', 1),
 ('display_gamelist', '0', 'No', 0),
+('HeatmapExplorerBeta', '0', 'Off', 1),
+('HeatmapExplorerBeta', '1', 'Opt-in', 0),
+('HeatmapExplorerBeta', '2', 'Default', 0),
 ('display_style_selector', '1', 'Yes', 0),
 ('display_style_selector', '0', 'No', 1);
 -- --------------------------------------------------------

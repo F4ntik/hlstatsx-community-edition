@@ -17,6 +17,113 @@ function assert_same($expected, $actual, string $message): void
     }
 }
 
+function assert_true($actual, string $message): void
+{
+    assert_same(true, $actual === true, $message);
+}
+
+function assert_contains(string $needle, string $haystack, string $message): void
+{
+    assert_true(strpos($haystack, $needle) !== false, $message);
+}
+
+$installSql = file_get_contents(dirname(__DIR__) . '/sql/install.sql');
+assert_true($installSql !== false, 'installer SQL should be readable');
+assert_contains('SET @DBVERSION="81";', $installSql, 'fresh install should set dbversion 81');
+assert_true(
+    preg_match(
+        "/`cropy2` int\\(11\\) NOT NULL default '0',\\s+`floors_json` TEXT NULL,/",
+        $installSql
+    ) === 1,
+    'fresh heatmap config should place nullable floors_json after cropy2'
+);
+assert_true(
+    preg_match(
+        '/CREATE TABLE IF NOT EXISTS `hlstats_Heatmap_Config` \\(.*?\\) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4/s',
+        $installSql
+    ) === 1,
+    'fresh heatmap config should use InnoDB'
+);
+assert_contains("('HeatmapExplorerBeta', '0',2)", $installSql, 'fresh options should include the beta rollout flag');
+assert_same(4, substr_count($installSql, 'HeatmapExplorerBeta'), 'fresh install should define one beta flag and three choices');
+foreach (array(
+    "('HeatmapExplorerBeta', '0', 'Off', 1)",
+    "('HeatmapExplorerBeta', '1', 'Opt-in', 0)",
+    "('HeatmapExplorerBeta', '2', 'Default', 0)",
+) as $choice) {
+    assert_contains($choice, $installSql, 'fresh install should define the expected beta choice');
+}
+
+$updater80Path = ROOT_PATH . '/updater/80.php';
+assert_true(is_file($updater80Path), 'updater 80 bridge should exist');
+$updater80 = file_get_contents($updater80Path);
+assert_true($updater80 !== false, 'updater 80 bridge should be readable');
+assert_contains("defined('IN_UPDATER')", $updater80, 'updater 80 should guard direct access');
+assert_contains('$dbversion = 80;', $updater80, 'updater 80 should set dbversion 80');
+assert_contains('$version = "1.7.0";', $updater80, 'updater 80 should set product version 1.7.0');
+assert_same(2, substr_count($updater80, '$db->query('), 'updater 80 should update only version state');
+assert_contains("`keyname` = 'version'", $updater80, 'updater 80 should update product version');
+assert_contains("`keyname` = 'dbversion'", $updater80, 'updater 80 should update dbversion');
+assert_true(strpos($updater80, 'ALTER TABLE') === false, 'updater 80 should remain a schema no-op');
+assert_true(strpos($updater80, 'INSERT ') === false, 'updater 80 should not add data');
+
+$updater81Path = ROOT_PATH . '/updater/81.php';
+assert_true(is_file($updater81Path), 'updater 81 migration should exist');
+$updater81 = file_get_contents($updater81Path);
+assert_true($updater81 !== false, 'updater 81 migration should be readable');
+assert_contains("defined('IN_UPDATER')", $updater81, 'updater 81 should guard direct access');
+assert_contains('$dbversion = 81;', $updater81, 'updater 81 should set dbversion 81');
+assert_contains('$version = "1.7.0";', $updater81, 'updater 81 should set product version 1.7.0');
+
+$columnCheck = strpos($updater81, "SHOW COLUMNS FROM hlstats_Heatmap_Config LIKE 'floors_json'");
+$columnAdd = strpos($updater81, 'ALTER TABLE `hlstats_Heatmap_Config` ADD `floors_json` TEXT NULL AFTER `cropy2`');
+assert_true(
+    $columnCheck !== false
+        && $columnAdd !== false
+        && $columnCheck < $columnAdd
+        && strpos($updater81, '$db->fetch_row(', $columnCheck) !== false,
+    'updater 81 should check for floors_json before adding it'
+);
+
+$tableCheck = strpos($updater81, "SHOW TABLE STATUS LIKE 'hlstats_Heatmap_Config'");
+$engineCheck = strpos($updater81, '$tableStatus[\'Engine\']');
+$engineConvert = strpos($updater81, 'ALTER TABLE `hlstats_Heatmap_Config` ENGINE=InnoDB');
+assert_true(
+    $tableCheck !== false
+        && $engineCheck !== false
+        && $engineConvert !== false
+        && $tableCheck < $engineCheck
+        && $engineCheck < $engineConvert,
+    'updater 81 should inspect the associative table engine before conversion'
+);
+assert_contains('$db->fetch_array(', $updater81, 'updater 81 should use the existing associative database API');
+assert_contains('if ($tableStatus &&', $updater81, 'updater 81 should only convert an existing non-InnoDB table');
+assert_contains("!== 'innodb'", $updater81, 'updater 81 should leave InnoDB untouched');
+
+$optionInsert = strpos($updater81, 'INSERT IGNORE INTO `hlstats_Options`');
+$choiceInsert = strpos($updater81, 'INSERT IGNORE INTO `hlstats_Options_Choices`');
+$versionUpdate = strpos($updater81, "`keyname` = 'version'");
+$dbversionUpdate = strpos($updater81, "`keyname` = 'dbversion'");
+assert_true(
+    $optionInsert !== false
+        && $choiceInsert !== false
+        && $versionUpdate !== false
+        && $dbversionUpdate !== false
+        && $optionInsert < $choiceInsert
+        && $choiceInsert < $versionUpdate
+        && $versionUpdate < $dbversionUpdate
+        && strrpos($updater81, '$db->query(') < $dbversionUpdate,
+    'updater 81 should finish with dbversion after schema and rollout data'
+);
+assert_contains("('HeatmapExplorerBeta', '0', 2)", $updater81, 'updater 81 should insert the beta rollout flag idempotently');
+foreach (array(
+    "('HeatmapExplorerBeta', '0', 'Off', 1)",
+    "('HeatmapExplorerBeta', '1', 'Opt-in', 0)",
+    "('HeatmapExplorerBeta', '2', 'Default', 0)",
+) as $choice) {
+    assert_contains($choice, $updater81, 'updater 81 should insert each beta choice idempotently');
+}
+
 assert_same('de_dust2', heatmap_clean_token('de_dust2'), 'valid map token should pass');
 assert_same('$2000$', heatmap_clean_token('$2000$'), 'dollar map token should pass');
 assert_same('', heatmap_clean_token('../de_dust2'), 'path-ish map token should be rejected');
