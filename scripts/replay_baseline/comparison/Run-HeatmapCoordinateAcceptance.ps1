@@ -93,7 +93,7 @@ function Assert-UnoccupiedDisposableTarget {
 
 function Wait-ForDisposableDatabase {
     for ($attempt = 1; $attempt -le 60; $attempt++) {
-        $discardedOutput = @(& docker exec -e "MARIADB_PWD=$script:dbPassword" $script:containerName `
+        $discardedOutput = @(& docker exec -e "MYSQL_PWD=$script:dbPassword" $script:containerName `
                 mariadb-admin --protocol=socket -u $script:dbUsername ping 2>&1)
         if ($LASTEXITCODE -eq 0) {
             return
@@ -106,7 +106,7 @@ function Wait-ForDisposableDatabase {
 function Invoke-DatabaseRows {
     param([Parameter(Mandatory = $true)][string]$Sql)
 
-    $rows = @($Sql | & docker exec -i -e "MARIADB_PWD=$script:dbPassword" $script:containerName `
+    $rows = @($Sql | & docker exec -i -e "MYSQL_PWD=$script:dbPassword" $script:containerName `
             mariadb --protocol=socket -u $script:dbUsername --batch --skip-column-names $script:dbName 2>&1)
     if ($LASTEXITCODE -ne 0) {
         throw "A coordinate assertion database command failed."
@@ -114,52 +114,27 @@ function Invoke-DatabaseRows {
     return @($rows | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ -ne "" })
 }
 
-function Resolve-FragColumn {
-    param([Parameter(Mandatory = $true)][string[]]$Candidates)
-
-    foreach ($candidate in $Candidates) {
-        if ($script:fragColumns -contains $candidate) {
-            return $candidate
-        }
-    }
-    throw "Required heatmap coordinate column is missing."
-}
-
 function Get-FragCoordinates {
     param(
         [Parameter(Mandatory = $true)][string]$KillerUniqueId,
         [Parameter(Mandatory = $true)][string]$VictimUniqueId,
         [Parameter(Mandatory = $true)][string]$Weapon,
-        [switch]$Headshot,
-        [switch]$Suicide
+        [switch]$Headshot
     )
 
     $coordinateProjection = @"
 CONCAT_WS('|',
-  COALESCE(CAST(frag.$($script:killerX) AS CHAR), 'NULL'),
-  COALESCE(CAST(frag.$($script:killerY) AS CHAR), 'NULL'),
-  COALESCE(CAST(frag.$($script:killerZ) AS CHAR), 'NULL'),
-  COALESCE(CAST(frag.$($script:victimX) AS CHAR), 'NULL'),
-  COALESCE(CAST(frag.$($script:victimY) AS CHAR), 'NULL'),
-  COALESCE(CAST(frag.$($script:victimZ) AS CHAR), 'NULL')
+  COALESCE(CAST(frag.pos_x AS CHAR), 'NULL'),
+  COALESCE(CAST(frag.pos_y AS CHAR), 'NULL'),
+  COALESCE(CAST(frag.pos_z AS CHAR), 'NULL'),
+  COALESCE(CAST(frag.pos_victim_x AS CHAR), 'NULL'),
+  COALESCE(CAST(frag.pos_victim_y AS CHAR), 'NULL'),
+  COALESCE(CAST(frag.pos_victim_z AS CHAR), 'NULL')
 )
 "@
     $killerId = $KillerUniqueId.Replace("'", "''")
     $victimId = $VictimUniqueId.Replace("'", "''")
     $weaponName = $Weapon.Replace("'", "''")
-
-    if ($Suicide) {
-        $sql = @"
-SELECT $coordinateProjection
-FROM hlstats_Events_Frags AS frag
-INNER JOIN hlstats_Players AS victim ON victim.playerId = frag.victimId
-WHERE victim.uniqueId = '$victimId'
-  AND frag.weapon = '$weaponName'
-  AND frag.suicide = 1
-ORDER BY frag.eventId
-"@
-        return Invoke-DatabaseRows -Sql $sql
-    }
 
     $headshotPredicate = if ($Headshot) { "AND frag.headshot = 1" } else { "" }
     $sql = @"
@@ -171,7 +146,31 @@ WHERE killer.uniqueId = '$killerId'
   AND victim.uniqueId = '$victimId'
   AND frag.weapon = '$weaponName'
   $headshotPredicate
-ORDER BY frag.eventId
+ORDER BY frag.id
+"@
+    return Invoke-DatabaseRows -Sql $sql
+}
+
+function Get-SuicideCoordinates {
+    param(
+        [Parameter(Mandatory = $true)][string]$VictimUniqueId,
+        [Parameter(Mandatory = $true)][string]$Weapon
+    )
+
+    $victimId = $VictimUniqueId.Replace("'", "''")
+    $weaponName = $Weapon.Replace("'", "''")
+    $sql = @"
+SELECT CONCAT_WS('|',
+  'NULL', 'NULL', 'NULL',
+  COALESCE(CAST(suicide.pos_x AS CHAR), 'NULL'),
+  COALESCE(CAST(suicide.pos_y AS CHAR), 'NULL'),
+  COALESCE(CAST(suicide.pos_z AS CHAR), 'NULL')
+)
+FROM hlstats_Events_Suicides AS suicide
+INNER JOIN hlstats_Players AS victim ON victim.playerId = suicide.playerId
+WHERE victim.uniqueId = '$victimId'
+  AND suicide.weapon = '$weaponName'
+ORDER BY suicide.id
 "@
     return Invoke-DatabaseRows -Sql $sql
 }
@@ -207,7 +206,7 @@ try {
     Invoke-CheckedDocker -Arguments @(
         "run", "--rm", "--network", "container:$containerName",
         "-v", "${absoluteDumpPath}:/dump.sql.gz:ro",
-        "-e", "MARIADB_PWD=$rootPassword",
+        "-e", "MYSQL_PWD=$rootPassword",
         "mariadb:10.11", "sh", "-c",
         "gunzip -c /dump.sql.gz | mariadb --protocol=TCP -h 127.0.0.1 -u root $dbName"
     ) -FailureMessage "Fresh disposable baseline restore failed."
@@ -220,32 +219,23 @@ try {
         throw "Fixture import failed."
     }
 
-    $fragColumns = @(Invoke-DatabaseRows -Sql @"
-SELECT COLUMN_NAME
-FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'hlstats_Events_Frags'
-ORDER BY ORDINAL_POSITION
-"@)
-    $killerX = Resolve-FragColumn -Candidates @("killerX", "killer_x", "attackerX", "attacker_x")
-    $killerY = Resolve-FragColumn -Candidates @("killerY", "killer_y", "attackerY", "attacker_y")
-    $killerZ = Resolve-FragColumn -Candidates @("killerZ", "killer_z", "attackerZ", "attacker_z")
-    $victimX = Resolve-FragColumn -Candidates @("victimX", "victim_x")
-    $victimY = Resolve-FragColumn -Candidates @("victimY", "victim_y")
-    $victimZ = Resolve-FragColumn -Candidates @("victimZ", "victim_z")
-
     $coordinateCases = @(
-        [ordered]@{ name = "shipped_cstrike_distinct"; killer = "STEAM_1:0:900001"; victim = "STEAM_1:0:900002"; weapon = "ak47"; headshot = $true; suicide = $false; expected = "101|202|303|404|505|606" },
-        [ordered]@{ name = "sourcemod_suicide_victim_only"; killer = "STEAM_1:0:900003"; victim = "STEAM_1:0:900003"; weapon = "worldspawn"; headshot = $false; suicide = $true; expected = "NULL|NULL|NULL|707|808|909" },
-        [ordered]@{ name = "staged_pair_consumed_once"; killer = "STEAM_1:0:900004"; victim = "STEAM_1:0:900005"; weapon = "m4a1"; headshot = $false; suicide = $false; expected = "1001|1002|1003|1101|1102|1103" },
-        [ordered]@{ name = "staged_pair_not_reused"; killer = "STEAM_1:0:900006"; victim = "STEAM_1:0:900007"; weapon = "m4a1"; headshot = $false; suicide = $false; expected = "NULL|NULL|NULL|NULL|NULL|NULL" },
-        [ordered]@{ name = "source_boundary_clears_staged_pair"; killer = "STEAM_1:0:900008"; victim = "STEAM_1:0:900009"; weapon = "m4a1"; headshot = $false; suicide = $false; expected = "NULL|NULL|NULL|NULL|NULL|NULL" }
+        [ordered]@{ name = "shipped_cstrike_distinct"; source = "frag"; killer = "STEAM_1:0:900001"; victim = "STEAM_1:0:900002"; weapon = "ak47"; headshot = $true; expected = "101|202|303|404|505|606" },
+        [ordered]@{ name = "sourcemod_suicide_victim_only"; source = "suicide"; victim = "STEAM_1:0:900003"; weapon = "worldspawn"; expected = "NULL|NULL|NULL|707|808|909" },
+        [ordered]@{ name = "staged_pair_consumed_once"; source = "frag"; killer = "STEAM_1:0:900004"; victim = "STEAM_1:0:900005"; weapon = "m4a1"; headshot = $false; expected = "1001|1002|1003|1101|1102|1103" },
+        [ordered]@{ name = "staged_pair_not_reused"; source = "frag"; killer = "STEAM_1:0:900006"; victim = "STEAM_1:0:900007"; weapon = "m4a1"; headshot = $false; expected = "NULL|NULL|NULL|NULL|NULL|NULL" },
+        [ordered]@{ name = "source_boundary_clears_staged_pair"; source = "frag"; killer = "STEAM_1:0:900008"; victim = "STEAM_1:0:900009"; weapon = "m4a1"; headshot = $false; expected = "NULL|NULL|NULL|NULL|NULL|NULL" }
     )
 
     $rowCounts = [ordered]@{}
     $assertedCoordinateTuples = [ordered]@{}
     foreach ($case in $coordinateCases) {
-        $rows = @(Get-FragCoordinates -KillerUniqueId $case.killer -VictimUniqueId $case.victim `
-                -Weapon $case.weapon -Headshot:$case.headshot -Suicide:$case.suicide)
+        $rows = if ($case.source -eq "suicide") {
+            @(Get-SuicideCoordinates -VictimUniqueId $case.victim -Weapon $case.weapon)
+        } else {
+            @(Get-FragCoordinates -KillerUniqueId $case.killer -VictimUniqueId $case.victim `
+                    -Weapon $case.weapon -Headshot:$case.headshot)
+        }
         if ($rows.Count -ne 1 -or $rows[0] -ne $case.expected) {
             throw "Coordinate assertion failed."
         }

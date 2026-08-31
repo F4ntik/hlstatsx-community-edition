@@ -48,7 +48,23 @@ def test_coordinate_acceptance_runner_fixture_and_ci_source_contracts() -> None:
     assert "Get-FileHash" in runner
     assert "python -m hlstats_py.runtime" in runner
     assert "--stdin" in runner
+    assert "MYSQL_PWD" in runner
+    assert "MARIADB_PWD" not in runner
     assert "hlstats_Events_Frags" in runner
+    assert "hlstats_Events_Suicides" in runner
+    for canonical_position_column in (
+        "frag.pos_x",
+        "frag.pos_y",
+        "frag.pos_z",
+        "frag.pos_victim_x",
+        "frag.pos_victim_y",
+        "frag.pos_victim_z",
+    ):
+        assert canonical_position_column in runner
+    assert "ORDER BY frag.id" in runner
+    assert "ORDER BY suicide.id" in runner
+    for invalid_frag_field in ("frag.suicide", "frag.eventId"):
+        assert invalid_frag_field not in runner
     assert "fixture_sha256" in runner
     assert "row_counts" in runner
     assert "asserted_coordinate_tuples" in runner
