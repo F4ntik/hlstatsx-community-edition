@@ -65,6 +65,41 @@ def test_parse_kill_event():
     assert event.properties.get("headshot") is True
 
 
+def test_parse_shipped_cstrike_kill_positions() -> None:
+    event = parse_log_event(
+        'L 01/02/2024 - 03:04:05: "Alice<2><STEAM_1:2><CT>" killed '
+        '"Bob<3><STEAM_1:3><TERRORIST>" with "ak47" (headshot) '
+        '(attacker_position "1 2 3") (victim_position "4 5 6")'
+    )
+
+    assert event.properties["attacker_position"] == "1 2 3"
+    assert event.properties["victim_position"] == "4 5 6"
+    assert event.properties["headshot"] is True
+
+
+def test_parse_inline_setpos_exact_kill_positions() -> None:
+    event = parse_log_event(
+        'L 01/02/2024 - 03:04:05: "Alice<2><STEAM_1:2><CT>" killed '
+        '"Bob<3><STEAM_1:3><TERRORIST>" with "ak47" '
+        'setpos_exact 1.5 -2.5 3.5 [4 5 6]'
+    )
+
+    assert event.properties["attacker_position"] == "2 -3 4"
+    assert event.properties["victim_position"] == "4 5 6"
+
+
+@pytest.mark.parametrize("position", ["8388607.6 0 0", "-8388608.6 0 0"])
+def test_parse_inline_setpos_exact_rejects_after_rounding_out_of_mediumint(
+    position: str,
+) -> None:
+    event = parse_log_event(
+        'L 01/02/2024 - 03:04:05: "Alice<2><STEAM_1:2><CT>" killed '
+        f'"Bob<3><STEAM_1:3><TERRORIST>" with "ak47" setpos_exact {position}'
+    )
+
+    assert "attacker_position" not in event.properties
+
+
 def test_parse_trigger_event():
     payload = (
         "L 06/15/2023 - 10:16:00: "

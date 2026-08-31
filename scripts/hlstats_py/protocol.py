@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, auto
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import hashlib
 import re
 from types import MappingProxyType
@@ -45,6 +46,24 @@ _WORLD_TRIGGER_RE = re.compile(r'^World triggered "(?P<action>[^"]+)"(?P<propert
 _TEAM_TRIGGER_RE = re.compile(
     r'^Team "(?P<team>[^"]+)" triggered "(?P<action>[^"]+)"(?P<properties>.*)$'
 )
+_INTEGER_RE = re.compile(r"^[+-]?\d+$")
+_INLINE_NUMBER = r"[+-]?(?:\d+(?:\.\d*)?|\.\d+|nan|inf(?:inity)?)"
+_INLINE_SETPOSE_RE = re.compile(
+    rf"\bsetpos_exact\b\s*(?:[:=]\s*)?(?:[\(\[\"']\s*)?"
+    rf"(?P<x>{_INLINE_NUMBER})[\s,]+(?P<y>{_INLINE_NUMBER})[\s,]+"
+    rf"(?P<z>{_INLINE_NUMBER})(?:\s*[\)\]\"'])?"
+    rf"(?!\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+))",
+    re.IGNORECASE,
+)
+_INLINE_BRACKET_RE = re.compile(
+    rf"\[\s*(?P<x>{_INLINE_NUMBER})[\s,]+(?P<y>{_INLINE_NUMBER})[\s,]+"
+    rf"(?P<z>{_INLINE_NUMBER})\s*\]",
+    re.IGNORECASE,
+)
+_MEDIUMINT_MIN = -(1 << 23)
+_MEDIUMINT_MAX = (1 << 23) - 1
+
+Position = tuple[int, int, int]
 
 
 def _is_exact_entry_remainder(remainder: str) -> bool:
@@ -425,6 +444,110 @@ def _parse_properties(text: str) -> Mapping[str, tuple[str, ...] | str | bool]:
     return MappingProxyType(dict(properties))
 
 
+def _parse_position_triplet(value: object) -> Position | None:
+    """Parse a strict integer XYZ triplet within MySQL signed MEDIUMINT."""
+
+    if isinstance(value, str):
+        parts: list[object] = value.split()
+    elif isinstance(value, (list, tuple)):
+        parts = list(value)
+    else:
+        return None
+    if len(parts) != 3:
+        return None
+
+    coordinates: list[int] = []
+    for part in parts:
+        if isinstance(part, bool):
+            return None
+        if isinstance(part, int):
+            coordinate = part
+        elif isinstance(part, str) and _INTEGER_RE.fullmatch(part.strip()):
+            coordinate = int(part.strip())
+        else:
+            return None
+        if not _MEDIUMINT_MIN <= coordinate <= _MEDIUMINT_MAX:
+            return None
+        coordinates.append(coordinate)
+    return coordinates[0], coordinates[1], coordinates[2]
+
+
+def _parse_inline_coordinate(value: str, *, allow_fraction: bool) -> int | None:
+    try:
+        decimal_value = Decimal(value)
+    except (InvalidOperation, ValueError):
+        return None
+    if not decimal_value.is_finite():
+        return None
+    if not allow_fraction and decimal_value != decimal_value.to_integral_value():
+        return None
+    rounded = decimal_value.to_integral_value(rounding=ROUND_HALF_UP)
+    coordinate = int(rounded)
+    if not _MEDIUMINT_MIN <= coordinate <= _MEDIUMINT_MAX:
+        return None
+    return coordinate
+
+
+def _inline_position(match: re.Match[str], *, allow_fraction: bool) -> Position | None:
+    coordinates = [
+        _parse_inline_coordinate(match.group(axis), allow_fraction=allow_fraction)
+        for axis in ("x", "y", "z")
+    ]
+    if any(coordinate is None for coordinate in coordinates):
+        return None
+    return coordinates[0], coordinates[1], coordinates[2]  # type: ignore[return-value]
+
+
+def _extract_inline_kill_positions(body: str) -> tuple[Position | None, Position | None]:
+    """Extract supported inline attacker/victim coordinates in source order."""
+
+    matches: list[tuple[int, int, Position | None]] = [
+        (match.start(), match.end(), _inline_position(match, allow_fraction=True))
+        for match in _INLINE_SETPOSE_RE.finditer(body)
+    ]
+    for match in _INLINE_BRACKET_RE.finditer(body):
+        if any(start < match.end() and match.start() < end for start, end, _ in matches):
+            continue
+        matches.append((match.start(), match.end(), _inline_position(match, allow_fraction=False)))
+    positions = [position for _start, _end, position in sorted(matches) if position is not None]
+    attacker = positions[0] if positions else None
+    victim = positions[1] if len(positions) > 1 else None
+    return attacker, victim
+
+
+def _format_position(position: Position) -> str:
+    return f"{position[0]} {position[1]} {position[2]}"
+
+
+def _normalize_position_properties(
+    properties: Mapping[str, tuple[str, ...] | str | bool],
+    *,
+    body: str,
+) -> Mapping[str, tuple[str, ...] | str | bool]:
+    """Canonicalize supported position properties while retaining invalid input."""
+
+    normalized: dict[str, tuple[str, ...] | str | bool] = dict(properties)
+    inline_attacker, inline_victim = _extract_inline_kill_positions(body)
+    for canonical, alias, inline in (
+        ("attacker_position", "killerpos", inline_attacker),
+        ("victim_position", "victimpos", inline_victim),
+    ):
+        if canonical in normalized:
+            position = _parse_position_triplet(normalized[canonical])
+            if position is not None:
+                normalized[canonical] = _format_position(position)
+            continue
+        if alias in normalized:
+            position = _parse_position_triplet(normalized[alias])
+            if position is not None:
+                normalized[alias] = _format_position(position)
+                normalized[canonical] = _format_position(position)
+            continue
+        if inline is not None:
+            normalized[canonical] = _format_position(inline)
+    return MappingProxyType(normalized)
+
+
 def _parse_kill_event(
     body: str,
     actor: PlayerDescriptor,
@@ -445,7 +568,10 @@ def _parse_kill_event(
         return _parse_generic_event(body, timestamp, raw, actor=actor)
 
     weapon = weapon_match.group("weapon")
-    properties = _parse_properties(weapon_match.group("properties"))
+    properties = _normalize_position_properties(
+        _parse_properties(weapon_match.group("properties")),
+        body=body,
+    )
 
     return LogEvent(
         event_type=LogEventType.KILL,
@@ -638,7 +764,10 @@ def _parse_suicide_event(
     if not weapon_match:
         return _parse_generic_event(body, timestamp, raw, actor=actor)
 
-    properties = _parse_properties(weapon_match.group("properties"))
+    properties = _normalize_position_properties(
+        _parse_properties(weapon_match.group("properties")),
+        body=body,
+    )
     return LogEvent(
         event_type=LogEventType.KILL,
         timestamp=timestamp,
@@ -654,7 +783,10 @@ def _parse_world_event(body: str, timestamp: datetime, raw: str) -> LogEvent:
     if not match:
         return _parse_generic_event(body, timestamp, raw)
 
-    properties = _parse_properties(match.group("properties"))
+    properties = _normalize_position_properties(
+        _parse_properties(match.group("properties")),
+        body=body,
+    )
     return LogEvent(
         event_type=LogEventType.WORLD_TRIGGER,
         timestamp=timestamp,

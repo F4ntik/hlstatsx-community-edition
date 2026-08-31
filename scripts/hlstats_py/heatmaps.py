@@ -1234,10 +1234,14 @@ def draw_hud(
     image = image.copy().convert("RGBA")
     draw = ImageDraw.Draw(image, "RGBA")
     font = load_font(font_path, config.font)
+    start_date = time.strftime(
+        "%m/%d/%y",
+        time.localtime(now - 60 * 60 * 24 * config.days),
+    )
+    end_date = time.strftime("%m/%d/%y", time.localtime(now))
     hud_text = [
         f"{map_name.upper()} - HLX:CE HEATMAP - TOTAL KILLS",
-        f"{time.strftime('%m/%d/%y', time.localtime(now - 60 * 60 * 24 * 30))} - "
-        f"{time.strftime('%m/%d/%y', time.localtime(now))}",
+        f"LEGACY ROLLING SNAPSHOT ({config.days} DAYS): {start_date} - {end_date}",
         f"Generated: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(now))}",
         hud_url,
     ]

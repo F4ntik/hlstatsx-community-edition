@@ -43,6 +43,7 @@ class RecordedMapTransition:
 class StubStorage:
     def __init__(self) -> None:
         self.recorded: list[RecordedEvent] = []
+        self.updates: list[object] = []
         self.map_transitions: list[RecordedMapTransition] = []
         self.reset_calls = 0
         self.finalize_calls = 0
@@ -69,6 +70,7 @@ class StubStorage:
         self.map_transitions.append(RecordedMapTransition(server_id=server_id, phase=phase, map_name=map_name))
 
     def record(self, update: object, context: object) -> None:
+        self.updates.append(update)
         event_code = getattr(update, "event_code")
         category = getattr(getattr(update, "category"), "value")
         server_id = getattr(context, "server_id")
@@ -587,6 +589,110 @@ def test_runtime_processes_stdin_line_for_known_server() -> None:
         )
     ]
     assert storage.finalize_calls == 1
+
+
+def test_runtime_killlocation_is_server_scoped_and_one_shot() -> None:
+    adapter = StubAdapter()
+    adapter.server_batches[0].append(
+        GameServer(
+            server_id=8,
+            address="127.0.0.2",
+            port=27015,
+            name="Inferno",
+            game="csgo",
+            current_map="de_inferno",
+        )
+    )
+    storage = StubStorage()
+    logger = ProxyLogger(LoggerConfig(stream=StringIO()))
+    runtime = HlstatsRuntime(adapter, ProxyUdpServer(logger), logger, build_dispatcher(), storage)
+    adapter.connect()
+    runtime._reload_state()
+
+    runtime.process_stdin_line(
+        'L 01/02/2024 - 03:00:00: World triggered "killlocation" '
+        '(attacker_position "10 20 30") (victim_position "40 50 60")',
+        "127.0.0.1:27015",
+    )
+    runtime.process_stdin_line(
+        'L 01/02/2024 - 03:00:01: "Alice<2><STEAM_1:2><CT>" killed '
+        '"Bob<3><STEAM_1:3><TERRORIST>" with "ak47"',
+        "127.0.0.2:27015",
+    )
+    runtime.process_stdin_line(
+        'L 01/02/2024 - 03:00:02: "Alice<2><STEAM_1:2><CT>" killed '
+        '"Bob<3><STEAM_1:3><TERRORIST>" with "ak47"',
+        "127.0.0.1:27015",
+    )
+    runtime.process_stdin_line(
+        'L 01/02/2024 - 03:00:03: "Alice<2><STEAM_1:2><CT>" killed '
+        '"Bob<3><STEAM_1:3><TERRORIST>" with "ak47"',
+        "127.0.0.1:27015",
+    )
+
+    kill_properties = [
+        update.attributes["properties"]
+        for update in storage.updates
+        if getattr(update, "event_code", None) == "ak47"
+    ]
+    assert "attacker_position" not in kill_properties[0]
+    assert kill_properties[1]["attacker_position"] == "10 20 30"
+    assert kill_properties[1]["victim_position"] == "40 50 60"
+    assert "attacker_position" not in kill_properties[2]
+    assert runtime._servers.get("127.0.0.1:27015").state.pending_kill_attacker is None
+
+
+def test_runtime_inline_positions_override_staged_killlocation() -> None:
+    adapter = StubAdapter()
+    storage = StubStorage()
+    logger = ProxyLogger(LoggerConfig(stream=StringIO()))
+    runtime = HlstatsRuntime(adapter, ProxyUdpServer(logger), logger, build_dispatcher(), storage)
+    adapter.connect()
+    runtime._reload_state()
+
+    runtime.process_stdin_line(
+        'L 01/02/2024 - 03:00:00: World triggered "killlocation" '
+        '(attacker_position "10 20 30") (victim_position "40 50 60")',
+        "127.0.0.1:27015",
+    )
+    runtime.process_stdin_line(
+        'L 01/02/2024 - 03:00:01: "Alice<2><STEAM_1:2><CT>" killed '
+        '"Bob<3><STEAM_1:3><TERRORIST>" with "ak47" '
+        '(attacker_position "70 80 90")',
+        "127.0.0.1:27015",
+    )
+
+    properties = storage.updates[-1].attributes["properties"]
+    assert properties["attacker_position"] == "70 80 90"
+    assert properties["victim_position"] == "40 50 60"
+
+
+def test_runtime_source_boundary_clears_staged_killlocation() -> None:
+    adapter = StubAdapter()
+    storage = StubStorage()
+    logger = ProxyLogger(LoggerConfig(stream=StringIO()))
+    runtime = HlstatsRuntime(adapter, ProxyUdpServer(logger), logger, build_dispatcher(), storage)
+    adapter.connect()
+    runtime._reload_state()
+
+    runtime.process_stdin_line(
+        'L 01/02/2024 - 03:00:00: World triggered "killlocation" '
+        '(attacker_position "10 20 30") (victim_position "40 50 60")',
+        "127.0.0.1:27015",
+    )
+    runtime.process_stdin_line(
+        "L 01/02/2024 - 03:00:01: Log file started",
+        "127.0.0.1:27015",
+    )
+    runtime.process_stdin_line(
+        'L 01/02/2024 - 03:00:02: "Alice<2><STEAM_1:2><CT>" killed '
+        '"Bob<3><STEAM_1:3><TERRORIST>" with "ak47"',
+        "127.0.0.1:27015",
+    )
+
+    properties = storage.updates[-1].attributes["properties"]
+    assert "attacker_position" not in properties
+    assert "victim_position" not in properties
 
 
 def test_runtime_marks_only_exact_log_file_started_boundary() -> None:

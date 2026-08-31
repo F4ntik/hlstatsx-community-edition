@@ -16,7 +16,7 @@ from hlx_core import db as proxy_db
 from .event_buffer import BufferPolicy, EventBuffer
 from .events import EventCategory, EventContext, EventUpdate
 from .frag_write_delta_buffer import FragWriteDeltaBuffer
-from .protocol import PlayerDescriptor
+from .protocol import PlayerDescriptor, Position, _parse_position_triplet
 from .runtime_decisions import (
     canonical_unique_id,
     is_transient_unique_id,
@@ -1125,12 +1125,8 @@ class EventStorage:
         killer_role = self._extract_role(update.actor)
         victim_role = self._extract_role(update.target)
         properties = update.attributes.get("properties")
-        attacker_position = self._parse_position(
-            properties.get("attacker_position") if isinstance(properties, Mapping) else None
-        )
-        victim_position = self._parse_position(
-            properties.get("victim_position") if isinstance(properties, Mapping) else None
-        )
+        attacker_position = self._resolve_position(properties, "attacker_position", "killerpos")
+        victim_position = self._resolve_position(properties, "victim_position", "victimpos")
         is_suicide = bool(update.attributes.get("is_suicide"))
         if killer_id is not None and victim_id is not None and killer_id == victim_id:
             is_suicide = True
@@ -1155,12 +1151,12 @@ class EventStorage:
                 processed_at=processed_at,
                 player_id=victim_id,
                 weapon_code=update.event_code,
-                position=attacker_position,
+                position=victim_position or attacker_position or (None, None, None),
             )
             return
 
-        if headshot:
-            attacker_position = (None, None, None)
+        attacker_position = attacker_position or (None, None, None)
+        victim_position = victim_position or (None, None, None)
 
         killer_team = self._effective_player_team(killer_id, update.actor)
         victim_team = self._effective_player_team(victim_id, update.target)
@@ -3719,16 +3715,26 @@ class EventStorage:
             return ""
         return descriptor.additional_tokens[0]
 
-    def _parse_position(self, value: Any) -> tuple[int | None, int | None, int | None]:
-        if not isinstance(value, str):
-            return (None, None, None)
-        parts = value.split()
-        if len(parts) != 3:
-            return (None, None, None)
-        try:
-            return (int(parts[0]), int(parts[1]), int(parts[2]))
-        except ValueError:
-            return (None, None, None)
+    def _resolve_position(
+        self,
+        properties: object,
+        canonical: str,
+        alias: str,
+    ) -> Position | None:
+        if not isinstance(properties, Mapping):
+            return None
+        if canonical in properties:
+            value = properties[canonical]
+        elif alias in properties:
+            value = properties[alias]
+        else:
+            return None
+        if value is None:
+            return None
+        position = _parse_position_triplet(value)
+        if position is None:
+            raise StorageError(f"invalid {canonical} position: {value!r}")
+        return position
 
     def _execute(
         self,

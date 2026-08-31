@@ -14,6 +14,7 @@ from hlstats_py.heatmaps import (
     build_points_query,
     collect_projection_stats,
     crop_image,
+    draw_hud,
     effective_image_size,
     load_settings,
     normalize_crop,
@@ -304,6 +305,32 @@ def test_apply_brush_opacity_handles_fully_opaque_pixels() -> None:
     assert adjusted.size == brush.size
     assert adjusted.getpixel((0, 0))[3] <= 255
     assert adjusted.getpixel((1, 0))[3] <= 255
+
+
+def test_draw_hud_labels_the_configured_legacy_rolling_days(monkeypatch) -> None:
+    captured: list[str] = []
+
+    class FakeDraw:
+        def rectangle(self, *args, **kwargs) -> None:
+            return None
+
+        def text(self, _position, text: str, **kwargs) -> None:
+            captured.append(text)
+
+    monkeypatch.setattr("hlstats_py.heatmaps.ImageDraw.Draw", lambda *args: FakeDraw())
+    monkeypatch.setattr("hlstats_py.heatmaps.load_font", lambda *args: object())
+    config = replace(_make_config(), days=7)
+
+    draw_hud(
+        Image.new("RGBA", (120, 80)),
+        "de_dust2",
+        config,
+        hud_url="https://example.invalid",
+        font_path=Path("missing.ttf"),
+        now=1_735_689_600.0,
+    )
+
+    assert any("LEGACY ROLLING SNAPSHOT (7 DAYS)" in text for text in captured)
 
 
 def test_heatmap_generator_writes_legacy_outputs_and_cache(tmp_path: Path) -> None:

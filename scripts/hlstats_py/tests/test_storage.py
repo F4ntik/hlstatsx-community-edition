@@ -81,6 +81,7 @@ from hlstats_py.storage import (
     _UPSERT_MAP_COUNTS_QUERY,
     _UPSERT_WEAPON_QUERY,
     EventStorage,
+    StorageError,
 )
 
 _UPDATE_SERVER_SUICIDE_TOTALS_QUERY = "UPDATE hlstats_Servers SET `suicides` = `suicides` + 1 WHERE `serverId` = %s"
@@ -1674,7 +1675,7 @@ def test_record_frag_persists_attacker_and_victim_positions(
     ) in connection.executed
 
 
-def test_record_headshot_frag_matches_legacy_attacker_position_behavior(
+def test_record_headshot_frag_preserves_attacker_and_victim_positions(
     dispatcher: EventDispatcher,
     event_context: EventContext,
 ) -> None:
@@ -1706,14 +1707,72 @@ def test_record_headshot_frag_matches_legacy_attacker_position_behavior(
             1,
             "",
             "",
-            None,
-            None,
-            None,
+            1,
+            2,
+            3,
             4,
             5,
             6,
         ),
     ) in connection.executed
+
+
+def test_record_suicide_prefers_victim_position_then_attacker_position(
+    event_context: EventContext,
+) -> None:
+    dispatcher = EventDispatcher([KillEventHandler()])
+    events = (
+        (
+            'L 01/02/2024 - 03:04:05: "Alice<2><STEAM_1:2><CT>" committed suicide '
+            'with "worldspawn" (victim_position "4 5 6")',
+            (4, 5, 6),
+        ),
+        (
+            'L 01/02/2024 - 03:04:05: "Alice<2><STEAM_1:2><CT>" committed suicide '
+            'with "worldspawn" (attacker_position "1 2 3")',
+            (1, 2, 3),
+        ),
+    )
+
+    for payload, position in events:
+        update = dispatcher.dispatch(parse_log_event(payload), event_context)
+        responses: Dict[QueryKey, List[QueryResponse]] = {
+            (_PLAYER_BY_UNIQUE_QUERY, ("STEAM_1:2", "csgo")): [QueryResponse(fetchone=(101,))],
+            (_SELECT_SERVER_CONFIG_QUERY, (7, "MinPlayers")): [QueryResponse(fetchone=(0,))],
+        }
+        connection = FakeConnection(responses)
+        storage = EventStorage(StubAdapter(connection), clock=lambda: update.timestamp)
+
+        storage.record(update, event_context)
+
+        assert (
+            _INSERT_SUICIDE_QUERY,
+            (update.timestamp, 7, "de_dust2", 101, "worldspawn", *position),
+        ) in connection.executed
+
+
+@pytest.mark.parametrize("position", ["1 2", "8388608 0 0"])
+def test_record_frag_rejects_malformed_and_out_of_mediumint_positions(
+    dispatcher: EventDispatcher,
+    event_context: EventContext,
+    position: str,
+) -> None:
+    event = parse_log_event(
+        'L 01/02/2024 - 03:04:05: "Alice<2><STEAM_1:2><CT>" killed '
+        f'"Bob<3><STEAM_1:3><TERRORIST>" with "ak47" (attacker_position "{position}")'
+    )
+    update = dispatcher.dispatch(event, event_context)
+    responses: Dict[QueryKey, List[QueryResponse]] = {
+        (_PLAYER_BY_UNIQUE_QUERY, ("STEAM_1:2", "csgo")): [QueryResponse(fetchone=(101,))],
+        (_PLAYER_BY_UNIQUE_QUERY, ("STEAM_1:3", "csgo")): [QueryResponse(fetchone=(102,))],
+    }
+    connection = FakeConnection(responses)
+    storage = EventStorage(StubAdapter(connection), clock=lambda: update.timestamp)
+
+    with pytest.raises(StorageError, match="position"):
+        storage.record(update, event_context)
+
+    assert all(query != _INSERT_FRAG_QUERY for query, _params in connection.executed)
 
 
 def test_connect_event_updates_last_known_address(event_context: EventContext) -> None:
@@ -3342,7 +3401,7 @@ def test_teamkill_records_teamkill_event_and_penalty(
     assert all(query != _INSERT_FRAG_QUERY for query, _params in connection.executed)
     assert (
         _INSERT_TEAMKILL_QUERY,
-        (update.timestamp, 7, "de_dust2", 101, 102, "ak47", None, None, None, 4, 5, 6),
+        (update.timestamp, 7, "de_dust2", 101, 102, "ak47", 1, 2, 3, 4, 5, 6),
     ) in connection.executed
     assert (_UPDATE_PLAYER_TEAMKILLS_QUERY, (101,)) in connection.executed
     assert (_UPDATE_PLAYER_SKILL_QUERY, (-25, 101)) in connection.executed

@@ -12,7 +12,7 @@ import threading
 import time
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from math import isfinite
 from types import MappingProxyType
@@ -43,7 +43,13 @@ from . import (
 )
 from .cli import load_settings
 from .goldsrc_physical_lines import iter_merged_goldsrc_physical_lines
-from .protocol import ControlCommand, ControlCommandType, LogEvent, LogEventType
+from .protocol import (
+    ControlCommand,
+    ControlCommandType,
+    LogEvent,
+    LogEventType,
+    _parse_position_triplet,
+)
 
 
 class SupportsWorkerAdapter(Protocol):
@@ -145,17 +151,25 @@ class RuntimeMapState:
     map_lifecycle: str = "active"
     pending_map: str = ""
     round_status: int = 0
+    pending_kill_attacker: tuple[int, int, int] | None = None
+    pending_kill_victim: tuple[int, int, int] | None = None
 
     def apply_started(self, map_name: str) -> None:
         self.current_map = map_name
         self.pending_map = ""
         self.map_lifecycle = "started"
+        self.clear_pending_killlocation()
 
     def apply_loading(self, map_name: str) -> None:
         self.pending_map = map_name
         if not self.current_map:
             self.current_map = map_name
         self.map_lifecycle = "loading"
+        self.clear_pending_killlocation()
+
+    def clear_pending_killlocation(self) -> None:
+        self.pending_kill_attacker = None
+        self.pending_kill_victim = None
 
 
 @dataclass(slots=True)
@@ -992,6 +1006,56 @@ class HlstatsRuntime:
             f"Reloaded worker configuration: {len(self._servers.format_server_list().splitlines()) - 1} servers"
         )
 
+    @staticmethod
+    def _position_property(
+        properties: Mapping[str, object],
+        canonical: str,
+        alias: str,
+    ) -> tuple[int, int, int] | None:
+        value = properties.get(canonical) if canonical in properties else properties.get(alias)
+        return _parse_position_triplet(value)
+
+    @staticmethod
+    def _format_position(position: tuple[int, int, int]) -> str:
+        return f"{position[0]} {position[1]} {position[2]}"
+
+    @staticmethod
+    def _clear_pending_killlocation(server: TrackedServer) -> None:
+        server.state.clear_pending_killlocation()
+
+    def _stage_killlocation(self, event: LogEvent, server: TrackedServer) -> None:
+        if event.event_type is not LogEventType.WORLD_TRIGGER or event.action != "killlocation":
+            return
+        properties = event.properties
+        server.state.pending_kill_attacker = self._position_property(
+            properties, "attacker_position", "killerpos"
+        )
+        server.state.pending_kill_victim = self._position_property(
+            properties, "victim_position", "victimpos"
+        )
+
+    def _apply_staged_killlocation(self, event: LogEvent, server: TrackedServer) -> LogEvent:
+        if event.event_type is not LogEventType.KILL:
+            return event
+        properties = dict(event.properties)
+        if (
+            "attacker_position" not in properties
+            and "killerpos" not in properties
+            and server.state.pending_kill_attacker is not None
+        ):
+            properties["attacker_position"] = self._format_position(
+                server.state.pending_kill_attacker
+            )
+        if (
+            "victim_position" not in properties
+            and "victimpos" not in properties
+            and server.state.pending_kill_victim is not None
+        ):
+            properties["victim_position"] = self._format_position(server.state.pending_kill_victim)
+        if properties == dict(event.properties):
+            return event
+        return replace(event, properties=MappingProxyType(properties))
+
     def _worker_reload(self, operation_fence: _StorageOperationFence) -> None:
         self._require_storage_executor_owner("_worker_reload")
         self._raise_if_storage_operation_cancelled(operation_fence)
@@ -1125,10 +1189,37 @@ class HlstatsRuntime:
             backend=self._parser_backend,
             server_address=source_label,
         )
+        is_kill = event.event_type is LogEventType.KILL
+        if event.event_type is LogEventType.GENERIC and event.message == "Log file started":
+            self._clear_pending_killlocation(server)
+        self._stage_killlocation(event, server)
+        if is_kill:
+            try:
+                event = self._apply_staged_killlocation(event, server)
+                round_status_for_event = self._round_status_for_event(event, server)
+                transition = apply_map_lifecycle_message(server, event.message)
+                if transition is not None:
+                    self._clear_pending_killlocation(server)
+                context = EventContext(
+                    server_id=server.server_id,
+                    game=server.game,
+                    extras=MappingProxyType(
+                        {
+                            "map": server.current_map or "",
+                            "round_status": round_status_for_event,
+                        }
+                    ),
+                )
+                update = self._dispatcher.dispatch(event, context)
+                return event, transition, context, update, round_status_for_event
+            finally:
+                self._clear_pending_killlocation(server)
         if event.event_type is LogEventType.WORLD_TRIGGER:
             self._project_round_status(event, server)
         round_status_for_event = self._round_status_for_event(event, server)
         transition = apply_map_lifecycle_message(server, event.message)
+        if transition is not None:
+            self._clear_pending_killlocation(server)
         context = EventContext(
             server_id=server.server_id,
             game=server.game,
