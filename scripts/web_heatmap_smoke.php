@@ -531,4 +531,305 @@ assert_throws('invalid_floor_config', function () use ($floorConfig): void {
     heatmap_merge_config_override($floorConfig, array('floors_json' => '{"not":"a list"}'));
 }, 'config merge should fail closed for invalid floor storage');
 
+function scene_query(array $overrides = array()): array
+{
+    return array_merge(array(
+        'game' => 'cstrike',
+        'map' => 'de_dust2',
+        'player' => 42,
+        'from' => 1700000000,
+        'to' => 1700003600,
+        'event' => 'both',
+        'lens' => 'overview',
+        'floor' => 'all',
+        'lang' => 'en',
+    ), $overrides);
+}
+
+function scene_config(array $overrides = array()): array
+{
+    return array_merge(array(
+        'code' => 'cstrike',
+        'game' => 'cstrike',
+        'realgame' => 'cstrike',
+        'map' => 'de_dust2',
+        'xoffset' => 0,
+        'yoffset' => 0,
+        'flipx' => 0,
+        'flipy' => 0,
+        'rotate' => 0,
+        'scale' => 1,
+        'cropx1' => 0,
+        'cropy1' => 0,
+        'cropx2' => 0,
+        'cropy2' => 0,
+        'floors' => array(
+            floor_fixture('lower', 0, 10, 'Lower', 'Lower'),
+            floor_fixture('upper', 10, 20, 'Upper', 'Upper'),
+        ),
+    ), $overrides);
+}
+
+function scene_image(array $overrides = array()): array
+{
+    return array_merge(array(
+        'url' => './hlstatsimg/games/cstrike/maps/de_dust2.jpg',
+        'width' => 128,
+        'height' => 128,
+    ), $overrides);
+}
+
+function scene_row(array $overrides = array()): array
+{
+    return array_merge(array(
+        'eventId' => '1',
+        'eventTime' => '2026-01-01 00:00:00',
+        'killerId' => '42',
+        'victimId' => '84',
+        'weapon' => 'ak47',
+        'headshot' => '0',
+        'teamkill' => '0',
+        'attackerX' => '8',
+        'attackerY' => '8',
+        'attackerZ' => '5',
+        'victimX' => '12',
+        'victimY' => '4',
+        'victimZ' => '15',
+    ), $overrides);
+}
+
+function scene_payload(array $rows, array $query = array(), array $config = array(), array $image = array()): array
+{
+    $state = array(
+        'query' => scene_query($query),
+        'config' => scene_config($config),
+        'image' => scene_image($image),
+        'excludedSuicides' => 2,
+    );
+    foreach ($rows as $row) {
+        heatmap_accumulate_scene_row($state, $row);
+    }
+
+    return heatmap_finalize_scene($state);
+}
+
+function scene_layer_row(array $rows, string $cell): array
+{
+    foreach ($rows as $row) {
+        if ($row[0] === $cell) {
+            return $row;
+        }
+    }
+
+    fwrite(STDERR, 'missing expected scene cell: ' . $cell . PHP_EOL);
+    exit(1);
+}
+
+function assert_float_close(float $expected, float $actual, string $message): void
+{
+    assert_true(abs($expected - $actual) < 0.000000001, $message);
+}
+
+$sceneSql = heatmap_build_scene_sql(scene_query(), scene_config());
+assert_same(250001, $sceneSql['limit'], 'scene SQL should retain exactly one overflow sentinel');
+assert_same(1, substr_count($sceneSql['sql'], 'UNION ALL'), 'scene SQL should union Frags and Teamkills exactly once');
+assert_same(1, substr_count($sceneSql['sql'], 'hlstats_Events_Frags'), 'scene SQL should select Frags exactly once');
+assert_same(1, substr_count($sceneSql['sql'], 'hlstats_Events_Teamkills'), 'scene SQL should select Teamkills exactly once');
+assert_contains('hef.map = :frags_map', $sceneSql['sql'], 'Frags branch should filter the exact map');
+assert_contains('hs.game = :frags_game', $sceneSql['sql'], 'Frags branch should filter the exact server game');
+assert_contains('hef.eventTime >= FROM_UNIXTIME(:frags_from)', $sceneSql['sql'], 'Frags branch should retain the half-open lower time boundary');
+assert_contains('hef.eventTime < FROM_UNIXTIME(:frags_to)', $sceneSql['sql'], 'Frags branch should retain the half-open upper time boundary');
+assert_contains('hef.eventTime >= FROM_UNIXTIME(:teamkills_from)', $sceneSql['sql'], 'Teamkills branch should use branch-specific lower-bound parameters');
+assert_contains('hef.eventTime < FROM_UNIXTIME(:teamkills_to)', $sceneSql['sql'], 'Teamkills branch should use branch-specific upper-bound parameters');
+assert_true(strpos($sceneSql['sql'], 'COALESCE(') === false, 'scene SQL should never substitute attacker coordinates for a victim');
+assert_true(strpos($sceneSql['sql'], 'killerId = :') === false, 'scene SQL should not pre-filter the personal kill lens');
+assert_true(strpos($sceneSql['sql'], 'victimId = :') === false, 'scene SQL should not pre-filter the personal death lens');
+assert_same(array(
+    'frags_map' => 'de_dust2',
+    'frags_game' => 'cstrike',
+    'frags_from' => 1700000000,
+    'frags_to' => 1700003600,
+    'teamkills_map' => 'de_dust2',
+    'teamkills_game' => 'cstrike',
+    'teamkills_from' => 1700000000,
+    'teamkills_to' => 1700003600,
+), $sceneSql['params'], 'scene SQL should expose every branch-specific bind parameter');
+assert_same(array(
+    'suicides_map' => 'de_dust2',
+    'suicides_game' => 'cstrike',
+    'suicides_from' => 1700000000,
+    'suicides_to' => 1700003600,
+), $sceneSql['suicides']['params'], 'suicide count should retain its own complete map/game/window bindings');
+assert_contains('COUNT(*) AS excludedSuicides', $sceneSql['suicides']['sql'], 'suicide count should be a separate aggregate query');
+assert_contains('hlstats_Events_Suicides', $sceneSql['suicides']['sql'], 'suicide count should query the suicide source table');
+assert_true(strpos($sceneSql['suicides']['sql'], 'playerId = :') === false, 'suicide count should be independent of the player lens');
+
+$bucketCases = array(
+    array('width' => 1, 'height' => 1, 'bucket' => 4),
+    array('width' => 512, 'height' => 128, 'bucket' => 4),
+    array('width' => 4096, 'height' => 2048, 'bucket' => 32),
+);
+foreach ($bucketCases as $case) {
+    assert_same(
+        $case['bucket'],
+        heatmap_scene_bucket_size($case['width'], $case['height']),
+        'scene bucket size should stay bounded for ' . $case['width'] . 'x' . $case['height']
+    );
+}
+assert_throws('invalid_image', function (): void {
+    heatmap_scene_bucket_size(0, 128);
+}, 'scene bucket builder should reject a non-positive image width');
+
+$bothPayload = scene_payload(array(scene_row(array('headshot' => '1', 'teamkill' => '1'))));
+assert_same('ok', $bothPayload['state'], 'one well-formed combat row should build an ok scene');
+assert_same(2, $bothPayload['summary']['excludedSuicides'], 'scene summary should retain separately counted suicides');
+assert_same(4, $bothPayload['grid']['bucketSize'], 'small scene images should use the minimum bucket size');
+assert_same(array('cell', 'x', 'y', 'kills', 'deaths'), $bothPayload['grid']['fields'], 'scene grids should expose stable compact layer fields');
+assert_same(
+    array(
+        array('c3.1', 3, 1, 0, 1),
+        array('c2.2', 2, 2, 1, 0),
+    ),
+    $bothPayload['layers']['total'],
+    'one combat row should contribute independently to victim deaths and attacker kills'
+);
+assert_same(array('c2.2', 2, 2, 1, 0), scene_layer_row($bothPayload['layers']['me'], 'c2.2'), 'personal kills should match killerId only');
+assert_same(array('c3.1', 3, 1, 0, 1), scene_layer_row($bothPayload['layers']['others'], 'c3.1'), 'others should retain compatible victim deaths');
+assert_same(1, $bothPayload['coverage']['sourceRows'], 'source row coverage should count one combat event');
+assert_same(2, $bothPayload['coverage']['candidate'], 'both channels should create two candidate contributions from one combat event');
+assert_same(2, $bothPayload['coverage']['validXY'], 'both participant coordinates should independently count as valid XY');
+assert_same(2, $bothPayload['coverage']['assigned'], 'both participant coordinates should independently assign a floor');
+assert_same(1.0, $bothPayload['coverage']['zCoverage'], 'fully assigned floor data should have complete Z coverage');
+assert_same(array('id', 'label', 'count', 'available'), array_keys($bothPayload['floors'][0]), 'floor metadata should never expose an asset token');
+assert_same('./hlstatsimg/games/cstrike/maps/de_dust2.jpg', $bothPayload['map']['image']['url'], 'all floors should share the validated map image');
+
+$deathPayload = scene_payload(array(scene_row(array(
+    'killerId' => '7',
+    'victimId' => '42',
+    'attackerX' => '4',
+    'attackerY' => '4',
+    'attackerZ' => '5',
+    'victimX' => '20',
+    'victimY' => '12',
+    'victimZ' => '5',
+))), scene_query(array('event' => 'deaths', 'lens' => 'me')));
+assert_same(array('c5.3', 5, 3, 0, 1), $deathPayload['layers']['me'][0], 'personal deaths should use victimId and victim coordinates only');
+
+$floorProjectionPayload = scene_payload(
+    array(scene_row(array('attackerX' => '8', 'attackerY' => '8', 'attackerZ' => '5'))),
+    scene_query(array('event' => 'kills', 'floor' => 'lower')),
+    scene_config(array('xoffset' => 20))
+);
+assert_same('ok', $floorProjectionPayload['state'], 'raw Z should assign a requested floor before XY projection');
+assert_same(array('c7.2', 7, 2, 1, 0), $floorProjectionPayload['layers']['total'][0], 'projection should run after floor selection');
+assert_same(1, $floorProjectionPayload['floors'][0]['count'], 'floor metadata should count requested-channel contributions');
+assert_same(true, $floorProjectionPayload['floors'][0]['available'], 'a covered populated floor should be available');
+
+$allFloorPayload = scene_payload(
+    array(scene_row(array('attackerZ' => null))),
+    scene_query(array('event' => 'kills', 'floor' => 'all'))
+);
+assert_same('ok', $allFloorPayload['state'], 'the all-floor view should retain valid XY without Z');
+assert_same(1, count($allFloorPayload['layers']['total']), 'the all-floor view should retain XY-only contributions');
+assert_same(1, $allFloorPayload['coverage']['missingCoordinates'], 'missing Z should remain a per-contribution diagnostic');
+assert_same(0.0, $allFloorPayload['coverage']['zCoverage'], 'floor-enabled maps should report incomplete Z coverage without an assignment');
+
+$lowFloorCoveragePayload = scene_payload(array(
+    scene_row(array('attackerZ' => '5')),
+    scene_row(array('eventId' => '2', 'attackerX' => '12', 'attackerZ' => null)),
+), scene_query(array('event' => 'kills', 'floor' => 'lower')));
+assert_same('floors_unavailable', $lowFloorCoveragePayload['state'], 'a selected floor should fail closed below global Z coverage');
+assert_same(array(), $lowFloorCoveragePayload['layers']['total'], 'unavailable floors should not expose partial bins');
+
+$diagnosticPayload = scene_payload(array(
+    scene_row(array('eventId' => '1', 'attackerX' => '8', 'attackerY' => '8', 'attackerZ' => '5')),
+    scene_row(array('eventId' => '2', 'attackerX' => null, 'attackerY' => '8', 'attackerZ' => '5')),
+    scene_row(array('eventId' => '3', 'attackerX' => 'not-an-integer', 'attackerY' => '8', 'attackerZ' => '5')),
+    scene_row(array('eventId' => '4', 'attackerX' => '130', 'attackerY' => '8', 'attackerZ' => '25')),
+), scene_query(array('event' => 'kills')));
+assert_same('weak_projection', $diagnosticPayload['state'], 'active-floor projection below 70 percent should fail closed');
+assert_same(4, $diagnosticPayload['coverage']['sourceRows'], 'coverage should retain fetched source-row count');
+assert_same(4, $diagnosticPayload['coverage']['candidate'], 'coverage should count requested-channel candidates before coordinate validation');
+assert_same(2, $diagnosticPayload['coverage']['validXY'], 'coverage should retain only canonical MEDIUMINT XY candidates');
+assert_same(2, $diagnosticPayload['coverage']['validZ'], 'coverage should distinguish valid raw Z from unassigned Z');
+assert_same(1, $diagnosticPayload['coverage']['missingCoordinates'], 'coverage should count null coordinates without coercion');
+assert_same(1, $diagnosticPayload['coverage']['malformedCoordinates'], 'coverage should count malformed coordinates without coercion');
+assert_same(1, $diagnosticPayload['coverage']['assigned'], 'coverage should count floor assignments from raw Z');
+assert_same(1, $diagnosticPayload['coverage']['unassigned'], 'coverage should count valid raw Z outside every floor band');
+assert_same(2, $diagnosticPayload['coverage']['projected'], 'coverage should project only valid XY contributions in the active floor');
+assert_same(1, $diagnosticPayload['coverage']['inBounds'], 'coverage should count bounded projected contributions');
+assert_same(1, $diagnosticPayload['coverage']['outOfBounds'], 'coverage should count projected but out-of-bounds contributions');
+assert_same(array(), $diagnosticPayload['layers']['total'], 'weak projection should not expose biased partial bins');
+
+$missingCoordinatesPayload = scene_payload(array(scene_row(array('attackerX' => null, 'attackerY' => null))), scene_query(array('event' => 'kills')));
+assert_same('missing_coordinates', $missingCoordinatesPayload['state'], 'combat rows without requested-channel XY should expose the coordinate state');
+assert_same(array(), $missingCoordinatesPayload['layers']['total'], 'missing coordinate scenes should not expose partial bins');
+$emptyPayload = scene_payload(array(), scene_query(array('event' => 'kills')));
+assert_same('empty', $emptyPayload['state'], 'zero combat rows should expose the empty state');
+
+$orderedRows = array(
+    scene_row(array('eventId' => '1', 'attackerX' => '12', 'attackerY' => '4', 'attackerZ' => '5')),
+    scene_row(array('eventId' => '2', 'attackerX' => '4', 'attackerY' => '8', 'attackerZ' => '5')),
+);
+$orderedPayload = scene_payload($orderedRows, scene_query(array('event' => 'kills')));
+$reversedPayload = scene_payload(array_reverse($orderedRows), scene_query(array('event' => 'kills')));
+assert_same($orderedPayload['layers'], $reversedPayload['layers'], 'scene layer aggregation should not depend on SQL row order');
+assert_same(
+    array(
+        array('c3.1', 3, 1, 1, 0),
+        array('c1.2', 1, 2, 1, 0),
+    ),
+    $orderedPayload['layers']['total'],
+    'scene cells should sort deterministically by gridY then gridX'
+);
+
+$largeScenePayload = scene_payload(
+    array(scene_row(array('attackerX' => '4095', 'attackerY' => '2047', 'attackerZ' => '5'))),
+    scene_query(array('event' => 'kills')),
+    scene_config(),
+    scene_image(array('width' => 4096, 'height' => 2048))
+);
+assert_same(32, $largeScenePayload['grid']['bucketSize'], '4096-pixel images should use a 32-pixel grid bucket');
+assert_same(128, $largeScenePayload['grid']['width'], '4096-pixel images should cap the horizontal grid axis at 128');
+assert_same(64, $largeScenePayload['grid']['height'], '2048-pixel images should retain the bounded vertical grid axis');
+
+$comparisonRows = array(
+    scene_row(array('eventId' => '1', 'killerId' => '42', 'attackerX' => '4', 'attackerY' => '4', 'attackerZ' => '5')),
+    scene_row(array('eventId' => '2', 'killerId' => '42', 'attackerX' => '4', 'attackerY' => '4', 'attackerZ' => '5')),
+    scene_row(array('eventId' => '3', 'killerId' => '7', 'attackerX' => '4', 'attackerY' => '4', 'attackerZ' => '5')),
+    scene_row(array('eventId' => '4', 'killerId' => '42', 'attackerX' => '8', 'attackerY' => '4', 'attackerZ' => '5')),
+    scene_row(array('eventId' => '5', 'killerId' => '8', 'attackerX' => '8', 'attackerY' => '4', 'attackerZ' => '5')),
+    scene_row(array('eventId' => '6', 'killerId' => '9', 'attackerX' => '8', 'attackerY' => '4', 'attackerZ' => '5')),
+    scene_row(array('eventId' => '7', 'killerId' => '10', 'attackerX' => '8', 'attackerY' => '4', 'attackerZ' => '5')),
+);
+$comparisonPayload = scene_payload($comparisonRows, scene_query(array('event' => 'kills', 'lens' => 'difference')));
+assert_same('ok', $comparisonPayload['state'], 'three personal kills should satisfy the comparison sample floor');
+assert_same(array('cell', 'x', 'y', 'killDelta', 'deathDelta', 'sample'), $comparisonPayload['comparison']['fields'], 'comparison should retain the canonical six-field scene shape');
+assert_same(3, $comparisonPayload['comparison']['personalSample'], 'comparison should expose the complete in-bounds personal sample');
+assert_same(4, $comparisonPayload['comparison']['otherSample'], 'comparison should expose the complete compatible other sample');
+assert_float_close(5 / 12, $comparisonPayload['comparison']['bins'][0][3], 'comparison should use per-layer kill density shares');
+assert_same(0.0, $comparisonPayload['comparison']['bins'][0][4], 'kill comparisons should leave the death delta column neutral');
+assert_same(3, $comparisonPayload['comparison']['bins'][0][5], 'comparison samples should sum compatible me and other counts per cell');
+assert_float_close(-5 / 12, $comparisonPayload['comparison']['bins'][1][3], 'comparison should retain negative density deltas for other-heavy cells');
+
+$insufficientPayload = scene_payload(array_slice($comparisonRows, 0, 3), scene_query(array('event' => 'kills', 'lens' => 'difference')));
+assert_same('insufficient_sample', $insufficientPayload['state'], 'comparison scenes below three personal events should be terminal but complete');
+assert_true(count($insufficientPayload['layers']['total']) > 0, 'insufficient comparison scenes should retain count layers');
+assert_same(array(), $insufficientPayload['comparison']['bins'], 'insufficient comparison scenes should not expose unstable comparison bins');
+
+$overflowState = array(
+    'query' => scene_query(array('event' => 'kills')),
+    'config' => scene_config(),
+    'image' => scene_image(),
+);
+for ($rowIndex = 0; $rowIndex <= HEATMAP_MAX_SOURCE_ROWS; $rowIndex++) {
+    heatmap_accumulate_scene_row($overflowState, scene_row(array('eventId' => strval($rowIndex + 1))));
+}
+$overflowPayload = heatmap_finalize_scene($overflowState);
+assert_same('too_many_events', $overflowPayload['state'], 'the 250001st fetched row should produce the explicit source budget state');
+assert_same(250001, $overflowPayload['summary']['rowsRead'], 'the overflow sentinel should be recorded only as a row observation');
+assert_same(250000, $overflowPayload['coverage']['sourceRows'], 'coverage should exclude the overflow sentinel from source rows');
+assert_same(array(), $overflowPayload['layers']['total'], 'overflow scenes should discard every accumulated bin');
+assert_same(array(), $overflowPayload['comparison']['bins'], 'overflow scenes should not expose comparison bins');
+
 echo "web heatmap smoke ok\n";

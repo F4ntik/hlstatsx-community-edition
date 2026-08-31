@@ -12,6 +12,10 @@ const HEATMAP_MEDIUMINT_MIN = -8388608;
 const HEATMAP_MEDIUMINT_MAX = 8388607;
 const HEATMAP_MYSQL_UNSIGNED_INT_MAX = 4294967295;
 const HEATMAP_FLOOR_PARSER_SCHEMA = 1;
+const HEATMAP_MAX_SOURCE_ROWS = 250000;
+const HEATMAP_GRID_MAX_AXIS = 128;
+const HEATMAP_MIN_FLOOR_Z_COVERAGE = 0.70;
+const HEATMAP_MIN_PROJECTION_COVERAGE = 0.70;
 
 function heatmap_clean_token($value)
 {
@@ -360,6 +364,629 @@ function heatmap_validate_requested_floor(string $floor, array $floors): string
     }
 
     throw new InvalidArgumentException('unknown_floor');
+}
+
+function heatmap_scene_sql_context(array $query, array $config): array
+{
+    $map = heatmap_v2_token($query['map'] ?? '');
+    $game = heatmap_v2_token($config['code'] ?? ($query['game'] ?? ''));
+    $from = heatmap_try_canonical_integer($query['from'] ?? null);
+    $to = heatmap_try_canonical_integer($query['to'] ?? null);
+    if ($from === null || $to === null || $from >= $to) {
+        throw new InvalidArgumentException('invalid_scene_query');
+    }
+
+    return array(
+        'map' => $map,
+        'game' => $game,
+        'from' => $from,
+        'to' => $to,
+    );
+}
+
+function heatmap_build_scene_sql(array $query, array $config): array
+{
+    $context = heatmap_scene_sql_context($query, $config);
+    $limit = HEATMAP_MAX_SOURCE_ROWS + 1;
+    $sql = '
+        SELECT
+            scene_events.eventId,
+            scene_events.eventTime,
+            scene_events.killerId,
+            scene_events.victimId,
+            scene_events.weapon,
+            scene_events.headshot,
+            scene_events.teamkill,
+            scene_events.attackerX,
+            scene_events.attackerY,
+            scene_events.attackerZ,
+            scene_events.victimX,
+            scene_events.victimY,
+            scene_events.victimZ
+        FROM (
+            SELECT
+                hef.id AS eventId,
+                hef.eventTime AS eventTime,
+                hef.killerId AS killerId,
+                hef.victimId AS victimId,
+                hef.weapon AS weapon,
+                hef.headshot AS headshot,
+                0 AS teamkill,
+                hef.pos_x AS attackerX,
+                hef.pos_y AS attackerY,
+                hef.pos_z AS attackerZ,
+                hef.pos_victim_x AS victimX,
+                hef.pos_victim_y AS victimY,
+                hef.pos_victim_z AS victimZ
+            FROM hlstats_Events_Frags AS hef
+            INNER JOIN hlstats_Servers AS hs ON hs.serverId = hef.serverId
+            WHERE hef.map = :frags_map
+                AND hs.game = :frags_game
+                AND hef.eventTime >= FROM_UNIXTIME(:frags_from)
+                AND hef.eventTime < FROM_UNIXTIME(:frags_to)
+            UNION ALL
+            SELECT
+                hef.id AS eventId,
+                hef.eventTime AS eventTime,
+                hef.killerId AS killerId,
+                hef.victimId AS victimId,
+                hef.weapon AS weapon,
+                0 AS headshot,
+                1 AS teamkill,
+                hef.pos_x AS attackerX,
+                hef.pos_y AS attackerY,
+                hef.pos_z AS attackerZ,
+                hef.pos_victim_x AS victimX,
+                hef.pos_victim_y AS victimY,
+                hef.pos_victim_z AS victimZ
+            FROM hlstats_Events_Teamkills AS hef
+            INNER JOIN hlstats_Servers AS hs ON hs.serverId = hef.serverId
+            WHERE hef.map = :teamkills_map
+                AND hs.game = :teamkills_game
+                AND hef.eventTime >= FROM_UNIXTIME(:teamkills_from)
+                AND hef.eventTime < FROM_UNIXTIME(:teamkills_to)
+        ) AS scene_events
+        LIMIT ' . $limit;
+    $params = array(
+        'frags_map' => $context['map'],
+        'frags_game' => $context['game'],
+        'frags_from' => $context['from'],
+        'frags_to' => $context['to'],
+        'teamkills_map' => $context['map'],
+        'teamkills_game' => $context['game'],
+        'teamkills_from' => $context['from'],
+        'teamkills_to' => $context['to'],
+    );
+
+    return array(
+        'sql' => $sql,
+        'params' => $params,
+        'limit' => $limit,
+        'suicides' => array(
+            'sql' => '
+                SELECT COUNT(*) AS excludedSuicides
+                FROM hlstats_Events_Suicides AS hes
+                INNER JOIN hlstats_Servers AS hs ON hs.serverId = hes.serverId
+                WHERE hes.map = :suicides_map
+                    AND hs.game = :suicides_game
+                    AND hes.eventTime >= FROM_UNIXTIME(:suicides_from)
+                    AND hes.eventTime < FROM_UNIXTIME(:suicides_to)',
+            'params' => array(
+                'suicides_map' => $context['map'],
+                'suicides_game' => $context['game'],
+                'suicides_from' => $context['from'],
+                'suicides_to' => $context['to'],
+            ),
+        ),
+    );
+}
+
+function heatmap_scene_bucket_size(int $width, int $height): int
+{
+    if ($width <= 0 || $height <= 0) {
+        throw new InvalidArgumentException('invalid_image');
+    }
+
+    return max(4, intval(ceil(max($width, $height) / HEATMAP_GRID_MAX_AXIS)));
+}
+
+function heatmap_scene_dimension($value): int
+{
+    $dimension = heatmap_try_canonical_integer($value);
+    if ($dimension === null || $dimension <= 0) {
+        throw new InvalidArgumentException('invalid_image');
+    }
+
+    return $dimension;
+}
+
+function heatmap_scene_player_id($value): ?int
+{
+    $playerId = heatmap_try_canonical_integer($value);
+    if ($playerId === null || $playerId < 0 || $playerId > HEATMAP_MYSQL_UNSIGNED_INT_MAX) {
+        return null;
+    }
+
+    return $playerId;
+}
+
+function heatmap_scene_count($value): int
+{
+    $count = heatmap_try_canonical_integer($value);
+    return $count === null || $count < 0 ? 0 : $count;
+}
+
+function heatmap_scene_coordinate($value): array
+{
+    if ($value === null) {
+        return array('status' => 'missing', 'value' => null);
+    }
+
+    $coordinate = heatmap_try_canonical_integer($value);
+    if ($coordinate === null || $coordinate < HEATMAP_MEDIUMINT_MIN || $coordinate > HEATMAP_MEDIUMINT_MAX) {
+        return array('status' => 'malformed', 'value' => null);
+    }
+
+    return array('status' => 'valid', 'value' => $coordinate);
+}
+
+function heatmap_scene_prepare_state(array &$state): void
+{
+    if (($state['_sceneReady'] ?? false) === true) {
+        return;
+    }
+    if (!isset($state['query']) || !is_array($state['query'])
+        || !isset($state['config']) || !is_array($state['config'])
+        || !isset($state['image']) || !is_array($state['image'])) {
+        throw new InvalidArgumentException('invalid_scene_state');
+    }
+
+    $query = $state['query'];
+    $config = $state['config'];
+    $context = heatmap_scene_sql_context($query, $config);
+    $player = heatmap_scene_player_id($query['player'] ?? 0);
+    $event = $query['event'] ?? 'both';
+    $lens = $query['lens'] ?? 'overview';
+    $floor = $query['floor'] ?? 'all';
+    $lang = $query['lang'] ?? 'en';
+    if ($player === null || !in_array($event, array('kills', 'deaths', 'both'), true)
+        || !in_array($lens, array('overview', 'me', 'difference'), true)
+        || !is_string($floor) || !is_string($lang) || ($lang !== 'en' && $lang !== 'ru')
+        || (($lens === 'me' || $lens === 'difference') && $player <= 0)
+        || ($lens === 'difference' && $event === 'both')) {
+        throw new InvalidArgumentException('invalid_scene_query');
+    }
+
+    $floors = heatmap_config_floors($config);
+    $floor = heatmap_validate_requested_floor($floor, $floors);
+    $baseWidth = heatmap_scene_dimension($state['image']['sourceWidth'] ?? $state['image']['width'] ?? null);
+    $baseHeight = heatmap_scene_dimension($state['image']['sourceHeight'] ?? $state['image']['height'] ?? null);
+    $config = heatmap_normalize_crop($config, $baseWidth, $baseHeight);
+    $config['floors'] = $floors;
+    $width = heatmap_scene_dimension($state['image']['width'] ?? null);
+    $height = heatmap_scene_dimension($state['image']['height'] ?? null);
+    $bucketSize = heatmap_scene_bucket_size($width, $height);
+    $floorCounts = array();
+    foreach ($floors as $configuredFloor) {
+        $floorCounts[$configuredFloor['id']] = 0;
+    }
+
+    $state['_sceneReady'] = true;
+    $state['_scene'] = array(
+        'query' => array(
+            'game' => heatmap_v2_token($query['game'] ?? $context['game']),
+            'map' => $context['map'],
+            'player' => $player,
+            'from' => $context['from'],
+            'to' => $context['to'],
+            'event' => $event,
+            'lens' => $lens,
+            'floor' => $floor,
+            'lang' => $lang,
+        ),
+        'config' => $config,
+        'image' => array(
+            'url' => is_string($state['image']['url'] ?? null) ? $state['image']['url'] : '',
+            'width' => $width,
+            'height' => $height,
+        ),
+        'floors' => $floors,
+        'floorCounts' => $floorCounts,
+        'bucketSize' => $bucketSize,
+        'gridWidth' => intval(ceil($width / $bucketSize)),
+        'gridHeight' => intval(ceil($height / $bucketSize)),
+        'rowsRead' => 0,
+        'sourceRows' => 0,
+        'candidate' => 0,
+        'validXY' => 0,
+        'validZ' => 0,
+        'missingCoordinates' => 0,
+        'malformedCoordinates' => 0,
+        'assigned' => 0,
+        'unassigned' => 0,
+        'projected' => 0,
+        'inBounds' => 0,
+        'outOfBounds' => 0,
+        'overflow' => false,
+        'totalBins' => array(),
+        'meBins' => array(),
+    );
+}
+
+function heatmap_scene_add_bin(array &$bins, string $cellId, int $gridX, int $gridY, string $channel): void
+{
+    if (!isset($bins[$cellId])) {
+        $bins[$cellId] = array(
+            'cell' => $cellId,
+            'x' => $gridX,
+            'y' => $gridY,
+            'kills' => 0,
+            'deaths' => 0,
+        );
+    }
+    $bins[$cellId][$channel]++;
+}
+
+function heatmap_scene_accumulate_contribution(array &$scene, array $row, string $channel, string $participant): void
+{
+    $scene['candidate']++;
+    $x = heatmap_scene_coordinate($row[$participant . 'X'] ?? null);
+    $y = heatmap_scene_coordinate($row[$participant . 'Y'] ?? null);
+    $z = heatmap_scene_coordinate($row[$participant . 'Z'] ?? null);
+    $coordinates = array($x, $y, $z);
+    $hasMissing = false;
+    $hasMalformed = false;
+    foreach ($coordinates as $coordinate) {
+        $hasMissing = $hasMissing || $coordinate['status'] === 'missing';
+        $hasMalformed = $hasMalformed || $coordinate['status'] === 'malformed';
+    }
+    if ($hasMissing) {
+        $scene['missingCoordinates']++;
+    }
+    if ($hasMalformed) {
+        $scene['malformedCoordinates']++;
+    }
+    if ($x['status'] !== 'valid' || $y['status'] !== 'valid') {
+        return;
+    }
+
+    $scene['validXY']++;
+    $assignedFloor = null;
+    if ($z['status'] === 'valid') {
+        $scene['validZ']++;
+        if ($scene['floors']) {
+            $assignedFloor = heatmap_assign_floor($z['value'], $scene['floors']);
+            if ($assignedFloor === null) {
+                $scene['unassigned']++;
+            } else {
+                $scene['assigned']++;
+                $scene['floorCounts'][$assignedFloor]++;
+            }
+        }
+    }
+    if ($scene['query']['floor'] !== 'all' && $assignedFloor !== $scene['query']['floor']) {
+        return;
+    }
+
+    $scene['projected']++;
+    $point = heatmap_transform_point(array('pos_x' => $x['value'], 'pos_y' => $y['value']), $scene['config']);
+    $projectedX = $point['x'];
+    $projectedY = $point['y'];
+    if ($projectedX < 0 || $projectedY < 0
+        || $projectedX >= $scene['image']['width'] || $projectedY >= $scene['image']['height']) {
+        $scene['outOfBounds']++;
+        return;
+    }
+
+    $scene['inBounds']++;
+    $gridX = intval(floor($projectedX / $scene['bucketSize']));
+    $gridY = intval(floor($projectedY / $scene['bucketSize']));
+    $cellId = 'c' . $gridX . '.' . $gridY;
+    heatmap_scene_add_bin($scene['totalBins'], $cellId, $gridX, $gridY, $channel);
+    $participantId = heatmap_scene_player_id($row[$participant === 'attacker' ? 'killerId' : 'victimId'] ?? null);
+    if ($scene['query']['player'] > 0 && $participantId === $scene['query']['player']) {
+        heatmap_scene_add_bin($scene['meBins'], $cellId, $gridX, $gridY, $channel);
+    }
+}
+
+function heatmap_accumulate_scene_row(array &$state, array $row): void
+{
+    heatmap_scene_prepare_state($state);
+    $scene =& $state['_scene'];
+    $scene['rowsRead']++;
+    if ($scene['rowsRead'] > HEATMAP_MAX_SOURCE_ROWS) {
+        $scene['overflow'] = true;
+        $scene['totalBins'] = array();
+        $scene['meBins'] = array();
+        return;
+    }
+
+    $scene['sourceRows']++;
+    if ($scene['query']['event'] === 'kills' || $scene['query']['event'] === 'both') {
+        heatmap_scene_accumulate_contribution($scene, $row, 'kills', 'attacker');
+    }
+    if ($scene['query']['event'] === 'deaths' || $scene['query']['event'] === 'both') {
+        heatmap_scene_accumulate_contribution($scene, $row, 'deaths', 'victim');
+    }
+}
+
+function heatmap_scene_layer_rows(array $bins): array
+{
+    $rows = array_values($bins);
+    usort($rows, function ($left, $right) {
+        $yCompare = $left['y'] <=> $right['y'];
+        return $yCompare !== 0 ? $yCompare : ($left['x'] <=> $right['x']);
+    });
+
+    return array_map(function ($bin) {
+        return array($bin['cell'], $bin['x'], $bin['y'], $bin['kills'], $bin['deaths']);
+    }, $rows);
+}
+
+function heatmap_scene_layers(array $scene): array
+{
+    $totalBins = $scene['totalBins'];
+    $meBins = array();
+    $othersBins = array();
+    foreach ($totalBins as $cellId => $total) {
+        $me = $scene['meBins'][$cellId] ?? array(
+            'cell' => $total['cell'],
+            'x' => $total['x'],
+            'y' => $total['y'],
+            'kills' => 0,
+            'deaths' => 0,
+        );
+        $meBins[$cellId] = $me;
+        $othersBins[$cellId] = array(
+            'cell' => $total['cell'],
+            'x' => $total['x'],
+            'y' => $total['y'],
+            'kills' => max(0, $total['kills'] - $me['kills']),
+            'deaths' => max(0, $total['deaths'] - $me['deaths']),
+        );
+    }
+
+    return array(
+        'total' => heatmap_scene_layer_rows($totalBins),
+        'me' => heatmap_scene_layer_rows($meBins),
+        'others' => heatmap_scene_layer_rows($othersBins),
+    );
+}
+
+function heatmap_scene_comparison(array $layers, array $scene): array
+{
+    $comparison = array(
+        'fields' => array('cell', 'x', 'y', 'killDelta', 'deathDelta', 'sample'),
+        'bins' => array(),
+        'personalSample' => 0,
+        'otherSample' => 0,
+    );
+    if ($scene['query']['event'] !== 'kills' && $scene['query']['event'] !== 'deaths') {
+        return $comparison;
+    }
+
+    $valueIndex = $scene['query']['event'] === 'kills' ? 3 : 4;
+    foreach ($layers['me'] as $row) {
+        $comparison['personalSample'] += $row[$valueIndex];
+    }
+    foreach ($layers['others'] as $row) {
+        $comparison['otherSample'] += $row[$valueIndex];
+    }
+    if ($scene['query']['lens'] !== 'difference') {
+        return $comparison;
+    }
+
+    foreach ($layers['total'] as $index => $row) {
+        $me = $layers['me'][$index][$valueIndex];
+        $others = $layers['others'][$index][$valueIndex];
+        $delta = ($me / max(1, $comparison['personalSample']))
+            - ($others / max(1, $comparison['otherSample']));
+        $comparison['bins'][] = array(
+            $row[0],
+            $row[1],
+            $row[2],
+            $scene['query']['event'] === 'kills' ? $delta : 0.0,
+            $scene['query']['event'] === 'deaths' ? $delta : 0.0,
+            $me + $others,
+        );
+    }
+
+    return $comparison;
+}
+
+function heatmap_scene_floor_metadata(array $scene, float $zCoverage): array
+{
+    $metadata = array();
+    foreach ($scene['floors'] as $floor) {
+        $count = $scene['floorCounts'][$floor['id']] ?? 0;
+        $metadata[] = array(
+            'id' => $floor['id'],
+            'label' => $scene['query']['lang'] === 'ru' ? $floor['label_ru'] : $floor['label_en'],
+            'count' => $count,
+            'available' => $zCoverage >= HEATMAP_MIN_FLOOR_Z_COVERAGE && $count > 0,
+        );
+    }
+
+    return $metadata;
+}
+
+function heatmap_scene_floor_config_hash(array $floors): string
+{
+    $encoded = json_encode($floors, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    return substr(sha1(is_string($encoded) ? $encoded : '[]'), 0, 16);
+}
+
+function heatmap_finalize_scene(array $state): array
+{
+    heatmap_scene_prepare_state($state);
+    $scene = $state['_scene'];
+    $zCoverage = !$scene['floors']
+        ? 1.0
+        : ($scene['validXY'] > 0 ? floatval($scene['assigned']) / floatval($scene['validXY']) : 0.0);
+    $projectionCoverage = $scene['projected'] > 0
+        ? floatval($scene['inBounds']) / floatval($scene['projected'])
+        : 0.0;
+    $xyCoverage = $scene['candidate'] > 0
+        ? floatval($scene['validXY']) / floatval($scene['candidate'])
+        : 0.0;
+    $floors = heatmap_scene_floor_metadata($scene, $zCoverage);
+    $activeFloorAvailable = $scene['query']['floor'] === 'all';
+    foreach ($floors as $floor) {
+        if ($floor['id'] === $scene['query']['floor']) {
+            $activeFloorAvailable = $floor['available'];
+            break;
+        }
+    }
+    $layers = heatmap_scene_layers($scene);
+    $comparison = heatmap_scene_comparison($layers, $scene);
+    if ($scene['overflow']) {
+        $stateName = 'too_many_events';
+    } elseif ($scene['sourceRows'] === 0) {
+        $stateName = 'empty';
+    } elseif ($scene['validXY'] === 0) {
+        $stateName = 'missing_coordinates';
+    } elseif ($scene['query']['floor'] !== 'all' && !$activeFloorAvailable) {
+        $stateName = 'floors_unavailable';
+    } elseif ($scene['projected'] > 0 && $projectionCoverage < HEATMAP_MIN_PROJECTION_COVERAGE) {
+        $stateName = 'weak_projection';
+    } elseif ($scene['query']['lens'] === 'difference' && $comparison['personalSample'] < 3) {
+        $stateName = 'insufficient_sample';
+    } else {
+        $stateName = 'ok';
+    }
+    if (in_array($stateName, array('too_many_events', 'missing_coordinates', 'floors_unavailable', 'weak_projection'), true)) {
+        $layers = array('total' => array(), 'me' => array(), 'others' => array());
+        $comparison['bins'] = array();
+    } elseif ($stateName === 'insufficient_sample') {
+        $comparison['bins'] = array();
+    }
+    $warnings = array();
+    if ($stateName === 'ok') {
+        if ($scene['missingCoordinates'] > 0) {
+            $warnings[] = 'missing_coordinates';
+        }
+        if ($scene['malformedCoordinates'] > 0) {
+            $warnings[] = 'malformed_coordinates';
+        }
+        if ($scene['unassigned'] > 0) {
+            $warnings[] = 'unassigned_floor';
+        }
+        if ($scene['outOfBounds'] > 0) {
+            $warnings[] = 'out_of_bounds';
+        }
+    }
+    $game = rawurlencode($scene['query']['game']);
+    $map = rawurlencode($scene['query']['map']);
+    $excludedSuicides = heatmap_scene_count($state['excludedSuicides'] ?? 0);
+
+    return array(
+        'schemaVersion' => HEATMAP_V2_SCHEMA,
+        'state' => $stateName,
+        'query' => $scene['query'],
+        'map' => array(
+            'game' => $scene['query']['game'],
+            'realgame' => strval($scene['config']['game'] ?? ($scene['config']['realgame'] ?? $scene['query']['game'])),
+            'name' => $scene['query']['map'],
+            'image' => $scene['image'],
+            'projectionHash' => heatmap_config_hash($scene['config'], $scene['image']),
+            'floorConfigHash' => heatmap_scene_floor_config_hash($scene['floors']),
+        ),
+        'floors' => $floors,
+        'activeFloor' => $scene['query']['floor'],
+        'grid' => array(
+            'bucketSize' => $scene['bucketSize'],
+            'width' => $scene['gridWidth'],
+            'height' => $scene['gridHeight'],
+            'fields' => array('cell', 'x', 'y', 'kills', 'deaths'),
+        ),
+        'layers' => $layers,
+        'comparison' => $comparison,
+        'coverage' => array(
+            'sourceRows' => $scene['sourceRows'],
+            'candidate' => $scene['candidate'],
+            'validXY' => $scene['validXY'],
+            'validZ' => $scene['validZ'],
+            'missingCoordinates' => $scene['missingCoordinates'],
+            'malformedCoordinates' => $scene['malformedCoordinates'],
+            'assigned' => $scene['assigned'],
+            'unassigned' => $scene['unassigned'],
+            'xyCoverage' => $xyCoverage,
+            'zCoverage' => $zCoverage,
+            'projected' => $scene['projected'],
+            'inBounds' => $scene['inBounds'],
+            'outOfBounds' => $scene['outOfBounds'],
+            'projectionCoverage' => $projectionCoverage,
+        ),
+        'summary' => array(
+            'rowsRead' => $scene['rowsRead'],
+            'sourceRows' => $scene['sourceRows'],
+            'candidate' => $scene['candidate'],
+            'excludedSuicides' => $excludedSuicides,
+            'personalSample' => $comparison['personalSample'],
+            'otherSample' => $comparison['otherSample'],
+        ),
+        'warnings' => $warnings,
+        'fallback' => array(
+            'v1' => 'heatmap_points.php?game=' . $game . '&map=' . $map,
+            'jpeg' => './hlstatsimg/games/' . $game . '/heatmaps/' . $map . '-kill.jpg',
+            'thumbnail' => './hlstatsimg/games/' . $game . '/heatmaps/' . $map . '-kill-thumb.jpg',
+        ),
+    );
+}
+
+function heatmap_build_scene(PDO $pdo, array $query, array $config, array $image): array
+{
+    $descriptor = heatmap_build_scene_sql($query, $config);
+    $state = array('query' => $query, 'config' => $config, 'image' => $image);
+    $bufferedAttribute = defined('PDO::MYSQL_ATTR_USE_BUFFERED_QUERY')
+        ? constant('PDO::MYSQL_ATTR_USE_BUFFERED_QUERY')
+        : null;
+    if ($bufferedAttribute === null) {
+        throw new RuntimeException('mysql_buffering_unavailable');
+    }
+
+    $previousBuffered = true;
+    try {
+        $previousBuffered = $pdo->getAttribute($bufferedAttribute);
+    } catch (Throwable $exception) {
+        $previousBuffered = true;
+    }
+    $statement = null;
+    $bufferingChanged = false;
+    try {
+        if (!$pdo->setAttribute($bufferedAttribute, false)) {
+            throw new RuntimeException('mysql_buffering_unavailable');
+        }
+        $bufferingChanged = true;
+        $statement = $pdo->prepare($descriptor['sql']);
+        if (!$statement instanceof PDOStatement) {
+            throw new RuntimeException('scene_statement_unavailable');
+        }
+        $statement->execute($descriptor['params']);
+        while (($row = $statement->fetch(PDO::FETCH_ASSOC)) !== false) {
+            heatmap_accumulate_scene_row($state, $row);
+        }
+    } finally {
+        if ($statement instanceof PDOStatement) {
+            $statement->closeCursor();
+        }
+        if ($bufferingChanged) {
+            $pdo->setAttribute($bufferedAttribute, $previousBuffered);
+        }
+    }
+
+    $suicideStatement = $pdo->prepare($descriptor['suicides']['sql']);
+    if (!$suicideStatement instanceof PDOStatement) {
+        throw new RuntimeException('scene_statement_unavailable');
+    }
+    try {
+        $suicideStatement->execute($descriptor['suicides']['params']);
+        $state['excludedSuicides'] = heatmap_scene_count($suicideStatement->fetchColumn());
+    } finally {
+        $suicideStatement->closeCursor();
+    }
+
+    return heatmap_finalize_scene($state);
 }
 
 function heatmap_clean_renderer_mode($value)
