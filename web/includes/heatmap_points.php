@@ -16,6 +16,273 @@ const HEATMAP_MAX_SOURCE_ROWS = 250000;
 const HEATMAP_GRID_MAX_AXIS = 128;
 const HEATMAP_MIN_FLOOR_Z_COVERAGE = 0.70;
 const HEATMAP_MIN_PROJECTION_COVERAGE = 0.70;
+const HEATMAP_SCENE_CACHE_SCHEMA = 2;
+const HEATMAP_SCENE_BUCKET_VERSION = 1;
+const HEATMAP_PAYLOAD_CACHE_MAX_AGE = 172800;
+const HEATMAP_PAYLOAD_CACHE_PRUNE_LIMIT = 32;
+
+function heatmap_explorer_mode(array $options): int
+{
+    if (!array_key_exists('HeatmapExplorerBeta', $options)) {
+        return 0;
+    }
+
+    $value = $options['HeatmapExplorerBeta'];
+    if (is_int($value) && $value >= 0 && $value <= 2) {
+        return $value;
+    }
+    if (!is_string($value) || preg_match('/^[012]$/D', $value) !== 1) {
+        return 0;
+    }
+
+    return intval($value);
+}
+
+function heatmap_cache_identity_value($value)
+{
+    if (!is_array($value)) {
+        if (is_int($value) || is_string($value) || is_bool($value) || $value === null) {
+            return $value;
+        }
+        if (is_float($value)) {
+            return is_finite($value) ? $value : null;
+        }
+
+        return null;
+    }
+
+    if (array_is_list($value)) {
+        return array_map('heatmap_cache_identity_value', $value);
+    }
+
+    $keys = array_keys($value);
+    usort($keys, function ($left, $right): int {
+        return strcmp(strval($left), strval($right));
+    });
+    $canonical = array();
+    foreach ($keys as $key) {
+        $canonical[strval($key)] = heatmap_cache_identity_value($value[$key]);
+    }
+
+    return $canonical;
+}
+
+function heatmap_scene_cache_key(array $query, array $config, array $image): string
+{
+    $identity = array(
+        'cacheSchema' => HEATMAP_SCENE_CACHE_SCHEMA,
+        'responseSchema' => HEATMAP_V2_SCHEMA,
+        'bucketVersion' => $config['bucketVersion'] ?? HEATMAP_SCENE_BUCKET_VERSION,
+        'query' => array(
+            'schemaVersion' => $query['schemaVersion'] ?? HEATMAP_V2_SCHEMA,
+            'game' => $query['game'] ?? '',
+            'realgame' => $query['realgame'] ?? '',
+            'map' => $query['map'] ?? '',
+            'player' => $query['player'] ?? 0,
+            'lens' => $query['lens'] ?? 'overview',
+            'event' => $query['event'] ?? 'both',
+            'channel' => $query['channel'] ?? ($query['event'] ?? 'both'),
+            'from' => $query['from'] ?? 0,
+            'to' => $query['to'] ?? 0,
+            'floor' => $query['floor'] ?? 'all',
+            'lang' => $query['lang'] ?? 'en',
+            'normalization' => $query['normalization'] ?? ($config['normalization'] ?? 'none'),
+        ),
+        'config' => array(
+            'code' => $config['code'] ?? '',
+            'game' => $config['game'] ?? '',
+            'realgame' => $config['realgame'] ?? '',
+            'map' => $config['map'] ?? '',
+            'projectionHash' => $config['projectionHash'] ?? ($config['projection_hash'] ?? ($config['configHash'] ?? '')),
+            'floorConfigHash' => $config['floorConfigHash'] ?? ($config['floorHash'] ?? ($config['floor_hash'] ?? '')),
+            'projection' => $config['projection'] ?? null,
+            'floors' => $config['floors'] ?? null,
+        ),
+        'image' => array(
+            'url' => $image['url'] ?? '',
+            'width' => $image['width'] ?? 0,
+            'height' => $image['height'] ?? 0,
+            'sourceIdentity' => $image['sourceIdentity'] ?? ($image['sourceId'] ?? ($image['source'] ?? '')),
+        ),
+    );
+    $encoded = json_encode(
+        heatmap_cache_identity_value($identity),
+        JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION
+    );
+
+    return hash('sha256', is_string($encoded) ? $encoded : 'heatmap-invalid-cache-identity');
+}
+
+function heatmap_atomic_write_json(string $path, array $payload): bool
+{
+    try {
+        $encoded = json_encode(
+            $payload,
+            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+        );
+    } catch (Throwable $exception) {
+        return false;
+    }
+    if (!is_string($encoded)) {
+        return false;
+    }
+
+    $directory = dirname($path);
+    if (!is_dir($directory) && !@mkdir($directory, 0775, true) && !is_dir($directory)) {
+        return false;
+    }
+    if (is_link($directory) || !is_writable($directory)) {
+        return false;
+    }
+
+    $staging = null;
+    $handle = null;
+    try {
+        for ($attempt = 0; $attempt < 8; $attempt++) {
+            $candidate = $directory . DIRECTORY_SEPARATOR . '.heatmap-' . bin2hex(random_bytes(16)) . '.tmp';
+            $candidateHandle = @fopen($candidate, 'x+b');
+            if ($candidateHandle !== false) {
+                $staging = $candidate;
+                $handle = $candidateHandle;
+                break;
+            }
+        }
+        if (!is_resource($handle) || $staging === null || !@flock($handle, LOCK_EX)) {
+            throw new RuntimeException('cache_stage_failed');
+        }
+
+        $length = strlen($encoded);
+        $offset = 0;
+        while ($offset < $length) {
+            $written = @fwrite($handle, substr($encoded, $offset));
+            if ($written === false || $written === 0) {
+                throw new RuntimeException('cache_write_failed');
+            }
+            $offset += $written;
+        }
+        if (!@fflush($handle)) {
+            throw new RuntimeException('cache_flush_failed');
+        }
+        if (!@fclose($handle)) {
+            $handle = null;
+            throw new RuntimeException('cache_close_failed');
+        }
+        $handle = null;
+        if (!@rename($staging, $path)) {
+            throw new RuntimeException('cache_rename_failed');
+        }
+        $staging = null;
+        return true;
+    } catch (Throwable $exception) {
+        if (is_resource($handle)) {
+            @fclose($handle);
+        }
+        if ($staging !== null) {
+            @unlink($staging);
+        }
+
+        return false;
+    }
+}
+
+function heatmap_scene_state_is_cacheable($state): bool
+{
+    return is_string($state) && in_array($state, array('ok', 'empty', 'insufficient_sample'), true);
+}
+
+function heatmap_prune_payload_cache(string $directory, int $now, int $limit = 32): int
+{
+    $limit = max(0, min(HEATMAP_PAYLOAD_CACHE_PRUNE_LIMIT, $limit));
+    if ($limit === 0 || !is_dir($directory) || is_link($directory)) {
+        return 0;
+    }
+
+    $cutoff = $now - HEATMAP_PAYLOAD_CACHE_MAX_AGE;
+    $candidates = array();
+    foreach (scandir($directory) ?: array() as $entry) {
+        if ($entry === '.' || $entry === '..' || $entry[0] === '.'
+            || strpos($entry, '.tmp') !== false || strpos($entry, '.stage') !== false
+            || substr($entry, -5) !== '.json') {
+            continue;
+        }
+        $path = $directory . DIRECTORY_SEPARATOR . $entry;
+        if (is_link($path) || !is_file($path)) {
+            continue;
+        }
+        $mtime = @filemtime($path);
+        if ($mtime === false || $mtime >= $cutoff) {
+            continue;
+        }
+        $candidates[] = array('path' => $path, 'name' => $entry, 'mtime' => intval($mtime));
+    }
+    usort($candidates, function (array $left, array $right): int {
+        $mtimeCompare = $left['mtime'] <=> $right['mtime'];
+        return $mtimeCompare !== 0 ? $mtimeCompare : strcmp($left['name'], $right['name']);
+    });
+
+    $deleted = 0;
+    foreach (array_slice($candidates, 0, $limit) as $candidate) {
+        if (@unlink($candidate['path'])) {
+            $deleted++;
+        }
+    }
+
+    return $deleted;
+}
+
+function heatmap_log_number($value, float $minimum, float $maximum, bool $fractional)
+{
+    if (is_string($value) && !is_numeric($value)) {
+        $number = 0.0;
+    } elseif (is_int($value) || is_float($value) || is_numeric($value)) {
+        $number = floatval($value);
+    } else {
+        $number = 0.0;
+    }
+    if (!is_finite($number)) {
+        $number = 0.0;
+    }
+    $number = min($maximum, max($minimum, $number));
+
+    return $fractional ? $number : intval($number);
+}
+
+function heatmap_log_string($value, string $fallback = ''): string
+{
+    if (!is_string($value) || strlen($value) > 64
+        || preg_match('/^[A-Za-z0-9_.:$-]*$/D', $value) !== 1) {
+        return $fallback;
+    }
+
+    return $value;
+}
+
+function heatmap_request_log(array $metrics): string
+{
+    $payload = array(
+        'version' => heatmap_log_number($metrics['version'] ?? 2, 0, 99, false),
+        'operation' => heatmap_log_string($metrics['operation'] ?? 'scene', 'scene'),
+        'game' => heatmap_log_string($metrics['game'] ?? ''),
+        'map' => heatmap_log_string($metrics['map'] ?? ''),
+        'windowClass' => heatmap_log_string($metrics['windowClass'] ?? 'default', 'default'),
+        'lens' => heatmap_log_string($metrics['lens'] ?? 'overview', 'overview'),
+        'floor' => heatmap_log_string($metrics['floor'] ?? 'all', 'all'),
+        'rowsRead' => heatmap_log_number($metrics['rowsRead'] ?? 0, 0, 1000000000, false),
+        'binsReturned' => heatmap_log_number($metrics['binsReturned'] ?? 0, 0, 1000000000, false),
+        'rawPayloadBytes' => heatmap_log_number($metrics['rawPayloadBytes'] ?? 0, 0, 1000000000, false),
+        'queryMs' => heatmap_log_number($metrics['queryMs'] ?? 0, 0, 86400000, true),
+        'totalMs' => heatmap_log_number($metrics['totalMs'] ?? 0, 0, 86400000, true),
+        'cache' => heatmap_log_string($metrics['cache'] ?? 'miss', 'miss'),
+        'xyCoverage' => heatmap_log_number($metrics['xyCoverage'] ?? 0, 0, 1, true),
+        'zCoverage' => heatmap_log_number($metrics['zCoverage'] ?? 0, 0, 1, true),
+        'projectionCoverage' => heatmap_log_number($metrics['projectionCoverage'] ?? 0, 0, 1, true),
+        'state' => heatmap_log_string($metrics['state'] ?? 'unknown', 'unknown'),
+        'fallbackReason' => heatmap_log_string($metrics['fallbackReason'] ?? ''),
+    );
+
+    $encoded = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    return is_string($encoded) ? $encoded : '{}';
+}
 
 function heatmap_clean_token($value)
 {
@@ -1149,12 +1416,37 @@ function heatmap_cache_path($key)
 function heatmap_read_payload_cache($key)
 {
     $path = heatmap_cache_path($key);
-    if (!is_file($path)) {
+    if (is_link($path) || !is_file($path)) {
         return null;
     }
 
     $payload = json_decode((string) file_get_contents($path), true);
     return is_array($payload) ? $payload : null;
+}
+
+function heatmap_read_complete_payload_cache($key): ?array
+{
+    $payload = heatmap_read_payload_cache($key);
+    if (!is_array($payload)
+        || !is_int($payload['schemaVersion'] ?? null)
+        || $payload['schemaVersion'] !== HEATMAP_V2_SCHEMA
+        || !heatmap_scene_state_is_cacheable($payload['state'] ?? null)) {
+        return null;
+    }
+    foreach (array('query', 'map', 'floors', 'grid', 'layers', 'comparison', 'coverage', 'summary', 'warnings', 'fallback') as $field) {
+        if (!array_key_exists($field, $payload) || !is_array($payload[$field])) {
+            return null;
+        }
+    }
+    if (!is_array($payload['grid']['fields'] ?? null)
+        || !is_array($payload['layers']['total'] ?? null)
+        || !is_array($payload['layers']['me'] ?? null)
+        || !is_array($payload['layers']['others'] ?? null)
+        || !is_array($payload['comparison']['bins'] ?? null)) {
+        return null;
+    }
+
+    return $payload;
 }
 
 function heatmap_write_payload_cache($key, array $payload)
@@ -1167,7 +1459,12 @@ function heatmap_write_payload_cache($key, array $payload)
         return false;
     }
 
-    return file_put_contents(heatmap_cache_path($key), json_encode($payload, JSON_UNESCAPED_SLASHES)) !== false;
+    $written = heatmap_atomic_write_json(heatmap_cache_path($key), $payload);
+    if ($written) {
+        heatmap_prune_payload_cache($dir, time());
+    }
+
+    return $written;
 }
 
 function heatmap_clear_payload_cache($game = '', $map = '')
@@ -1178,16 +1475,37 @@ function heatmap_clear_payload_cache($game = '', $map = '')
     }
 
     $deleted = 0;
-    foreach (glob($dir . '/*.json') as $file) {
+    foreach (scandir($dir) ?: array() as $entry) {
+        if ($entry === '.' || $entry === '..' || $entry[0] === '.'
+            || substr($entry, -5) !== '.json') {
+            continue;
+        }
+        $file = $dir . DIRECTORY_SEPARATOR . $entry;
+        if (is_link($file) || !is_file($file)) {
+            continue;
+        }
+        $payload = json_decode((string) @file_get_contents($file), true);
+        if (!is_array($payload)) {
+            continue;
+        }
         if ($game !== '' || $map !== '') {
-            $payload = json_decode((string) @file_get_contents($file), true);
-            if (!is_array($payload)) {
+            $query = is_array($payload['query'] ?? null) ? $payload['query'] : array();
+            $mapPayload = is_array($payload['map'] ?? null) ? $payload['map'] : array();
+            $publicGame = is_string($payload['game'] ?? null)
+                ? $payload['game']
+                : (is_string($query['game'] ?? null)
+                    ? $query['game']
+                    : (is_string($mapPayload['game'] ?? null) ? $mapPayload['game'] : ''));
+            $realGame = is_string($mapPayload['realgame'] ?? null) ? $mapPayload['realgame'] : '';
+            $payloadMap = is_string($payload['map'] ?? null)
+                ? $payload['map']
+                : (is_string($query['map'] ?? null)
+                    ? $query['map']
+                    : (is_string($mapPayload['name'] ?? null) ? $mapPayload['name'] : ''));
+            if ($game !== '' && $publicGame !== $game && $realGame !== $game) {
                 continue;
             }
-            if ($game !== '' && strval($payload['game'] ?? '') !== $game) {
-                continue;
-            }
-            if ($map !== '' && strval($payload['map'] ?? '') !== $map) {
+            if ($map !== '' && $payloadMap !== $map) {
                 continue;
             }
         }
@@ -1665,11 +1983,11 @@ function heatmap_fetch_rows(PDO $pdo, array $config, $limit = 10000)
     $params = array();
 
     $addPart = function ($table, $prefix, $coordinateMode, $playerClause) use (&$queryParts, &$params, $config, $boundary, $limit) {
-        $xExpression = $coordinateMode === 'victim' ? 'COALESCE(hef.pos_victim_x, hef.pos_x)' : 'hef.pos_x';
-        $yExpression = $coordinateMode === 'victim' ? 'COALESCE(hef.pos_victim_y, hef.pos_y)' : 'hef.pos_y';
+        $xExpression = $coordinateMode === 'victim' ? 'hef.pos_victim_x' : 'hef.pos_x';
+        $yExpression = $coordinateMode === 'victim' ? 'hef.pos_victim_y' : 'hef.pos_y';
         $heatmapEvent = $coordinateMode === 'victim' ? "'deaths'" : "'kills'";
         $coordinateWhere = $coordinateMode === 'victim'
-            ? '((hef.pos_victim_x IS NOT NULL AND hef.pos_victim_y IS NOT NULL) OR (hef.pos_x IS NOT NULL AND hef.pos_y IS NOT NULL))'
+            ? '(hef.pos_victim_x IS NOT NULL AND hef.pos_victim_y IS NOT NULL)'
             : '(hef.pos_x IS NOT NULL AND hef.pos_y IS NOT NULL)';
 
         $queryParts[] = '

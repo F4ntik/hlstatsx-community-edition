@@ -72,6 +72,247 @@ function floor_fixture_json(array $floors): string
     return $json;
 }
 
+function smoke_temp_directory(string $suffix): string
+{
+    $directory = sys_get_temp_dir() . '/hlstats-' . $suffix . '-' . bin2hex(random_bytes(8));
+    assert_true(mkdir($directory, 0700, true), 'temporary directory should be created');
+    return $directory;
+}
+
+function smoke_remove_directory(string $directory): void
+{
+    if (!is_dir($directory)) {
+        return;
+    }
+    foreach (scandir($directory) ?: array() as $entry) {
+        if ($entry === '.' || $entry === '..') {
+            continue;
+        }
+        $path = $directory . DIRECTORY_SEPARATOR . $entry;
+        if (is_dir($path) && !is_link($path)) {
+            smoke_remove_directory($path);
+        } else {
+            @unlink($path);
+        }
+    }
+    @rmdir($directory);
+}
+
+$explorerModeCases = array(
+    array('input' => array(), 'mode' => 0),
+    array('input' => array('HeatmapExplorerBeta' => 0), 'mode' => 0),
+    array('input' => array('HeatmapExplorerBeta' => 1), 'mode' => 1),
+    array('input' => array('HeatmapExplorerBeta' => 2), 'mode' => 2),
+    array('input' => array('HeatmapExplorerBeta' => '0'), 'mode' => 0),
+    array('input' => array('HeatmapExplorerBeta' => '1'), 'mode' => 1),
+    array('input' => array('HeatmapExplorerBeta' => '2'), 'mode' => 2),
+);
+foreach ($explorerModeCases as $case) {
+    assert_same($case['mode'], heatmap_explorer_mode($case['input']), 'explorer mode should accept only canonical 0/1/2 values');
+}
+foreach (array(false, true, '', ' ', '01', '1.0', '1e0', -1, 3, 1.5, array(1), new stdClass()) as $invalidMode) {
+    assert_same(0, heatmap_explorer_mode(array('HeatmapExplorerBeta' => $invalidMode)), 'invalid explorer mode should fail closed');
+}
+
+$sceneKeyQuery = array(
+    'game' => 'cstrike',
+    'map' => 'de_dust2',
+    'player' => 42,
+    'lens' => 'overview',
+    'event' => 'kills',
+    'channel' => 'kills',
+    'from' => 1700000000,
+    'to' => 1700003600,
+    'floor' => 'all',
+    'lang' => 'en',
+    'normalization' => 'sqrt',
+);
+$sceneKeyConfig = array(
+    'code' => 'cstrike',
+    'game' => 'cstrike',
+    'realgame' => 'cstrike',
+    'map' => 'de_dust2',
+    'projectionHash' => 'projection-a',
+    'floorConfigHash' => 'floor-a',
+);
+$sceneKeyImage = array(
+    'url' => './hlstatsimg/games/cstrike/maps/de_dust2.jpg',
+    'width' => 1024,
+    'height' => 768,
+    'source' => 'hlstatsimg',
+    'sourceIdentity' => 'asset-a',
+);
+$sceneKey = heatmap_scene_cache_key($sceneKeyQuery, $sceneKeyConfig, $sceneKeyImage);
+assert_true(preg_match('/^[a-f0-9]{64}$/D', $sceneKey) === 1, 'scene cache key should be a stable SHA-256 token');
+$sceneKeyDimensions = array(
+    array('query', 'schemaVersion', 3),
+    array('query', 'game', 'arena'),
+    array('query', 'realgame', 'arena-real'),
+    array('query', 'map', 'de_nuke'),
+    array('query', 'player', 84),
+    array('query', 'lens', 'me'),
+    array('query', 'event', 'deaths'),
+    array('query', 'channel', 'deaths'),
+    array('query', 'from', 1700000001),
+    array('query', 'to', 1700003601),
+    array('query', 'floor', 'upper'),
+    array('query', 'lang', 'ru'),
+    array('query', 'normalization', 'linear'),
+    array('config', 'realgame', 'cstrike-real'),
+    array('config', 'bucketVersion', 2),
+    array('config', 'projectionHash', 'projection-b'),
+    array('config', 'floorConfigHash', 'floor-b'),
+    array('image', 'url', './map-b.jpg'),
+    array('image', 'width', 2048),
+    array('image', 'height', 2048),
+    array('image', 'sourceIdentity', 'asset-b'),
+);
+foreach ($sceneKeyDimensions as $dimension) {
+    $query = $sceneKeyQuery;
+    $config = $sceneKeyConfig;
+    $image = $sceneKeyImage;
+    if ($dimension[0] === 'query') {
+        $query[$dimension[1]] = $dimension[2];
+    } elseif ($dimension[0] === 'config') {
+        $config[$dimension[1]] = $dimension[2];
+    } else {
+        $image[$dimension[1]] = $dimension[2];
+    }
+    assert_true(
+        $sceneKey !== heatmap_scene_cache_key($query, $config, $image),
+        'scene cache key should include ' . $dimension[0] . '.' . $dimension[1]
+    );
+}
+$reorderedQuery = array_reverse($sceneKeyQuery, true);
+$reorderedConfig = array_reverse($sceneKeyConfig, true);
+$reorderedImage = array_reverse($sceneKeyImage, true);
+assert_same(
+    $sceneKey,
+    heatmap_scene_cache_key($reorderedQuery, $reorderedConfig, $reorderedImage),
+    'scene cache key should be independent of associative insertion order'
+);
+
+$atomicDirectory = smoke_temp_directory('atomic');
+$atomicPath = $atomicDirectory . '/scene.json';
+assert_same(true, heatmap_atomic_write_json($atomicPath, array('state' => 'ok', 'version' => 1)), 'atomic writer should publish a complete JSON file');
+$previousAtomicJson = file_get_contents($atomicPath);
+assert_true(is_string($previousAtomicJson), 'atomic writer fixture should be readable');
+$resource = fopen($atomicDirectory . '/resource', 'wb');
+assert_true(is_resource($resource), 'atomic writer failure fixture should open a resource');
+assert_same(false, heatmap_atomic_write_json($atomicPath, array('unsupported' => $resource)), 'JSON encoding failure should be reported');
+fclose($resource);
+assert_same($previousAtomicJson, file_get_contents($atomicPath), 'JSON encoding failure should preserve the previous complete file');
+$renameFailurePath = $atomicPath . '/';
+assert_same(false, heatmap_atomic_write_json($renameFailurePath, array('state' => 'replacement')), 'staging/rename failure should be reported');
+assert_same($previousAtomicJson, file_get_contents($atomicPath), 'staging/rename failure should preserve the previous complete file');
+smoke_remove_directory($atomicDirectory);
+
+$cacheableStates = array('ok', 'empty', 'insufficient_sample');
+foreach (array('ok', 'empty', 'insufficient_sample') as $state) {
+    assert_same(true, heatmap_scene_state_is_cacheable($state), 'complete scene state should be cacheable: ' . $state);
+}
+foreach (array('missing_coordinates', 'floors_unavailable', 'weak_projection', 'too_many_events', 'explorer_disabled', 'rejected', 'unexpected_error', 'truncated', 'inspect') as $state) {
+    assert_same(false, heatmap_scene_state_is_cacheable($state), 'non-complete scene state should not be cacheable: ' . $state);
+}
+assert_same($cacheableStates, array_values(array_filter(
+    array('ok', 'empty', 'insufficient_sample', 'missing_coordinates'),
+    'heatmap_scene_state_is_cacheable'
+)), 'cacheable state allowlist should remain exact');
+
+$pruneDirectory = smoke_temp_directory('prune');
+$pruneNow = 2000000000;
+$pruneCutoff = $pruneNow - 172800;
+file_put_contents($pruneDirectory . '/old-a.json', '{}');
+file_put_contents($pruneDirectory . '/old-b.json', '{}');
+file_put_contents($pruneDirectory . '/boundary.json', '{}');
+file_put_contents($pruneDirectory . '/new.json', '{}');
+file_put_contents($pruneDirectory . '/not-json.txt', '{}');
+file_put_contents($pruneDirectory . '/stage.tmp', '{}');
+mkdir($pruneDirectory . '/nested', 0700, true);
+file_put_contents($pruneDirectory . '/nested/nested.json', '{}');
+touch($pruneDirectory . '/old-a.json', $pruneCutoff - 2);
+touch($pruneDirectory . '/old-b.json', $pruneCutoff - 1);
+touch($pruneDirectory . '/boundary.json', $pruneCutoff);
+touch($pruneDirectory . '/new.json', $pruneNow);
+assert_same(1, heatmap_prune_payload_cache($pruneDirectory, $pruneNow, 1), 'pruner should honor the bounded delete limit and oldest order');
+assert_true(!is_file($pruneDirectory . '/old-a.json'), 'pruner should delete the oldest eligible direct JSON');
+assert_true(is_file($pruneDirectory . '/old-b.json'), 'pruner should retain eligible JSON beyond the limit');
+assert_true(is_file($pruneDirectory . '/boundary.json'), 'pruner should retain the exact 48-hour age boundary');
+assert_true(is_file($pruneDirectory . '/not-json.txt'), 'pruner should ignore non-JSON entries');
+assert_true(is_file($pruneDirectory . '/stage.tmp'), 'pruner should ignore staging entries');
+assert_true(is_file($pruneDirectory . '/nested/nested.json'), 'pruner should never recurse into subdirectories');
+for ($index = 0; $index < 40; $index++) {
+    $path = $pruneDirectory . '/bulk-' . $index . '.json';
+    file_put_contents($path, '{}');
+    touch($path, $pruneCutoff - 100 - $index);
+}
+assert_same(32, heatmap_prune_payload_cache($pruneDirectory, $pruneNow, 999), 'pruner should cap one pass at 32 files');
+if (function_exists('symlink')) {
+    $symlinkTarget = $pruneDirectory . '/symlink-target.json';
+    $symlinkPath = $pruneDirectory . '/symlink.json';
+    file_put_contents($symlinkTarget, '{}');
+    touch($symlinkTarget, $pruneCutoff - 10);
+    if (@symlink($symlinkTarget, $symlinkPath)) {
+        heatmap_prune_payload_cache($pruneDirectory, $pruneNow, 1);
+        assert_true(is_link($symlinkPath), 'pruner should ignore symlink entries');
+        assert_true(is_file($symlinkTarget), 'pruner should not delete a symlink target');
+        @unlink($symlinkPath);
+    }
+}
+smoke_remove_directory($pruneDirectory);
+
+$logFields = array(
+    'version' => 2,
+    'operation' => 'scene',
+    'game' => 'cstrike',
+    'map' => 'de_dust2',
+    'windowClass' => 'preset',
+    'lens' => 'overview',
+    'floor' => 'all',
+    'rowsRead' => 12,
+    'binsReturned' => 4,
+    'rawPayloadBytes' => 512,
+    'queryMs' => 12.5,
+    'totalMs' => INF,
+    'cache' => 'miss',
+    'xyCoverage' => 0.75,
+    'zCoverage' => NAN,
+    'projectionCoverage' => 1.5,
+    'state' => 'ok',
+    'fallbackReason' => '',
+    'playerId' => 42,
+    'ip' => '198.51.100.1',
+    'sql' => 'SELECT secret',
+);
+$logJson = heatmap_request_log($logFields);
+$logPayload = json_decode($logJson, true);
+assert_true(is_array($logPayload), 'request log should be valid JSON');
+assert_same(
+    array('version', 'operation', 'game', 'map', 'windowClass', 'lens', 'floor', 'rowsRead', 'binsReturned', 'rawPayloadBytes', 'queryMs', 'totalMs', 'cache', 'xyCoverage', 'zCoverage', 'projectionCoverage', 'state', 'fallbackReason'),
+    array_keys($logPayload),
+    'request log should emit only the stable allowlist in order'
+);
+assert_true(strpos($logJson, '198.51.100.1') === false, 'request log should not expose IP values');
+assert_true(strpos($logJson, 'SELECT') === false, 'request log should not expose SQL values');
+assert_true(is_finite(floatval($logPayload['totalMs'])), 'request log should normalize non-finite numbers');
+assert_true(floatval($logPayload['projectionCoverage']) <= 1.0, 'request log should bound coverage values');
+
+$routeSource = file_get_contents(ROOT_PATH . '/heatmap_points.php');
+assert_true($routeSource !== false, 'heatmap route should be readable');
+assert_contains("\$container = require __DIR__ . '/bootstrap.php';", $routeSource, 'route should bootstrap before selecting v1 or v2');
+assert_contains('OptionService::class', $routeSource, 'route should load options before selecting v1 or v2');
+assert_contains("\$_GET['v'] !== '2'", $routeSource, 'route should split only on exact v=2');
+assert_contains('explorer_disabled', $routeSource, 'disabled v2 mode should publish the stable disabled state');
+assert_contains('heatmap_build_scene(', $routeSource, 'v2 route should delegate scene construction to the Task 4 builder');
+assert_contains('heatmap_atomic_write_json', $routeSource . file_get_contents(ROOT_PATH . '/includes/heatmap_points.php'), 'route path should use the atomic cache writer');
+assert_true(substr_count($routeSource, 'heatmap_v2_emit(') >= 2, 'v2 responses should pass through one encode/log emission helper');
+
+$heatmapIncludeSource = file_get_contents(ROOT_PATH . '/includes/heatmap_points.php');
+assert_true($heatmapIncludeSource !== false, 'heatmap include should be readable');
+assert_true(strpos($heatmapIncludeSource, 'COALESCE(hef.pos_victim_x') === false, 'v1 death SQL should never fall back to attacker X');
+assert_true(strpos($heatmapIncludeSource, 'COALESCE(hef.pos_victim_y') === false, 'v1 death SQL should never fall back to attacker Y');
+assert_contains("hef.pos_victim_x IS NOT NULL AND hef.pos_victim_y IS NOT NULL", $heatmapIncludeSource, 'v1 death SQL should require victim XY');
+
 $installSql = file_get_contents(dirname(__DIR__) . '/sql/install.sql');
 assert_true($installSql !== false, 'installer SQL should be readable');
 assert_contains('SET @DBVERSION="81";', $installSql, 'fresh install should set dbversion 81');
