@@ -1014,6 +1014,11 @@ class EventStorage:
                 post_record_prune = True
                 return
 
+            if update.category is EventCategory.FRAG:
+                properties = update.attributes.get("properties")
+                self._resolve_position(properties, "attacker_position", "killerpos")
+                self._resolve_position(properties, "victim_position", "victimpos")
+
             if update.category is EventCategory.ACTION and update.event_code in _IGNORED_PLAYER_TRIGGER_ACTIONS:
                 if self._should_prime_ignored_action_for_team_sync(update, context):
                     self._prime_player_state(

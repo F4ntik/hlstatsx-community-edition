@@ -667,6 +667,30 @@ def test_runtime_inline_positions_override_staged_killlocation() -> None:
     assert properties["victim_position"] == "40 50 60"
 
 
+def test_runtime_invalid_inline_position_does_not_fall_back_to_staged_data() -> None:
+    adapter = StubAdapter()
+    storage = StubStorage()
+    logger = ProxyLogger(LoggerConfig(stream=StringIO()))
+    runtime = HlstatsRuntime(adapter, ProxyUdpServer(logger), logger, build_dispatcher(), storage)
+    adapter.connect()
+    runtime._reload_state()
+
+    runtime.process_stdin_line(
+        'L 01/02/2024 - 03:00:00: World triggered "killlocation" '
+        '(attacker_position "10 20 30") (victim_position "40 50 60")',
+        "127.0.0.1:27015",
+    )
+    runtime.process_stdin_line(
+        'L 01/02/2024 - 03:00:01: "Alice<2><STEAM_1:2><CT>" killed '
+        '"Bob<3><STEAM_1:3><TERRORIST>" with "ak47" setpos_exact 1,2,3,4',
+        "127.0.0.1:27015",
+    )
+
+    properties = storage.updates[-1].attributes["properties"]
+    assert properties["attacker_position"] == "1,2,3,4"
+    assert properties["victim_position"] == "40 50 60"
+
+
 def test_runtime_source_boundary_clears_staged_killlocation() -> None:
     adapter = StubAdapter()
     storage = StubStorage()

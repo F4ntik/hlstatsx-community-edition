@@ -97,7 +97,60 @@ def test_parse_inline_setpos_exact_rejects_after_rounding_out_of_mediumint(
         f'"Bob<3><STEAM_1:3><TERRORIST>" with "ak47" setpos_exact {position}'
     )
 
+    assert event.properties["attacker_position"] == position
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        (
+            'L 01/02/2024 - 03:04:05: "Alice [1 2 3]<2><STEAM_1:2><CT>" '
+            'killed "Bob [4 5 6]<3><STEAM_1:3><TERRORIST>" with "ak47"'
+        ),
+        (
+            'L 01/02/2024 - 03:04:05: "Alice<2><STEAM_1:2><CT>" killed '
+            '"Bob<3><STEAM_1:3><TERRORIST>" with "[7 8 9]"'
+        ),
+    ],
+)
+def test_parse_kill_inline_coordinates_ignore_names_and_weapon(payload: str) -> None:
+    event = parse_log_event(payload)
+
+    assert event.event_type is LogEventType.KILL
     assert "attacker_position" not in event.properties
+    assert "victim_position" not in event.properties
+
+
+def test_parse_inline_positions_preserve_invalid_slot_order() -> None:
+    event = parse_log_event(
+        'L 01/02/2024 - 03:04:05: "Alice<2><STEAM_1:2><CT>" killed '
+        '"Bob<3><STEAM_1:3><TERRORIST>" with "ak47" '
+        "setpos_exact 1,2,3,4 [4 5 6]"
+    )
+
+    assert event.properties["attacker_position"] == "1,2,3,4"
+    assert event.properties["victim_position"] == "4 5 6"
+
+
+def test_parse_inline_setpos_exact_rejects_fourth_component() -> None:
+    event = parse_log_event(
+        'L 01/02/2024 - 03:04:05: "Alice<2><STEAM_1:2><CT>" killed '
+        '"Bob<3><STEAM_1:3><TERRORIST>" with "ak47" setpos_exact 1,2,3,4'
+    )
+
+    assert event.properties["attacker_position"] == "1,2,3,4"
+    assert "victim_position" not in event.properties
+
+
+def test_parse_position_property_rejects_oversized_integer_without_raising() -> None:
+    oversized = "9" * 10_000
+    event = parse_log_event(
+        'L 01/02/2024 - 03:04:05: "Alice<2><STEAM_1:2><CT>" killed '
+        f'"Bob<3><STEAM_1:3><TERRORIST>" with "ak47" '
+        f'(attacker_position "{oversized} 0 0")'
+    )
+
+    assert event.properties["attacker_position"] == f"{oversized} 0 0"
 
 
 def test_parse_trigger_event():

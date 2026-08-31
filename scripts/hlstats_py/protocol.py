@@ -47,19 +47,15 @@ _TEAM_TRIGGER_RE = re.compile(
     r'^Team "(?P<team>[^"]+)" triggered "(?P<action>[^"]+)"(?P<properties>.*)$'
 )
 _INTEGER_RE = re.compile(r"^[+-]?\d+$")
+_MAX_POSITION_TOKEN_LENGTH = 64
 _INLINE_NUMBER = r"[+-]?(?:\d+(?:\.\d*)?|\.\d+|nan|inf(?:inity)?)"
 _INLINE_SETPOSE_RE = re.compile(
-    rf"\bsetpos_exact\b\s*(?:[:=]\s*)?(?:[\(\[\"']\s*)?"
-    rf"(?P<x>{_INLINE_NUMBER})[\s,]+(?P<y>{_INLINE_NUMBER})[\s,]+"
-    rf"(?P<z>{_INLINE_NUMBER})(?:\s*[\)\]\"'])?"
-    rf"(?!\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+))",
+    rf"\bsetpos_exact\b\s*(?:[:=]\s*)?"
+    rf"(?P<vector>\[[^\]]*\]|\([^\)]*\)|[^()[\]]*)",
     re.IGNORECASE,
 )
-_INLINE_BRACKET_RE = re.compile(
-    rf"\[\s*(?P<x>{_INLINE_NUMBER})[\s,]+(?P<y>{_INLINE_NUMBER})[\s,]+"
-    rf"(?P<z>{_INLINE_NUMBER})\s*\]",
-    re.IGNORECASE,
-)
+_INLINE_BRACKET_RE = re.compile(r"\[[^\[\]]*\]")
+_INLINE_NUMBER_RE = re.compile(rf"^{_INLINE_NUMBER}$", re.IGNORECASE)
 _MEDIUMINT_MIN = -(1 << 23)
 _MEDIUMINT_MAX = (1 << 23) - 1
 
@@ -462,8 +458,14 @@ def _parse_position_triplet(value: object) -> Position | None:
             return None
         if isinstance(part, int):
             coordinate = part
-        elif isinstance(part, str) and _INTEGER_RE.fullmatch(part.strip()):
-            coordinate = int(part.strip())
+        elif isinstance(part, str):
+            token = part.strip()
+            if len(token) > _MAX_POSITION_TOKEN_LENGTH or _INTEGER_RE.fullmatch(token) is None:
+                return None
+            try:
+                coordinate = int(token)
+            except ValueError:
+                return None
         else:
             return None
         if not _MEDIUMINT_MIN <= coordinate <= _MEDIUMINT_MAX:
@@ -473,6 +475,8 @@ def _parse_position_triplet(value: object) -> Position | None:
 
 
 def _parse_inline_coordinate(value: str, *, allow_fraction: bool) -> int | None:
+    if len(value.strip()) > _MAX_POSITION_TOKEN_LENGTH:
+        return None
     try:
         decimal_value = Decimal(value)
     except (InvalidOperation, ValueError):
@@ -482,37 +486,71 @@ def _parse_inline_coordinate(value: str, *, allow_fraction: bool) -> int | None:
     if not allow_fraction and decimal_value != decimal_value.to_integral_value():
         return None
     rounded = decimal_value.to_integral_value(rounding=ROUND_HALF_UP)
-    coordinate = int(rounded)
+    try:
+        coordinate = int(rounded)
+    except ValueError:
+        return None
     if not _MEDIUMINT_MIN <= coordinate <= _MEDIUMINT_MAX:
         return None
     return coordinate
 
 
-def _inline_position(match: re.Match[str], *, allow_fraction: bool) -> Position | None:
+def _parse_inline_vector(value: str, *, allow_fraction: bool) -> Position | None:
+    """Parse one fully delimited inline XYZ vector."""
+
+    text = value.strip()
+    if len(text) > _MAX_POSITION_TOKEN_LENGTH * 3:
+        return None
+    while len(text) >= 2 and ((text[0], text[-1]) in {
+        ("[", "]"),
+        ("(", ")"),
+        ('"', '"'),
+        ("'", "'"),
+    }):
+        text = text[1:-1].strip()
+    parts = [part for part in re.split(r"[\s,]+", text) if part]
+    if len(parts) != 3 or any(_INLINE_NUMBER_RE.fullmatch(part) is None for part in parts):
+        return None
     coordinates = [
-        _parse_inline_coordinate(match.group(axis), allow_fraction=allow_fraction)
-        for axis in ("x", "y", "z")
+        _parse_inline_coordinate(part, allow_fraction=allow_fraction) for part in parts
     ]
     if any(coordinate is None for coordinate in coordinates):
         return None
     return coordinates[0], coordinates[1], coordinates[2]  # type: ignore[return-value]
 
 
-def _extract_inline_kill_positions(body: str) -> tuple[Position | None, Position | None]:
+_InlinePositionSlot = tuple[Position | None, str | None]
+
+
+def _extract_inline_kill_position_slots(metadata: str) -> tuple[_InlinePositionSlot, _InlinePositionSlot]:
+    """Extract inline attacker/victim slots, retaining invalid entries."""
+
+    matches: list[tuple[int, int, Position | None, str]] = []
+    for match in _INLINE_SETPOSE_RE.finditer(metadata):
+        raw = match.group("vector").strip()
+        matches.append(
+            (match.start(), match.end(), _parse_inline_vector(raw, allow_fraction=True), raw)
+        )
+    for match in _INLINE_BRACKET_RE.finditer(metadata):
+        if any(start < match.end() and match.start() < end for start, end, _position, _raw in matches):
+            continue
+        raw = match.group(0).strip()
+        matches.append(
+            (match.start(), match.end(), _parse_inline_vector(raw, allow_fraction=False), raw)
+        )
+    slots = [
+        (position, raw)
+        for _start, _end, position, raw in sorted(matches, key=lambda item: item[0])
+    ][:2]
+    slots.extend([(None, None)] * (2 - len(slots)))
+    return slots[0], slots[1]
+
+
+def _extract_inline_kill_positions(metadata: str) -> tuple[Position | None, Position | None]:
     """Extract supported inline attacker/victim coordinates in source order."""
 
-    matches: list[tuple[int, int, Position | None]] = [
-        (match.start(), match.end(), _inline_position(match, allow_fraction=True))
-        for match in _INLINE_SETPOSE_RE.finditer(body)
-    ]
-    for match in _INLINE_BRACKET_RE.finditer(body):
-        if any(start < match.end() and match.start() < end for start, end, _ in matches):
-            continue
-        matches.append((match.start(), match.end(), _inline_position(match, allow_fraction=False)))
-    positions = [position for _start, _end, position in sorted(matches) if position is not None]
-    attacker = positions[0] if positions else None
-    victim = positions[1] if len(positions) > 1 else None
-    return attacker, victim
+    attacker, victim = _extract_inline_kill_position_slots(metadata)
+    return attacker[0], victim[0]
 
 
 def _format_position(position: Position) -> str:
@@ -522,12 +560,12 @@ def _format_position(position: Position) -> str:
 def _normalize_position_properties(
     properties: Mapping[str, tuple[str, ...] | str | bool],
     *,
-    body: str,
+    metadata: str,
 ) -> Mapping[str, tuple[str, ...] | str | bool]:
     """Canonicalize supported position properties while retaining invalid input."""
 
     normalized: dict[str, tuple[str, ...] | str | bool] = dict(properties)
-    inline_attacker, inline_victim = _extract_inline_kill_positions(body)
+    inline_attacker, inline_victim = _extract_inline_kill_position_slots(metadata)
     for canonical, alias, inline in (
         ("attacker_position", "killerpos", inline_attacker),
         ("victim_position", "victimpos", inline_victim),
@@ -543,8 +581,9 @@ def _normalize_position_properties(
                 normalized[alias] = _format_position(position)
                 normalized[canonical] = _format_position(position)
             continue
-        if inline is not None:
-            normalized[canonical] = _format_position(inline)
+        position, raw = inline
+        if raw is not None:
+            normalized[canonical] = _format_position(position) if position is not None else raw
     return MappingProxyType(normalized)
 
 
@@ -570,7 +609,7 @@ def _parse_kill_event(
     weapon = weapon_match.group("weapon")
     properties = _normalize_position_properties(
         _parse_properties(weapon_match.group("properties")),
-        body=body,
+        metadata=weapon_match.group("properties"),
     )
 
     return LogEvent(
@@ -766,7 +805,7 @@ def _parse_suicide_event(
 
     properties = _normalize_position_properties(
         _parse_properties(weapon_match.group("properties")),
-        body=body,
+        metadata=weapon_match.group("properties"),
     )
     return LogEvent(
         event_type=LogEventType.KILL,
@@ -785,7 +824,7 @@ def _parse_world_event(body: str, timestamp: datetime, raw: str) -> LogEvent:
 
     properties = _normalize_position_properties(
         _parse_properties(match.group("properties")),
-        body=body,
+        metadata=match.group("properties"),
     )
     return LogEvent(
         event_type=LogEventType.WORLD_TRIGGER,

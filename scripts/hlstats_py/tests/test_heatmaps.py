@@ -327,10 +327,15 @@ def test_draw_hud_labels_the_configured_legacy_rolling_days(monkeypatch) -> None
         config,
         hud_url="https://example.invalid",
         font_path=Path("missing.ttf"),
-        now=1_735_689_600.0,
+        now=1_735_732_800.0,
     )
 
     assert any("LEGACY ROLLING SNAPSHOT (7 DAYS)" in text for text in captured)
+    assert any(
+        text
+        == "LEGACY ROLLING SNAPSHOT (7 DAYS): 12/25/24 - 01/01/25"
+        for text in captured
+    )
 
 
 def test_heatmap_generator_writes_legacy_outputs_and_cache(tmp_path: Path) -> None:

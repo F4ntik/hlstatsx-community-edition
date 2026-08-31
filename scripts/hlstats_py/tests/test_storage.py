@@ -1775,6 +1775,53 @@ def test_record_frag_rejects_malformed_and_out_of_mediumint_positions(
     assert all(query != _INSERT_FRAG_QUERY for query, _params in connection.executed)
 
 
+def test_record_frag_rejects_malformed_positions_before_new_player_resolution(
+    dispatcher: EventDispatcher,
+    event_context: EventContext,
+) -> None:
+    event = parse_log_event(
+        'L 01/02/2024 - 03:04:05: "New Alice<902><STEAM_1:902><CT>" killed '
+        '"New Bob<903><STEAM_1:903><TERRORIST>" with "ak47" '
+        '(attacker_position "1 2 3 4")'
+    )
+    update = dispatcher.dispatch(event, event_context)
+    connection = FakeConnection()
+    storage = EventStorage(StubAdapter(connection), clock=lambda: update.timestamp)
+    storage.begin_stdin_batch(transaction_batch_size=0)
+
+    with pytest.raises(StorageError, match="position"):
+        storage.record(update, event_context)
+
+    assert connection.executed == []
+    assert storage._player_cache == {}
+    assert storage._player_teams == {}
+    assert storage._server_connected_players == {}
+    storage.end_stdin_batch()
+
+
+def test_record_frag_rejects_malformed_positions_before_online_player_resolution(
+    dispatcher: EventDispatcher,
+    event_context: EventContext,
+) -> None:
+    event = parse_log_event(
+        'L 01/02/2024 - 03:04:05: "Online Alice<904><STEAM_1:904><CT>" killed '
+        '"Online Bob<905><STEAM_1:905><TERRORIST>" with "ak47" '
+        '(victim_position "8388608 0 0")'
+    )
+    update = dispatcher.dispatch(event, event_context)
+    connection = FakeConnection()
+    storage = EventStorage(StubAdapter(connection), clock=lambda: update.timestamp)
+    storage.begin_online_event()
+
+    with pytest.raises(StorageError, match="position"):
+        storage.record(update, event_context)
+
+    assert connection.executed == []
+    assert storage._player_cache == {}
+    assert storage._online_event_touched_players == set()
+    storage.abort_online_event()
+
+
 def test_connect_event_updates_last_known_address(event_context: EventContext) -> None:
     generic = GenericEventHandler()
     dispatcher = EventDispatcher(
