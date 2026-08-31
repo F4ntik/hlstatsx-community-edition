@@ -2220,7 +2220,10 @@
   };
 
   HeatmapExplorerWorkspace.prototype.retry = function () {
-    if (this._lastRequestType === 'inspect' && this._lastInspectCell) {
+    if (this._lastRequestType === 'inspect') {
+      if (!this._lastInspectCell || this.state.cell !== this._lastInspectCell) {
+        return Promise.resolve(false);
+      }
       return this._loadInspect(this._lastInspectCell, this._lastRequestUrl || this.inspectUrl(this._lastInspectCell));
     }
     return this._loadScene(this._lastReason || 'retry', this._lastRequestUrl || this.sceneUrl());
@@ -2272,6 +2275,10 @@
 
   HeatmapExplorerWorkspace.prototype.clearPin = function () {
     this._inspectGeneration += 1;
+    if (this._lastRequestType === 'inspect') {
+      this._lastInspectCell = null;
+      this._lastRequestUrl = null;
+    }
     this.state.cell = null;
     this.state.focusedCell = null;
     if (this._nodes && this._nodes.inspectOutput) {

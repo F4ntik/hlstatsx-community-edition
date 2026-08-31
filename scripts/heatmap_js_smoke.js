@@ -965,6 +965,36 @@ async function assertSeparateInspectAndDeepLinkFlow() {
   assert.match(pinned.nodes.inspectOutput.textContent, /Alice.*ak47/, 'pinning should render the inspect payload instead of treating it as a scene');
 }
 
+async function assertClearedInspectCannotRetry() {
+  const retry = workspaceHarness();
+  const retryTransport = deferredTransport();
+  const retryWorkspace = new HeatmapExplorerWorkspace(retry.root, {
+    window: retry.window,
+    fetch: retryTransport.fetch,
+    messages: workspaceMessages,
+    Renderer: WorkspaceRenderer,
+  });
+  retryWorkspace.mount();
+  await settleWorkspace();
+  retryTransport.requests[0].resolve(jsonResponse(sceneForMap('de_dust2')));
+  await settleWorkspace();
+  retryWorkspace.pin('c2.0');
+  await settleWorkspace();
+  retryTransport.requests[1].reject(new Error('inspect failed'));
+  await settleWorkspace();
+  const retainedScene = retryWorkspace._scene;
+  retryWorkspace.clearPin();
+  const requestCount = retryTransport.requests.length;
+  let retryResult = null;
+  retryWorkspace.retry().then(result => { retryResult = result; });
+  await settleWorkspace();
+  assert.strictEqual(retryTransport.requests.length, requestCount, 'retry after clearPin must not start a stale inspect fetch');
+  assert.strictEqual(retryWorkspace._scene, retainedScene, 'retry after clearPin must retain the current scene');
+  assert.strictEqual(retryWorkspace.state.cell, null, 'retry after clearPin must keep the cell unpinned');
+  assert.notStrictEqual(retry.nodes.status.textContent, 'Loading', 'retry after clearPin must not leave the status loading');
+  assert.strictEqual(retryResult, false, 'retry after clearPin must resolve without requesting inspect');
+}
+
 async function assertLatestSceneRequestWins() {
   const success = workspaceHarness();
   const successTransport = deferredTransport();
@@ -1045,6 +1075,7 @@ function assertZoomUsesReversibleFactors() {
 
 (async function runFixRoundOneRegressions() {
   await assertSeparateInspectAndDeepLinkFlow();
+  await assertClearedInspectCannotRetry();
   await assertLatestSceneRequestWins();
   assertZoomUsesReversibleFactors();
   console.log('heatmap explorer contract smoke ok');
