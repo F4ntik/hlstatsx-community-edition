@@ -717,7 +717,8 @@ assert.strictEqual(workspaceState.state.focusedCell, 'c2.0', 'navigation-mode ar
 assert.strictEqual(navigationPrevented, true);
 workspaceState._handleStageKey({key: 'Enter', preventDefault() {}});
 assert.strictEqual(workspaceState.state.cell, 'c2.0', 'Enter should pin the selected cell');
-assert.match(workspaceState.sceneUrl(), /&inspect=c2.0$/, 'pinning should request strict v2 inspect=cX.Y');
+assert.doesNotMatch(workspaceState.sceneUrl(), /inspect=/, 'scene URLs must stay distinct from inspect requests');
+assert.match(workspaceState.inspectUrl(), /&inspect=c2.0$/, 'pinning should prepare a strict v2 inspect=cX.Y request');
 workspaceState._handleStageKey({key: 'Escape', preventDefault() {}});
 assert.strictEqual(workspaceState.state.cell, null, 'Escape should clear the pinned cell');
 workspaceState._camera = new HeatmapExplorerCamera({viewportWidth: 200, viewportHeight: 150, contentWidth: 400, contentHeight: 300});
@@ -797,4 +798,257 @@ noFetchWorkspace.mount();
 assert.strictEqual(noFetchNodes['[data-heatmap-status]'].textContent, 'Fallback', 'no-fetch environments should immediately expose the usable static fallback');
 assert.strictEqual(noFetchNodes['[data-heatmap-interactive]'].style.display, 'none');
 
-console.log('heatmap explorer contract smoke ok');
+function workspaceEventElement(attributes = {}) {
+  const node = workspaceElement(attributes);
+  const listeners = Object.create(null);
+  node.addEventListener = function (type, handler) {
+    (listeners[type] || (listeners[type] = [])).push(handler);
+  };
+  node.removeEventListener = function (type, handler) {
+    if (listeners[type]) listeners[type] = listeners[type].filter(candidate => candidate !== handler);
+  };
+  node.dispatch = function (type, details = {}) {
+    const event = Object.assign({type, currentTarget: node, target: node, preventDefault() {}}, details);
+    (listeners[type] || []).slice().forEach(handler => handler(event));
+  };
+  return node;
+}
+
+function workspaceHarness(search = '?page=4') {
+  const nodes = {
+    interactive: workspaceEventElement(),
+    stage: workspaceEventElement(),
+    image: workspaceEventElement(),
+    canvas: workspaceEventElement(),
+    static: workspaceEventElement(),
+    status: workspaceEventElement(),
+    alert: workspaceEventElement(),
+    summary: workspaceEventElement(),
+    inspectOutput: workspaceEventElement(),
+    zoomIn: workspaceEventElement(),
+    zoomOut: workspaceEventElement(),
+  };
+  const selectors = {
+    '[data-heatmap-interactive]': nodes.interactive,
+    '[data-heatmap-stage]': nodes.stage,
+    '[data-heatmap-image]': nodes.image,
+    '[data-heatmap-canvas]': nodes.canvas,
+    '[data-heatmap-static]': nodes.static,
+    '[data-heatmap-status]': nodes.status,
+    '[data-heatmap-alert]': nodes.alert,
+    '[data-heatmap-summary]': nodes.summary,
+    '[data-heatmap-inspect-output]': nodes.inspectOutput,
+    '[data-heatmap-zoom="in"]': nodes.zoomIn,
+    '[data-heatmap-zoom="out"]': nodes.zoomOut,
+  };
+  const root = workspaceEventElement({
+    'data-heatmap-game': 'cstrike',
+    'data-heatmap-map': 'de_dust2',
+    'data-heatmap-player': '42',
+    'data-heatmap-endpoint': 'heatmap_points.php',
+    'data-heatmap-lang': 'en',
+    'data-heatmap-allow-me': '1',
+    'data-heatmap-allow-difference': '1',
+  });
+  root.querySelector = selector => selectors[selector] || null;
+  root.querySelectorAll = () => [];
+  return {
+    root,
+    nodes,
+    window: {
+      location: {search, pathname: '/hlstats.php'},
+      history: {replaceState() {}},
+    },
+  };
+}
+
+function deferredTransport() {
+  const requests = [];
+  return {
+    requests,
+    fetch(url) {
+      let resolve;
+      let reject;
+      const promise = new Promise((resolvePromise, rejectPromise) => {
+        resolve = resolvePromise;
+        reject = rejectPromise;
+      });
+      requests.push({url, resolve, reject, promise});
+      return promise;
+    },
+  };
+}
+
+function jsonResponse(payload) {
+  return {ok: true, json() { return Promise.resolve(payload); }};
+}
+
+function sceneForMap(map) {
+  const payload = explorerSceneFixture();
+  payload.query.map = map;
+  payload.map.name = map;
+  payload.map.image = {url: './' + map + '.jpg', width: 40, height: 30};
+  payload.fallback = {
+    v1: 'heatmap_points.php?game=cstrike&map=' + map,
+    jpeg: './' + map + '-kill.jpg',
+    thumbnail: './' + map + '-kill-thumb.jpg',
+  };
+  return payload;
+}
+
+function inspectPayload() {
+  return {
+    schemaVersion: 2,
+    operation: 'inspect',
+    state: 'ok',
+    rows: [{
+      eventTime: '2026-08-31T12:00:00Z',
+      event: 'kill',
+      killer: {id: 42, name: 'Alice'},
+      victim: {id: 7, name: 'Bob'},
+      weapon: 'ak47',
+      headshot: true,
+      teamkill: false,
+    }],
+    truncated: false,
+    warnings: [],
+  };
+}
+
+async function settleWorkspace() {
+  for (let turn = 0; turn < 6; turn += 1) await Promise.resolve();
+}
+
+async function assertSeparateInspectAndDeepLinkFlow() {
+  const deepLink = workspaceHarness('?page=4&hm_cell=c2.0');
+  const deepLinkTransport = deferredTransport();
+  const deepLinkWorkspace = new HeatmapExplorerWorkspace(deepLink.root, {
+    window: deepLink.window,
+    fetch: deepLinkTransport.fetch,
+    messages: workspaceMessages,
+    Renderer: WorkspaceRenderer,
+  });
+  deepLinkWorkspace.mount();
+  await settleWorkspace();
+  assert.strictEqual(deepLinkTransport.requests.length, 1, 'a deep-linked cell should start with one scene request');
+  assert.doesNotMatch(deepLinkTransport.requests[0].url, /inspect=/, 'the initial scene request must not be replaced by inspect');
+  deepLinkTransport.requests[0].resolve(jsonResponse(sceneForMap('de_dust2')));
+  await settleWorkspace();
+  assert.strictEqual(deepLinkWorkspace._scene.map.name, 'de_dust2', 'deep-link loading must retain the validated scene before inspect');
+  assert.strictEqual(deepLinkTransport.requests.length, 2, 'deep-linked cell should issue a separate inspect request after scene load');
+  assert.match(deepLinkTransport.requests[1].url, /&inspect=c2.0$/, 'the follow-up request must target the pinned cell');
+  deepLinkTransport.requests[1].resolve(jsonResponse(inspectPayload()));
+  await settleWorkspace();
+  assert.match(deepLink.nodes.inspectOutput.textContent, /Alice.*ak47/, 'validated inspect rows should render in the inspector');
+
+  const pinned = workspaceHarness();
+  const pinnedTransport = deferredTransport();
+  const pinnedWorkspace = new HeatmapExplorerWorkspace(pinned.root, {
+    window: pinned.window,
+    fetch: pinnedTransport.fetch,
+    messages: workspaceMessages,
+    Renderer: WorkspaceRenderer,
+  });
+  pinnedWorkspace.mount();
+  await settleWorkspace();
+  pinnedTransport.requests[0].resolve(jsonResponse(sceneForMap('de_dust2')));
+  await settleWorkspace();
+  const retainedScene = pinnedWorkspace._scene;
+  const retainedRenderer = pinnedWorkspace._renderer;
+  pinnedWorkspace.pin('c2.0');
+  await settleWorkspace();
+  assert.strictEqual(pinnedTransport.requests.length, 2, 'pinning after scene load should issue inspect without a second scene reload');
+  pinnedTransport.requests[1].resolve(jsonResponse(inspectPayload()));
+  await settleWorkspace();
+  assert.strictEqual(pinnedWorkspace._scene, retainedScene, 'inspect success must retain the existing scene instance');
+  assert.strictEqual(pinnedWorkspace._renderer, retainedRenderer, 'inspect success must not recreate the scene renderer');
+  assert.match(pinned.nodes.inspectOutput.textContent, /Alice.*ak47/, 'pinning should render the inspect payload instead of treating it as a scene');
+}
+
+async function assertLatestSceneRequestWins() {
+  const success = workspaceHarness();
+  const successTransport = deferredTransport();
+  const successWorkspace = new HeatmapExplorerWorkspace(success.root, {
+    window: success.window,
+    fetch: successTransport.fetch,
+    messages: workspaceMessages,
+    Renderer: WorkspaceRenderer,
+  });
+  successWorkspace.mount();
+  await settleWorkspace();
+  successWorkspace._setState({map: 'de_nuke', floor: 'all', cell: null}, 'map');
+  await settleWorkspace();
+  assert.strictEqual(successTransport.requests.length, 2, 'a newer selection while loading must start the newest request');
+  const oldestSuccess = successTransport.requests[0];
+  const newestSuccess = successTransport.requests[1];
+  assert.match(newestSuccess.url, /map=de_nuke/, 'the newest queued request must contain the current selection');
+  newestSuccess.resolve(jsonResponse(sceneForMap('de_nuke')));
+  await settleWorkspace();
+  assert.strictEqual(success.nodes.image.attributes.src, './de_nuke.jpg', 'the newest scene success must own the rendered image');
+  oldestSuccess.resolve(jsonResponse(sceneForMap('de_dust2')));
+  await settleWorkspace();
+  assert.strictEqual(successWorkspace.state.map, 'de_nuke', 'inverse-order stale scene success must not restore an older map selection');
+  assert.strictEqual(success.nodes.image.attributes.src, './de_nuke.jpg', 'inverse-order stale success must not overwrite the newest rendered image');
+
+  const failure = workspaceHarness();
+  const failureTransport = deferredTransport();
+  const failureWorkspace = new HeatmapExplorerWorkspace(failure.root, {
+    window: failure.window,
+    fetch: failureTransport.fetch,
+    messages: workspaceMessages,
+    Renderer: WorkspaceRenderer,
+  });
+  failureWorkspace.mount();
+  await settleWorkspace();
+  failureWorkspace._setState({map: 'de_nuke', floor: 'all', cell: null}, 'map');
+  await settleWorkspace();
+  assert.strictEqual(failureTransport.requests.length, 2, 'the newest selection must survive while the older request is pending');
+  const oldestFailure = failureTransport.requests[0];
+  const newestFailure = failureTransport.requests[1];
+  newestFailure.resolve(jsonResponse(sceneForMap('de_nuke')));
+  await settleWorkspace();
+  assert.strictEqual(failure.nodes.image.attributes.src, './de_nuke.jpg', 'the request after a stale failure must still render the newest scene');
+  oldestFailure.reject(new Error('stale failure'));
+  await settleWorkspace();
+  assert.strictEqual(failureWorkspace.state.map, 'de_nuke', 'inverse-order stale scene failure must not restore an older selection');
+  assert.strictEqual(failure.nodes.image.attributes.src, './de_nuke.jpg', 'inverse-order stale failure must not overwrite the newest image');
+  assert.notStrictEqual(failure.nodes.status.textContent, 'Failed', 'inverse-order stale failure must not replace the newest loaded state');
+}
+
+function assertZoomUsesReversibleFactors() {
+  const zoom = workspaceHarness();
+  const zoomWorkspace = new HeatmapExplorerWorkspace(zoom.root, {messages: workspaceMessages});
+  zoomWorkspace._nodes = {
+    floors: null, mapSelect: null, range: null, reset: null, pan: null, stage: null, canvas: null,
+    zoomIn: zoom.nodes.zoomIn, zoomOut: zoom.nodes.zoomOut,
+  };
+  const cameraForControls = new HeatmapExplorerCamera({
+    viewportWidth: 200,
+    viewportHeight: 150,
+    contentWidth: 400,
+    contentHeight: 300,
+  });
+  const observedFactors = [];
+  const originalZoomAt = cameraForControls.zoomAt;
+  cameraForControls.zoomAt = function (factor, x, y) {
+    observedFactors.push(factor);
+    return originalZoomAt.call(this, factor, x, y);
+  };
+  zoomWorkspace._camera = cameraForControls;
+  zoomWorkspace._renderer = {setCamera() {}};
+  zoomWorkspace._bindEvents();
+  zoom.nodes.zoomIn.dispatch('click');
+  zoom.nodes.zoomOut.dispatch('click');
+  assert.deepStrictEqual(observedFactors, [1.25, 0.8], 'zoom controls must pass stable inverse factors, never the current absolute zoom');
+  assert.strictEqual(cameraForControls.state.zoom, 1, 'zoom in followed by zoom out must return to the prior zoom level');
+}
+
+(async function runFixRoundOneRegressions() {
+  await assertSeparateInspectAndDeepLinkFlow();
+  await assertLatestSceneRequestWins();
+  assertZoomUsesReversibleFactors();
+  console.log('heatmap explorer contract smoke ok');
+}()).catch(error => {
+  console.error(error && error.stack ? error.stack : error);
+  process.exitCode = 1;
+});

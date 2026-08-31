@@ -1609,6 +1609,53 @@
     return typeof value === 'string' && value.length > 0 ? value : null;
   }
 
+  function invalidInspect() {
+    throw new Error('invalid_inspect');
+  }
+
+  function inspectText(value, maximum) {
+    if (typeof value !== 'string' || value.length > maximum) {
+      invalidInspect();
+    }
+    return value;
+  }
+
+  function inspectActor(value) {
+    if (!isRecord(value) || !safeInteger(value.id) || value.id < 0) {
+      invalidInspect();
+    }
+    return {id: value.id, name: inspectText(value.name, 256)};
+  }
+
+  function inspectRow(value) {
+    if (!isRecord(value) || (value.event !== 'kill' && value.event !== 'death')
+      || typeof value.headshot !== 'boolean' || typeof value.teamkill !== 'boolean') {
+      invalidInspect();
+    }
+    return {
+      eventTime: inspectText(value.eventTime, 64),
+      event: value.event,
+      killer: inspectActor(value.killer),
+      victim: inspectActor(value.victim),
+      weapon: inspectText(value.weapon, 64),
+      headshot: value.headshot,
+      teamkill: value.teamkill
+    };
+  }
+
+  function HeatmapExplorerInspect(payload) {
+    if (!isRecord(payload) || payload.schemaVersion !== 2 || payload.operation !== 'inspect'
+      || payload.state !== 'ok' || !Array.isArray(payload.rows) || payload.rows.length > 100
+      || typeof payload.truncated !== 'boolean' || !Array.isArray(payload.warnings)) {
+      invalidInspect();
+    }
+    this.rows = payload.rows.map(inspectRow);
+    this.truncated = payload.truncated;
+    this.warnings = payload.warnings.map(function (warning) {
+      return inspectText(warning, 256);
+    });
+  }
+
   function HeatmapExplorerWorkspace(rootElement, options) {
     this.root = rootElement;
     this.options = isRecord(options) ? options : {};
@@ -1651,6 +1698,10 @@
     this._mounted = false;
     this._destroyed = false;
     this._loading = false;
+    this._sceneGeneration = 0;
+    this._inspectGeneration = 0;
+    this._lastRequestType = null;
+    this._lastInspectCell = null;
     this._initialUrlError = false;
     this._readUrlState();
     this._normalizeSelection(false);
@@ -1754,7 +1805,7 @@
     return href;
   };
 
-  HeatmapExplorerWorkspace.prototype._sceneState = function () {
+  HeatmapExplorerWorkspace.prototype._sceneState = function (inspectCell) {
     var state = {
       v: '2',
       game: this.state.game,
@@ -1773,14 +1824,13 @@
       state.from = String(this.state.from);
       state.to = String(this.state.to);
     }
-    if (this.state.cell) {
-      state.inspect = this.state.cell;
+    if (inspectCell) {
+      state.inspect = inspectCell;
     }
     return state;
   };
 
-  HeatmapExplorerWorkspace.prototype.sceneUrl = function () {
-    var state = this._sceneState();
+  HeatmapExplorerWorkspace.prototype._requestUrl = function (state) {
     var order = ['v', 'game', 'map', 'player', 'range', 'from', 'to', 'event', 'lens', 'floor', 'lang', 'inspect'];
     var pairs = [];
     for (var index = 0; index < order.length; index += 1) {
@@ -1790,6 +1840,15 @@
       }
     }
     return this.endpoint + '?' + pairs.join('&');
+  };
+
+  HeatmapExplorerWorkspace.prototype.sceneUrl = function () {
+    return this._requestUrl(this._sceneState(null));
+  };
+
+  HeatmapExplorerWorkspace.prototype.inspectUrl = function (cell) {
+    var parsed = parseCellId(typeof cell === 'string' ? cell : this.state.cell);
+    return parsed ? this._requestUrl(this._sceneState(parsed.cell)) : this.sceneUrl();
   };
 
   HeatmapExplorerWorkspace.prototype._setStatus = function (key) {
@@ -2047,17 +2106,22 @@
     }
     if (this.state.cell) {
       this._renderPinnedCell(this.state.cell);
+      this._loadInspect(this.state.cell);
     }
   };
 
-  HeatmapExplorerWorkspace.prototype._load = function (reason, exactUrl) {
+  HeatmapExplorerWorkspace.prototype._loadScene = function (reason, exactUrl) {
     var self = this;
-    if (this._destroyed || !this.fetch || this._loading) {
+    if (this._destroyed || !this.fetch) {
       return Promise.resolve(false);
     }
     var requestUrl = typeof exactUrl === 'string' ? exactUrl : this.sceneUrl();
+    var generation = ++this._sceneGeneration;
+    this._inspectGeneration += 1;
     this._lastRequestUrl = requestUrl;
     this._lastReason = reason;
+    this._lastRequestType = 'scene';
+    this._lastInspectCell = null;
     this._loading = true;
     this._setStatus('loading');
     this._clearAlert();
@@ -2069,11 +2133,20 @@
       }
       return response.json();
     }).then(function (payload) {
+      if (self._destroyed || generation !== self._sceneGeneration) {
+        return false;
+      }
       var scene = new self.Scene(payload);
+      if (self._destroyed || generation !== self._sceneGeneration) {
+        return false;
+      }
       self._loading = false;
       self._applyScene(scene, reason);
       return true;
-    }, function () {
+    }).catch(function () {
+      if (self._destroyed || generation !== self._sceneGeneration) {
+        return false;
+      }
       self._loading = false;
       self._showAlert('failed');
       self._showFailureActions();
@@ -2082,8 +2155,75 @@
     });
   };
 
+  HeatmapExplorerWorkspace.prototype._renderInspect = function (inspect) {
+    if (!this._nodes || !this._nodes.inspectOutput) {
+      return;
+    }
+    if (!inspect.rows.length) {
+      workspaceSetText(this._nodes.inspectOutput, this._message('noCell'));
+      return;
+    }
+    var rows = [];
+    for (var index = 0; index < inspect.rows.length; index += 1) {
+      var row = inspect.rows[index];
+      rows.push(row.killer.name + ' → ' + row.victim.name + (row.weapon ? ' (' + row.weapon + ')' : ''));
+    }
+    workspaceSetText(this._nodes.inspectOutput, this._message('inspect') + ' ' + this.state.cell + ': ' + rows.join('; '));
+  };
+
+  HeatmapExplorerWorkspace.prototype._loadInspect = function (cell, exactUrl) {
+    var self = this;
+    var parsed = parseCellId(cell);
+    if (this._destroyed || !this.fetch || !this._scene || !parsed) {
+      return Promise.resolve(false);
+    }
+    var generation = ++this._inspectGeneration;
+    var sceneGeneration = this._sceneGeneration;
+    var requestUrl = typeof exactUrl === 'string' ? exactUrl : this.inspectUrl(parsed.cell);
+    this._lastRequestUrl = requestUrl;
+    this._lastReason = 'inspect';
+    this._lastRequestType = 'inspect';
+    this._lastInspectCell = parsed.cell;
+    this._setStatus('loading');
+    this._clearAlert();
+    return Promise.resolve().then(function () {
+      return self.fetch(requestUrl, {credentials: 'same-origin'});
+    }).then(function (response) {
+      if (!response || response.ok === false || typeof response.json !== 'function') {
+        throw new Error('request_failed');
+      }
+      return response.json();
+    }).then(function (payload) {
+      if (self._destroyed || generation !== self._inspectGeneration
+        || sceneGeneration !== self._sceneGeneration || self.state.cell !== parsed.cell) {
+        return false;
+      }
+      var inspect = new HeatmapExplorerInspect(payload);
+      if (self._destroyed || generation !== self._inspectGeneration
+        || sceneGeneration !== self._sceneGeneration || self.state.cell !== parsed.cell) {
+        return false;
+      }
+      self._renderInspect(inspect);
+      self._clearAlert();
+      self._setStatus('pinned');
+      return true;
+    }).catch(function () {
+      if (self._destroyed || generation !== self._inspectGeneration
+        || sceneGeneration !== self._sceneGeneration || self.state.cell !== parsed.cell) {
+        return false;
+      }
+      self._showAlert('failed');
+      self._showFailureActions();
+      self._setStatus('failed');
+      return false;
+    });
+  };
+
   HeatmapExplorerWorkspace.prototype.retry = function () {
-    return this._load(this._lastReason || 'retry', this._lastRequestUrl || this.sceneUrl());
+    if (this._lastRequestType === 'inspect' && this._lastInspectCell) {
+      return this._loadInspect(this._lastInspectCell, this._lastRequestUrl || this.inspectUrl(this._lastInspectCell));
+    }
+    return this._loadScene(this._lastReason || 'retry', this._lastRequestUrl || this.sceneUrl());
   };
 
   HeatmapExplorerWorkspace.prototype.showFallback = function () {
@@ -2124,11 +2264,14 @@
     this._renderPinnedCell(parsed.cell);
     this._writeUrl();
     this._setStatus('pinned');
-    this._load('inspect');
+    if (this._scene && !this._loading) {
+      this._loadInspect(parsed.cell);
+    }
     return true;
   };
 
   HeatmapExplorerWorkspace.prototype.clearPin = function () {
+    this._inspectGeneration += 1;
     this.state.cell = null;
     this.state.focusedCell = null;
     if (this._nodes && this._nodes.inspectOutput) {
@@ -2148,7 +2291,7 @@
     }
     this._normalizeSelection(reason === 'lens');
     this._syncControls();
-    this._load(reason);
+    this._loadScene(reason);
   };
 
   HeatmapExplorerWorkspace.prototype._selectFocusedCell = function (direction) {
@@ -2286,13 +2429,13 @@
     });
     this._listen(this._nodes.zoomIn, 'click', function () {
       if (self._camera) {
-        self._camera.zoomAt(self._camera.state.zoom * 1.25, 0, 0);
+        self._camera.zoomAt(1.25, 0, 0);
         if (self._renderer) self._renderer.setCamera(self._camera);
       }
     });
     this._listen(this._nodes.zoomOut, 'click', function () {
       if (self._camera) {
-        self._camera.zoomAt(self._camera.state.zoom / 1.25, 0, 0);
+        self._camera.zoomAt(0.8, 0, 0);
         if (self._renderer) self._renderer.setCamera(self._camera);
       }
     });
@@ -2376,7 +2519,7 @@
       this._setStatus('invalidUrl');
       return this;
     }
-    this._load('initial');
+    this._loadScene('initial');
     return this;
   };
 
