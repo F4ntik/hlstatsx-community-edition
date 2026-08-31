@@ -443,6 +443,57 @@ assert_true(is_file($cacheFixturePath($cacheFixtureKeys['mapMismatch'])), 'cache
 assert_true(is_file($cacheFixturePath($cacheFixtureKeys['otherGame'])), 'cache clear should retain a different public and real game');
 smoke_remove_directory($cacheFixtureDirectory);
 
+$aliasCacheDirectory = smoke_temp_directory('alias-cache');
+$aliasCachePath = function (string $key) use ($aliasCacheDirectory): string {
+    return $aliasCacheDirectory . DIRECTORY_SEPARATOR . $key . '.json';
+};
+$writeAliasCache = function (string $key, string $publicGame, string $realGame, string $sourceIdentity) use ($aliasCachePath): void {
+    $payload = array(
+        'schemaVersion' => 2,
+        'state' => 'ok',
+        'query' => array('game' => $publicGame, 'map' => 'de_alias'),
+        'map' => array(
+            'name' => 'de_alias',
+            'realgame' => $realGame,
+            'image' => array('width' => 1024, 'height' => 768, 'sourceIdentity' => $sourceIdentity),
+        ),
+        'floors' => array(),
+        'grid' => array('fields' => array()),
+        'layers' => array('total' => array(), 'me' => array(), 'others' => array()),
+        'comparison' => array('bins' => array()),
+        'coverage' => array(),
+        'summary' => array(),
+        'warnings' => array(),
+        'fallback' => array(),
+    );
+    assert_true(file_put_contents($aliasCachePath($key), json_encode($payload)) !== false, $key . ' alias cache fixture should be written');
+};
+$writeAliasCache('save-primary', 'public_a', 'shared_realgame', 'projection-before-save');
+$writeAliasCache('save-sibling', 'public_b', 'shared_realgame', 'projection-before-save');
+assert_same(1, heatmap_clear_payload_cache('public_a', 'de_alias', $aliasCacheDirectory), 'config save should first clear the submitted public alias cache');
+assert_true(is_file($aliasCachePath('save-sibling')), 'config save sibling alias should demonstrate the remaining canonical cache scope');
+assert_same(1, heatmap_clear_payload_cache('shared_realgame', 'de_alias', $aliasCacheDirectory), 'config save should also clear the resolved canonical game cache');
+assert_true(!is_file($aliasCachePath('save-sibling')), 'config save should not leave a sibling public alias cache stale');
+
+$jpegBeforeReplacement = array('width' => 1024, 'height' => 768, 'sourceIdentity' => 'jpeg-before-replacement');
+$jpegAfterReplacement = array('width' => 1024, 'height' => 768, 'sourceIdentity' => 'jpeg-after-replacement');
+assert_same($jpegBeforeReplacement['width'], $jpegAfterReplacement['width'], 'same-dimension JPEG replacement should preserve the published width');
+assert_same($jpegBeforeReplacement['height'], $jpegAfterReplacement['height'], 'same-dimension JPEG replacement should preserve the published height');
+assert_true($jpegBeforeReplacement['sourceIdentity'] !== $jpegAfterReplacement['sourceIdentity'], 'same-dimension JPEG replacement should still change the content identity');
+$writeAliasCache('upload-primary', 'public_a', 'shared_realgame', $jpegBeforeReplacement['sourceIdentity']);
+$writeAliasCache('upload-sibling', 'public_b', 'shared_realgame', $jpegBeforeReplacement['sourceIdentity']);
+assert_same(1, heatmap_clear_payload_cache('public_a', 'de_alias', $aliasCacheDirectory), 'same-dimension JPEG replacement should clear the submitted public alias cache');
+assert_true(is_file($aliasCachePath('upload-sibling')), 'same-dimension JPEG replacement should retain the sibling until canonical invalidation');
+assert_same(1, heatmap_clear_payload_cache('shared_realgame', 'de_alias', $aliasCacheDirectory), 'same-dimension JPEG replacement should clear the canonical game cache even when dimensions match');
+assert_true(!is_file($aliasCachePath('upload-sibling')), 'same-dimension JPEG replacement should not leave a sibling public alias cache stale');
+smoke_remove_directory($aliasCacheDirectory);
+
+$heatmapAdminSource = file_get_contents(ROOT_PATH . '/heatmap_admin.php');
+assert_true($heatmapAdminSource !== false, 'heatmap admin source should be readable');
+assert_contains('function heatmap_admin_invalidate_alias_payload_caches', $heatmapAdminSource, 'admin cache invalidation should resolve both public and canonical aliases');
+assert_contains('heatmap_admin_invalidate_alias_payload_caches($game, $map, $readback);', $heatmapAdminSource, 'config save should invalidate canonical sibling aliases after commit');
+assert_contains('heatmap_admin_invalidate_alias_payload_caches($game, $map, $config);', $heatmapAdminSource, 'same-dimension JPEG upload should invalidate canonical sibling aliases after commit');
+
 $heatmapIncludeSource = file_get_contents(ROOT_PATH . '/includes/heatmap_points.php');
 assert_true($heatmapIncludeSource !== false, 'heatmap include should be readable');
 assert_true(strpos($heatmapIncludeSource, 'COALESCE(hef.pos_victim_x') === false, 'v1 death SQL should never fall back to attacker X');

@@ -279,6 +279,25 @@ function heatmap_admin_require_config_hash(array $request, string $currentHash):
     }
 }
 
+function heatmap_admin_invalidate_alias_payload_caches(string $game, string $map, array $config): void
+{
+    $map = heatmap_clean_token($map);
+    if ($map === '') {
+        return;
+    }
+
+    $games = array();
+    foreach (array($game, $config['game'] ?? '', $config['realgame'] ?? '') as $candidate) {
+        $candidate = heatmap_clean_token($candidate);
+        if ($candidate !== '') {
+            $games[$candidate] = true;
+        }
+    }
+    foreach (array_keys($games) as $cacheGame) {
+        heatmap_clear_payload_cache($cacheGame, $map);
+    }
+}
+
 function heatmap_admin_locked_config(PDO $pdo, string $game, string $map): array
 {
     $config = heatmap_fetch_config_for_update($pdo, $game, $map);
@@ -473,7 +492,7 @@ function heatmap_admin_save(PDO $pdo, $logger, array $request): void
         if (!$pdo->commit()) {
             throw new HeatmapAdminException('save_failed', 500);
         }
-        heatmap_clear_payload_cache($game, $map);
+        heatmap_admin_invalidate_alias_payload_caches($game, $map, $readback);
         $success = true;
         $status = 200;
         $response = heatmap_admin_result('saved', $language, array(
@@ -745,7 +764,7 @@ function heatmap_admin_upload(PDO $pdo, $logger, array $request): void
         if (!$pdo->commit()) {
             throw new HeatmapAdminException('upload_failed', 500);
         }
-        heatmap_clear_payload_cache($game, $map);
+        heatmap_admin_invalidate_alias_payload_caches($game, $map, $config);
         $success = true;
         $status = 200;
         $response = heatmap_admin_result('uploaded', $language, array(
