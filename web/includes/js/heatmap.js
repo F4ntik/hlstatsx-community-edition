@@ -34,7 +34,7 @@ if (typeof module !== 'undefined' && module.exports) {
 }
 
 var HeatmapAdminPayload = (function() {
-	function build(action, identity, controls, useCurrentControls) {
+	function build(action, identity, controls, useCurrentControls, configHash) {
 		var payload = {
 			action: action || 'preview',
 			game: identity.game,
@@ -47,6 +47,9 @@ var HeatmapAdminPayload = (function() {
 					payload[name] = controls[name];
 				}
 			}
+		}
+		if ((payload.action === 'save' || payload.action === 'upload') && /^[a-f0-9]{64}$/i.test(configHash || '')) {
+			payload.configHash = configHash;
 		}
 		return payload;
 	}
@@ -61,6 +64,28 @@ if (typeof module !== 'undefined' && module.exports) {
 var heatmapI18n = (typeof window !== 'undefined' && window.HLX_I18N) || {};
 function heatmapText(name, fallback) {
 	return heatmapI18n[name] || fallback;
+}
+
+function heatmapSafeImageUrl(value) {
+	if (typeof value !== 'string' || value.length === 0 || value.length > 512 || value.indexOf('..') !== -1) {
+		return '';
+	}
+	if (value.indexOf('heatmap_map.php?') === 0 && /^heatmap_map\.php\?[A-Za-z0-9_=&%.-]+$/.test(value)) {
+		return value;
+	}
+	if (value.indexOf('./hlstatsimg/games/') === 0 && /^\.\/hlstatsimg\/games\/[A-Za-z0-9_./%-]+\.(?:jpg|jpeg|png|gif)(?:\?[A-Za-z0-9_=&%.-]+)?$/i.test(value)) {
+		return value;
+	}
+	return '';
+}
+
+function heatmapSafeImageDimension(value, fallback) {
+	value = Number(value);
+	if (isFinite(value) && value > 0 && value <= 8192 && Math.floor(value) === value) {
+		return value;
+	}
+	fallback = Number(fallback);
+	return isFinite(fallback) && fallback > 0 && fallback <= 8192 ? Math.floor(fallback) : 1;
 }
 
 window.addEvent('domready', function() {
@@ -306,36 +331,46 @@ function setupInlineHeatmap(viewer) {
 
 	function setStatus(text, warning) {
 		if (status) {
-			status.innerHTML = text || '';
+			status.textContent = text || '';
 			status.className = warning ? 'heatmap-status is-warning' : 'heatmap-status';
 		}
 	}
 
 	function syncCanvasSize(payload) {
-		var width = payload.image && payload.image.width ? payload.image.width : image.naturalWidth;
-		var height = payload.image && payload.image.height ? payload.image.height : image.naturalHeight;
+		var width = heatmapSafeImageDimension(payload.image && payload.image.width, image.naturalWidth);
+		var height = heatmapSafeImageDimension(payload.image && payload.image.height, image.naturalHeight);
 		canvas.width = width;
 		canvas.height = height;
 		renderer.data([], 1, payload.renderer || renderer.options).draw();
 		canvas.style.display = overlayVisible ? 'block' : 'none';
 	}
 
-	function escapeHtml(text) {
-		var div = document.createElement('div');
-		div.appendChild(document.createTextNode(text == null ? '' : String(text)));
-		return div.innerHTML;
+	function appendTooltipLine(label, value, strong) {
+		var line = document.createElement('div');
+		var labelNode;
+		var valueNode;
+		if (label) {
+			labelNode = document.createElement('b');
+			labelNode.textContent = String(label) + ':';
+			line.appendChild(labelNode);
+			line.appendChild(document.createTextNode(' '));
+		}
+		valueNode = strong ? document.createElement('b') : document.createTextNode('');
+		valueNode.textContent = value == null ? '' : String(value);
+		line.appendChild(valueNode);
+		tooltip.appendChild(line);
 	}
 
-	function formatActors(label, actors) {
+	function appendTooltipActors(label, actors) {
 		var i;
 		var rows = [];
 		if (!actors || !actors.length) {
-			return '';
+			return;
 		}
 		for (i = 0; i < Math.min(3, actors.length); i++) {
-			rows.push(escapeHtml(actors[i].name) + ' (' + escapeHtml(actors[i].count) + ')');
+			rows.push(String(actors[i].name == null ? '' : actors[i].name) + ' (' + String(actors[i].count == null ? 0 : actors[i].count) + ')');
 		}
-		return '<div><b>' + escapeHtml(label) + ':</b> ' + rows.join(', ') + '</div>';
+		appendTooltipLine(label, rows.join(', '), false);
 	}
 
 	function hideTooltip() {
@@ -383,12 +418,16 @@ function setupInlineHeatmap(viewer) {
 			return;
 		}
 
-		tooltip.innerHTML =
-			'<div><b>' + escapeHtml(nearest.value || 0) + '</b> ' + escapeHtml(heatmapText('heatmapEvents', 'events')) + '</div>' +
-			'<div>' + escapeHtml(heatmapText('kills', 'Kills')) + ': ' + escapeHtml(nearest.killValue || 0) + ' / ' + escapeHtml(heatmapText('deaths', 'Deaths')) + ': ' + escapeHtml(nearest.deathValue || 0) + '</div>' +
-			formatActors(heatmapText('heatmapKillers', 'Killers'), nearest.topKillers) +
-			formatActors(heatmapText('heatmapVictims', 'Victims'), nearest.topVictims) +
-			formatActors(heatmapText('players', 'Players'), nearest.topPlayers);
+		tooltip.textContent = '';
+		appendTooltipLine('', String(nearest.value || 0) + ' ' + heatmapText('heatmapEvents', 'events'), true);
+		appendTooltipLine(
+			heatmapText('kills', 'Kills'),
+			String(nearest.killValue || 0) + ' / ' + heatmapText('deaths', 'Deaths') + ': ' + String(nearest.deathValue || 0),
+			false
+		);
+		appendTooltipActors(heatmapText('heatmapKillers', 'Killers'), nearest.topKillers);
+		appendTooltipActors(heatmapText('heatmapVictims', 'Victims'), nearest.topVictims);
+		appendTooltipActors(heatmapText('players', 'Players'), nearest.topPlayers);
 		tooltip.style.left = Math.min(rect.width - 12, Math.max(8, event.clientX - rect.left + 12)) + 'px';
 		tooltip.style.top = Math.min(rect.height - 12, Math.max(8, event.clientY - rect.top + 12)) + 'px';
 		tooltip.style.display = 'block';
@@ -453,13 +492,13 @@ function setupInlineHeatmap(viewer) {
 					warning = true;
 				}
 				lastPayload = payload;
-				if (payload.image && payload.image.url) {
+				if (payload.image && payload.image.url && heatmapSafeImageUrl(payload.image.url)) {
 					image.onload = function() {
 						syncCanvasSize(payload);
 						renderer.data([], 1, payload.renderer || renderer.options).draw();
 						setStatus(warningText || '0', warning);
 					};
-					image.src = payload.image.url;
+					image.src = heatmapSafeImageUrl(payload.image.url);
 					if (image.complete) {
 						syncCanvasSize(payload);
 						renderer.data([], 1, payload.renderer || renderer.options).draw();
@@ -474,7 +513,7 @@ function setupInlineHeatmap(viewer) {
 				syncCanvasSize(payload);
 				render(payload);
 			};
-			image.src = payload.image.url;
+			image.src = heatmapSafeImageUrl(payload.image.url);
 			if (image.complete) {
 				syncCanvasSize(payload);
 				render(payload);
@@ -572,6 +611,16 @@ function setupHeatmapAdminWizard(wizard) {
 	var mapImage = wizard.querySelector('[data-heatmap-map-image]');
 	var overviewFile = wizard.querySelector('[data-heatmap-overview-file]');
 	var overviewText = wizard.querySelector('[data-heatmap-overview]');
+	var floorSelect = wizard.querySelector('[data-heatmap-admin-floor]');
+	var eventSelect = wizard.querySelector('[data-heatmap-admin-event]');
+	var floorRows = wizard.querySelector('[data-heatmap-floor-rows]');
+	var diagnosticFrom = wizard.querySelector('[data-heatmap-diagnostic-from]');
+	var diagnosticTo = wizard.querySelector('[data-heatmap-diagnostic-to]');
+	var diagnosticCounts = wizard.querySelector('[data-heatmap-diagnostic-counts]');
+	var zHistogram = wizard.querySelector('[data-heatmap-z-histogram]');
+	var floorSuggestButton = wizard.querySelector('[data-heatmap-floor-suggest]');
+	var csrfToken = wizard.getAttribute('data-heatmap-csrf') || '';
+	var adminLanguage = wizard.getAttribute('data-heatmap-lang') === 'ru' ? 'ru' : 'en';
 	var toggle = wizard.querySelector('[data-heatmap-toggle]');
 	var overlayVisible = true;
 	var lastPayload = null;
@@ -585,6 +634,8 @@ function setupHeatmapAdminWizard(wizard) {
 	var originMarker = null;
 	var cropGuide = null;
 	var lastGuideRadius = 24;
+	var currentConfigHash = '';
+	var suggestedFloors = [];
 	var currentConfig = {
 		xoffset: 0,
 		yoffset: 0,
@@ -604,6 +655,186 @@ function setupHeatmapAdminWizard(wizard) {
 	function setLog(text) {
 		if (log) {
 			log.textContent = text || '';
+		}
+	}
+
+	function adminText(name, fallback) {
+		var value = wizard.getAttribute('data-heatmap-admin-text-' + name);
+		return value || fallback;
+	}
+
+	function isConfigHash(value) {
+		return typeof value === 'string' && /^[a-f0-9]{64}$/i.test(value);
+	}
+
+	function clearChildren(element) {
+		if (element) {
+			element.textContent = '';
+		}
+	}
+
+	function dateTimeValue(date) {
+		function pad(value) {
+			return String(value).length < 2 ? '0' + String(value) : String(value);
+		}
+		return date.getUTCFullYear() + '-' + pad(date.getUTCMonth() + 1) + '-' + pad(date.getUTCDate())
+			+ 'T' + pad(date.getUTCHours()) + ':' + pad(date.getUTCMinutes());
+	}
+
+	function diagnosticSeconds(field) {
+		var value = field ? field.value : '';
+		var milliseconds;
+		if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) {
+			return null;
+		}
+		milliseconds = Date.parse(value + ':00Z');
+		return isFinite(milliseconds) ? Math.floor(milliseconds / 1000) : null;
+	}
+
+	function seedDiagnosticWindow() {
+		var to;
+		var from;
+		if (!diagnosticFrom || !diagnosticTo || (diagnosticFrom.value && diagnosticTo.value)) {
+			return;
+		}
+		to = new Date();
+		from = new Date(to.getTime() - 30 * 86400000);
+		diagnosticFrom.value = dateTimeValue(from);
+		diagnosticTo.value = dateTimeValue(to);
+	}
+
+	function createFloorCell(row, name, value, type) {
+		var cell = document.createElement('td');
+		var input = document.createElement('input');
+		input.type = type || 'text';
+		input.value = value == null ? '' : String(value);
+		input.setAttribute('data-heatmap-floor-field', name);
+		if (name === 'id') {
+			input.maxLength = 32;
+		}
+		if (name === 'label_en' || name === 'label_ru') {
+			input.maxLength = 64;
+		}
+		if (type === 'number') {
+			input.step = '1';
+		}
+		cell.appendChild(input);
+		row.appendChild(cell);
+	}
+
+	function addFloorRow(floor) {
+		var row;
+		var removeCell;
+		var removeButton;
+		if (!floorRows || floorRows.children.length >= 8) {
+			return;
+		}
+		floor = floor || {};
+		row = document.createElement('tr');
+		createFloorCell(row, 'id', floor.id || '', 'text');
+		createFloorCell(row, 'label_en', floor.label_en || '', 'text');
+		createFloorCell(row, 'label_ru', floor.label_ru || '', 'text');
+		createFloorCell(row, 'z_min', floor.z_min == null ? 0 : floor.z_min, 'number');
+		createFloorCell(row, 'z_max', floor.z_max == null ? 1 : floor.z_max, 'number');
+		removeCell = document.createElement('td');
+		removeButton = document.createElement('button');
+		removeButton.type = 'button';
+		removeButton.textContent = '×';
+		removeButton.title = adminText('remove-floor', 'Remove floor');
+		removeButton.onclick = function() {
+			floorRows.removeChild(row);
+			schedulePreview();
+		};
+		removeCell.appendChild(removeButton);
+		row.appendChild(removeCell);
+		floorRows.appendChild(row);
+	}
+
+	function readFloors() {
+		var rows = floorRows ? floorRows.querySelectorAll('tr') : [];
+		var floors = [];
+		var index;
+		var fields;
+		var floor;
+		for (index = 0; index < rows.length; index++) {
+			fields = rows[index].querySelectorAll('[data-heatmap-floor-field]');
+			if (fields.length !== 5) {
+				continue;
+			}
+			floor = {};
+			for (var fieldIndex = 0; fieldIndex < fields.length; fieldIndex++) {
+				var fieldName = fields[fieldIndex].getAttribute('data-heatmap-floor-field');
+				floor[fieldName] = fieldName === 'z_min' || fieldName === 'z_max'
+					? Number(fields[fieldIndex].value)
+					: fields[fieldIndex].value;
+			}
+			floors.push(floor);
+		}
+		return floors;
+	}
+
+	function renderFloors(floors) {
+		var index;
+		clearChildren(floorRows);
+		for (index = 0; Array.isArray(floors) && index < floors.length && index < 8; index++) {
+			addFloorRow(floors[index]);
+		}
+	}
+
+	function renderFloorSelect(floors) {
+		var selected = floorSelect ? floorSelect.value : 'all';
+		var index;
+		var option;
+		if (!floorSelect) {
+			return;
+		}
+		clearChildren(floorSelect);
+		option = document.createElement('option');
+		option.value = 'all';
+		option.textContent = adminText('all-floors', 'All floors');
+		floorSelect.appendChild(option);
+		for (index = 0; Array.isArray(floors) && index < floors.length; index++) {
+			if (!floors[index] || typeof floors[index].id !== 'string') {
+				continue;
+			}
+			option = document.createElement('option');
+			option.value = floors[index].id;
+			option.textContent = adminLanguage === 'ru' ? floors[index].label_ru : floors[index].label_en;
+			floorSelect.appendChild(option);
+		}
+		floorSelect.value = selected;
+		if (floorSelect.value !== selected) {
+			floorSelect.value = 'all';
+		}
+	}
+
+	function renderDiagnostics(payload) {
+		var diagnostics = payload && payload.diagnostics ? payload.diagnostics : {};
+		var histogram = diagnostics.zHistogram;
+		var index;
+		var row;
+		var item;
+		if (diagnosticCounts) {
+			diagnosticCounts.textContent = 'sourceRows: ' + Number(diagnostics.sourceRows || 0)
+				+ '; candidate: ' + Number(diagnostics.candidate || 0)
+				+ '; validXY: ' + Number(diagnostics.validXY || 0)
+				+ '; validZ: ' + Number(diagnostics.validZ || 0)
+				+ '; assigned: ' + Number(diagnostics.assigned || 0)
+				+ '; inBounds: ' + Number(diagnostics.inBounds || 0);
+		}
+		clearChildren(zHistogram);
+		for (index = 0; zHistogram && Array.isArray(histogram) && index < histogram.length; index++) {
+			row = histogram[index];
+			if (!row || !isFinite(Number(row.z)) || !isFinite(Number(row.count))) {
+				continue;
+			}
+			item = document.createElement('li');
+			item.textContent = String(Math.round(Number(row.z))) + '…' + String(Math.round(Number(row.z)) + 31) + ': ' + String(Math.max(0, Math.round(Number(row.count))));
+			zHistogram.appendChild(item);
+		}
+		suggestedFloors = Array.isArray(payload && payload.suggestedFloors) ? payload.suggestedFloors : [];
+		if (floorSuggestButton) {
+			floorSuggestButton.disabled = suggestedFloors.length === 0;
 		}
 	}
 
@@ -681,7 +912,7 @@ function setupHeatmapAdminWizard(wizard) {
 		}
 		for (i = 0; i < rotateButtons.length; i++) {
 			rotateButtons[i].className = rotationSteps() ? 'heatmap-transform-button is-active' : 'heatmap-transform-button';
-			rotateButtons[i].innerHTML = heatmapText('heatmapRotate', 'Rotate') + ' ' + (rotationSteps() ? (rotationSteps() * 90) : 90) + '&deg;';
+			rotateButtons[i].textContent = heatmapText('heatmapRotate', 'Rotate') + ' ' + (rotationSteps() ? (rotationSteps() * 90) : 90) + '°';
 		}
 	}
 
@@ -747,20 +978,32 @@ function setupHeatmapAdminWizard(wizard) {
 		guides.className = 'heatmap-admin-guides';
 		layerGuide = document.createElement('div');
 		layerGuide.className = 'heatmap-layer-guide';
-		layerGuide.innerHTML =
-			'<span class="heatmap-layer-handle heatmap-layer-handle-nw" data-heatmap-resize="nw"></span>' +
-			'<span class="heatmap-layer-handle heatmap-layer-handle-n" data-heatmap-resize="n"></span>' +
-			'<span class="heatmap-layer-handle heatmap-layer-handle-ne" data-heatmap-resize="ne"></span>' +
-			'<span class="heatmap-layer-handle heatmap-layer-handle-e" data-heatmap-resize="e"></span>' +
-			'<span class="heatmap-layer-handle heatmap-layer-handle-se" data-heatmap-resize="se"></span>' +
-			'<span class="heatmap-layer-handle heatmap-layer-handle-s" data-heatmap-resize="s"></span>' +
-			'<span class="heatmap-layer-handle heatmap-layer-handle-sw" data-heatmap-resize="sw"></span>' +
-			'<span class="heatmap-layer-handle heatmap-layer-handle-w" data-heatmap-resize="w"></span>' +
-			'<span class="heatmap-layer-rotate-controls">' +
-			'<button type="button" class="heatmap-layer-rotate-button" data-heatmap-rotate-step="-1" title="' + heatmapText('heatmapRotateLeft90', 'Rotate left 90 degrees') + '">&#8635;</button>' +
-			'<button type="button" class="heatmap-layer-rotate-button" data-heatmap-rotate-step="1" title="' + heatmapText('heatmapRotateRight90', 'Rotate right 90 degrees') + '">&#8634;</button>' +
-			'</span>';
-		var frameRotateButtons = layerGuide.querySelectorAll('.heatmap-layer-rotate-button');
+		var resizeNames = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+		var handle;
+		var rotateControls = document.createElement('span');
+		var rotateLeft = document.createElement('button');
+		var rotateRight = document.createElement('button');
+		for (var handleIndex = 0; handleIndex < resizeNames.length; handleIndex++) {
+			handle = document.createElement('span');
+			handle.className = 'heatmap-layer-handle heatmap-layer-handle-' + resizeNames[handleIndex];
+			handle.setAttribute('data-heatmap-resize', resizeNames[handleIndex]);
+			layerGuide.appendChild(handle);
+		}
+		rotateControls.className = 'heatmap-layer-rotate-controls';
+		rotateLeft.type = 'button';
+		rotateLeft.className = 'heatmap-layer-rotate-button';
+		rotateLeft.setAttribute('data-heatmap-rotate-step', '-1');
+		rotateLeft.title = heatmapText('heatmapRotateLeft90', 'Rotate left 90 degrees');
+		rotateLeft.textContent = '↺';
+		rotateRight.type = 'button';
+		rotateRight.className = 'heatmap-layer-rotate-button';
+		rotateRight.setAttribute('data-heatmap-rotate-step', '1');
+		rotateRight.title = heatmapText('heatmapRotateRight90', 'Rotate right 90 degrees');
+		rotateRight.textContent = '↻';
+		rotateControls.appendChild(rotateLeft);
+		rotateControls.appendChild(rotateRight);
+		layerGuide.appendChild(rotateControls);
+		var frameRotateButtons = rotateControls.querySelectorAll('.heatmap-layer-rotate-button');
 		for (var rb = 0; rb < frameRotateButtons.length; rb++) {
 			frameRotateButtons[rb].onclick = function(event) {
 				rotateLayer(this.getAttribute('data-heatmap-rotate-step'));
@@ -774,10 +1017,24 @@ function setupHeatmapAdminWizard(wizard) {
 		}
 		transformToolbar = document.createElement('div');
 		transformToolbar.className = 'heatmap-transform-overlay';
-		transformToolbar.innerHTML =
-			'<button type="button" class="heatmap-transform-button" data-heatmap-toggle-check="flipx">' + heatmapText('heatmapFlipX', 'Flip X') + '</button>' +
-			'<button type="button" class="heatmap-transform-button" data-heatmap-toggle-check="flipy">' + heatmapText('heatmapFlipY', 'Flip Y') + '</button>' +
-			'<button type="button" class="heatmap-transform-button" data-heatmap-rotate-step="1">' + heatmapText('heatmapRotate', 'Rotate') + ' 90&deg;</button>';
+		var flipXButton = document.createElement('button');
+		var flipYButton = document.createElement('button');
+		var toolbarRotateButton = document.createElement('button');
+		flipXButton.type = 'button';
+		flipXButton.className = 'heatmap-transform-button';
+		flipXButton.setAttribute('data-heatmap-toggle-check', 'flipx');
+		flipXButton.textContent = heatmapText('heatmapFlipX', 'Flip X');
+		flipYButton.type = 'button';
+		flipYButton.className = 'heatmap-transform-button';
+		flipYButton.setAttribute('data-heatmap-toggle-check', 'flipy');
+		flipYButton.textContent = heatmapText('heatmapFlipY', 'Flip Y');
+		toolbarRotateButton.type = 'button';
+		toolbarRotateButton.className = 'heatmap-transform-button';
+		toolbarRotateButton.setAttribute('data-heatmap-rotate-step', '1');
+		toolbarRotateButton.textContent = heatmapText('heatmapRotate', 'Rotate') + ' 90°';
+		transformToolbar.appendChild(flipXButton);
+		transformToolbar.appendChild(flipYButton);
+		transformToolbar.appendChild(toolbarRotateButton);
 		originMarker = document.createElement('div');
 		originMarker.className = 'heatmap-origin-marker';
 		cropGuide = document.createElement('div');
@@ -1093,11 +1350,25 @@ function setupHeatmapAdminWizard(wizard) {
 
 	function collectConfig(action, useCurrentControls) {
 		var controls = {
-			overviewText: overviewText ? overviewText.value : ''
+			overviewText: overviewText ? overviewText.value : '',
+			floors: readFloors(),
+			floor: floorSelect ? floorSelect.value : 'all',
+			event: eventSelect ? eventSelect.value : 'both',
+			lang: adminLanguage
 		};
 		var fields = wizard.querySelectorAll('[data-heatmap-number]');
 		var checks = wizard.querySelectorAll('[data-heatmap-check]');
+		var from = diagnosticSeconds(diagnosticFrom);
+		var to = diagnosticSeconds(diagnosticTo);
 		var i;
+		if ((from === null) !== (to === null) || (from !== null && to !== null && from >= to)) {
+			setLog(adminText('diagnostic-window-invalid', 'Choose a valid UTC diagnostic window.'));
+			return null;
+		}
+		if (from !== null && to !== null) {
+			controls.diagnosticFrom = from;
+			controls.diagnosticTo = to;
+		}
 		if (useCurrentControls) {
 			for (i = 0; i < fields.length; i++) {
 				controls[fields[i].getAttribute('data-heatmap-number')] = fields[i].value;
@@ -1109,31 +1380,48 @@ function setupHeatmapAdminWizard(wizard) {
 		return HeatmapAdminPayload.build(action, {
 			game: wizard.getAttribute('data-heatmap-game'),
 			map: activeMap()
-		}, controls, useCurrentControls);
+		}, controls, useCurrentControls, currentConfigHash);
 	}
 
-	function render(payload) {
+	function responseMessage(data, fallback) {
+		return data && typeof data.message === 'string' && data.message.length <= 512
+			? data.message
+			: fallback;
+	}
+
+	function render(payload, replaceFloors) {
 		var side;
 		var radius;
+		var imageUrl;
+		var points;
 		lastPayload = payload;
+		if (isConfigHash(payload.configHash)) {
+			currentConfigHash = payload.configHash;
+		}
 		if (payload.projection) {
 			currentConfig = payload.projection;
 			currentConfig.renderer = payload.renderer ? payload.renderer.mode : 'thermal';
 			currentConfig.normalization = payload.renderer ? payload.renderer.normalization : 'sqrt';
 			syncFieldsFromConfig(currentConfig);
+			if (replaceFloors) {
+				renderFloors(currentConfig.floors || []);
+			}
+			renderFloorSelect(currentConfig.floors || []);
 		}
-		if (payload.image && payload.image.url) {
+		points = Array.isArray(payload.points) ? payload.points : [];
+		imageUrl = payload.image && heatmapSafeImageUrl(payload.image.url);
+		if (imageUrl) {
 			image.onload = function() {
-				canvas.width = payload.image.width || image.naturalWidth;
-				canvas.height = payload.image.height || image.naturalHeight;
+				canvas.width = heatmapSafeImageDimension(payload.image.width, image.naturalWidth);
+				canvas.height = heatmapSafeImageDimension(payload.image.height, image.naturalHeight);
 				side = Math.sqrt(canvas.width * canvas.height);
-				radius = payload.points.length <= 5 ? 46 : Math.max(24, Math.min(54, Math.round(side / 38)));
+				radius = points.length <= 5 ? 46 : Math.max(24, Math.min(54, Math.round(side / 38)));
 				lastGuideRadius = radius + Math.round(radius * 0.55);
-				renderer.radius(radius, Math.round(radius * 0.55)).data(payload.points || [], payload.max || 1, payload.renderer).draw();
+				renderer.radius(radius, Math.round(radius * 0.55)).data(points, payload.max || 1, payload.renderer).draw();
 				canvas.style.display = overlayVisible ? 'block' : 'none';
 				updateGuides();
 			};
-			image.src = payload.image.url;
+			image.src = imageUrl;
 			if (image.complete) {
 				image.onload();
 			}
@@ -1142,15 +1430,23 @@ function setupHeatmapAdminWizard(wizard) {
 			status.textContent = payload.diagnostics.inBounds + '/' + payload.diagnostics.queried + ' ' + heatmapText('heatmapInBounds', 'in bounds');
 			status.className = payload.diagnostics.manualRequired ? 'heatmap-status is-warning' : 'heatmap-status';
 		}
-		setLog(JSON.stringify({
-			saved: Boolean(payload.saved),
-			configHash: payload.configHash,
-			diagnostics: payload.diagnostics
-		}, null, 2));
+		renderDiagnostics(payload);
+		setLog(responseMessage(payload, adminText('preview-ready', 'Preview ready.')));
 	}
 
 	function request(action, token, useCurrentControls) {
 		var payload = collectConfig(action, useCurrentControls !== false);
+		var headers = {
+			'Content-Type': 'application/json',
+			'X-HLX-CSRF': csrfToken
+		};
+		if (!payload) {
+			return Promise.resolve(null);
+		}
+		if (action === 'save' && !isConfigHash(currentConfigHash)) {
+			setLog(adminText('load-before-save', 'Load the calibration before saving.'));
+			return Promise.resolve(null);
+		}
 		if (!token) {
 			token = ++requestSeq;
 		}
@@ -1162,7 +1458,7 @@ function setupHeatmapAdminWizard(wizard) {
 		return fetch('heatmap_admin.php', {
 			method: 'POST',
 			credentials: 'same-origin',
-			headers: {'Content-Type': 'application/json'},
+			headers: headers,
 			body: JSON.stringify(payload)
 		})
 		.then(function(response) {
@@ -1174,18 +1470,29 @@ function setupHeatmapAdminWizard(wizard) {
 			});
 		})
 		.then(function(data) {
-			if (action === 'regenerate') {
-				setLog(JSON.stringify(data, null, 2));
-				return data;
-			}
 			if (token !== requestSeq) {
 				return data;
 			}
-			render(data);
+			if (action === 'save') {
+				if (isConfigHash(data.configHash)) {
+					currentConfigHash = data.configHash;
+				}
+				if (data.projection) {
+					syncFieldsFromConfig(data.projection);
+					renderFloors(data.floors || data.projection.floors || []);
+					renderFloorSelect(data.floors || data.projection.floors || []);
+				}
+				setLog(responseMessage(data, adminText('saved', 'Calibration saved.')));
+				return request('preview');
+			}
+			render(data, useCurrentControls === false);
 			return data;
 		})
 		.catch(function(error) {
-			setLog(JSON.stringify(error, null, 2));
+			setLog(responseMessage(error, heatmapText('heatmapRequestFailed', 'Heatmap request failed')));
+			if (error && error.code === 'stale_config') {
+				requestStoredConfig();
+			}
 		});
 	}
 
@@ -1195,9 +1502,15 @@ function setupHeatmapAdminWizard(wizard) {
 
 	function upload() {
 		var form = new FormData();
+		if (!isConfigHash(currentConfigHash)) {
+			setLog(adminText('load-before-save', 'Load the calibration before saving files.'));
+			return;
+		}
 		form.append('action', 'upload');
 		form.append('game', wizard.getAttribute('data-heatmap-game'));
 		form.append('map', activeMap());
+		form.append('configHash', currentConfigHash);
+		form.append('lang', adminLanguage);
 		if (mapImage && mapImage.files && mapImage.files[0]) {
 			form.append('mapImage', mapImage.files[0]);
 		}
@@ -1211,6 +1524,7 @@ function setupHeatmapAdminWizard(wizard) {
 		fetch('heatmap_admin.php', {
 			method: 'POST',
 			credentials: 'same-origin',
+			headers: {'X-HLX-CSRF': csrfToken},
 			body: form
 		})
 		.then(function(response) {
@@ -1222,14 +1536,20 @@ function setupHeatmapAdminWizard(wizard) {
 			});
 		})
 		.then(function(data) {
+			if (isConfigHash(data.configHash)) {
+				currentConfigHash = data.configHash;
+			}
 			if (data.projection) {
 				syncFieldsFromConfig(data.projection);
 			}
-			setLog(JSON.stringify(data, null, 2));
+			setLog(responseMessage(data, adminText('uploaded', 'Upload saved.')));
 			request('preview');
 		})
 		.catch(function(error) {
-			setLog(JSON.stringify(error, null, 2));
+			setLog(responseMessage(error, heatmapText('heatmapRequestFailed', 'Heatmap request failed')));
+			if (error && error.code === 'stale_config') {
+				requestStoredConfig();
+			}
 		});
 	}
 
@@ -1244,8 +1564,23 @@ function setupHeatmapAdminWizard(wizard) {
 	bindClick('[data-heatmap-admin-preview]', function() { request('preview'); });
 	bindClick('[data-heatmap-admin-save]', function() { request('save'); });
 	bindClick('[data-heatmap-admin-upload]', upload);
-	bindClick('[data-heatmap-admin-regenerate]', function() {
-		request('regenerate');
+	bindClick('[data-heatmap-floor-add]', function() {
+		addFloorRow({
+			id: 'floor' + String((floorRows ? floorRows.children.length : 0) + 1),
+			label_en: 'Floor',
+			label_ru: 'Уровень',
+			z_min: 0,
+			z_max: 1
+		});
+		schedulePreview();
+	});
+	bindClick('[data-heatmap-floor-suggest]', function() {
+		if (!suggestedFloors.length) {
+			return;
+		}
+		renderFloors(suggestedFloors);
+		renderFloorSelect(suggestedFloors);
+		schedulePreview();
 	});
 	if (toggle) {
 		toggle.onclick = function() {
@@ -1298,6 +1633,18 @@ function setupHeatmapAdminWizard(wizard) {
 	}
 	if (mapSelect) {
 		mapSelect.onchange = requestStoredConfig;
+	}
+	if (floorSelect) {
+		floorSelect.onchange = schedulePreview;
+	}
+	if (eventSelect) {
+		eventSelect.onchange = schedulePreview;
+	}
+	if (diagnosticFrom) {
+		diagnosticFrom.onchange = schedulePreview;
+	}
+	if (diagnosticTo) {
+		diagnosticTo.onchange = schedulePreview;
 	}
 	if (canvas) {
 		canvas.onmousedown = function(event) {
@@ -1354,6 +1701,7 @@ function setupHeatmapAdminWizard(wizard) {
 		};
 	}
 	syncFieldsFromConfig(currentConfig);
+	seedDiagnosticWindow();
 	updateGuides();
 	if (activeMap()) {
 		requestStoredConfig();

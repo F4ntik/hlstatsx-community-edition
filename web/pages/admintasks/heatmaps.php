@@ -18,9 +18,11 @@ $container = require dirname(__DIR__, 2) . '/bootstrap.php';
 $pdo = $container->get('pdo');
 $maps = $selectedGame === '' ? array() : heatmap_fetch_known_maps($pdo, $selectedGame);
 $defaultMap = count($maps) ? $maps[0] : '';
+$csrfToken = heatmap_admin_session_csrf_token();
+$adminLanguage = current_lang();
 ?>
 
-<div class="heatmap-admin-wizard" data-heatmap-admin="1" data-heatmap-game="<?php echo eHtml($selectedGame); ?>" data-heatmap-map="<?php echo eHtml($defaultMap); ?>">
+<div class="heatmap-admin-wizard" data-heatmap-admin="1" data-heatmap-game="<?php echo eHtml($selectedGame); ?>" data-heatmap-map="<?php echo eHtml($defaultMap); ?>" data-heatmap-csrf="<?php echo eHtml($csrfToken); ?>" data-heatmap-lang="<?php echo eHtml($adminLanguage); ?>" data-heatmap-admin-text-all-floors="<?php echo eHtml(t('admin.task.heatmaps.all_floors')); ?>" data-heatmap-admin-text-remove-floor="<?php echo eHtml(t('admin.task.heatmaps.remove_floor')); ?>" data-heatmap-admin-text-diagnostic-window-invalid="<?php echo eHtml(t('admin.task.heatmaps.diagnostic_window_invalid')); ?>" data-heatmap-admin-text-preview-ready="<?php echo eHtml(t('admin.task.heatmaps.preview_ready')); ?>" data-heatmap-admin-text-saved="<?php echo eHtml(t('admin.task.heatmaps.saved')); ?>" data-heatmap-admin-text-uploaded="<?php echo eHtml(t('admin.task.heatmaps.uploaded')); ?>" data-heatmap-admin-text-load-before-save="<?php echo eHtml(t('admin.task.heatmaps.load_before_save')); ?>">
 	<p><?php echo eHtml(t('admin.task.heatmaps.intro')); ?></p>
 	<div class="heatmap-admin-controls">
 		<label>
@@ -82,6 +84,34 @@ $defaultMap = count($maps) ? $maps[0] : '';
 					<option value="log">log</option>
 				</select>
 			</label>
+			<label><?php echo eHtml(t('admin.task.heatmaps.floor')); ?>
+				<select data-heatmap-admin-floor="1"><option value="all"><?php echo eHtml(t('admin.task.heatmaps.all_floors')); ?></option></select>
+			</label>
+			<label><?php echo eHtml(t('admin.task.heatmaps.event')); ?>
+				<select data-heatmap-admin-event="1">
+					<option value="both"><?php echo eHtml(t('admin.task.heatmaps.events_both')); ?></option>
+					<option value="kills"><?php echo eHtml(t('literal.kills')); ?></option>
+					<option value="deaths"><?php echo eHtml(t('literal.deaths')); ?></option>
+				</select>
+			</label>
+			<fieldset class="heatmap-admin-diagnostic">
+				<legend><?php echo eHtml(t('admin.task.heatmaps.diagnostic')); ?></legend>
+				<label><?php echo eHtml(t('admin.task.heatmaps.diagnostic_from')); ?> <input type="datetime-local" data-heatmap-diagnostic-from="1" /></label>
+				<label><?php echo eHtml(t('admin.task.heatmaps.diagnostic_to')); ?> <input type="datetime-local" data-heatmap-diagnostic-to="1" /></label>
+				<p data-heatmap-diagnostic-counts="1" aria-live="polite"></p>
+				<ol class="heatmap-admin-histogram" data-heatmap-z-histogram="1"></ol>
+			</fieldset>
+			<fieldset class="heatmap-admin-floors">
+				<legend><?php echo eHtml(t('admin.task.heatmaps.floors')); ?></legend>
+				<div class="heatmap-admin-floor-table-wrap">
+					<table class="heatmap-admin-floor-table">
+						<thead><tr><th><?php echo eHtml(t('admin.task.heatmaps.floor_id')); ?></th><th><?php echo eHtml(t('admin.task.heatmaps.floor_label_en')); ?></th><th><?php echo eHtml(t('admin.task.heatmaps.floor_label_ru')); ?></th><th><?php echo eHtml(t('admin.task.heatmaps.floor_z_min')); ?></th><th><?php echo eHtml(t('admin.task.heatmaps.floor_z_max')); ?></th><th></th></tr></thead>
+						<tbody data-heatmap-floor-rows="1"></tbody>
+					</table>
+				</div>
+				<button type="button" data-heatmap-floor-add="1"><?php echo eHtml(t('admin.task.heatmaps.add_floor')); ?></button>
+				<button type="button" data-heatmap-floor-suggest="1"><?php echo eHtml(t('admin.task.heatmaps.use_suggestion')); ?></button>
+			</fieldset>
 			<textarea data-heatmap-overview="1" placeholder="<?php echo eHtml(t('heatmap.overview_placeholder')); ?>"></textarea>
 			<div class="heatmap-admin-buttons">
 				<input type="file" accept="image/jpeg" data-heatmap-map-image="1" />
@@ -89,9 +119,11 @@ $defaultMap = count($maps) ? $maps[0] : '';
 				<button type="button" data-heatmap-admin-upload="1"><?php echo eHtml(t('admin.task.heatmaps.upload')); ?></button>
 				<button type="button" data-heatmap-admin-preview="1"><?php echo eHtml(t('admin.task.heatmaps.preview')); ?></button>
 				<button type="button" data-heatmap-admin-save="1"><?php echo eHtml(t('admin.task.heatmaps.save')); ?></button>
-				<button type="button" data-heatmap-admin-regenerate="1"><?php echo eHtml(t('admin.task.heatmaps.regenerate')); ?></button>
 			</div>
-			<pre class="heatmap-admin-log" data-heatmap-admin-log="1"></pre>
+			<p class="heatmap-admin-deployment" data-heatmap-deployment-note="1"><?php echo eHtml(t('admin.task.heatmaps.deployment')); ?></p>
+			<code class="heatmap-admin-deployment-command" data-heatmap-deployment-command="1">$env:PYTHONPATH='scripts'
+rtk python -m hlstats_py.heatmaps --game &lt;validated-game&gt; --map &lt;validated-map&gt; --disablecache</code>
+			<div class="heatmap-admin-log" data-heatmap-admin-log="1" role="status" aria-live="polite"></div>
 		</div>
 	</div>
 </div>

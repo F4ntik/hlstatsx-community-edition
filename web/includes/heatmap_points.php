@@ -500,6 +500,22 @@ function heatmap_v2_token($value)
     return $value;
 }
 
+function heatmap_admin_session_csrf_token(): string
+{
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        throw new RuntimeException('admin_session_unavailable');
+    }
+
+    $token = $_SESSION['heatmap_admin_csrf'] ?? null;
+    if (is_string($token) && preg_match('/^[a-f0-9]{64}$/D', $token) === 1) {
+        return $token;
+    }
+
+    $token = bin2hex(random_bytes(32));
+    $_SESSION['heatmap_admin_csrf'] = $token;
+    return $token;
+}
+
 function heatmap_floor_id_is_valid($value)
 {
     return is_string($value) && preg_match('/^[A-Za-z][A-Za-z0-9_-]{0,31}$/D', $value) === 1;
@@ -1023,6 +1039,7 @@ function heatmap_scene_prepare_state(array &$state): void
         'candidate' => 0,
         'validXY' => 0,
         'validZ' => 0,
+        'zHistogram' => array(),
         'missingCoordinates' => 0,
         'malformedCoordinates' => 0,
         'assigned' => 0,
@@ -1062,6 +1079,13 @@ function heatmap_scene_accumulate_contribution(array &$scene, array $row, string
     foreach ($coordinates as $coordinate) {
         $hasMissing = $hasMissing || $coordinate['status'] === 'missing';
         $hasMalformed = $hasMalformed || $coordinate['status'] === 'malformed';
+    }
+    if ($z['status'] === 'valid') {
+        $bucket = intval(floor(floatval($z['value']) / 32.0)) * 32;
+        if (!isset($scene['zHistogram'][$bucket])) {
+            $scene['zHistogram'][$bucket] = 0;
+        }
+        $scene['zHistogram'][$bucket]++;
     }
     if ($hasMissing) {
         $scene['missingCoordinates']++;
@@ -1239,6 +1263,70 @@ function heatmap_scene_floor_config_hash(array $floors): string
     return substr(sha1(is_string($encoded) ? $encoded : '[]'), 0, 16);
 }
 
+function heatmap_scene_z_histogram_rows(array $histogram): array
+{
+    $rows = array();
+    foreach ($histogram as $z => $count) {
+        if (!is_numeric($z) || intval($count) <= 0) {
+            continue;
+        }
+        $rows[] = array('z' => intval($z), 'count' => intval($count));
+    }
+    usort($rows, function ($left, $right) {
+        return $left['z'] <=> $right['z'];
+    });
+
+    return $rows;
+}
+
+function heatmap_suggest_floor_bands(array $histogramRows): array
+{
+    $rows = array();
+    foreach ($histogramRows as $row) {
+        if (!is_array($row) || !isset($row['z'], $row['count']) || intval($row['count']) <= 0) {
+            continue;
+        }
+        $z = intval($row['z']);
+        if ($z < HEATMAP_MEDIUMINT_MIN || $z > HEATMAP_MEDIUMINT_MAX - 31) {
+            continue;
+        }
+        $rows[$z] = true;
+    }
+    $starts = array_keys($rows);
+    sort($starts, SORT_NUMERIC);
+    if (!$starts) {
+        return array();
+    }
+
+    $bands = array();
+    $start = intval($starts[0]);
+    $end = $start + 32;
+    foreach (array_slice($starts, 1) as $next) {
+        $next = intval($next);
+        $gap = $next - $end;
+        if ($gap >= 128 && count($bands) < HEATMAP_MAX_FLOORS - 1) {
+            $bands[] = array('z_min' => $start, 'z_max' => $end);
+            $start = $next;
+        }
+        $end = max($end, $next + 32);
+    }
+    $bands[] = array('z_min' => $start, 'z_max' => $end);
+
+    $suggestions = array();
+    foreach ($bands as $index => $band) {
+        $number = $index + 1;
+        $suggestions[] = array(
+            'id' => 'floor' . $number,
+            'label_en' => 'Floor ' . $number,
+            'label_ru' => 'Уровень ' . $number,
+            'z_min' => intval($band['z_min']),
+            'z_max' => intval($band['z_max']),
+        );
+    }
+
+    return heatmap_parse_floor_array($suggestions);
+}
+
 function heatmap_finalize_scene(array $state): array
 {
     heatmap_scene_prepare_state($state);
@@ -1329,6 +1417,7 @@ function heatmap_finalize_scene(array $state): array
             'candidate' => $scene['candidate'],
             'validXY' => $scene['validXY'],
             'validZ' => $scene['validZ'],
+            'zHistogram' => heatmap_scene_z_histogram_rows($scene['zHistogram']),
             'missingCoordinates' => $scene['missingCoordinates'],
             'malformedCoordinates' => $scene['malformedCoordinates'],
             'assigned' => $scene['assigned'],
@@ -2067,6 +2156,36 @@ function heatmap_cache_dir()
     return dirname(__DIR__) . '/cache/heatmaps';
 }
 
+function heatmap_cache_subdirectory(string $name): ?string
+{
+    if ($name !== 'locks') {
+        return null;
+    }
+
+    $directory = heatmap_cache_dir() . DIRECTORY_SEPARATOR . $name;
+    if (!is_dir($directory) && !@mkdir($directory, 0700, true)) {
+        return null;
+    }
+    if (is_link($directory) || !is_dir($directory) || !is_writable($directory)) {
+        return null;
+    }
+
+    @chmod($directory, 0700);
+    return $directory;
+}
+
+function heatmap_admin_map_lock_path(string $game, string $map): string
+{
+    $game = heatmap_clean_token($game);
+    $map = heatmap_clean_token($map);
+    $directory = heatmap_cache_subdirectory('locks');
+    if ($game === '' || $map === '' || $directory === null) {
+        throw new RuntimeException('admin_lock_unavailable');
+    }
+
+    return $directory . DIRECTORY_SEPARATOR . hash('sha256', $game . "\0" . $map) . '.lock';
+}
+
 function heatmap_cache_key(array $parts)
 {
     return sha1(json_encode($parts, JSON_UNESCAPED_SLASHES));
@@ -2203,6 +2322,69 @@ function heatmap_config_hash(array $config, array $image = null)
     }
 
     return substr(sha1(json_encode($payload, JSON_UNESCAPED_SLASHES)), 0, 16);
+}
+
+function heatmap_admin_file_identity(string $path): array
+{
+    clearstatcache(true, $path);
+    if (is_link($path) || !is_file($path)) {
+        return array('state' => 'missing');
+    }
+
+    $digest = hash_file('sha256', $path);
+    if (!is_string($digest) || $digest === '') {
+        throw new RuntimeException('admin_asset_unreadable');
+    }
+    clearstatcache(true, $path);
+
+    return array(
+        'state' => 'present',
+        'sha256' => $digest,
+        'bytes' => max(0, intval(filesize($path))),
+    );
+}
+
+function heatmap_overview_path(array $config, string $map): string
+{
+    $game = heatmap_clean_token($config['game'] ?? '');
+    $map = heatmap_clean_token($map);
+    if ($game === '' || $map === '') {
+        throw new InvalidArgumentException('invalid_overview_target');
+    }
+
+    return dirname(__DIR__, 2) . '/heatmaps/overviews/' . $game . '/' . $map . '.txt';
+}
+
+function heatmap_admin_config_hash(array $config, array $image = null): string
+{
+    $map = heatmap_clean_token($config['map'] ?? '');
+    if ($map === '') {
+        throw new InvalidArgumentException('invalid_config_hash');
+    }
+    $image = $image ?? heatmap_image_metadata($config['code'] ?? $config['game'] ?? '', $map, $config);
+    $sourceWidth = intval($image['sourceWidth'] ?? $image['width'] ?? 0);
+    $sourceHeight = intval($image['sourceHeight'] ?? $image['height'] ?? 0);
+    $config = heatmap_normalize_crop($config, $sourceWidth, $sourceHeight);
+    $sourcePath = heatmap_source_path($config, $map);
+    $imagePath = strval($image['path'] ?? '');
+    if ($imagePath === '') {
+        $imagePath = $sourcePath;
+    }
+    $payload = array(
+        'schema' => 1,
+        'projection' => heatmap_projection_config($config),
+        'image' => heatmap_admin_file_identity($imagePath),
+        'overview' => heatmap_admin_file_identity(heatmap_overview_path($config, $map)),
+    );
+    $encoded = json_encode(
+        heatmap_cache_identity_value($payload),
+        JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION
+    );
+    if (!is_string($encoded)) {
+        throw new RuntimeException('admin_hash_unavailable');
+    }
+
+    return hash('sha256', $encoded);
 }
 
 function heatmap_add_actor(array &$bucket, $group, $id, $name)
@@ -2496,6 +2678,46 @@ function heatmap_fetch_config(PDO $pdo, $game, $map)
     $statement->execute(array('game' => $game, 'map' => $map));
     $row = $statement->fetch(PDO::FETCH_ASSOC);
 
+    if (!$row) {
+        return null;
+    }
+
+    $row['floors'] = heatmap_parse_floor_config($row['floors_json'] ?? null);
+    $row['floors_json'] = heatmap_floor_config_json($row['floors']);
+    return $row;
+}
+
+function heatmap_fetch_config_for_update(PDO $pdo, $game, $map): ?array
+{
+    $statement = $pdo->prepare(
+        'SELECT
+            g.code,
+            g.realgame,
+            hc.map,
+            hc.game,
+            hc.xoffset,
+            hc.yoffset,
+            hc.flipx,
+            hc.flipy,
+            hc.rotate,
+            hc.days,
+            hc.brush,
+            hc.scale,
+            hc.font,
+            hc.thumbw,
+            hc.thumbh,
+            hc.cropx1,
+            hc.cropy1,
+            hc.cropx2,
+            hc.cropy2,
+            hc.floors_json
+        FROM hlstats_Games AS g
+        INNER JOIN hlstats_Heatmap_Config AS hc ON hc.game = g.realgame
+        WHERE g.code = :game AND hc.map = :map
+        LIMIT 1 FOR UPDATE'
+    );
+    $statement->execute(array('game' => $game, 'map' => $map));
+    $row = $statement->fetch(PDO::FETCH_ASSOC);
     if (!$row) {
         return null;
     }

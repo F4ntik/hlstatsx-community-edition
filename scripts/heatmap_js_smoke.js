@@ -46,6 +46,14 @@ assert.deepStrictEqual(
   {action: 'preview', game: 'cstrike', map: 'de_dust2', overviewText: '', xoffset: '0', yoffset: '0', scale: '1', flipy: 0},
   'edit preview should send current controls'
 );
+assert.deepStrictEqual(
+  plain(adminPayload.build('save', identity, controls, true, 'a'.repeat(64))),
+  {action: 'save', game: 'cstrike', map: 'de_dust2', overviewText: '', xoffset: '0', yoffset: '0', scale: '1', flipy: 0, configHash: 'a'.repeat(64)},
+  'save should carry the last server-issued configuration hash'
+);
+assert.match(source, /'X-HLX-CSRF'/, 'admin mutations should carry the session-bound CSRF header');
+assert.doesNotMatch(source, /innerHTML/, 'untrusted heatmap payloads must be rendered with DOM text nodes');
+assert.doesNotMatch(source, /data-heatmap-admin-regenerate/, 'the browser must not expose server-side regeneration');
 assert.match(source, /bindClick\('\[data-heatmap-admin-load\]', requestStoredConfig\);/, 'Load button should request stored config');
 assert.match(source, /mapSelect\.onchange = requestStoredConfig;/, 'map change should request stored config');
 assert.match(source, /if \(activeMap\(\)\) \{\s*requestStoredConfig\(\);/, 'initial wizard load should request stored config');

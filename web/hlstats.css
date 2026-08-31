@@ -972,6 +972,65 @@ nav{
 	box-sizing: border-box;
 }
 
+.heatmap-admin-diagnostic,
+.heatmap-admin-floors {
+	grid-column: 1 / -1;
+	min-width: 0;
+	margin: 0;
+	padding: 8px;
+	border: 1px solid #b8b8b8;
+}
+
+.heatmap-admin-diagnostic label {
+	display: inline-block;
+	margin-right: 12px;
+}
+
+.heatmap-admin-diagnostic input[type=datetime-local] {
+	max-width: 178px;
+}
+
+.heatmap-admin-histogram {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+	gap: 3px 12px;
+	max-height: 116px;
+	margin: 6px 0 0;
+	padding-left: 22px;
+	overflow: auto;
+}
+
+.heatmap-admin-floor-table-wrap {
+	max-width: 100%;
+	overflow-x: auto;
+}
+
+.heatmap-admin-floor-table {
+	width: 100%;
+	border-collapse: collapse;
+	font: 11px Arial, sans-serif;
+}
+
+.heatmap-admin-floor-table th,
+.heatmap-admin-floor-table td {
+	padding: 3px;
+	border-bottom: 1px solid #d0d0d0;
+	text-align: left;
+}
+
+.heatmap-admin-floor-table input {
+	box-sizing: border-box;
+	width: 100%;
+	min-width: 74px;
+}
+
+.heatmap-admin-deployment-command {
+	display: block;
+	padding: 6px;
+	background: #f2f2f2;
+	white-space: pre-wrap;
+}
+
 .heatmap-admin-buttons button {
 	margin: 4px 4px 0 0;
 }
@@ -989,5 +1048,9 @@ nav{
 @media (max-width: 800px) {
 	.heatmap-admin-grid {
 		grid-template-columns: 1fr;
+	}
+
+	.heatmap-admin-diagnostic label {
+		display: block;
 	}
 }

@@ -98,6 +98,14 @@ function smoke_remove_directory(string $directory): void
     @rmdir($directory);
 }
 
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
+}
+unset($_SESSION['heatmap_admin_csrf']);
+$adminCsrfToken = heatmap_admin_session_csrf_token();
+assert_true(preg_match('/^[a-f0-9]{64}$/D', $adminCsrfToken) === 1, 'admin CSRF token should be a 32-byte random hex token');
+assert_same($adminCsrfToken, heatmap_admin_session_csrf_token(), 'admin CSRF token should remain stable for the current session');
+
 $explorerModeCases = array(
     array('input' => array(), 'mode' => 0),
     array('input' => array('HeatmapExplorerBeta' => 0), 'mode' => 0),
@@ -899,6 +907,47 @@ assert_throws('invalid_floor_config', function () use ($floorConfig): void {
 assert_throws('invalid_floor_config', function () use ($floorConfig): void {
     heatmap_merge_config_override($floorConfig, array('floors_json' => '{"not":"a list"}'));
 }, 'config merge should fail closed for invalid floor storage');
+
+$adminHashDirectory = smoke_temp_directory('admin-hash');
+$adminHashImage = $adminHashDirectory . '/map.jpg';
+assert_same(3, file_put_contents($adminHashImage, 'one'), 'admin hash fixture should write its first image identity');
+$adminHashConfig = array(
+    'game' => 'adminhash',
+    'map' => 'de_hash',
+    'xoffset' => 0,
+    'yoffset' => 0,
+    'scale' => 1,
+    'floors_json' => '[]',
+);
+$adminHashImageMetadata = array('path' => $adminHashImage, 'width' => 16, 'height' => 16);
+$firstAdminHash = heatmap_admin_config_hash($adminHashConfig, $adminHashImageMetadata);
+assert_true(preg_match('/^[a-f0-9]{64}$/D', $firstAdminHash) === 1, 'admin hash should be a complete SHA-256 token');
+assert_same(3, file_put_contents($adminHashImage, 'two'), 'admin hash fixture should replace image content without changing the path');
+assert_true(
+    $firstAdminHash !== heatmap_admin_config_hash($adminHashConfig, $adminHashImageMetadata),
+    'admin hash should change with the resolved image content identity'
+);
+smoke_remove_directory($adminHashDirectory);
+
+$histogramRows = heatmap_scene_z_histogram_rows(array(160 => 2, -64 => 1, 0 => 3, 'bad' => 4, 64 => 0));
+assert_same(
+    array(
+        array('z' => -64, 'count' => 1),
+        array('z' => 0, 'count' => 3),
+        array('z' => 160, 'count' => 2),
+    ),
+    $histogramRows,
+    'Z histogram rows should be sorted 32-unit buckets with positive valid contributions only'
+);
+$suggestedFloors = heatmap_suggest_floor_bands($histogramRows);
+assert_same(
+    array(
+        floor_fixture('floor1', -64, 32, 'Floor 1', 'Уровень 1'),
+        floor_fixture('floor2', 160, 192, 'Floor 2', 'Уровень 2'),
+    ),
+    $suggestedFloors,
+    'floor suggestions should split only the sufficiently large Z gap and remain parser-valid'
+);
 
 function scene_query(array $overrides = array()): array
 {

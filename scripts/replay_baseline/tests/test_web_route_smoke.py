@@ -129,6 +129,57 @@ def test_heatmap_explorer_public_contract_keeps_i18n_controls_and_safe_shells_in
     assert "innerHTML" not in explorer_js
 
 
+def test_heatmap_admin_mutation_boundary_is_fail_closed() -> None:
+    """Admin writes stay behind the agreed session-bound request boundary."""
+
+    admin = (REPOSITORY_ROOT / "web/heatmap_admin.php").read_text(encoding="utf-8")
+    helper = (REPOSITORY_ROOT / "web/includes/heatmap_points.php").read_text(
+        encoding="utf-8"
+    )
+    wizard = (REPOSITORY_ROOT / "web/pages/admintasks/heatmaps.php").read_text(
+        encoding="utf-8"
+    )
+    client = (REPOSITORY_ROOT / "web/includes/js/heatmap.js").read_text(
+        encoding="utf-8"
+    )
+
+    for token in (
+        "heatmap_admin_session_csrf_token",
+        "HTTP_X_HLX_CSRF",
+        "hash_equals(",
+        "HTTP_ORIGIN",
+        "HTTP_REFERER",
+        "REQUEST_METHOD",
+        "array('save', 'upload')",
+    ):
+        assert token in admin
+    assert "random_bytes(32)" in helper
+    for token in (
+        "heatmap_admin_config_hash",
+        "hash_file('sha256'",
+        "heatmap_admin_map_lock_path",
+        "FOR UPDATE",
+    ):
+        assert token in helper
+    assert "flock(" in admin
+    assert "heatmap_clear_payload_cache" in admin
+    assert "CONTENT_TYPE" in admin
+    assert "application/json" in admin
+    for token in (
+        "data-heatmap-csrf",
+        "data-heatmap-floor-rows",
+        "data-heatmap-diagnostic-from",
+        "data-heatmap-deployment-command",
+    ):
+        assert token in wizard
+    assert "data-heatmap-admin-regenerate" not in wizard
+    assert "'X-HLX-CSRF'" in client
+    assert "heatmapSafeImageUrl" in client
+    assert "innerHTML" not in client
+    for forbidden in ("regenerate", "proc_open", "'detail' =>", "'command' =>"):
+        assert forbidden not in admin
+
+
 def test_representative_routes_include_populated_cstrike_award_tabs() -> None:
     award_tabs = {
         params["tab"]
