@@ -219,6 +219,33 @@ assert_same($cacheableStates, array_values(array_filter(
     'heatmap_scene_state_is_cacheable'
 )), 'cacheable state allowlist should remain exact');
 
+$cacheReadProbeDirectory = smoke_temp_directory('payload-cache-red');
+$cacheReadProbeKey = str_repeat('4', 64);
+$cacheReadProbePayload = array(
+    'schemaVersion' => 2,
+    'state' => 'ok',
+    'query' => array(),
+    'map' => array(),
+    'floors' => array(),
+    'grid' => array('fields' => array()),
+    'layers' => array('total' => array(), 'me' => array(), 'others' => array()),
+    'comparison' => array('bins' => array()),
+    'coverage' => array(),
+    'summary' => array(),
+    'warnings' => array(),
+    'fallback' => array(),
+);
+assert_true(file_put_contents(
+    $cacheReadProbeDirectory . DIRECTORY_SEPARATOR . $cacheReadProbeKey . '.json',
+    json_encode($cacheReadProbePayload)
+) !== false, 'cache read probe fixture should be written');
+assert_same(
+    $cacheReadProbePayload,
+    heatmap_read_complete_payload_cache($cacheReadProbeKey, $cacheReadProbeDirectory),
+    'complete cache reads should support an explicit test directory'
+);
+smoke_remove_directory($cacheReadProbeDirectory);
+
 $pruneDirectory = smoke_temp_directory('prune');
 $pruneNow = 2000000000;
 $pruneCutoff = $pruneNow - 172800;
@@ -299,13 +326,114 @@ assert_true(floatval($logPayload['projectionCoverage']) <= 1.0, 'request log sho
 
 $routeSource = file_get_contents(ROOT_PATH . '/heatmap_points.php');
 assert_true($routeSource !== false, 'heatmap route should be readable');
-assert_contains("\$container = require __DIR__ . '/bootstrap.php';", $routeSource, 'route should bootstrap before selecting v1 or v2');
-assert_contains('OptionService::class', $routeSource, 'route should load options before selecting v1 or v2');
-assert_contains("\$_GET['v'] !== '2'", $routeSource, 'route should split only on exact v=2');
+$v2Marker = strpos($routeSource, '$isV2 =');
+$v1Branch = strpos($routeSource, 'if (!$isV2) {');
+$v1Validation = strpos($routeSource, "if (\$game === '' || \$map === '')");
+$bootstrapMarker = strpos($routeSource, "\$container = require __DIR__ . '/bootstrap.php';");
+$v1Pdo = strpos($routeSource, "\$pdo = \$container->get('pdo');");
+$v2Start = strpos($routeSource, '$v2StartedAt = microtime(true);');
+$optionLookup = strpos($routeSource, 'OptionService::class');
+assert_true(
+    $v2Marker !== false
+        && $v1Branch !== false
+        && $v1Validation !== false
+        && $bootstrapMarker !== false
+        && $v2Marker < $v1Branch
+        && $v1Branch < $v1Validation
+        && $v1Validation < $bootstrapMarker,
+    'v1 parsing and invalid-game validation should precede bootstrap'
+);
+assert_true(
+    $v1Pdo !== false
+        && $optionLookup !== false
+        && $v1Pdo < $optionLookup
+        && $v2Start !== false
+        && $v2Start < $optionLookup,
+    'v1 should obtain PDO without entering the v2 option lookup'
+);
+assert_true(
+    $v2Start !== false && $optionLookup > $v2Start,
+    'OptionService lookup should be unreachable from the completed v1 branch'
+);
+assert_contains('OptionService::class', $routeSource, 'v2 route should load options after v1 isolation');
+assert_contains("\$isV2 = isset(\$_GET['v']) && is_string(\$_GET['v']) && \$_GET['v'] === '2';", $routeSource, 'route should split only on exact v=2');
 assert_contains('explorer_disabled', $routeSource, 'disabled v2 mode should publish the stable disabled state');
 assert_contains('heatmap_build_scene(', $routeSource, 'v2 route should delegate scene construction to the Task 4 builder');
 assert_contains('heatmap_atomic_write_json', $routeSource . file_get_contents(ROOT_PATH . '/includes/heatmap_points.php'), 'route path should use the atomic cache writer');
 assert_true(substr_count($routeSource, 'heatmap_v2_emit(') >= 2, 'v2 responses should pass through one encode/log emission helper');
+
+$cacheFixtureDirectory = smoke_temp_directory('payload-cache');
+$cacheFixtureKeys = array(
+    'corrupt' => str_repeat('a', 64),
+    'incomplete' => str_repeat('b', 64),
+    'forbidden' => str_repeat('c', 64),
+    'v1' => str_repeat('d', 64),
+    'v2' => str_repeat('e', 64),
+    'public' => str_repeat('f', 64),
+    'realgame' => str_repeat('1', 64),
+    'mapMismatch' => str_repeat('2', 64),
+    'otherGame' => str_repeat('3', 64),
+);
+$cacheFixturePath = function (string $key) use ($cacheFixtureDirectory): string {
+    return $cacheFixtureDirectory . DIRECTORY_SEPARATOR . $key . '.json';
+};
+$completeCachePayload = array(
+    'schemaVersion' => 2,
+    'state' => 'ok',
+    'query' => array('game' => 'cstrike', 'map' => 'de_dust2'),
+    'map' => array('name' => 'de_dust2', 'realgame' => 'cstrike'),
+    'floors' => array(),
+    'grid' => array('fields' => array()),
+    'layers' => array('total' => array(), 'me' => array(), 'others' => array()),
+    'comparison' => array('bins' => array()),
+    'coverage' => array(),
+    'summary' => array(),
+    'warnings' => array(),
+    'fallback' => array(),
+);
+assert_true(file_put_contents($cacheFixturePath($cacheFixtureKeys['corrupt']), '{not-json') !== false, 'corrupt cache fixture should be written');
+assert_true(file_put_contents($cacheFixturePath($cacheFixtureKeys['incomplete']), json_encode(array(
+    'schemaVersion' => 2,
+    'state' => 'ok',
+    'query' => array('game' => 'cstrike', 'map' => 'de_dust2'),
+    'map' => array('name' => 'de_dust2', 'realgame' => 'cstrike'),
+))) !== false, 'incomplete cache fixture should be written');
+assert_true(file_put_contents($cacheFixturePath($cacheFixtureKeys['forbidden']), json_encode(array_replace($completeCachePayload, array('state' => 'too_many_events')))) !== false, 'forbidden cache fixture should be written');
+assert_true(file_put_contents($cacheFixturePath($cacheFixtureKeys['v1']), json_encode(array('schemaVersion' => 1, 'game' => 'cstrike', 'map' => 'de_dust2'))) !== false, 'v1 cache fixture should be written');
+assert_true(file_put_contents($cacheFixturePath($cacheFixtureKeys['v2']), json_encode($completeCachePayload)) !== false, 'v2 cache fixture should be written');
+assert_same(null, heatmap_read_complete_payload_cache($cacheFixtureKeys['corrupt'], $cacheFixtureDirectory), 'corrupt JSON should never be a complete cache hit');
+assert_same(null, heatmap_read_complete_payload_cache($cacheFixtureKeys['incomplete'], $cacheFixtureDirectory), 'incomplete v2 payload should never be a complete cache hit');
+assert_same(null, heatmap_read_complete_payload_cache($cacheFixtureKeys['forbidden'], $cacheFixtureDirectory), 'forbidden v2 state should never be a complete cache hit');
+assert_same(null, heatmap_read_complete_payload_cache($cacheFixtureKeys['v1'], $cacheFixtureDirectory), 'v1 payload should never be a complete v2 cache hit');
+assert_same($completeCachePayload, heatmap_read_complete_payload_cache($cacheFixtureKeys['v2'], $cacheFixtureDirectory), 'valid v2 payload should be a complete cache hit');
+
+$publicV2Payload = $completeCachePayload;
+$publicV2Payload['game'] = 'cstrike';
+$realgameV2Payload = $completeCachePayload;
+$realgameV2Payload['query']['game'] = 'alias';
+$mapMismatchPayload = $completeCachePayload;
+$mapMismatchPayload['query']['map'] = 'de_nuke';
+$mapMismatchPayload['map']['name'] = 'de_nuke';
+$otherGamePayload = $completeCachePayload;
+$otherGamePayload['query']['game'] = 'tf2';
+$otherGamePayload['map']['realgame'] = 'tf2';
+foreach (array(
+    'public' => $publicV2Payload,
+    'realgame' => $realgameV2Payload,
+    'mapMismatch' => $mapMismatchPayload,
+    'otherGame' => $otherGamePayload,
+) as $fixtureName => $fixturePayload) {
+    assert_true(file_put_contents($cacheFixturePath($cacheFixtureKeys[$fixtureName]), json_encode($fixturePayload)) !== false, $fixtureName . ' cache fixture should be written');
+}
+assert_true(file_put_contents($cacheFixturePath($cacheFixtureKeys['v1']), json_encode(array('schemaVersion' => 1, 'game' => 'cstrike', 'map' => 'de_dust2'))) !== false, 'v1 cache fixture should remain writable');
+assert_same(6, heatmap_clear_payload_cache('cstrike', 'de_dust2', $cacheFixtureDirectory), 'cache clear should match v1, v2, public-game, realgame, incomplete, and forbidden payloads');
+foreach (array('incomplete', 'forbidden', 'v1', 'v2', 'public', 'realgame') as $fixtureName) {
+    assert_true(!is_file($cacheFixturePath($cacheFixtureKeys[$fixtureName])), $fixtureName . ' matching cache should be invalidated');
+}
+assert_true(is_file($cacheFixturePath($cacheFixtureKeys['corrupt'])), 'cache clear should skip corrupt JSON');
+assert_true(is_file($cacheFixturePath($cacheFixtureKeys['mapMismatch'])), 'cache clear should retain a matching game with a different map');
+assert_true(is_file($cacheFixturePath($cacheFixtureKeys['otherGame'])), 'cache clear should retain a different public and real game');
+smoke_remove_directory($cacheFixtureDirectory);
 
 $heatmapIncludeSource = file_get_contents(ROOT_PATH . '/includes/heatmap_points.php');
 assert_true($heatmapIncludeSource !== false, 'heatmap include should be readable');

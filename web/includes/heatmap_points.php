@@ -1408,14 +1408,15 @@ function heatmap_cache_key(array $parts)
     return sha1(json_encode($parts, JSON_UNESCAPED_SLASHES));
 }
 
-function heatmap_cache_path($key)
+function heatmap_cache_path($key, ?string $directory = null)
 {
-    return heatmap_cache_dir() . '/' . preg_replace('/[^a-f0-9]/', '', $key) . '.json';
+    $directory = $directory ?? heatmap_cache_dir();
+    return $directory . '/' . preg_replace('/[^a-f0-9]/', '', $key) . '.json';
 }
 
-function heatmap_read_payload_cache($key)
+function heatmap_read_payload_cache($key, ?string $directory = null)
 {
-    $path = heatmap_cache_path($key);
+    $path = heatmap_cache_path($key, $directory);
     if (is_link($path) || !is_file($path)) {
         return null;
     }
@@ -1424,9 +1425,9 @@ function heatmap_read_payload_cache($key)
     return is_array($payload) ? $payload : null;
 }
 
-function heatmap_read_complete_payload_cache($key): ?array
+function heatmap_read_complete_payload_cache($key, ?string $directory = null): ?array
 {
-    $payload = heatmap_read_payload_cache($key);
+    $payload = heatmap_read_payload_cache($key, $directory);
     if (!is_array($payload)
         || !is_int($payload['schemaVersion'] ?? null)
         || $payload['schemaVersion'] !== HEATMAP_V2_SCHEMA
@@ -1467,9 +1468,9 @@ function heatmap_write_payload_cache($key, array $payload)
     return $written;
 }
 
-function heatmap_clear_payload_cache($game = '', $map = '')
+function heatmap_clear_payload_cache($game = '', $map = '', ?string $directory = null)
 {
-    $dir = heatmap_cache_dir();
+    $dir = $directory ?? heatmap_cache_dir();
     if (!is_dir($dir)) {
         return 0;
     }

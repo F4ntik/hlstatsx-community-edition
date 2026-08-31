@@ -106,33 +106,7 @@ function heatmap_v2_scene_metrics(array &$metrics, array $payload): void
 }
 
 $isV2 = isset($_GET['v']) && is_string($_GET['v']) && $_GET['v'] === '2';
-$bootstrapStartedAt = microtime(true);
-try {
-    $container = require __DIR__ . '/bootstrap.php';
-    $optionService = $container->get(\Service\OptionService::class);
-    $g_options = $optionService->getAllOptions();
-} catch (Throwable $exception) {
-    if ($isV2) {
-        heatmap_v2_emit(
-            array('schemaVersion' => 2, 'state' => 'unexpected_error', 'code' => 'internal_error'),
-            500,
-            heatmap_v2_metrics(
-                array(
-                    'game' => heatmap_clean_token($_GET['game'] ?? ''),
-                    'map' => heatmap_clean_token($_GET['map'] ?? ''),
-                ),
-                'default',
-                'error',
-                $bootstrapStartedAt
-            )
-        );
-    } else {
-        heatmap_json_response(array('error' => 'heatmap query failed'), 500);
-    }
-    exit;
-}
-
-if (!isset($_GET['v']) || !is_string($_GET['v']) || $_GET['v'] !== '2') {
+if (!$isV2) {
     $game = heatmap_clean_token($_GET['game'] ?? '');
     $map = heatmap_clean_token($_GET['map'] ?? '');
     $playerId = max(0, intval($_GET['player'] ?? 0));
@@ -148,6 +122,7 @@ if (!isset($_GET['v']) || !is_string($_GET['v']) || $_GET['v'] !== '2') {
     }
 
     try {
+        $container = require __DIR__ . '/bootstrap.php';
         $pdo = $container->get('pdo');
         $config = heatmap_fetch_config($pdo, $game, $map);
 
@@ -204,6 +179,28 @@ if (!isset($_GET['v']) || !is_string($_GET['v']) || $_GET['v'] !== '2') {
 }
 
 $v2StartedAt = microtime(true);
+$bootstrapStartedAt = $v2StartedAt;
+try {
+    $container = require __DIR__ . '/bootstrap.php';
+    $optionService = $container->get(\Service\OptionService::class);
+    $g_options = $optionService->getAllOptions();
+} catch (Throwable $exception) {
+    heatmap_v2_emit(
+        array('schemaVersion' => 2, 'state' => 'unexpected_error', 'code' => 'internal_error'),
+        500,
+        heatmap_v2_metrics(
+            array(
+                'game' => heatmap_clean_token($_GET['game'] ?? ''),
+                'map' => heatmap_clean_token($_GET['map'] ?? ''),
+            ),
+            'default',
+            'error',
+            $bootstrapStartedAt
+        )
+    );
+    exit;
+}
+
 $windowClass = array_key_exists('range', $_GET)
     ? 'preset'
     : (array_key_exists('from', $_GET) || array_key_exists('to', $_GET) ? 'custom' : 'default');
