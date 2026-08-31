@@ -55,7 +55,11 @@ assert.match(source, /request\('preview', token\);/, 'scheduled preview should s
 console.log('heatmap JS projection smoke ok');
 
 const explorerSource = fs.readFileSync('web/includes/js/heatmap-explorer.js', 'utf8');
-const explorerContext = {module: {exports: {}}, window: {}};
+const explorerContext = {
+  module: {exports: {}},
+  window: {},
+  btoa(value) { return Buffer.from(String(value), 'binary').toString('base64'); },
+};
 vm.runInNewContext(explorerSource, explorerContext, {filename: 'heatmap-explorer.js'});
 const explorerApi = explorerContext.module.exports;
 assert.deepStrictEqual(
@@ -368,7 +372,15 @@ function makeDom(gl) {
 
 function fakeGl(options = {}) {
   let nextId = 0;
-  const calls = {textures: [], texImages: [], shaderSources: [], draws: 0, programs: 0, buffers: 0};
+  const calls = {
+    textures: [],
+    texImages: [],
+    shaderSources: [],
+    draws: 0,
+    programs: 0,
+    buffers: 0,
+    deleted: {shaders: [], programs: [], buffers: [], textures: []},
+  };
   const gl = {
     VERTEX_SHADER: 35633, FRAGMENT_SHADER: 35632, COMPILE_STATUS: 35713, LINK_STATUS: 35714,
     ARRAY_BUFFER: 34962, STATIC_DRAW: 35044, FLOAT: 5126, TEXTURE_2D: 3553,
@@ -380,22 +392,35 @@ function fakeGl(options = {}) {
     compileShader() {},
     getShaderParameter(shader, parameter) { return !options.compileFailure && parameter === gl.COMPILE_STATUS; },
     getShaderInfoLog() { return 'driver shader details'; },
-    deleteShader() {},
-    createProgram() { calls.programs += 1; return {id: ++nextId}; },
+    deleteShader(shader) { calls.deleted.shaders.push(shader.id); },
+    createProgram() {
+      if (options.createProgramFailure) return null;
+      calls.programs += 1;
+      return {id: ++nextId};
+    },
     attachShader() {},
     linkProgram() {},
     getProgramParameter(program, parameter) { return !options.linkFailure && parameter === gl.LINK_STATUS; },
     getProgramInfoLog() { return 'driver link details'; },
-    deleteProgram() {},
-    createBuffer() { calls.buffers += 1; return {id: ++nextId}; },
+    deleteProgram(program) { calls.deleted.programs.push(program.id); },
+    createBuffer() {
+      if (options.createBufferFailure) return null;
+      calls.buffers += 1;
+      return {id: ++nextId};
+    },
     bindBuffer() {},
     bufferData() {},
-    deleteBuffer() {},
-    createTexture() { const texture = {id: ++nextId}; calls.textures.push(texture); return texture; },
+    deleteBuffer(buffer) { calls.deleted.buffers.push(buffer.id); },
+    createTexture() {
+      if (options.createTextureFailure) return null;
+      const texture = {id: ++nextId};
+      calls.textures.push(texture);
+      return texture;
+    },
     bindTexture() {},
     texParameteri() {},
     texImage2D(...args) { calls.texImages.push(args); if (options.textureFailure) throw new Error('texture failure'); },
-    deleteTexture() {},
+    deleteTexture(texture) { calls.deleted.textures.push(texture.id); },
     useProgram() {},
     getAttribLocation() { return 0; },
     enableVertexAttribArray() {},
@@ -410,7 +435,7 @@ function fakeGl(options = {}) {
     clearColor() {},
     clear() {},
     getError() { return options.errorCode || 0; },
-    getExtension(name) { calls.extension = name; return {}; },
+    getExtension(name) { calls.extension = name; return options.extensionNull ? null : {}; },
   };
   gl.calls = calls;
   return gl;
@@ -436,6 +461,11 @@ assert.strictEqual(dom.nodes.canvas.width, 640, 'resize should cap device pixel 
 assert.strictEqual(dom.root.attributes['data-heatmap-render-ms'] !== undefined, true);
 assert.strictEqual(dom.root.dispatches.length, 1);
 assert.ok(Number.isFinite(dom.root.attributes['data-heatmap-render-ms'] * 1));
+assert.ok(Number.isFinite(dom.root.dispatches[0].detail.durationMs));
+assert.strictEqual(
+  dom.root.dispatches[0].detail.durationMs,
+  dom.root.attributes['data-heatmap-render-ms'] * 1
+);
 assert.strictEqual(rendererStates.length, 0);
 renderer.render({layer: 'difference', channel: 'kills'});
 const uploaded = goodGl.calls.texImages[goodGl.calls.texImages.length - 1].at(-1);
@@ -449,6 +479,46 @@ renderer.setCamera(sharedCamera);
 assert.strictEqual(dom.nodes.camera.style.transform, 'translate3d(-8px,0,0) scale(2)');
 assert.strictEqual(dom.nodes.image.style.transform, undefined);
 assert.strictEqual(dom.nodes.canvas.style.transform, undefined);
+assert.match(
+  explorerSource,
+  /vec2 sampleUv = vec2\(v_uv\.x, 1\.0 - v_uv\.y\)/,
+  'fragment sampling should flip texture Y while preserving server row order'
+);
+const asymmetricPayload = explorerSceneFixture();
+asymmetricPayload.query = Object.assign({}, asymmetricPayload.query, {lens: 'overview', event: 'kills'});
+asymmetricPayload.grid = {
+  bucketSize: 8,
+  width: 1,
+  height: 2,
+  fields: ['cell', 'x', 'y', 'kills', 'deaths'],
+};
+asymmetricPayload.layers = {
+  total: [['c0.0', 0, 0, 1, 0], ['c0.1', 0, 1, 9, 0]],
+  me: [['c0.0', 0, 0, 0, 0], ['c0.1', 0, 1, 0, 0]],
+  others: [['c0.0', 0, 0, 1, 0], ['c0.1', 0, 1, 9, 0]],
+};
+asymmetricPayload.comparison = {
+  fields: ['cell', 'x', 'y', 'killDelta', 'deathDelta', 'sample'],
+  bins: [],
+  personalSample: 0,
+  otherSample: 10,
+};
+asymmetricPayload.summary = {rowsRead: 2, sourceRows: 2, personalSample: 0, otherSample: 10};
+const asymmetricScene = new HeatmapExplorerScene(asymmetricPayload);
+const asymmetricGl = fakeGl();
+const asymmetricDom = makeDom(asymmetricGl);
+const asymmetricRenderer = new HeatmapGlRenderer(
+  asymmetricDom.root,
+  asymmetricScene,
+  {window: asymmetricDom.window}
+);
+asymmetricRenderer.mount();
+assert.deepStrictEqual(
+  Array.from(asymmetricGl.calls.texImages[0].at(-1)),
+  [1, 9],
+  'top-down server row order should reach the single texture unchanged'
+);
+asymmetricRenderer.destroy();
 let prevented = false;
 dom.nodes.canvas.dispatchEvent({type: 'webglcontextlost', preventDefault() { prevented = true; }});
 assert.strictEqual(prevented, true);
@@ -461,6 +531,19 @@ renderer.destroy();
 assert.strictEqual((dom.nodes.canvas.listeners.webglcontextlost || []).length, 0);
 assert.strictEqual((dom.nodes.canvas.listeners.webglcontextrestored || []).length, 0);
 assert.strictEqual((dom.window.listeners.resize || []).length, 0);
+
+const extensionlessGl = fakeGl({extensionNull: true});
+const extensionlessDom = makeDom(extensionlessGl);
+const extensionlessRenderer = new HeatmapGlRenderer(
+  extensionlessDom.root,
+  validScene,
+  {window: extensionlessDom.window}
+);
+extensionlessRenderer.mount();
+assert.ok(extensionlessGl.calls.draws > 0, 'WebGL2 sampling should not require EXT_color_buffer_float');
+assert.strictEqual(extensionlessDom.nodes.interactive.style.display, '');
+assert.strictEqual(extensionlessDom.nodes.static.style.display, 'none');
+extensionlessRenderer.destroy();
 
 const emptyGl = fakeGl();
 const emptyDom = makeDom(emptyGl);
@@ -490,6 +573,51 @@ assert.strictEqual(failedDom.nodes.static.style.display, '');
 assert.strictEqual(failedDom.nodes.status.textContent, '<static_fallback>');
 assert.strictEqual(failedDom.nodes.status.textContent.includes('driver'), false);
 failedRenderer.destroy();
+
+function deletedResources(gl) {
+  return Object.fromEntries(
+    Object.entries(gl.calls.deleted).map(([name, values]) => [
+      name,
+      values.slice().sort((left, right) => left - right),
+    ])
+  );
+}
+
+function assertResourceCleanup(options, expected, label) {
+  const gl = fakeGl(options);
+  const dom = makeDom(gl);
+  const resourceRenderer = new HeatmapGlRenderer(dom.root, validScene, {window: dom.window});
+  resourceRenderer.mount();
+  assert.strictEqual(dom.root.attributes['data-heatmap-state'], 'static_fallback', label + ' should use static fallback');
+  assert.deepStrictEqual(deletedResources(gl), expected, label + ' should delete every local allocation');
+  resourceRenderer.destroy();
+  assert.deepStrictEqual(
+    deletedResources(gl),
+    expected,
+    label + ' cleanup should not double-delete transferred handles'
+  );
+}
+
+assertResourceCleanup(
+  {createProgramFailure: true},
+  {shaders: [1, 2], programs: [], buffers: [], textures: []},
+  'program allocation failure'
+);
+assertResourceCleanup(
+  {linkFailure: true},
+  {shaders: [1, 2], programs: [3], buffers: [], textures: []},
+  'program link failure'
+);
+assertResourceCleanup(
+  {createBufferFailure: true},
+  {shaders: [1, 2], programs: [3], buffers: [], textures: []},
+  'buffer allocation failure'
+);
+assertResourceCleanup(
+  {createTextureFailure: true},
+  {shaders: [1, 2], programs: [3], buffers: [4], textures: []},
+  'texture allocation failure'
+);
 
 assert.strictEqual(/innerHTML|outerHTML|insertAdjacentHTML|document\.write|\beval\s*\(|new\s+Function/.test(explorerSource), false, 'renderer source must not use unsafe HTML/eval APIs');
 assert.match(explorerSource, /R32F/);

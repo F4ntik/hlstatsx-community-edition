@@ -1108,9 +1108,7 @@
 
   HeatmapGlRenderer.prototype._createResources = function () {
     var gl = this._gl;
-    if (!gl || typeof gl.getExtension !== 'function'
-      || gl.getExtension('EXT_color_buffer_float') === null
-      || typeof gl.createTexture !== 'function' || typeof gl.createBuffer !== 'function'
+    if (!gl || typeof gl.createTexture !== 'function' || typeof gl.createBuffer !== 'function'
       || typeof gl.createProgram !== 'function') {
       throw new Error('webgl_unavailable');
     }
@@ -1149,10 +1147,11 @@
       + '}\n'
       + 'void main() {\n'
       + '  vec2 texel = 1.0 / u_gridSize;\n'
+      + '  vec2 sampleUv = vec2(v_uv.x, 1.0 - v_uv.y);\n'
       + '  float sum = 0.0;\n'
       + '  for (int offsetY = -1; offsetY <= 1; offsetY++) {\n'
       + '    for (int offsetX = -1; offsetX <= 1; offsetX++) {\n'
-      + '      sum += texture(u_density, v_uv + vec2(float(offsetX), float(offsetY)) * texel).r;\n'
+      + '      sum += texture(u_density, sampleUv + vec2(float(offsetX), float(offsetY)) * texel).r;\n'
       + '    }\n'
       + '  }\n'
       + '  float value = sum / 9.0;\n'
@@ -1166,56 +1165,81 @@
       + '  outputColor = vec4(mix(color, vec3(1.0), contour), amount);\n'
       + '}\n';
 
-    var vertex = this._createShader(gl, gl.VERTEX_SHADER, vertexSource);
-    var fragment = this._createShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
-    var program = gl.createProgram();
-    if (!program) {
-      throw new Error('program_unavailable');
-    }
-    gl.attachShader(program, vertex);
-    gl.attachShader(program, fragment);
-    gl.linkProgram(program);
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      if (typeof gl.deleteShader === 'function') {
-        gl.deleteShader(vertex);
-        gl.deleteShader(fragment);
+    var vertex = null;
+    var fragment = null;
+    var program = null;
+    var buffer = null;
+    var texture = null;
+    function release(method, handle) {
+      if (handle && typeof gl[method] === 'function') {
+        try {
+          gl[method](handle);
+        } catch (error) {
+          // Cleanup is best effort and the original initialization error wins.
+        }
       }
-      if (typeof gl.deleteProgram === 'function') {
-        gl.deleteProgram(program);
+    }
+    try {
+      vertex = this._createShader(gl, gl.VERTEX_SHADER, vertexSource);
+      fragment = this._createShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
+      program = gl.createProgram();
+      if (!program) {
+        throw new Error('program_unavailable');
       }
-      throw new Error('program_unavailable');
-    }
-    if (typeof gl.deleteShader === 'function') {
-      gl.deleteShader(vertex);
-      gl.deleteShader(fragment);
-    }
+      gl.attachShader(program, vertex);
+      gl.attachShader(program, fragment);
+      gl.linkProgram(program);
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        throw new Error('program_unavailable');
+      }
+      release('deleteShader', vertex);
+      vertex = null;
+      release('deleteShader', fragment);
+      fragment = null;
 
-    var buffer = gl.createBuffer();
-    var texture = gl.createTexture();
-    if (!buffer || !texture) {
-      throw new Error('resource_unavailable');
-    }
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      buffer = gl.createBuffer();
+      if (!buffer) {
+        throw new Error('resource_unavailable');
+      }
+      texture = gl.createTexture();
+      if (!texture) {
+        throw new Error('resource_unavailable');
+      }
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-    this._program = program;
-    this._buffer = buffer;
-    this._texture = texture;
-    this._uniforms = {
-      gridSize: gl.getUniformLocation(program, 'u_gridSize'),
-      maxAbs: gl.getUniformLocation(program, 'u_maxAbs'),
-      palette: gl.getUniformLocation(program, 'u_palette'),
-      contours: gl.getUniformLocation(program, 'u_contours'),
-      density: gl.getUniformLocation(program, 'u_density')
-    };
-    this._position = gl.getAttribLocation(program, 'a_position');
-    if (this._position < 0) {
-      throw new Error('attribute_unavailable');
+      var uniforms = {
+        gridSize: gl.getUniformLocation(program, 'u_gridSize'),
+        maxAbs: gl.getUniformLocation(program, 'u_maxAbs'),
+        palette: gl.getUniformLocation(program, 'u_palette'),
+        contours: gl.getUniformLocation(program, 'u_contours'),
+        density: gl.getUniformLocation(program, 'u_density')
+      };
+      var position = gl.getAttribLocation(program, 'a_position');
+      if (position < 0) {
+        throw new Error('attribute_unavailable');
+      }
+
+      this._program = program;
+      program = null;
+      this._buffer = buffer;
+      buffer = null;
+      this._texture = texture;
+      texture = null;
+      this._uniforms = uniforms;
+      this._position = position;
+    } catch (error) {
+      release('deleteTexture', texture);
+      release('deleteBuffer', buffer);
+      release('deleteProgram', program);
+      release('deleteShader', fragment);
+      release('deleteShader', vertex);
+      throw error;
     }
   };
 
@@ -1255,9 +1279,9 @@
       var view = this.options.window || (typeof window !== 'undefined' ? window : null);
       var event;
       if (view && typeof view.CustomEvent === 'function') {
-        event = new view.CustomEvent('heatmap-explorer-ready', {detail: {renderMs: duration}});
+        event = new view.CustomEvent('heatmap-explorer-ready', {detail: {durationMs: duration, renderMs: duration}});
       } else {
-        event = {type: 'heatmap-explorer-ready', detail: {renderMs: duration}};
+        event = {type: 'heatmap-explorer-ready', detail: {durationMs: duration, renderMs: duration}};
       }
       this.root.dispatchEvent(event);
     }
