@@ -166,6 +166,15 @@ jobs:
             php -l "$file"
           done
 
+      - name: Heatmap Explorer JavaScript syntax
+        run: node --check web/includes/js/heatmap-explorer.js
+
+      - name: Heatmap Explorer JavaScript smoke
+        run: node scripts/heatmap_js_smoke.js
+
+      - name: Heatmap Explorer PHP smoke
+        run: php scripts/web_heatmap_smoke.php
+
       - name: Web i18n smoke
         run: php scripts/web_i18n_smoke.php
 

@@ -288,6 +288,34 @@ overlay behavior changes:
 Full replay and `--disablecache` heatmap regeneration are promotion checks.
 Use the already populated DB for visual/projection iteration first.
 
+### Modern Heatmap Explorer
+
+- Focused RED/GREEN source contract: `python -m pytest
+  scripts/replay_baseline/tests/test_heatmap_coordinate_acceptance_script.py -q`.
+- Full Python source checks: `python -m pytest scripts/hlstats_py/tests -q`,
+  `python -m pytest scripts/replay_baseline/tests -q`, and
+  `python -m compileall -q scripts/hlstats_py scripts/replay_baseline`.
+- PHP lint/smoke: `php scripts/web_heatmap_smoke.php` plus the focused web and
+  updater `php -l` checks; on Windows without PHP, use the approved
+  `python-web:latest` Docker image with the same commands.
+- JavaScript syntax/smoke: `node --check web/includes/js/heatmap.js`,
+  `node --check web/includes/js/heatmap-explorer.js`, and
+  `node scripts/heatmap_js_smoke.js`.
+- Route smoke: `python -m pytest
+  scripts/replay_baseline/tests/test_web_route_smoke.py -q`. Migration checks
+  include the focused source assertions and `php -l web/updater/80.php` plus
+  `php -l web/updater/81.php`.
+- Coordinate runner: `powershell -NoProfile -ExecutionPolicy Bypass -File
+  scripts/replay_baseline/comparison/Run-HeatmapCoordinateAcceptance.ps1` only
+  against the disposable `bench_ephemeral` contour; it is deliberately not a
+  normal source test.
+
+**Source gate:** static contract, Python, PHP, JavaScript, route, migration,
+and diff checks pass without Docker DB execution. **Runtime acceptance:** a
+fresh disposable coordinate-runner receipt proves persisted tuples. **Release
+acceptance:** adds the approved live DB/browser/regeneration and release
+evidence; source or runtime results alone do not establish it.
+
 ### Frontend / i18n
 
 Run targeted checks when frontend-visible behavior changes:

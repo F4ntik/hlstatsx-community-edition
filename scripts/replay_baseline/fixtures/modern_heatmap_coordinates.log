@@ -1,0 +1,27 @@
+L 08/31/2026 - 12:00:00: Started map "de_dust2" (CRC "00000000000000000000000000000000")
+L 08/31/2026 - 12:00:01: "HeatmapFixtureAttacker<101><STEAM_1:0:900001><CT>" connected, address "10.20.0.1:27005"
+L 08/31/2026 - 12:00:02: "HeatmapFixtureAttacker<101><STEAM_1:0:900001><CT>" joined team "CT"
+L 08/31/2026 - 12:00:03: "HeatmapFixtureVictim<102><STEAM_1:0:900002><TERRORIST>" connected, address "10.20.0.2:27005"
+L 08/31/2026 - 12:00:04: "HeatmapFixtureVictim<102><STEAM_1:0:900002><TERRORIST>" joined team "TERRORIST"
+L 08/31/2026 - 12:00:05: "HeatmapFixtureSuicide<103><STEAM_1:0:900003><CT>" connected, address "10.20.0.3:27005"
+L 08/31/2026 - 12:00:06: "HeatmapFixtureSuicide<103><STEAM_1:0:900003><CT>" joined team "CT"
+L 08/31/2026 - 12:00:07: "HeatmapFixtureStagedFirst<104><STEAM_1:0:900004><CT>" connected, address "10.20.0.4:27005"
+L 08/31/2026 - 12:00:08: "HeatmapFixtureStagedFirst<104><STEAM_1:0:900004><CT>" joined team "CT"
+L 08/31/2026 - 12:00:09: "HeatmapFixtureStagedVictim<105><STEAM_1:0:900005><TERRORIST>" connected, address "10.20.0.5:27005"
+L 08/31/2026 - 12:00:10: "HeatmapFixtureStagedVictim<105><STEAM_1:0:900005><TERRORIST>" joined team "TERRORIST"
+L 08/31/2026 - 12:00:11: "HeatmapFixtureUnstagedFirst<106><STEAM_1:0:900006><CT>" connected, address "10.20.0.6:27005"
+L 08/31/2026 - 12:00:12: "HeatmapFixtureUnstagedFirst<106><STEAM_1:0:900006><CT>" joined team "CT"
+L 08/31/2026 - 12:00:13: "HeatmapFixtureUnstagedVictim<107><STEAM_1:0:900007><TERRORIST>" connected, address "10.20.0.7:27005"
+L 08/31/2026 - 12:00:14: "HeatmapFixtureUnstagedVictim<107><STEAM_1:0:900007><TERRORIST>" joined team "TERRORIST"
+L 08/31/2026 - 12:00:15: "HeatmapFixtureBoundaryFirst<108><STEAM_1:0:900008><CT>" connected, address "10.20.0.8:27005"
+L 08/31/2026 - 12:00:16: "HeatmapFixtureBoundaryFirst<108><STEAM_1:0:900008><CT>" joined team "CT"
+L 08/31/2026 - 12:00:17: "HeatmapFixtureBoundaryVictim<109><STEAM_1:0:900009><TERRORIST>" connected, address "10.20.0.9:27005"
+L 08/31/2026 - 12:00:18: "HeatmapFixtureBoundaryVictim<109><STEAM_1:0:900009><TERRORIST>" joined team "TERRORIST"
+L 08/31/2026 - 12:00:19: "HeatmapFixtureAttacker<101><STEAM_1:0:900001><CT>" killed "HeatmapFixtureVictim<102><STEAM_1:0:900002><TERRORIST>" with "ak47" (headshot) (attacker_position "101 202 303") (victim_position "404 505 606")
+L 08/31/2026 - 12:00:20: "HeatmapFixtureSuicide<103><STEAM_1:0:900003><CT>" committed suicide with "worldspawn" (victim_position "707 808 909")
+L 08/31/2026 - 12:00:21: World triggered "killlocation" (attacker_position "1001 1002 1003") (victim_position "1101 1102 1103")
+L 08/31/2026 - 12:00:22: "HeatmapFixtureStagedFirst<104><STEAM_1:0:900004><CT>" killed "HeatmapFixtureStagedVictim<105><STEAM_1:0:900005><TERRORIST>" with "m4a1"
+L 08/31/2026 - 12:00:23: "HeatmapFixtureUnstagedFirst<106><STEAM_1:0:900006><CT>" killed "HeatmapFixtureUnstagedVictim<107><STEAM_1:0:900007><TERRORIST>" with "m4a1"
+L 08/31/2026 - 12:00:24: World triggered "killlocation" (attacker_position "1201 1202 1203") (victim_position "1301 1302 1303")
+L 08/31/2026 - 12:00:25: Log file started
+L 08/31/2026 - 12:00:26: "HeatmapFixtureBoundaryFirst<108><STEAM_1:0:900008><CT>" killed "HeatmapFixtureBoundaryVictim<109><STEAM_1:0:900009><TERRORIST>" with "m4a1"
