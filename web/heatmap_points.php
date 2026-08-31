@@ -20,6 +20,10 @@ function heatmap_json_response($payload, int $status = 200): void
 
 function heatmap_v2_emit(array $payload, int $status, array $metrics): void
 {
+    if (($metrics['operation'] ?? '') === 'inspect' || ($metrics['cache'] ?? '') === 'no-store') {
+        header('Cache-Control: no-store');
+        header('Pragma: no-cache');
+    }
     $encoded = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     $encodingFailed = !is_string($encoded);
     if ($encodingFailed) {
@@ -58,7 +62,6 @@ function heatmap_v2_safe_error_code(Throwable $exception): string
         'invalid_floor_config',
         'invalid_scene_query',
         'invalid_image',
-        'inspect_not_available',
     );
     $message = $exception->getMessage();
     return in_array($message, $allowed, true) ? $message : 'invalid_request';
@@ -180,23 +183,28 @@ if (!$isV2) {
 
 $v2StartedAt = microtime(true);
 $bootstrapStartedAt = $v2StartedAt;
+$inspectRequested = array_key_exists('inspect', $_GET);
 try {
     $container = require __DIR__ . '/bootstrap.php';
     $optionService = $container->get(\Service\OptionService::class);
     $g_options = $optionService->getAllOptions();
 } catch (Throwable $exception) {
+    $bootstrapMetrics = heatmap_v2_metrics(
+        array(
+            'game' => heatmap_clean_token($_GET['game'] ?? ''),
+            'map' => heatmap_clean_token($_GET['map'] ?? ''),
+        ),
+        'default',
+        $inspectRequested ? 'no-store' : 'error',
+        $bootstrapStartedAt
+    );
+    if ($inspectRequested) {
+        $bootstrapMetrics['operation'] = 'inspect';
+    }
     heatmap_v2_emit(
         array('schemaVersion' => 2, 'state' => 'unexpected_error', 'code' => 'internal_error'),
         500,
-        heatmap_v2_metrics(
-            array(
-                'game' => heatmap_clean_token($_GET['game'] ?? ''),
-                'map' => heatmap_clean_token($_GET['map'] ?? ''),
-            ),
-            'default',
-            'error',
-            $bootstrapStartedAt
-        )
+        $bootstrapMetrics
     );
     exit;
 }
@@ -213,9 +221,13 @@ $initialMetrics = heatmap_v2_metrics(
     'miss',
     $v2StartedAt
 );
+if ($inspectRequested) {
+    $initialMetrics['operation'] = 'inspect';
+    $initialMetrics['cache'] = 'no-store';
+}
 
 if (heatmap_explorer_mode($g_options) === 0) {
-    $initialMetrics['cache'] = 'disabled';
+    $initialMetrics['cache'] = $inspectRequested ? 'no-store' : 'disabled';
     $initialMetrics['state'] = 'explorer_disabled';
     $initialMetrics['fallbackReason'] = 'explorer_disabled';
     heatmap_v2_emit(
@@ -228,17 +240,9 @@ if (heatmap_explorer_mode($g_options) === 0) {
 
 try {
     $query = heatmap_parse_v2_query($_GET, time());
-    $metrics = heatmap_v2_metrics($query, $windowClass, 'miss', $v2StartedAt);
-    if (array_key_exists('inspect', $query)) {
-        $metrics['state'] = 'rejected';
-        $metrics['fallbackReason'] = 'inspect_not_available';
-        heatmap_v2_emit(
-            array('schemaVersion' => 2, 'state' => 'rejected', 'code' => 'inspect_not_available'),
-            400,
-            $metrics
-        );
-        exit;
-    }
+    $isInspect = array_key_exists('inspect', $query);
+    $metrics = heatmap_v2_metrics($query, $windowClass, $isInspect ? 'no-store' : 'miss', $v2StartedAt);
+    $metrics['operation'] = $isInspect ? 'inspect' : 'scene';
 
     $pdo = $container->get('pdo');
     $config = heatmap_fetch_config($pdo, $query['game'], $query['map']);
@@ -267,6 +271,28 @@ try {
 
     $floors = heatmap_config_floors($config);
     heatmap_validate_requested_floor($query['floor'], $floors);
+    if ($isInspect) {
+        $inspectStartedAt = microtime(true);
+        $inspectContext = heatmap_inspect_context($query, $config, $image);
+        $cell = heatmap_parse_cell_id($query['inspect'], $inspectContext['grid']);
+        $bounds = heatmap_unproject_cell_bounds($cell, $inspectContext['grid'], $inspectContext['config']);
+        $descriptor = heatmap_build_inspect_sql($inspectContext['query'], $inspectContext['config'], $bounds);
+        $rows = heatmap_fetch_inspect_rows($pdo, $descriptor);
+        $metrics['queryMs'] = (microtime(true) - $inspectStartedAt) * 1000.0;
+        $metrics['rowsRead'] = count($rows);
+        $metrics['binsReturned'] = 0;
+        $metrics['cache'] = 'no-store';
+        $payload = heatmap_build_inspect_payload($rows, count($rows) > 100);
+        $payload['query'] = $inspectContext['query'];
+        $payload['cell'] = array(
+            'id' => $cell['id'],
+            'gridX' => $cell['gridX'],
+            'gridY' => $cell['gridY'],
+            'projectedBounds' => $bounds['projectedBounds'],
+        );
+        heatmap_v2_emit($payload, 200, $metrics);
+        exit;
+    }
     $cacheConfig = $config;
     $cacheConfig['projectionHash'] = heatmap_config_hash($config, $image);
     $cacheConfig['floorConfigHash'] = heatmap_scene_floor_config_hash($floors);

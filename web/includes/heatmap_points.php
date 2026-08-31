@@ -13,6 +13,7 @@ const HEATMAP_MEDIUMINT_MAX = 8388607;
 const HEATMAP_MYSQL_UNSIGNED_INT_MAX = 4294967295;
 const HEATMAP_FLOOR_PARSER_SCHEMA = 1;
 const HEATMAP_MAX_SOURCE_ROWS = 250000;
+const HEATMAP_INSPECT_MAX_ROWS = 101;
 const HEATMAP_GRID_MAX_AXIS = 128;
 const HEATMAP_MIN_FLOOR_Z_COVERAGE = 0.70;
 const HEATMAP_MIN_PROJECTION_COVERAGE = 0.70;
@@ -1262,6 +1263,514 @@ function heatmap_build_scene(PDO $pdo, array $query, array $config, array $image
     return heatmap_finalize_scene($state);
 }
 
+function heatmap_inspect_grid(array $grid): array
+{
+    foreach (array('bucketSize', 'width', 'height', 'imageWidth', 'imageHeight') as $field) {
+        if (!array_key_exists($field, $grid) || !is_int($grid[$field])) {
+            throw new InvalidArgumentException('invalid_inspect');
+        }
+    }
+    if ($grid['bucketSize'] <= 0 || $grid['width'] <= 0 || $grid['height'] <= 0
+        || $grid['width'] > HEATMAP_GRID_MAX_AXIS || $grid['height'] > HEATMAP_GRID_MAX_AXIS
+        || $grid['imageWidth'] <= 0 || $grid['imageHeight'] <= 0
+        || $grid['bucketSize'] > intdiv(PHP_INT_MAX, HEATMAP_GRID_MAX_AXIS + 1)) {
+        throw new InvalidArgumentException('invalid_inspect');
+    }
+
+    return array(
+        'bucketSize' => $grid['bucketSize'],
+        'width' => $grid['width'],
+        'height' => $grid['height'],
+        'imageWidth' => $grid['imageWidth'],
+        'imageHeight' => $grid['imageHeight'],
+    );
+}
+
+function heatmap_parse_cell_id(string $cellId, array $grid): array
+{
+    $grid = heatmap_inspect_grid($grid);
+    if (preg_match('/^c(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/D', $cellId) !== 1) {
+        throw new InvalidArgumentException('invalid_inspect');
+    }
+
+    $parts = explode('.', substr($cellId, 1));
+    $gridX = heatmap_try_canonical_integer($parts[0] ?? null);
+    $gridY = heatmap_try_canonical_integer($parts[1] ?? null);
+    if ($gridX === null || $gridY === null || $gridX < 0 || $gridX >= $grid['width']
+        || $gridY < 0 || $gridY >= $grid['height'] || $gridX > 127 || $gridY > 127) {
+        throw new InvalidArgumentException('invalid_inspect');
+    }
+
+    $xMin = $gridX * $grid['bucketSize'];
+    $yMin = $gridY * $grid['bucketSize'];
+    $xMax = min($grid['imageWidth'], ($gridX + 1) * $grid['bucketSize']);
+    $yMax = min($grid['imageHeight'], ($gridY + 1) * $grid['bucketSize']);
+    if (!is_int($xMin) || !is_int($xMax) || !is_int($yMin) || !is_int($yMax)
+        || $xMin >= $xMax || $yMin >= $yMax) {
+        throw new InvalidArgumentException('invalid_inspect');
+    }
+
+    return array(
+        'id' => $cellId,
+        'gridX' => $gridX,
+        'gridY' => $gridY,
+        'projectedBounds' => array(
+            'xMin' => $xMin,
+            'xMax' => $xMax,
+            'yMin' => $yMin,
+            'yMax' => $yMax,
+        ),
+    );
+}
+
+function heatmap_inspect_negated_interval(int $min, int $max): array
+{
+    if ($min >= $max) {
+        throw new InvalidArgumentException('invalid_inspect');
+    }
+    $negatedMin = 0 - $max + 1;
+    $negatedMax = 0 - $min + 1;
+    if (!is_int($negatedMin) || !is_int($negatedMax) || $negatedMin >= $negatedMax) {
+        throw new InvalidArgumentException('invalid_inspect');
+    }
+
+    return array($negatedMin, $negatedMax);
+}
+
+function heatmap_inspect_inverse_rotation(array $projected, int $rotate): array
+{
+    $xMin = $projected['xMin'];
+    $xMax = $projected['xMax'];
+    $yMin = $projected['yMin'];
+    $yMax = $projected['yMax'];
+    $rotate = heatmap_rotation_steps($rotate);
+    if ($rotate === 1) {
+        $xInterval = array($yMin, $yMax);
+        $yInterval = heatmap_inspect_negated_interval($xMin, $xMax);
+    } elseif ($rotate === 2) {
+        $xInterval = heatmap_inspect_negated_interval($xMin, $xMax);
+        $yInterval = heatmap_inspect_negated_interval($yMin, $yMax);
+    } elseif ($rotate === 3) {
+        $xInterval = heatmap_inspect_negated_interval($yMin, $yMax);
+        $yInterval = array($xMin, $xMax);
+    } else {
+        $xInterval = array($xMin, $xMax);
+        $yInterval = array($yMin, $yMax);
+    }
+
+    return array('x' => $xInterval, 'y' => $yInterval);
+}
+
+function heatmap_inspect_truncated_value(int $value, int $offset, float $scale): int
+{
+    $quotient = (floatval($value) + floatval($offset)) / $scale;
+    if ($quotient === INF || $quotient >= floatval(PHP_INT_MAX)) {
+        return PHP_INT_MAX;
+    }
+    if ($quotient === -INF || $quotient <= floatval(PHP_INT_MIN)) {
+        return PHP_INT_MIN;
+    }
+
+    return intval($quotient);
+}
+
+function heatmap_inspect_first_value_at_least(
+    int $domainMin,
+    int $domainMax,
+    int $target,
+    int $offset,
+    float $scale
+): int {
+    $low = $domainMin;
+    $high = $domainMax + 1;
+    while ($low < $high) {
+        $middle = $low + intdiv($high - $low, 2);
+        if (heatmap_inspect_truncated_value($middle, $offset, $scale) >= $target) {
+            $high = $middle;
+        } else {
+            $low = $middle + 1;
+        }
+    }
+
+    return $low;
+}
+
+function heatmap_inspect_axis_preimage(int $min, int $max, int $offset, float $scale, bool $flip): ?array
+{
+    if ($min >= $max || !is_finite($scale) || $scale <= 0.0) {
+        throw new InvalidArgumentException('invalid_inspect');
+    }
+
+    $domainMin = $flip ? -HEATMAP_MEDIUMINT_MAX : HEATMAP_MEDIUMINT_MIN;
+    $domainMax = $flip ? -HEATMAP_MEDIUMINT_MIN : HEATMAP_MEDIUMINT_MAX;
+    $firstAtMin = heatmap_inspect_first_value_at_least($domainMin, $domainMax, $min, $offset, $scale);
+    $firstAtMax = heatmap_inspect_first_value_at_least($domainMin, $domainMax, $max, $offset, $scale);
+    $afterMin = max($domainMin, $firstAtMin);
+    $afterMax = min($domainMax, $firstAtMax - 1);
+    if ($afterMin > $afterMax) {
+        return null;
+    }
+
+    if ($flip) {
+        return array(0 - $afterMax, 0 - $afterMin);
+    }
+
+    return array($afterMin, $afterMax);
+}
+
+function heatmap_inspect_projection_config(array $config): array
+{
+    $config = heatmap_normalize_crop($config);
+    $scale = heatmap_scale($config['scale'] ?? 1);
+    if (!is_finite($scale) || $scale <= 0.0) {
+        throw new InvalidArgumentException('invalid_inspect');
+    }
+
+    return array(
+        'xoffset' => intval($config['xoffset'] ?? 0),
+        'yoffset' => intval($config['yoffset'] ?? 0),
+        'flipx' => heatmap_bool($config['flipx'] ?? 0) === 1,
+        'flipy' => heatmap_bool($config['flipy'] ?? 0) === 1,
+        'rotate' => heatmap_rotation_steps($config['rotate'] ?? 0),
+        'scale' => $scale,
+        'cropx1' => intval($config['cropx1'] ?? 0),
+        'cropy1' => intval($config['cropy1'] ?? 0),
+    );
+}
+
+function heatmap_unproject_cell_bounds(array $cell, array $grid, array $config): array
+{
+    $grid = heatmap_inspect_grid($grid);
+    if (!isset($cell['id']) || !is_string($cell['id'])) {
+        throw new InvalidArgumentException('invalid_inspect');
+    }
+    $canonicalCell = heatmap_parse_cell_id($cell['id'], $grid);
+    foreach (array('gridX', 'gridY') as $field) {
+        if (array_key_exists($field, $cell) && $cell[$field] !== $canonicalCell[$field]) {
+            throw new InvalidArgumentException('invalid_inspect');
+        }
+    }
+    if (array_key_exists('projectedBounds', $cell)
+        && $cell['projectedBounds'] !== $canonicalCell['projectedBounds']) {
+        throw new InvalidArgumentException('invalid_inspect');
+    }
+
+    $projection = heatmap_inspect_projection_config($config);
+    $projected = $canonicalCell['projectedBounds'];
+    $projectedWithCrop = array(
+        'xMin' => $projected['xMin'] + $projection['cropx1'],
+        'xMax' => $projected['xMax'] + $projection['cropx1'],
+        'yMin' => $projected['yMin'] + $projection['cropy1'],
+        'yMax' => $projected['yMax'] + $projection['cropy1'],
+    );
+    foreach ($projectedWithCrop as $value) {
+        if (!is_int($value)) {
+            throw new InvalidArgumentException('invalid_inspect');
+        }
+    }
+    $inverse = heatmap_inspect_inverse_rotation($projectedWithCrop, $projection['rotate']);
+    $rawX = heatmap_inspect_axis_preimage(
+        $inverse['x'][0],
+        $inverse['x'][1],
+        $projection['xoffset'],
+        $projection['scale'],
+        $projection['flipx']
+    );
+    $rawY = heatmap_inspect_axis_preimage(
+        $inverse['y'][0],
+        $inverse['y'][1],
+        $projection['yoffset'],
+        $projection['scale'],
+        $projection['flipy']
+    );
+    if ($rawX === null || $rawY === null) {
+        throw new InvalidArgumentException('invalid_inspect');
+    }
+
+    return array(
+        'xMin' => max(HEATMAP_MEDIUMINT_MIN, min(HEATMAP_MEDIUMINT_MAX, $rawX[0])),
+        'xMax' => max(HEATMAP_MEDIUMINT_MIN, min(HEATMAP_MEDIUMINT_MAX, $rawX[1])),
+        'yMin' => max(HEATMAP_MEDIUMINT_MIN, min(HEATMAP_MEDIUMINT_MAX, $rawY[0])),
+        'yMax' => max(HEATMAP_MEDIUMINT_MIN, min(HEATMAP_MEDIUMINT_MAX, $rawY[1])),
+        'projectedBounds' => $projected,
+    );
+}
+
+function heatmap_inspect_raw_bounds(array $bounds): array
+{
+    if (isset($bounds['rawBounds']) && is_array($bounds['rawBounds'])) {
+        $bounds = $bounds['rawBounds'] + $bounds;
+    }
+    foreach (array('xMin', 'xMax', 'yMin', 'yMax') as $field) {
+        if (!array_key_exists($field, $bounds) || !is_int($bounds[$field])) {
+            throw new InvalidArgumentException('invalid_inspect');
+        }
+    }
+    if ($bounds['xMin'] > $bounds['xMax'] || $bounds['yMin'] > $bounds['yMax']
+        || $bounds['xMin'] < HEATMAP_MEDIUMINT_MIN || $bounds['xMax'] > HEATMAP_MEDIUMINT_MAX
+        || $bounds['yMin'] < HEATMAP_MEDIUMINT_MIN || $bounds['yMax'] > HEATMAP_MEDIUMINT_MAX) {
+        throw new InvalidArgumentException('invalid_inspect');
+    }
+
+    return array(
+        'xMin' => $bounds['xMin'],
+        'xMax' => $bounds['xMax'],
+        'yMin' => $bounds['yMin'],
+        'yMax' => $bounds['yMax'],
+    );
+}
+
+function heatmap_inspect_sql_context(array $query, array $config, array $bounds): array
+{
+    $context = heatmap_scene_sql_context($query, $config);
+    $player = heatmap_scene_player_id($query['player'] ?? 0);
+    $event = $query['event'] ?? 'both';
+    $lens = $query['lens'] ?? 'overview';
+    if ($player === null || !in_array($event, array('kills', 'deaths', 'both'), true)
+        || !in_array($lens, array('overview', 'me', 'difference'), true)
+        || (($lens === 'me' || $lens === 'difference') && $player <= 0)
+        || ($lens === 'difference' && $event === 'both')) {
+        throw new InvalidArgumentException('invalid_scene_query');
+    }
+    $floors = heatmap_config_floors($config);
+    $floor = $query['floor'] ?? 'all';
+    if (!is_string($floor)) {
+        throw new InvalidArgumentException('invalid_scene_query');
+    }
+    heatmap_validate_requested_floor($floor, $floors);
+    $rawBounds = heatmap_inspect_raw_bounds($bounds);
+    $floorBounds = null;
+    if ($floor !== 'all') {
+        foreach ($floors as $configuredFloor) {
+            if ($configuredFloor['id'] === $floor) {
+                $floorBounds = array('zMin' => $configuredFloor['z_min'], 'zMax' => $configuredFloor['z_max']);
+                break;
+            }
+        }
+        if ($floorBounds === null) {
+            throw new InvalidArgumentException('unknown_floor');
+        }
+    }
+
+    return array(
+        'context' => $context,
+        'player' => $player,
+        'event' => $event,
+        'lens' => $lens,
+        'rawBounds' => $rawBounds,
+        'floorBounds' => $floorBounds,
+    );
+}
+
+function heatmap_build_inspect_sql(array $query, array $config, array $bounds): array
+{
+    $context = heatmap_inspect_sql_context($query, $config, $bounds);
+    $branches = array();
+    $params = array();
+    $branchIndex = 0;
+    $channels = $context['event'] === 'both' ? array('kills', 'deaths') : array($context['event']);
+    $sources = array(
+        array('table' => 'hlstats_Events_Frags', 'prefix' => 'frags', 'teamkill' => 0),
+        array('table' => 'hlstats_Events_Teamkills', 'prefix' => 'teamkills', 'teamkill' => 1),
+    );
+    foreach ($channels as $channel) {
+        $participant = $channel === 'kills' ? 'attacker' : 'victim';
+        $xColumn = $channel === 'kills' ? 'pos_x' : 'pos_victim_x';
+        $yColumn = $channel === 'kills' ? 'pos_y' : 'pos_victim_y';
+        $zColumn = $channel === 'kills' ? 'pos_z' : 'pos_victim_z';
+        foreach ($sources as $source) {
+            $prefix = $source['prefix'] . '_' . $channel;
+            $playerJoinAlias = $participant === 'attacker' ? 'killer_player' : 'victim_player';
+            $playerPredicate = '';
+            if ($context['lens'] === 'me') {
+                $playerPredicate = '                AND ' . $playerJoinAlias . '.playerId = :' . $prefix . '_player';
+                $params[$prefix . '_player'] = $context['player'];
+            }
+            $floorPredicate = '';
+            if ($context['floorBounds'] !== null) {
+                $floorPredicate = '                AND hef.' . $zColumn . ' >= :' . $prefix . '_z_min' . "\n"
+                    . '                AND hef.' . $zColumn . ' < :' . $prefix . '_z_max' . "\n";
+                $params[$prefix . '_z_min'] = $context['floorBounds']['zMin'];
+                $params[$prefix . '_z_max'] = $context['floorBounds']['zMax'];
+            }
+            $branchLines = array(
+                '            SELECT',
+                '                hef.eventTime AS eventTime,',
+                "                '" . ($channel === 'kills' ? 'kill' : 'death') . "' AS event,",
+                '                COALESCE(killer_player.playerId, 0) AS killerId,',
+                "                COALESCE(killer_player.lastName, '') AS killerName,",
+                '                COALESCE(victim_player.playerId, 0) AS victimId,',
+                "                COALESCE(victim_player.lastName, '') AS victimName,",
+                '                hef.weapon AS weapon,',
+                $channel === 'kills' && $source['teamkill'] === 0
+                    ? '                hef.headshot AS headshot,'
+                    : '                0 AS headshot,',
+                '                ' . $source['teamkill'] . ' AS teamkill,',
+                '                hef.id AS eventId,',
+                '                ' . $branchIndex . ' AS sourceOrder',
+                '            FROM ' . $source['table'] . ' AS hef',
+                '            INNER JOIN hlstats_Servers AS hs ON hs.serverId = hef.serverId',
+                '            LEFT JOIN hlstats_Players AS killer_player',
+                '                ON killer_player.playerId = hef.killerId',
+                '                AND killer_player.hideranking = 0',
+                '            LEFT JOIN hlstats_Players AS victim_player',
+                '                ON victim_player.playerId = hef.victimId',
+                '                AND victim_player.hideranking = 0',
+                '            WHERE hef.map = :' . $prefix . '_map',
+                '                AND hs.game = :' . $prefix . '_game',
+                '                AND hef.eventTime >= FROM_UNIXTIME(:' . $prefix . '_from)',
+                '                AND hef.eventTime < FROM_UNIXTIME(:' . $prefix . '_to)',
+                '                AND hef.' . $xColumn . ' >= :' . $prefix . '_x_min',
+                '                AND hef.' . $xColumn . ' <= :' . $prefix . '_x_max',
+                '                AND hef.' . $yColumn . ' >= :' . $prefix . '_y_min',
+                '                AND hef.' . $yColumn . ' <= :' . $prefix . '_y_max',
+            );
+            $branch = implode("\n", $branchLines) . "\n" . $floorPredicate . $playerPredicate;
+            $branches[] = rtrim($branch);
+            $params[$prefix . '_map'] = $context['context']['map'];
+            $params[$prefix . '_game'] = $context['context']['game'];
+            $params[$prefix . '_from'] = $context['context']['from'];
+            $params[$prefix . '_to'] = $context['context']['to'];
+            $params[$prefix . '_x_min'] = $context['rawBounds']['xMin'];
+            $params[$prefix . '_x_max'] = $context['rawBounds']['xMax'];
+            $params[$prefix . '_y_min'] = $context['rawBounds']['yMin'];
+            $params[$prefix . '_y_max'] = $context['rawBounds']['yMax'];
+            $branchIndex++;
+        }
+    }
+    if (!$branches) {
+        throw new InvalidArgumentException('invalid_scene_query');
+    }
+
+    $sql = implode("\n", array(
+        'SELECT',
+        '    inspect_events.eventTime,',
+        '    inspect_events.event,',
+        '    inspect_events.killerId,',
+        '    inspect_events.killerName,',
+        '    inspect_events.victimId,',
+        '    inspect_events.victimName,',
+        '    inspect_events.weapon,',
+        '    inspect_events.headshot,',
+        '    inspect_events.teamkill',
+        'FROM (',
+        implode("\n            UNION ALL\n", $branches),
+        ') AS inspect_events',
+        'ORDER BY eventTime DESC, eventId DESC, sourceOrder ASC',
+        'LIMIT ' . HEATMAP_INSPECT_MAX_ROWS,
+    ));
+
+    return array('sql' => $sql, 'params' => $params, 'limit' => HEATMAP_INSPECT_MAX_ROWS);
+}
+
+function heatmap_inspect_event_time($value): string
+{
+    if ($value instanceof DateTimeInterface) {
+        return $value->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\\TH:i:s\\Z');
+    }
+    if (!is_string($value) && !is_int($value) && !is_float($value)) {
+        return '';
+    }
+    try {
+        $date = new DateTimeImmutable(strval($value), new DateTimeZone('UTC'));
+    } catch (Throwable $exception) {
+        return '';
+    }
+
+    return $date->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\\TH:i:s\\Z');
+}
+
+function heatmap_inspect_public_player_id($value): int
+{
+    $playerId = heatmap_try_canonical_integer($value);
+    return $playerId !== null && $playerId > 0 && $playerId <= HEATMAP_MYSQL_UNSIGNED_INT_MAX ? $playerId : 0;
+}
+
+function heatmap_inspect_weapon($value): string
+{
+    if (!is_string($value)) {
+        return '';
+    }
+    $value = trim($value);
+    return strlen($value) <= 64 && preg_match('/^[A-Za-z0-9_.:$-]*$/D', $value) === 1 ? $value : '';
+}
+
+function heatmap_build_inspect_payload(array $rows, bool $truncated): array
+{
+    $payloadRows = array();
+    foreach (array_slice($rows, 0, 100) as $row) {
+        $event = strtolower(trim(strval($row['event'] ?? '')));
+        $event = $event === 'death' || $event === 'deaths' ? 'death' : 'kill';
+        $payloadRows[] = array(
+            'eventTime' => heatmap_inspect_event_time($row['eventTime'] ?? null),
+            'event' => $event,
+            'killer' => array(
+                'id' => heatmap_inspect_public_player_id($row['killerId'] ?? null),
+                'name' => heatmap_actor_name($row['killerName'] ?? ''),
+            ),
+            'victim' => array(
+                'id' => heatmap_inspect_public_player_id($row['victimId'] ?? null),
+                'name' => heatmap_actor_name($row['victimName'] ?? ''),
+            ),
+            'weapon' => heatmap_inspect_weapon($row['weapon'] ?? null),
+            'headshot' => intval($row['headshot'] ?? 0) !== 0,
+            'teamkill' => intval($row['teamkill'] ?? 0) !== 0,
+        );
+    }
+
+    return array(
+        'schemaVersion' => HEATMAP_V2_SCHEMA,
+        'operation' => 'inspect',
+        'state' => 'ok',
+        'rows' => $payloadRows,
+        'truncated' => $truncated,
+        'warnings' => array(),
+    );
+}
+
+function heatmap_inspect_context(array $query, array $config, array $image): array
+{
+    $state = array('query' => $query, 'config' => $config, 'image' => $image);
+    heatmap_scene_prepare_state($state);
+    $scene = $state['_scene'];
+    return array(
+        'query' => $scene['query'],
+        'config' => $scene['config'],
+        'image' => $scene['image'],
+        'grid' => array(
+            'bucketSize' => $scene['bucketSize'],
+            'width' => $scene['gridWidth'],
+            'height' => $scene['gridHeight'],
+            'imageWidth' => $scene['image']['width'],
+            'imageHeight' => $scene['image']['height'],
+        ),
+    );
+}
+
+function heatmap_fetch_inspect_rows(PDO $pdo, array $descriptor): array
+{
+    if (!isset($descriptor['sql'], $descriptor['params']) || !is_string($descriptor['sql'])
+        || !is_array($descriptor['params'])) {
+        throw new InvalidArgumentException('invalid_inspect');
+    }
+    $statement = $pdo->prepare($descriptor['sql']);
+    if (!$statement instanceof PDOStatement) {
+        throw new RuntimeException('inspect_statement_unavailable');
+    }
+    $rows = array();
+    try {
+        $statement->execute($descriptor['params']);
+        while (count($rows) < HEATMAP_INSPECT_MAX_ROWS
+            && ($row = $statement->fetch(PDO::FETCH_ASSOC)) !== false) {
+            $rows[] = $row;
+        }
+    } finally {
+        $statement->closeCursor();
+    }
+
+    return $rows;
+}
+
 function heatmap_clean_renderer_mode($value)
 {
     $value = is_string($value) ? strtolower(trim($value)) : '';
@@ -1284,7 +1793,13 @@ function heatmap_actor_name($name)
     $name = str_replace("\xE2\x80\xAE", '', $name);
     $name = trim($name);
 
-    return $name === '' ? localized_text('literal.unknown', 'Unknown') : $name;
+    if ($name !== '') {
+        return $name;
+    }
+
+    return function_exists('localized_text')
+        ? localized_text('literal.unknown', 'Unknown')
+        : 'Unknown';
 }
 
 function heatmap_bool($value)

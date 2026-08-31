@@ -1222,6 +1222,204 @@ assert_same('insufficient_sample', $insufficientPayload['state'], 'comparison sc
 assert_true(count($insufficientPayload['layers']['total']) > 0, 'insufficient comparison scenes should retain count layers');
 assert_same(array(), $insufficientPayload['comparison']['bins'], 'insufficient comparison scenes should not expose unstable comparison bins');
 
+$inspectGrid = array(
+    'bucketSize' => 8,
+    'width' => 16,
+    'height' => 12,
+    'imageWidth' => 128,
+    'imageHeight' => 96,
+);
+$inspectCell = heatmap_parse_cell_id('c7.11', $inspectGrid);
+assert_same(
+    array(
+        'id' => 'c7.11',
+        'gridX' => 7,
+        'gridY' => 11,
+        'projectedBounds' => array('xMin' => 56, 'xMax' => 64, 'yMin' => 88, 'yMax' => 96),
+    ),
+    $inspectCell,
+    'inspect cell parsing should return the issued cell and clipped projected bounds'
+);
+foreach (array(
+    'c07.11',
+    'c+7.11',
+    ' c7.11',
+    'c7.11 ',
+    'c128.0',
+    'c15.12',
+    'c999999999999999999999.0',
+) as $invalidCellId) {
+    assert_throws('invalid_inspect', function () use ($invalidCellId, $inspectGrid): void {
+        heatmap_parse_cell_id($invalidCellId, $inspectGrid);
+    }, 'inspect cell parser should reject non-canonical or out-of-grid id: ' . $invalidCellId);
+}
+foreach (array(
+    array('bucketSize' => 0, 'width' => 16, 'height' => 12, 'imageWidth' => 128, 'imageHeight' => 96),
+    array('bucketSize' => 8, 'width' => 0, 'height' => 12, 'imageWidth' => 128, 'imageHeight' => 96),
+    array('bucketSize' => 8, 'width' => 129, 'height' => 12, 'imageWidth' => 128, 'imageHeight' => 96),
+    array('bucketSize' => 8, 'width' => 16, 'height' => 12, 'imageWidth' => 0, 'imageHeight' => 96),
+    array('bucketSize' => 8, 'width' => 16, 'height' => 12, 'imageWidth' => 128, 'imageHeight' => -1),
+) as $invalidGrid) {
+    assert_throws('invalid_inspect', function () use ($invalidGrid): void {
+        heatmap_parse_cell_id('c0.0', $invalidGrid);
+    }, 'inspect cell parser should reject invalid issued grid dimensions');
+}
+
+$inspectInverseConfigs = array(
+    array('rotate' => 0, 'flipx' => 0, 'flipy' => 0, 'scale' => 0.5, 'xoffset' => 3, 'yoffset' => -4, 'cropx1' => 4, 'cropy1' => 3, 'cropx2' => 128, 'cropy2' => 96),
+    array('rotate' => 1, 'flipx' => 1, 'flipy' => 0, 'scale' => 1.5, 'xoffset' => -5, 'yoffset' => 7, 'cropx1' => 4, 'cropy1' => 3, 'cropx2' => 128, 'cropy2' => 96),
+    array('rotate' => 2, 'flipx' => 0, 'flipy' => 1, 'scale' => 2.25, 'xoffset' => 11, 'yoffset' => -9, 'cropx1' => 4, 'cropy1' => 3, 'cropx2' => 128, 'cropy2' => 96),
+    array('rotate' => 3, 'flipx' => 1, 'flipy' => 1, 'scale' => 1.5, 'xoffset' => -8, 'yoffset' => 6, 'cropx1' => 4, 'cropy1' => 3, 'cropx2' => 128, 'cropy2' => 96),
+);
+$inverseRawCandidates = array(-23, -8, -1, 0, 1, 7, 19);
+foreach ($inspectInverseConfigs as $inverseConfig) {
+    foreach ($inverseRawCandidates as $rawX) {
+        foreach ($inverseRawCandidates as $rawY) {
+            $inversePoint = heatmap_transform_point(array('pos_x' => $rawX, 'pos_y' => $rawY), scene_config($inverseConfig));
+            if ($inversePoint['x'] < 0 || $inversePoint['x'] >= $inspectGrid['imageWidth']
+                || $inversePoint['y'] < 0 || $inversePoint['y'] >= $inspectGrid['imageHeight']) {
+                continue;
+            }
+            $cellId = 'c' . intval(floor($inversePoint['x'] / $inspectGrid['bucketSize']))
+                . '.' . intval(floor($inversePoint['y'] / $inspectGrid['bucketSize']));
+            $inverseCell = heatmap_parse_cell_id($cellId, $inspectGrid);
+            $inverseBounds = heatmap_unproject_cell_bounds($inverseCell, $inspectGrid, scene_config($inverseConfig));
+            $rawBounds = $inverseBounds;
+            assert_true(
+                $rawX >= $rawBounds['xMin'] && $rawX <= $rawBounds['xMax']
+                    && $rawY >= $rawBounds['yMin'] && $rawY <= $rawBounds['yMax'],
+                'inverse inspect bounds should contain every projected raw boundary point'
+            );
+            for ($boundedX = $rawBounds['xMin']; $boundedX <= $rawBounds['xMax']; $boundedX++) {
+                for ($boundedY = $rawBounds['yMin']; $boundedY <= $rawBounds['yMax']; $boundedY++) {
+                    $boundedPoint = heatmap_transform_point(array('pos_x' => $boundedX, 'pos_y' => $boundedY), scene_config($inverseConfig));
+                    assert_true(
+                        $boundedPoint['x'] >= $inverseCell['projectedBounds']['xMin']
+                            && $boundedPoint['x'] < $inverseCell['projectedBounds']['xMax']
+                            && $boundedPoint['y'] >= $inverseCell['projectedBounds']['yMin']
+                            && $boundedPoint['y'] < $inverseCell['projectedBounds']['yMax'],
+                        'inverse inspect bounds should not include a raw point outside the projected cell'
+                    );
+                }
+            }
+        }
+    }
+}
+assert_throws('invalid_inspect', function () use ($inspectGrid): void {
+    heatmap_unproject_cell_bounds(
+        heatmap_parse_cell_id('c1.0', $inspectGrid),
+        $inspectGrid,
+        scene_config(array('scale' => 0.000000001))
+    );
+}, 'inverse inspect should reject a cell with no signed MEDIUMINT preimage');
+
+$inspectBounds = heatmap_unproject_cell_bounds($inspectCell, $inspectGrid, scene_config(array(
+    'floors' => array(floor_fixture('ground', 0, 20)),
+)));
+$inspectQuery = scene_query(array('event' => 'both', 'lens' => 'overview', 'floor' => 'lower'));
+$inspectSql = heatmap_build_inspect_sql($inspectQuery, scene_config(), $inspectBounds);
+assert_same(101, $inspectSql['limit'], 'inspect SQL should cap reads at 101 rows');
+assert_contains('ORDER BY eventTime DESC, eventId DESC', $inspectSql['sql'], 'inspect SQL should use deterministic newest-event ordering');
+assert_contains('LIMIT 101', $inspectSql['sql'], 'inspect SQL should include the bounded result limit');
+assert_same(2, substr_count($inspectSql['sql'], 'hlstats_Events_Frags'), 'both inspect should query Frags once per source channel');
+assert_same(2, substr_count($inspectSql['sql'], 'hlstats_Events_Teamkills'), 'both inspect should query Teamkills once per source channel');
+assert_contains('hef.pos_x >= :frags_kills_x_min', $inspectSql['sql'], 'kill inspect should filter attacker X bounds');
+assert_contains('hef.pos_y <= :teamkills_kills_y_max', $inspectSql['sql'], 'kill inspect should filter attacker Y bounds');
+assert_contains('hef.pos_victim_x >= :frags_deaths_x_min', $inspectSql['sql'], 'death inspect should filter victim X bounds');
+assert_contains('hef.pos_victim_y <= :teamkills_deaths_y_max', $inspectSql['sql'], 'death inspect should filter victim Y bounds');
+assert_contains('hef.pos_z >= :frags_kills_z_min', $inspectSql['sql'], 'floor inspect should use a lower half-open Z bound');
+assert_contains('hef.pos_z < :frags_kills_z_max', $inspectSql['sql'], 'floor inspect should use an upper half-open Z bound');
+assert_contains('hef.pos_victim_z >= :frags_deaths_z_min', $inspectSql['sql'], 'death floor inspect should use victim Z lower bound');
+assert_contains('hef.pos_victim_z < :frags_deaths_z_max', $inspectSql['sql'], 'death floor inspect should use victim Z upper bound');
+assert_true(strpos($inspectSql['sql'], 'COALESCE(hef.pos_victim') === false, 'inspect SQL must never fall back from missing victim coordinates');
+foreach ($inspectSql['params'] as $parameter => $value) {
+    assert_same(1, substr_count($inspectSql['sql'], ':' . $parameter), 'inspect SQL should bind each native PDO placeholder exactly once: ' . $parameter);
+}
+$inspectMeSql = heatmap_build_inspect_sql(
+    scene_query(array('event' => 'kills', 'lens' => 'me', 'floor' => 'all')),
+    scene_config(),
+    $inspectBounds
+);
+assert_contains('killer_player.playerId = :frags_kills_player', $inspectMeSql['sql'], 'me kill inspect should filter the selected public killer');
+assert_true(strpos($inspectMeSql['sql'], 'victim_player.playerId = :') === false, 'me kill inspect should not filter the victim participant');
+$inspectDifferenceSql = heatmap_build_inspect_sql(
+    scene_query(array('event' => 'deaths', 'lens' => 'difference', 'floor' => 'all')),
+    scene_config(),
+    $inspectBounds
+);
+assert_true(strpos($inspectDifferenceSql['sql'], 'playerId = :') === false, 'difference inspect should retain personal and other compatible rows');
+$inspectAllFloorSql = heatmap_build_inspect_sql(
+    scene_query(array('event' => 'deaths', 'lens' => 'overview', 'floor' => 'all')),
+    scene_config(),
+    $inspectBounds
+);
+assert_true(strpos($inspectAllFloorSql['sql'], 'pos_z >=') === false, 'all-floor inspect should not require attacker Z bounds');
+assert_true(strpos($inspectAllFloorSql['sql'], 'pos_victim_z >=') === false, 'all-floor inspect should not require victim Z bounds');
+assert_contains('killer_player.hideranking = 0', $inspectSql['sql'], 'inspect actor joins should require public killer visibility');
+assert_contains('victim_player.hideranking = 0', $inspectSql['sql'], 'inspect actor joins should require public victim visibility');
+assert_contains('COALESCE(killer_player.playerId, 0) AS killerId', $inspectSql['sql'], 'inspect output should select the joined public killer id');
+assert_contains('COALESCE(victim_player.playerId, 0) AS victimId', $inspectSql['sql'], 'inspect output should select the joined public victim id');
+
+$inspectRows = array(
+    array(
+        'eventTime' => '2026-08-29 17:12:31+03:00',
+        'event' => 'kill',
+        'killerId' => '42',
+        'killerName' => "Alpha\xE2\x80\xAE",
+        'victimId' => null,
+        'victimName' => '',
+        'weapon' => 'ak47',
+        'headshot' => '1',
+        'teamkill' => '0',
+        'steamId' => 'STEAM_SECRET',
+        'attackerX' => 12,
+    ),
+    array(
+        'eventTime' => '2026-08-29T17:12:30Z',
+        'event' => 'death',
+        'killerId' => '7',
+        'killerName' => 'Gamma',
+        'victimId' => '84',
+        'victimName' => 'Beta',
+        'weapon' => '<script>alert(1)</script>',
+        'headshot' => 0,
+        'teamkill' => 1,
+        'sourceId' => 'INTERNAL_SECRET',
+    ),
+);
+$inspectPayload = heatmap_build_inspect_payload($inspectRows, false);
+assert_same(2, count($inspectPayload['rows']), 'inspect payload should retain all rows below the cap');
+assert_same('2026-08-29T14:12:31Z', $inspectPayload['rows'][0]['eventTime'], 'inspect payload should normalize event time to UTC');
+assert_same(array('id' => 42, 'name' => 'Alpha'), $inspectPayload['rows'][0]['killer'], 'inspect payload should sanitize public killer identity');
+assert_same(array('id' => 0, 'name' => 'Unknown'), $inspectPayload['rows'][0]['victim'], 'hidden or missing victim should fail closed to Unknown');
+assert_same(true, $inspectPayload['rows'][0]['headshot'], 'inspect payload should expose real booleans');
+assert_same(false, $inspectPayload['rows'][0]['teamkill'], 'inspect payload should expose teamkill as a real boolean');
+assert_same('', $inspectPayload['rows'][1]['weapon'], 'inspect payload should reject non-token weapons');
+assert_same(array('eventTime', 'event', 'killer', 'victim', 'weapon', 'headshot', 'teamkill'), array_keys($inspectPayload['rows'][0]), 'inspect rows should expose only the public allowlist');
+assert_same(array('schemaVersion', 'operation', 'state', 'rows', 'truncated', 'warnings'), array_keys($inspectPayload), 'inspect payload should retain the canonical envelope allowlist');
+$inspectOverflowPayload = heatmap_build_inspect_payload(array_merge($inspectRows, array_fill(0, 99, $inspectRows[0])), true);
+assert_same(100, count($inspectOverflowPayload['rows']), 'inspect payload should return no more than 100 rows');
+assert_same(true, $inspectOverflowPayload['truncated'], 'inspect payload should preserve the overflow flag');
+$inspectEmptyPayload = heatmap_build_inspect_payload(array(), false);
+assert_same('ok', $inspectEmptyPayload['state'], 'empty inspect should be a successful response');
+assert_same(array(), $inspectEmptyPayload['rows'], 'empty inspect should return an empty row list');
+assert_same(false, $inspectEmptyPayload['truncated'], 'empty inspect should not be truncated');
+
+$inspectRouteSource = file_get_contents(ROOT_PATH . '/heatmap_points.php');
+assert_true($inspectRouteSource !== false, 'inspect route source should be readable');
+assert_contains('heatmap_parse_cell_id', $inspectRouteSource, 'v2 route should validate the issued inspect cell');
+assert_contains('heatmap_unproject_cell_bounds', $inspectRouteSource, 'v2 route should derive exact raw cell bounds');
+assert_contains('heatmap_build_inspect_sql', $inspectRouteSource, 'v2 route should use the bounded inspect SQL builder');
+assert_contains('heatmap_build_inspect_payload', $inspectRouteSource, 'v2 route should use the bounded inspect payload builder');
+assert_true(strpos($inspectRouteSource, 'inspect_not_available') === false, 'v2 route should no longer reject valid inspect requests as unavailable');
+assert_contains("header('Cache-Control: no-store')", $inspectRouteSource, 'inspect responses should disable browser and proxy caching');
+assert_contains("header('Pragma: no-cache')", $inspectRouteSource, 'inspect responses should publish the legacy no-cache header');
+assert_contains("\$metrics['operation'] = \$isInspect ? 'inspect' : 'scene';", $inspectRouteSource, 'inspect requests should use the structured inspect log operation');
+assert_contains("\$metrics['cache'] = 'no-store';", $inspectRouteSource, 'inspect requests should be marked no-store in structured logs');
+$inspectDispatch = strpos($inspectRouteSource, 'if ($isInspect) {');
+$sceneCacheDispatch = strpos($inspectRouteSource, '$cacheKey = heatmap_scene_cache_key(');
+assert_true($inspectDispatch !== false && $sceneCacheDispatch !== false && $inspectDispatch < $sceneCacheDispatch, 'inspect dispatch should precede every scene cache read');
+
 $overflowState = array(
     'query' => scene_query(array('event' => 'kills')),
     'config' => scene_config(),
