@@ -27,6 +27,51 @@ function assert_contains(string $needle, string $haystack, string $message): voi
     assert_true(strpos($haystack, $needle) !== false, $message);
 }
 
+function assert_throws(string $expectedCode, callable $callback, string $message): void
+{
+    try {
+        $callback();
+    } catch (InvalidArgumentException $exception) {
+        assert_same($expectedCode, $exception->getMessage(), $message);
+        return;
+    } catch (Throwable $exception) {
+        fwrite(STDERR, $message . PHP_EOL);
+        fwrite(STDERR, 'Expected InvalidArgumentException, got ' . get_class($exception) . PHP_EOL);
+        exit(1);
+    }
+
+    fwrite(STDERR, $message . PHP_EOL);
+    fwrite(STDERR, 'Expected InvalidArgumentException with code: ' . $expectedCode . PHP_EOL);
+    exit(1);
+}
+
+function v2_query_input(array $overrides = array()): array
+{
+    return array_merge(array(
+        'v' => '2',
+        'game' => 'cstrike',
+        'map' => 'de_dust2',
+    ), $overrides);
+}
+
+function floor_fixture($id = 'ground', $zMin = 0, $zMax = 10, $labelEn = 'Ground', $labelRu = 'Зал'): array
+{
+    return array(
+        'id' => $id,
+        'label_en' => $labelEn,
+        'label_ru' => $labelRu,
+        'z_min' => $zMin,
+        'z_max' => $zMax,
+    );
+}
+
+function floor_fixture_json(array $floors): string
+{
+    $json = json_encode($floors, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION);
+    assert_true($json !== false, 'floor fixture should encode to JSON');
+    return $json;
+}
+
 $installSql = file_get_contents(dirname(__DIR__) . '/sql/install.sql');
 assert_true($installSql !== false, 'installer SQL should be readable');
 assert_contains('SET @DBVERSION="81";', $installSql, 'fresh install should set dbversion 81');
@@ -269,5 +314,212 @@ assert_same(1, $overviewConfig['rotate'], 'source overview should seed rotate');
 
 $projection = heatmap_projection_config(array('rotate' => 7));
 assert_same(3, $projection['rotate'], 'projection config should normalize rotate to quarter turns');
+
+$queryNow = 1700000123;
+$presetCases = array(
+    array('range' => '7d', 'from' => 1699395300, 'to' => 1700000100),
+    array('range' => '30d', 'from' => 1697408100, 'to' => 1700000100),
+    array('range' => '90d', 'from' => 1692224100, 'to' => 1700000100),
+    array('range' => '365d', 'from' => 1668464100, 'to' => 1700000100),
+);
+foreach ($presetCases as $case) {
+    $query = heatmap_parse_v2_query(v2_query_input(array('range' => $case['range'])), $queryNow);
+    assert_same($case['from'], $query['from'], 'preset should use the documented start boundary: ' . $case['range']);
+    assert_same($case['to'], $query['to'], 'preset should align end to a 15-minute boundary: ' . $case['range']);
+}
+
+$defaultQuery = heatmap_parse_v2_query(v2_query_input(), $queryNow);
+assert_same('cstrike', $defaultQuery['game'], 'v2 query should preserve the game token');
+assert_same('de_dust2', $defaultQuery['map'], 'v2 query should preserve the map token');
+assert_same(0, $defaultQuery['player'], 'v2 query should default player to zero');
+assert_same(1697408100, $defaultQuery['from'], 'v2 query should default to the 30-day start');
+assert_same(1700000100, $defaultQuery['to'], 'v2 query should default to the aligned end');
+assert_same('both', $defaultQuery['event'], 'v2 query should default to both channels');
+assert_same('overview', $defaultQuery['lens'], 'v2 query should default to overview lens');
+assert_same('all', $defaultQuery['floor'], 'v2 query should default to all floors');
+assert_same('en', $defaultQuery['lang'], 'v2 query should default to English');
+assert_true(!array_key_exists('inspect', $defaultQuery), 'v2 query should omit inspect when none was requested');
+assert_same(
+    $defaultQuery,
+    heatmap_parse_v2_query(v2_query_input(), $queryNow),
+    'v2 query should be deterministic for an injected historical now'
+);
+
+$customQuery = heatmap_parse_v2_query(
+    v2_query_input(array('from' => '1699990000', 'to' => '1700000001')),
+    $queryNow
+);
+assert_same(1699990000, $customQuery['from'], 'custom window should keep its exact inclusive start');
+assert_same(1700000001, $customQuery['to'], 'custom window should keep its exact exclusive end');
+
+$maximumWindow = heatmap_parse_v2_query(
+    v2_query_input(array('from' => '1384640400', 'to' => '1700000400')),
+    $queryNow
+);
+assert_same(1384640400, $maximumWindow['from'], 'the exact 3650-day custom window should be accepted');
+assert_same(1700000400, $maximumWindow['to'], 'the exact 3650-day custom window should retain its end');
+
+$v2InvalidCases = array(
+    array('name' => 'v2 version is required', 'input' => array('game' => 'cstrike', 'map' => 'de_dust2'), 'code' => 'invalid_query'),
+    array('name' => 'v2 version must be canonical', 'input' => v2_query_input(array('v' => '02')), 'code' => 'invalid_query'),
+    array('name' => 'game token cannot be empty', 'input' => v2_query_input(array('game' => '')), 'code' => 'invalid_query'),
+    array('name' => 'map token cannot be empty', 'input' => v2_query_input(array('map' => '')), 'code' => 'invalid_query'),
+    array('name' => 'game token must be bounded and safe', 'input' => v2_query_input(array('game' => '../cstrike')), 'code' => 'invalid_query'),
+    array('name' => 'map token must be bounded', 'input' => v2_query_input(array('map' => str_repeat('a', 65))), 'code' => 'invalid_query'),
+    array('name' => 'unknown query key is rejected', 'input' => v2_query_input(array('sort' => 'eventTime')), 'code' => 'invalid_query'),
+    array('name' => 'array query value is rejected', 'input' => v2_query_input(array('player' => array('1'))), 'code' => 'invalid_query'),
+    array('name' => 'object query value is rejected', 'input' => v2_query_input(array('map' => new stdClass())), 'code' => 'invalid_query'),
+    array('name' => 'range and custom window cannot mix', 'input' => v2_query_input(array('range' => '30d', 'from' => '1699990000', 'to' => '1700000001')), 'code' => 'invalid_window'),
+    array('name' => 'custom window requires both bounds', 'input' => v2_query_input(array('from' => '1699990000')), 'code' => 'invalid_window'),
+    array('name' => 'custom window rejects a lone end bound', 'input' => v2_query_input(array('to' => '1700000001')), 'code' => 'invalid_window'),
+    array('name' => 'custom window must be half-open with increasing bounds', 'input' => v2_query_input(array('from' => '1700000001', 'to' => '1700000001')), 'code' => 'invalid_window'),
+    array('name' => 'custom window rejects a reversed interval', 'input' => v2_query_input(array('from' => '1700000002', 'to' => '1700000001')), 'code' => 'invalid_window'),
+    array('name' => 'custom window cannot exceed 3650 days', 'input' => v2_query_input(array('from' => '1384640399', 'to' => '1700000400')), 'code' => 'invalid_window'),
+    array('name' => 'custom window cannot end more than five minutes in the future', 'input' => v2_query_input(array('from' => '1700000000', 'to' => '1700000424')), 'code' => 'invalid_window'),
+    array('name' => 'custom window integers must be canonical', 'input' => v2_query_input(array('from' => '01699990000', 'to' => '1700000001')), 'code' => 'invalid_window'),
+    array('name' => 'explicit zero player is rejected', 'input' => v2_query_input(array('player' => '0')), 'code' => 'invalid_player'),
+    array('name' => 'player integer cannot have a leading zero', 'input' => v2_query_input(array('player' => '01')), 'code' => 'invalid_player'),
+    array('name' => 'me lens needs a player', 'input' => v2_query_input(array('lens' => 'me')), 'code' => 'player_required'),
+    array('name' => 'difference lens needs a player', 'input' => v2_query_input(array('lens' => 'difference', 'event' => 'kills')), 'code' => 'player_required'),
+    array('name' => 'difference lens cannot combine channels', 'input' => v2_query_input(array('player' => '4', 'lens' => 'difference', 'event' => 'both')), 'code' => 'difference_channel_required'),
+    array('name' => 'event must be one published channel', 'input' => v2_query_input(array('event' => 'kill')), 'code' => 'invalid_event'),
+    array('name' => 'lens must be published', 'input' => v2_query_input(array('lens' => 'team')), 'code' => 'invalid_lens'),
+    array('name' => 'language must be supported', 'input' => v2_query_input(array('lang' => 'de')), 'code' => 'invalid_language'),
+    array('name' => 'floor identifier must be safe', 'input' => v2_query_input(array('floor' => 'upper floor')), 'code' => 'invalid_floor'),
+    array('name' => 'inspect must use a nonnegative grid cell id', 'input' => v2_query_input(array('inspect' => 'c-1.0')), 'code' => 'invalid_inspect'),
+    array('name' => 'inspect coordinates must be canonical', 'input' => v2_query_input(array('inspect' => 'c01.0')), 'code' => 'invalid_inspect'),
+);
+foreach ($v2InvalidCases as $case) {
+    assert_throws($case['code'], function () use ($case, $queryNow): void {
+        heatmap_parse_v2_query($case['input'], $queryNow);
+    }, 'v2 query should reject ' . $case['name']);
+}
+
+$inspectQuery = heatmap_parse_v2_query(v2_query_input(array('inspect' => 'c0.12')), $queryNow);
+assert_same('c0.12', $inspectQuery['inspect'], 'v2 query should retain a syntactically valid inspect cell id');
+
+foreach (array(null, '', '   ', '[]') as $emptyFloorsJson) {
+    assert_same(array(), heatmap_parse_floor_config($emptyFloorsJson), 'empty floor metadata should represent the all-floors map');
+}
+
+$canonicalFloors = array(
+    floor_fixture('basement', -10, 0, 'Basement', 'Подвал'),
+    floor_fixture('ground', 0, 10, 'Ground', 'Зал'),
+    floor_fixture('upper', 10, 20, 'Upper', 'Верх'),
+);
+$unorderedFloorsJson = floor_fixture_json(array(
+    $canonicalFloors[2],
+    $canonicalFloors[0],
+    $canonicalFloors[1],
+));
+assert_same(
+    $canonicalFloors,
+    heatmap_parse_floor_config($unorderedFloorsJson),
+    'floor metadata should sort non-overlapping adjacent bands canonically'
+);
+
+$eightFloors = array();
+for ($index = 0; $index < 8; $index++) {
+    $eightFloors[] = floor_fixture('f' . $index, $index * 10, ($index + 1) * 10, 'Floor ' . $index, 'Этаж ' . $index);
+}
+assert_same(8, count(heatmap_parse_floor_config(floor_fixture_json($eightFloors))), 'floor metadata should allow exactly eight bands');
+$nineFloors = $eightFloors;
+$nineFloors[] = floor_fixture('f8', 80, 90, 'Floor 8', 'Этаж 8');
+
+$floorInvalidCases = array(
+    array('name' => 'JSON null is not a floor list', 'json' => 'null'),
+    array('name' => 'malformed JSON', 'json' => '[{'),
+    array('name' => 'root object instead of list', 'json' => floor_fixture_json(floor_fixture())),
+    array('name' => 'more than eight bands', 'json' => floor_fixture_json($nineFloors)),
+    array('name' => 'invalid id', 'json' => floor_fixture_json(array(floor_fixture('1ground')))),
+    array('name' => 'missing required label', 'json' => floor_fixture_json(array(array(
+        'id' => 'ground',
+        'label_en' => 'Ground',
+        'z_min' => 0,
+        'z_max' => 10,
+    )))),
+    array('name' => 'untrimmed label', 'json' => floor_fixture_json(array(floor_fixture('ground', 0, 10, ' Ground ')))),
+    array('name' => 'too long label', 'json' => floor_fixture_json(array(floor_fixture('ground', 0, 10, str_repeat('x', 65))))),
+    array('name' => 'invalid UTF-8 label', 'json' => "[{\"id\":\"ground\",\"label_en\":\"\xC3\x28\",\"label_ru\":\"Зал\",\"z_min\":0,\"z_max\":10}]"),
+    array('name' => 'control character label', 'json' => '[{"id":"ground","label_en":"Ground\\u0001","label_ru":"Зал","z_min":0,"z_max":10}]'),
+    array('name' => 'unknown floor field', 'json' => floor_fixture_json(array(array_merge(floor_fixture(), array('image' => 'client.png'))))),
+    array('name' => 'duplicate id', 'json' => floor_fixture_json(array(floor_fixture('ground', 0, 10), floor_fixture('ground', 10, 20)))),
+    array('name' => 'string z bound', 'json' => floor_fixture_json(array(floor_fixture('ground', '0', 10)))),
+    array('name' => 'float z bound', 'json' => floor_fixture_json(array(floor_fixture('ground', 0.0, 10)))),
+    array('name' => 'boolean z bound', 'json' => floor_fixture_json(array(floor_fixture('ground', true, 10)))),
+    array('name' => 'null z bound', 'json' => floor_fixture_json(array(floor_fixture('ground', null, 10)))),
+    array('name' => 'out of range low z bound', 'json' => floor_fixture_json(array(floor_fixture('ground', -8388609, 10)))),
+    array('name' => 'out of range high z bound', 'json' => floor_fixture_json(array(floor_fixture('ground', 0, 8388608)))),
+    array('name' => 'empty z interval', 'json' => floor_fixture_json(array(floor_fixture('ground', 0, 0)))),
+    array('name' => 'reversed z interval', 'json' => floor_fixture_json(array(floor_fixture('ground', 10, 0)))),
+    array('name' => 'overlapping bands', 'json' => floor_fixture_json(array(floor_fixture('lower', 0, 10), floor_fixture('upper', 9, 20)))),
+);
+foreach ($floorInvalidCases as $case) {
+    assert_throws('invalid_floor_config', function () use ($case): void {
+        heatmap_parse_floor_config($case['json']);
+    }, 'floor parser should reject ' . $case['name']);
+}
+
+$floorAssignmentCases = array(
+    array('z' => -10, 'floor' => 'basement'),
+    array('z' => -1, 'floor' => 'basement'),
+    array('z' => '0', 'floor' => 'ground'),
+    array('z' => 9, 'floor' => 'ground'),
+    array('z' => 10, 'floor' => 'upper'),
+    array('z' => 19, 'floor' => 'upper'),
+    array('z' => 20, 'floor' => null),
+    array('z' => null, 'floor' => null),
+    array('z' => 'xy-only', 'floor' => null),
+    array('z' => 1.5, 'floor' => null),
+    array('z' => 8388608, 'floor' => null),
+);
+foreach ($floorAssignmentCases as $case) {
+    assert_same(
+        $case['floor'],
+        heatmap_assign_floor($case['z'], $canonicalFloors),
+        'floor assignment should use exact half-open Z bands'
+    );
+}
+assert_same('all', heatmap_validate_requested_floor('all', $canonicalFloors), 'all should remain valid for any floor configuration');
+assert_same('ground', heatmap_validate_requested_floor('ground', $canonicalFloors), 'configured floor id should remain valid');
+assert_throws('unknown_floor', function () use ($canonicalFloors): void {
+    heatmap_validate_requested_floor('roof', $canonicalFloors);
+}, 'unconfigured floor id should fail closed');
+
+$floorConfig = array(
+    'game' => 'cstrike',
+    'map' => 'de_dust2',
+    'xoffset' => 0,
+    'yoffset' => 0,
+    'scale' => 1,
+    'floors_json' => $unorderedFloorsJson,
+);
+$mergedFloorConfig = heatmap_merge_config_override($floorConfig, array());
+$canonicalFloorsJson = '[{"id":"basement","label_en":"Basement","label_ru":"Подвал","z_min":-10,"z_max":0},{"id":"ground","label_en":"Ground","label_ru":"Зал","z_min":0,"z_max":10},{"id":"upper","label_en":"Upper","label_ru":"Верх","z_min":10,"z_max":20}]';
+assert_same($canonicalFloors, $mergedFloorConfig['floors'], 'config merge should expose parsed canonical floors');
+assert_same($canonicalFloorsJson, $mergedFloorConfig['floors_json'], 'config merge should store deterministic canonical floor JSON');
+$roundTrippedConfig = heatmap_merge_config_override($mergedFloorConfig, array('floors_json' => $mergedFloorConfig['floors_json']));
+assert_same($mergedFloorConfig['floors'], $roundTrippedConfig['floors'], 'floor config should round trip through merge');
+assert_same($mergedFloorConfig['floors_json'], $roundTrippedConfig['floors_json'], 'floor JSON should round trip without formatting drift');
+assert_same($canonicalFloors, heatmap_projection_config($roundTrippedConfig)['floors'], 'projection config should retain canonical floors');
+assert_same(
+    heatmap_config_hash($mergedFloorConfig),
+    heatmap_config_hash($roundTrippedConfig),
+    'equivalent floor configs should share a cache identity'
+);
+$changedFloorConfig = heatmap_merge_config_override(
+    array('game' => 'cstrike', 'map' => 'de_dust2', 'floors_json' => '[]'),
+    array('floors_json' => floor_fixture_json(array(floor_fixture('ground', 0, 11))))
+);
+assert_true(
+    heatmap_config_hash($mergedFloorConfig) !== heatmap_config_hash($changedFloorConfig),
+    'floor changes should invalidate the config hash'
+);
+assert_throws('invalid_floor_config', function () use ($floorConfig): void {
+    heatmap_merge_config_override($floorConfig, array('floors' => array(floor_fixture('ground', 0.0, 10))));
+}, 'config merge should retain native float Z type violations');
+assert_throws('invalid_floor_config', function () use ($floorConfig): void {
+    heatmap_merge_config_override($floorConfig, array('floors_json' => '{"not":"a list"}'));
+}, 'config merge should fail closed for invalid floor storage');
 
 echo "web heatmap smoke ok\n";

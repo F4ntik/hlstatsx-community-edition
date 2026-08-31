@@ -5,6 +5,13 @@ if (!defined('IN_HLSTATS')) {
     exit;
 }
 
+const HEATMAP_V2_SCHEMA = 2;
+const HEATMAP_MAX_WINDOW_SECONDS = 315360000;
+const HEATMAP_MAX_FLOORS = 8;
+const HEATMAP_MEDIUMINT_MIN = -8388608;
+const HEATMAP_MEDIUMINT_MAX = 8388607;
+const HEATMAP_FLOOR_PARSER_SCHEMA = 1;
+
 function heatmap_clean_token($value)
 {
     if (!is_string($value)) {
@@ -33,6 +40,325 @@ function heatmap_clean_event($value)
     }
 
     return 'kills';
+}
+
+function heatmap_parse_canonical_integer($value, $errorCode)
+{
+    if (!is_string($value) || preg_match('/^(?:0|-?[1-9][0-9]*)$/D', $value) !== 1) {
+        throw new InvalidArgumentException($errorCode);
+    }
+
+    $parsed = filter_var($value, FILTER_VALIDATE_INT);
+    if ($parsed === false) {
+        throw new InvalidArgumentException($errorCode);
+    }
+
+    return intval($parsed);
+}
+
+function heatmap_try_canonical_integer($value)
+{
+    if (is_int($value)) {
+        return $value;
+    }
+    if (!is_string($value) || preg_match('/^(?:0|-?[1-9][0-9]*)$/D', $value) !== 1) {
+        return null;
+    }
+
+    $parsed = filter_var($value, FILTER_VALIDATE_INT);
+    return $parsed === false ? null : intval($parsed);
+}
+
+function heatmap_v2_token($value)
+{
+    if (!is_string($value) || $value === '' || strlen($value) > 64 || heatmap_clean_token($value) !== $value) {
+        throw new InvalidArgumentException('invalid_query');
+    }
+
+    return $value;
+}
+
+function heatmap_floor_id_is_valid($value)
+{
+    return is_string($value) && preg_match('/^[A-Za-z][A-Za-z0-9_-]{0,31}$/D', $value) === 1;
+}
+
+function heatmap_parse_v2_query(array $input, int $now): array
+{
+    $allowed = array_flip(array(
+        'v',
+        'game',
+        'map',
+        'player',
+        'range',
+        'from',
+        'to',
+        'event',
+        'lens',
+        'floor',
+        'lang',
+        'inspect',
+    ));
+    foreach ($input as $key => $value) {
+        if (!is_string($key) || !isset($allowed[$key]) || !is_string($value)) {
+            throw new InvalidArgumentException('invalid_query');
+        }
+    }
+
+    if (!isset($input['v']) || $input['v'] !== '2'
+        || !isset($input['game']) || !isset($input['map'])) {
+        throw new InvalidArgumentException('invalid_query');
+    }
+
+    $game = heatmap_v2_token($input['game']);
+    $map = heatmap_v2_token($input['map']);
+    $hasRange = array_key_exists('range', $input);
+    $hasFrom = array_key_exists('from', $input);
+    $hasTo = array_key_exists('to', $input);
+    if (($hasRange && ($hasFrom || $hasTo)) || $hasFrom !== $hasTo) {
+        throw new InvalidArgumentException('invalid_window');
+    }
+
+    if ($hasRange) {
+        $durations = array(
+            '7d' => 604800,
+            '30d' => 2592000,
+            '90d' => 7776000,
+            '365d' => 31536000,
+        );
+        if (!isset($durations[$input['range']])) {
+            throw new InvalidArgumentException('invalid_window');
+        }
+        $to = intdiv($now, 900) * 900;
+        $from = $to - $durations[$input['range']];
+    } elseif ($hasFrom) {
+        $from = heatmap_parse_canonical_integer($input['from'], 'invalid_window');
+        $to = heatmap_parse_canonical_integer($input['to'], 'invalid_window');
+        if ($from >= $to
+            || ($to - $from) > HEATMAP_MAX_WINDOW_SECONDS
+            || $to > $now + 300) {
+            throw new InvalidArgumentException('invalid_window');
+        }
+    } else {
+        $to = intdiv($now, 900) * 900;
+        $from = $to - 2592000;
+    }
+
+    $player = 0;
+    if (array_key_exists('player', $input)) {
+        $player = heatmap_parse_canonical_integer($input['player'], 'invalid_player');
+        if ($player <= 0) {
+            throw new InvalidArgumentException('invalid_player');
+        }
+    }
+
+    $event = $input['event'] ?? 'both';
+    if (!in_array($event, array('kills', 'deaths', 'both'), true)) {
+        throw new InvalidArgumentException('invalid_event');
+    }
+    $lens = $input['lens'] ?? 'overview';
+    if (!in_array($lens, array('overview', 'me', 'difference'), true)) {
+        throw new InvalidArgumentException('invalid_lens');
+    }
+    if (($lens === 'me' || $lens === 'difference') && $player <= 0) {
+        throw new InvalidArgumentException('player_required');
+    }
+    if ($lens === 'difference' && $event === 'both') {
+        throw new InvalidArgumentException('difference_channel_required');
+    }
+
+    $floor = $input['floor'] ?? 'all';
+    if ($floor !== 'all' && !heatmap_floor_id_is_valid($floor)) {
+        throw new InvalidArgumentException('invalid_floor');
+    }
+    $lang = $input['lang'] ?? 'en';
+    if ($lang !== 'en' && $lang !== 'ru') {
+        throw new InvalidArgumentException('invalid_language');
+    }
+
+    $query = array(
+        'game' => $game,
+        'map' => $map,
+        'player' => $player,
+        'from' => $from,
+        'to' => $to,
+        'event' => $event,
+        'lens' => $lens,
+        'floor' => $floor,
+        'lang' => $lang,
+    );
+    if (array_key_exists('inspect', $input)) {
+        $inspect = $input['inspect'];
+        if (preg_match('/^c(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/D', $inspect) !== 1) {
+            throw new InvalidArgumentException('invalid_inspect');
+        }
+        $query['inspect'] = $inspect;
+    }
+
+    return $query;
+}
+
+function heatmap_parse_floor_config($json): array
+{
+    if ($json === null) {
+        return array();
+    }
+    if (!is_string($json)) {
+        throw new InvalidArgumentException('invalid_floor_config');
+    }
+
+    $json = trim($json);
+    if ($json === '') {
+        return array();
+    }
+    if ($json[0] !== '[') {
+        throw new InvalidArgumentException('invalid_floor_config');
+    }
+
+    try {
+        $decoded = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+    } catch (JsonException $exception) {
+        throw new InvalidArgumentException('invalid_floor_config');
+    }
+    if (!is_array($decoded) || !array_is_list($decoded) || count($decoded) > HEATMAP_MAX_FLOORS) {
+        throw new InvalidArgumentException('invalid_floor_config');
+    }
+
+    $expectedKeys = array('id', 'label_en', 'label_ru', 'z_max', 'z_min');
+    sort($expectedKeys, SORT_STRING);
+    $floors = array();
+    $seenIds = array();
+    foreach ($decoded as $floor) {
+        if (!is_array($floor)) {
+            throw new InvalidArgumentException('invalid_floor_config');
+        }
+        $keys = array_keys($floor);
+        sort($keys, SORT_STRING);
+        if ($keys !== $expectedKeys) {
+            throw new InvalidArgumentException('invalid_floor_config');
+        }
+
+        $id = $floor['id'];
+        $labelEn = $floor['label_en'];
+        $labelRu = $floor['label_ru'];
+        if (!heatmap_floor_id_is_valid($id) || isset($seenIds[$id])
+            || !is_string($labelEn) || !is_string($labelRu)) {
+            throw new InvalidArgumentException('invalid_floor_config');
+        }
+        foreach (array($labelEn, $labelRu) as $label) {
+            if ($label === '' || preg_match('/^\s|\s$/u', $label) === 1
+                || preg_match('//u', $label) !== 1
+                || preg_match('/\p{Cc}/u', $label) === 1) {
+                throw new InvalidArgumentException('invalid_floor_config');
+            }
+            $codePointCount = preg_match_all('/./u', $label, $matches);
+            if ($codePointCount === false || $codePointCount < 1 || $codePointCount > 64) {
+                throw new InvalidArgumentException('invalid_floor_config');
+            }
+        }
+
+        $zMin = $floor['z_min'];
+        $zMax = $floor['z_max'];
+        if (!is_int($zMin) || !is_int($zMax)
+            || $zMin < HEATMAP_MEDIUMINT_MIN || $zMin > HEATMAP_MEDIUMINT_MAX
+            || $zMax < HEATMAP_MEDIUMINT_MIN || $zMax > HEATMAP_MEDIUMINT_MAX
+            || $zMin >= $zMax) {
+            throw new InvalidArgumentException('invalid_floor_config');
+        }
+
+        $seenIds[$id] = true;
+        $floors[] = array(
+            'id' => $id,
+            'label_en' => $labelEn,
+            'label_ru' => $labelRu,
+            'z_min' => $zMin,
+            'z_max' => $zMax,
+        );
+    }
+
+    usort($floors, function ($left, $right) {
+        $zCompare = $left['z_min'] <=> $right['z_min'];
+        return $zCompare !== 0 ? $zCompare : strcmp($left['id'], $right['id']);
+    });
+    $previousMax = null;
+    foreach ($floors as $floor) {
+        if ($previousMax !== null && $floor['z_min'] < $previousMax) {
+            throw new InvalidArgumentException('invalid_floor_config');
+        }
+        $previousMax = $floor['z_max'];
+    }
+
+    return $floors;
+}
+
+function heatmap_parse_floor_array(array $floors): array
+{
+    $json = json_encode($floors, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION);
+    if (!is_string($json)) {
+        throw new InvalidArgumentException('invalid_floor_config');
+    }
+
+    return heatmap_parse_floor_config($json);
+}
+
+function heatmap_config_floors(array $config): array
+{
+    if (array_key_exists('floors', $config)) {
+        if (!is_array($config['floors'])) {
+            throw new InvalidArgumentException('invalid_floor_config');
+        }
+
+        return heatmap_parse_floor_array($config['floors']);
+    }
+
+    return heatmap_parse_floor_config($config['floors_json'] ?? null);
+}
+
+function heatmap_floor_config_json(array $floors): string
+{
+    $floors = heatmap_parse_floor_array($floors);
+    $json = json_encode($floors, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if (!is_string($json)) {
+        throw new InvalidArgumentException('invalid_floor_config');
+    }
+
+    return $json;
+}
+
+function heatmap_assign_floor($z, array $floors): ?string
+{
+    $z = heatmap_try_canonical_integer($z);
+    if ($z === null || $z < HEATMAP_MEDIUMINT_MIN || $z > HEATMAP_MEDIUMINT_MAX) {
+        return null;
+    }
+
+    foreach ($floors as $floor) {
+        if (!is_array($floor) || !isset($floor['id'], $floor['z_min'], $floor['z_max'])
+            || !heatmap_floor_id_is_valid($floor['id'])
+            || !is_int($floor['z_min']) || !is_int($floor['z_max'])) {
+            return null;
+        }
+        if ($z >= $floor['z_min'] && $z < $floor['z_max']) {
+            return $floor['id'];
+        }
+    }
+
+    return null;
+}
+
+function heatmap_validate_requested_floor(string $floor, array $floors): string
+{
+    if ($floor === 'all') {
+        return 'all';
+    }
+    foreach ($floors as $configuredFloor) {
+        if (is_array($configuredFloor) && isset($configuredFloor['id'])
+            && is_string($configuredFloor['id']) && $configuredFloor['id'] === $floor) {
+            return $floor;
+        }
+    }
+
+    throw new InvalidArgumentException('unknown_floor');
 }
 
 function heatmap_clean_renderer_mode($value)
@@ -134,6 +460,8 @@ function heatmap_normalize_crop(array $config, $imageWidth = null, $imageHeight 
 
 function heatmap_projection_config(array $config)
 {
+    $floors = heatmap_config_floors($config);
+
     return array(
         'xoffset' => intval($config['xoffset'] ?? 0),
         'yoffset' => intval($config['yoffset'] ?? 0),
@@ -145,6 +473,8 @@ function heatmap_projection_config(array $config)
         'cropy1' => intval($config['cropy1'] ?? 0),
         'cropx2' => intval($config['cropx2'] ?? 0),
         'cropy2' => intval($config['cropy2'] ?? 0),
+        'floors' => $floors,
+        'floorParserSchema' => HEATMAP_FLOOR_PARSER_SCHEMA,
     );
 }
 
@@ -241,6 +571,8 @@ function heatmap_config_hash(array $config, array $image = null)
     $sourcePath = heatmap_source_path($config, $config['map'] ?? '');
     $payload = array(
         'projection' => $projection,
+        'floorParserSchema' => HEATMAP_FLOOR_PARSER_SCHEMA,
+        'floors' => $projection['floors'],
         'days' => intval($config['days'] ?? 30),
         'brush' => strval($config['brush'] ?? 'small'),
         'imageMtime' => is_file($sourcePath) ? filemtime($sourcePath) : 0,
@@ -537,7 +869,8 @@ function heatmap_fetch_config(PDO $pdo, $game, $map)
             hc.cropx1,
             hc.cropy1,
             hc.cropx2,
-            hc.cropy2
+            hc.cropy2,
+            hc.floors_json
         FROM hlstats_Games AS g
         INNER JOIN hlstats_Heatmap_Config AS hc ON hc.game = g.realgame
         WHERE g.code = :game AND hc.map = :map
@@ -546,7 +879,13 @@ function heatmap_fetch_config(PDO $pdo, $game, $map)
     $statement->execute(array('game' => $game, 'map' => $map));
     $row = $statement->fetch(PDO::FETCH_ASSOC);
 
-    return $row ?: null;
+    if (!$row) {
+        return null;
+    }
+
+    $row['floors'] = heatmap_parse_floor_config($row['floors_json'] ?? null);
+    $row['floors_json'] = heatmap_floor_config_json($row['floors']);
+    return $row;
 }
 
 function heatmap_default_config(PDO $pdo, $game, $map)
@@ -578,6 +917,8 @@ function heatmap_default_config(PDO $pdo, $game, $map)
         'cropy1' => 0,
         'cropx2' => 0,
         'cropy2' => 0,
+        'floors' => array(),
+        'floors_json' => '[]',
     );
 }
 
@@ -604,6 +945,18 @@ function heatmap_merge_config_override(array $config, array $values)
     if (isset($values['brush']) && preg_match('/^[A-Za-z0-9_-]{1,16}$/', strval($values['brush']))) {
         $config['brush'] = strval($values['brush']);
     }
+    if (array_key_exists('floors_json', $values)) {
+        $floors = heatmap_parse_floor_config($values['floors_json']);
+    } elseif (array_key_exists('floors', $values)) {
+        if (!is_array($values['floors'])) {
+            throw new InvalidArgumentException('invalid_floor_config');
+        }
+        $floors = heatmap_parse_floor_array($values['floors']);
+    } else {
+        $floors = heatmap_config_floors($config);
+    }
+    $config['floors'] = $floors;
+    $config['floors_json'] = heatmap_floor_config_json($floors);
     $config['scale'] = heatmap_scale($config['scale'] ?? 1);
     $config['days'] = max(1, min(3650, intval($config['days'] ?? 30)));
     $config = heatmap_normalize_crop($config);
@@ -614,11 +967,13 @@ function heatmap_merge_config_override(array $config, array $values)
 function heatmap_save_config(PDO $pdo, array $config)
 {
     $config = heatmap_normalize_crop($config);
+    $config['floors'] = heatmap_config_floors($config);
+    $config['floors_json'] = heatmap_floor_config_json($config['floors']);
     $statement = $pdo->prepare(
         'INSERT INTO hlstats_Heatmap_Config
-            (map, game, xoffset, yoffset, flipx, flipy, rotate, days, brush, scale, font, thumbw, thumbh, cropx1, cropy1, cropx2, cropy2)
+            (map, game, xoffset, yoffset, flipx, flipy, rotate, days, brush, scale, font, thumbw, thumbh, cropx1, cropy1, cropx2, cropy2, floors_json)
         VALUES
-            (:map, :game, :xoffset, :yoffset, :flipx, :flipy, :rotate, :days, :brush, :scale, :font, :thumbw, :thumbh, :cropx1, :cropy1, :cropx2, :cropy2)
+            (:map, :game, :xoffset, :yoffset, :flipx, :flipy, :rotate, :days, :brush, :scale, :font, :thumbw, :thumbh, :cropx1, :cropy1, :cropx2, :cropy2, :floors_json)
         ON DUPLICATE KEY UPDATE
             xoffset = VALUES(xoffset),
             yoffset = VALUES(yoffset),
@@ -634,7 +989,8 @@ function heatmap_save_config(PDO $pdo, array $config)
             cropx1 = VALUES(cropx1),
             cropy1 = VALUES(cropy1),
             cropx2 = VALUES(cropx2),
-            cropy2 = VALUES(cropy2)'
+            cropy2 = VALUES(cropy2),
+            floors_json = VALUES(floors_json)'
     );
     return $statement->execute(array(
         'map' => $config['map'],
@@ -654,6 +1010,7 @@ function heatmap_save_config(PDO $pdo, array $config)
         'cropy1' => intval($config['cropy1'] ?? 0),
         'cropx2' => intval($config['cropx2'] ?? 0),
         'cropy2' => intval($config['cropy2'] ?? 0),
+        'floors_json' => $config['floors_json'],
     ));
 }
 
