@@ -319,7 +319,14 @@ try {
         $assertedCoordinateTuples[$case.name] = $case.expected
     }
 
-    $fixtureHash = (Get-FileHash -LiteralPath $fixturePath -Algorithm SHA256).Hash.ToLowerInvariant()
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $fixtureBytes = [System.IO.File]::ReadAllBytes($fixturePath)
+        $fixtureHash = -join ($sha256.ComputeHash($fixtureBytes) | ForEach-Object { $_.ToString("x2") })
+    }
+    finally {
+        $sha256.Dispose()
+    }
     New-Item -ItemType Directory -Force -Path $receiptRoot | Out-Null
     $receiptPath = Join-Path $receiptRoot ("{0}-{1}.json" -f $EvidenceLabel, (Get-Date).ToUniversalTime().ToString("yyyyMMddTHHmmssZ"))
     $receipt = [ordered]@{

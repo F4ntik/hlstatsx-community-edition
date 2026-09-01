@@ -50,7 +50,8 @@ def test_coordinate_acceptance_runner_fixture_and_ci_source_contracts() -> None:
     assert "comparison\\python" not in runner
     assert "Get-NetTCPConnection" in runner
     assert "hlstatsx-writebench-db" in runner
-    assert "Get-FileHash" in runner
+    assert "[System.Security.Cryptography.SHA256]::Create()" in runner
+    assert ".ComputeHash(" in runner
     assert "python -m hlstats_py.runtime" in runner
     assert "--stdin" in runner
     assert "MYSQL_PWD" in runner
