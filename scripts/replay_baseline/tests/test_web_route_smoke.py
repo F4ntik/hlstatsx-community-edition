@@ -110,7 +110,6 @@ def test_heatmap_explorer_public_contract_keeps_i18n_controls_and_safe_shells_in
         "--hm-death:#35c6e8",
         "--hm-focus:#f5c451",
         "grid-template-columns: 220px minmax(0, 1fr) 300px",
-        "min-height: 620px",
         "@media (max-width: 900px)",
         ".heatmap-explorer__floors.is-open",
         ".heatmap-explorer__inspector.is-open",
@@ -120,9 +119,23 @@ def test_heatmap_explorer_public_contract_keeps_i18n_controls_and_safe_shells_in
         "prefers-reduced-motion: reduce",
     ):
         assert token in css
+    assert "min-height: 620px" not in css
+    sized_stage = re.search(
+        r'\.heatmap-explorer__stage\[data-heatmap-sized="1"\]\s*\{(?P<body>[^}]*)\}',
+        css,
+        re.S,
+    )
+    assert sized_stage is not None
+    assert "min-height: 0;" in sized_stage.group("body")
+    assert ".heatmap-explorer__stage:not([data-heatmap-sized=\"1\"])" in css
+    assert "min-height: 360px" in css
+    assert "min-height: 320px" in css
     assert "HeatmapExplorerWorkspace" in explorer_js
     assert "sceneUrl" in explorer_js
     assert "_renderFloors" in explorer_js
+    assert "_syncStageAspect" in explorer_js
+    assert "style.aspectRatio = size.width + ' / ' + size.height;" in explorer_js
+    assert "workspaceSetAttribute(this._nodes.stage, 'data-heatmap-sized', '1');" in explorer_js
     assert "DOMContentLoaded" in explorer_js
     assert "data-heatmap-alert" in explorer_js
     assert "pointermove" in explorer_js
