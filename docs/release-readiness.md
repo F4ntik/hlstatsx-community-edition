@@ -144,6 +144,101 @@ Store detailed replay transcripts and parity evidence under
 outputs in `scripts/replay_baseline/artifacts/`; nightly CI uploads matching
 release-readiness artifacts when present.
 
+## Modern Heatmap Explorer rollout notes
+
+Current status on 2026-09-01: blocked at Task 12 runtime acceptance. Use
+`docs/audits/modern-heatmap-explorer/runtime-acceptance.md` before promoting
+any rollout beyond mode `0`.
+
+The exact-HEAD `0b6a875` background-grading browser pass is accepted for its
+presentation-only seam, but does not change that broader release decision. It
+restored `HeatmapExplorerBeta=0` and the original config/assets/JPEG/thumb/
+users/fixtures/auto-increments/mounts with sessions `[]`. The committed JS
+smoke is the no-browser-fetch proof; a route-abort is not equivalent. The
+Difference invariant is bounded by the scoped CSS/JS contract and visual
+scene because an isolated-canvas attempt on the restored `1.26` baseline did
+not load and no third activation was authorized. No Steam/Valve asset is
+shipped and optional GoldSrc import needs separate acceptance.
+
+`HeatmapExplorerBeta` meanings:
+
+- `0`: legacy v1 Canvas/JPEG only; direct `v=2` route disabled
+- `1`: default legacy; explicit `heatmap_explorer=1` opt-in mounts v2
+- `2`: default v2; explicit `heatmap_legacy=1` rollback mounts v1
+
+Direct rollback path:
+
+```sql
+UPDATE hlstats_Options
+SET value='0'
+WHERE keyname='HeatmapExplorerBeta';
+```
+
+Read back the same row immediately after the update and verify that the next
+page request returns to the legacy `heatmap_points.php` path without `v=2`.
+
+Promotion sequence:
+
+```text
+deploy with mode 0 -> migrate/readback -> mode 1 internal opt-in
+-> mode 1 public beta -> mode 2 default
+```
+
+Rollback to mode `0` when, in a 15-minute sample, any of the following occurs:
+
+- v2 `5xx` exceeds `0.5%`
+- warm p95 exceeds `600 ms`
+- cold p95 exceeds `3000 ms`
+- inspect p95 exceeds `600 ms`
+- a scene is biased or truncated
+- an accepted map drops below its recorded coverage
+
+Structured request log shape for `web/heatmap_points.php`:
+
+- prefix: `hlstats_heatmap `
+- JSON fields: `version`, `operation`, `game`, `map`, `windowClass`, `lens`,
+  `floor`, `rowsRead`, `binsReturned`, `rawPayloadBytes`, `queryMs`,
+  `totalMs`, `cache`, `xyCoverage`, `zCoverage`, `projectionCoverage`,
+  `state`, `fallbackReason`
+
+Illustrative safe line:
+
+```text
+hlstats_heatmap {"version":2,"operation":"scene","game":"cstrike","map":"de_dust2","windowClass":"365d","lens":"overview","floor":"all","rowsRead":175,"binsReturned":0,"rawPayloadBytes":1556,"queryMs":12.5,"totalMs":15.4,"cache":"miss","xyCoverage":1,"zCoverage":1,"projectionCoverage":0.08571428571428572,"state":"weak_projection","fallbackReason":"weak_projection"}
+```
+
+Public deployment notes:
+
+- `inspect` requests bypass cache and emit `Cache-Control: no-store`; apply a
+  reverse-proxy per-IP rate limit on inspect traffic before public rollout.
+- payload cache root: `web/cache/heatmaps`
+- lock directory: `web/cache/heatmaps/locks`
+- cache retention constants in the shipped code: max age `172800` seconds,
+  prune limit `32`, lock directory mode `0700`
+- admin config/image saves invalidate payload caches through
+  `heatmap_clear_payload_cache()` for the current game and the config aliases
+  (`game`, `config.game`, `config.realgame`)
+- inspect responses also emit `Cache-Control: no-store`
+- compatibility JPEG regeneration is CLI-only; the admin HTTP surface must not
+  start JPEG generation. The documented operator command remains:
+
+```powershell
+$env:PYTHONPATH='scripts'
+rtk python -m hlstats_py.heatmaps --game <validated-game> --map <validated-map> --disablecache
+```
+
+- if dbversion `82` is retained, keep index rollout inside a maintenance
+  window with readback before mode promotion
+- if ordinary cache plus the retained index cannot hold the required SLA, stop
+  promotion and write a separate daily read-model design instead of expanding
+  scope ad hoc
+- shipped telemetry claim: the cstrike grammar is verified; other mods may use
+  only the coordinates actually present in their logs
+- current blocked-release reminder: do not promote beyond mode `0` until the
+  coordinate runner, accepted player/mobile browser path, fallback action,
+  custom period, pointer/touch pan, accessibility, and authenticated admin
+  gates are closed
+
 ## Deployment And Configuration Notes
 
 - Use `docs/python_migration_usage_guide.md` for runtime deployment and

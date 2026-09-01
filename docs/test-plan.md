@@ -290,6 +290,22 @@ Use the already populated DB for visual/projection iteration first.
 
 ### Modern Heatmap Explorer
 
+#### Background-grading runtime acceptance (`0b6a875`)
+
+- Passing local runtime rows: default/reversible Color and Mono without a scene
+  request or URL mutation; keyboard focus and `aria-pressed`; Russian mobile
+  `44px` style targets without horizontal overflow; 200% scale; reduced
+  motion; and WebGL-unavailable unfiltered static JPEG with hidden controls.
+- The committed JavaScript smoke is the deterministic no-`fetch` proof; a
+  route-abort tests a different failure path. Difference invariance is accepted
+  at the CSS/JS seam (image/pseudo-layer only, no renderer/fetch/URL call) and
+  visual runtime scene. The isolated-canvas attempt on baseline `1.26` is
+  retained as a bounded non-loading residual, with no third activation.
+- Record the exact restore readback and the documented whole-suite source
+  result (`302 passed` with `PYTHONPATH=scripts;scripts/replay_baseline`) in the
+  runtime acceptance receipt. The earlier `286/16` was the invalid no-PYTHONPATH
+  invocation, not a source regression.
+
 - Focused RED/GREEN source contract: `python -m pytest
   scripts/replay_baseline/tests/test_heatmap_coordinate_acceptance_script.py -q`.
 - Full Python source checks: `python -m pytest scripts/hlstats_py/tests -q`,
@@ -309,6 +325,17 @@ Use the already populated DB for visual/projection iteration first.
   scripts/replay_baseline/comparison/Run-HeatmapCoordinateAcceptance.ps1` only
   against the disposable `bench_ephemeral` contour; it is deliberately not a
   normal source test.
+- Current runtime truth for the frozen 2026-09-01 pass is
+  `docs/audits/modern-heatmap-explorer/runtime-acceptance.md`. That pass
+  remained blocked at release/runtime acceptance because the disposable runner
+  did not produce a persisted-row receipt (`Unknown column 'uniqueId'` on the
+  restored schema), the live player/mobile browser surface did not produce an
+  accepted Explorer interaction path or any
+  `heatmap-explorer-ready.detail.durationMs` receipt, and the live image did
+  not contain `scripts/web_heatmap_smoke.php` even though `php -l
+  /var/www/html/heatmap_points.php` and `php -l
+  /var/www/html/includes/heatmap_points.php` passed inside the running web
+  container.
 
 **Source gate:** static contract, Python, PHP, JavaScript, route, migration,
 and diff checks pass without Docker DB execution. **Runtime acceptance:** a

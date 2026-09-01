@@ -80,6 +80,26 @@ Historical autonomy follow-up context:
   web, static JPEG compatibility fallback, player-scoped kill/death widgets,
   and per-map projection calibration from overview seeds plus DB-first manual
   diagnostics.
+- Modern Heatmap Explorer runtime/release acceptance is currently blocked by
+  live evidence, not by missing source gates. The frozen Task 12 runtime pass
+  on 2026-09-01 proved modes `0/1/2`, direct v2 disablement in mode `0`, and
+  one-request rollback to v1, but it did not produce the required disposable
+  coordinate-runner receipt and it surfaced release-blocking browser/runtime
+  gaps: generic handling for `empty` / `weak_projection`, no visible custom
+  period control, no working Explorer alert fallback to v1, `pointerPan=false`,
+  no accepted player/mobile Explorer flow, and no authenticated admin matrix.
+  Use `docs/audits/modern-heatmap-explorer/runtime-acceptance.md` as the
+  current runtime truth before any correction pass.
+- The later background-grading Task 3 pass at `0b6a875` is source- and
+  browser-runtime accepted for the presentation-only Color/Mono seam. It
+  records the documented `302 passed` Python environment, no-request/URL
+  reversibility, keyboard/ARIA, responsive/reduced-motion, and unfiltered
+  WebGL fallback. The route-abort experiment is not the no-fetch branch (that
+  branch is committed-smoke coverage), and the attempted isolated Difference
+  proof could not load under the restored baseline without a prohibited third
+  activation. Keep GoldSrc import and any Steam/Valve provenance decision
+  outside this presentation-only slice; this is not a broader Task 12 release
+  promotion.
 - The autonomy/release-readiness follow-up through Phase 9 is complete for the
   current scope. For release-candidate preparation, use
   [`docs/release-readiness.md`](release-readiness.md) and update

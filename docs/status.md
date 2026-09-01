@@ -2,7 +2,32 @@
 
 ## Snapshot
 
-- Last updated: `2026-07-22`
+- Last updated: `2026-09-01`
+- The `Color / Mono` background-grading slice at exact HEAD `0b6a875` is
+  source- and browser-runtime accepted on the tested local stack: the documented
+  Python environment gives `302 passed`, Color/Mono is request/URL-free and
+  reversible with keyboard/ARIA, responsive/reduced-motion rows pass, and the
+  WebGL-unavailable JPEG is unfiltered with controls hidden. Difference palette
+  invariance is accepted at the CSS/JS seam plus a visual scene; the isolated
+  canvas readback could not load under the restored `1.26` baseline and was not
+  retried with a third activation. Restore returned mode `0` and the exact
+  config/assets/users/fixtures/auto-increments/mounts/sessions=`[]`. This does
+  not promote the broader Task 12/Explorer release boundary.
+- Task 12 runtime acceptance for the Modern Heatmap Explorer is currently
+  blocked, not `RUNTIME-ACCEPTED`, and not `RELEASE-READY`. The frozen
+  browser/runtime pass on 2026-09-01 preserved exact evidence in
+  `docs/audits/modern-heatmap-explorer/runtime-acceptance.md` and
+  `docs/audits/modern-heatmap-explorer/screenshots/`. The direct v2 mode gate
+  and one-request rollback were proven, but the required fresh disposable
+  coordinate runner did not produce a persisted-row receipt because the frozen
+  harness queried `hlstats_Players.uniqueId` against a restored schema that did
+  not contain that column. Live browser evidence also confirmed release-blocking
+  UI/runtime gaps: specialized `empty` / `weak_projection` handling collapsed
+  into the generic load error, no visible custom period control, no working
+  fallback-to-v1 action from the Explorer alert, `pointerPan=false`, no
+  accepted player/mobile explorer path, no authenticated admin matrix, and no
+  accepted `heatmap-explorer-ready.detail.durationMs` receipt. The stack was
+  restored to `HeatmapExplorerBeta=0` at the end of the pass.
 - The release-clean P1 hardening closure for post-ingest maintenance is
   accepted. The canonical runner now stages only the selected FTP logs,
   performs legacy-compatible `inactive -> awards -> ribbons -> strict GeoIP`
@@ -565,6 +590,11 @@ Current parity state:
 
 - Docker API access can still block single-log or narrow replay verification
   even when the local unit slice is already green.
+- The Modern Heatmap Explorer remains blocked at the runtime/release boundary
+  until a corrected disposable coordinate runner, specialized browser-state
+  handling, custom period control, working v1 fallback action, pointer/touch
+  pan, and the authenticated admin/accessibility matrices are evidenced on the
+  live stack.
 - Some Python test commands still require explicit `PYTHONPATH` setup because
   the imported package roots do not yet have a unified developer bootstrap.
 - `PlayerNames`, `Players`, and `Players_History` are no longer open
