@@ -684,6 +684,32 @@ function fakeGl(options = {}) {
   return gl;
 }
 
+function fragmentShaderSource(gl) {
+  const fragment = gl.calls.shaderSources.find(source => source.includes('differenceBlueNeutralAmber'));
+  assert.ok(fragment, 'renderer should compile and retain the fragment shader source');
+  return fragment;
+}
+
+function clampGridIndex(value, limit) {
+  return Math.max(0, Math.min(limit - 1, value));
+}
+
+function kernelAverage(upload, width, height, gridX, gridY) {
+  let sum = 0;
+  for (let offsetY = -1; offsetY <= 1; offsetY += 1) {
+    for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
+      const sampleX = clampGridIndex(gridX + offsetX, width);
+      const sampleY = clampGridIndex(gridY + offsetY, height);
+      sum += upload[sampleY * width + sampleX];
+    }
+  }
+  return sum / 9;
+}
+
+function normalizedAmount(value, maxAbs) {
+  return Math.max(0, Math.min(1, Math.abs(value) / Math.max(maxAbs, 0.000001)));
+}
+
 const goodGl = fakeGl();
 const dom = makeDom(goodGl);
 let nowValue = 100;
@@ -727,6 +753,94 @@ assert.match(
   /vec2 sampleUv = vec2\(v_uv\.x, 1\.0 - v_uv\.y\)/,
   'fragment sampling should flip texture Y while preserving server row order'
 );
+const differenceFragment = fragmentShaderSource(goodGl);
+assert.match(
+  differenceFragment,
+  /float center = texture\(u_density, sampleUv\)\.r;/,
+  'difference rendering should sample the center texel directly'
+);
+assert.match(
+  differenceFragment,
+  /float value = u_palette == 2 \? center : sum \/ 9\.0;/,
+  'difference palette should bypass the shared 3x3 smoothing while total\/me\/others keep it'
+);
+const signedDifferencePayload = explorerSceneFixture({
+  grid: {
+    bucketSize: 8,
+    width: 3,
+    height: 3,
+    fields: ['cell', 'x', 'y', 'kills', 'deaths'],
+  },
+  layers: {
+    total: [['c0.1', 0, 1, 3, 0], ['c1.1', 1, 1, 4, 0], ['c2.1', 2, 1, 3, 0]],
+    me: [['c0.1', 0, 1, 3, 0], ['c1.1', 1, 1, 4, 0], ['c2.1', 2, 1, 3, 0]],
+    others: [['c0.1', 0, 1, 0, 0], ['c1.1', 1, 1, 0, 0], ['c2.1', 2, 1, 0, 0]],
+  },
+  comparison: {
+    fields: ['cell', 'x', 'y', 'killDelta', 'deathDelta', 'sample'],
+    bins: [['c0.1', 0, 1, -0.8, 0, 3], ['c1.1', 1, 1, 0.8, 0, 4], ['c2.1', 2, 1, -0.8, 0, 3]],
+    personalSample: 10,
+    otherSample: 0,
+  },
+  summary: {rowsRead: 3, sourceRows: 3, personalSample: 10, otherSample: 0},
+});
+const signedDifferenceScene = new HeatmapExplorerScene(signedDifferencePayload);
+const signedDifferenceGl = fakeGl();
+const signedDifferenceDom = makeDom(signedDifferenceGl);
+const signedDifferenceRenderer = new HeatmapGlRenderer(signedDifferenceDom.root, signedDifferenceScene, {
+  window: signedDifferenceDom.window,
+});
+signedDifferenceRenderer.mount();
+const signedDifferenceUpload = signedDifferenceGl.calls.texImages[signedDifferenceGl.calls.texImages.length - 1].at(-1);
+const signedDifferenceDense = signedDifferenceScene.dense('difference', 'kills');
+const signedCenter = signedDifferenceUpload[4];
+const signedSmoothed = kernelAverage(signedDifferenceUpload, 3, 3, 1, 1);
+assert.ok(signedCenter > 0, 'signed difference center texel should remain positive before shader sampling');
+assert.ok(signedSmoothed < 0, 'the legacy shared 3x3 average would flip adjacent opposite-sign deltas negative');
+assert.ok(
+  normalizedAmount(signedCenter, signedDifferenceDense.maxAbs) > normalizedAmount(signedSmoothed, signedDifferenceDense.maxAbs),
+  'difference center sampling should preserve stronger signed intensity than the shared 3x3 smoothing path'
+);
+signedDifferenceRenderer.destroy();
+
+const sparseDifferencePayload = explorerSceneFixture({
+  grid: {
+    bucketSize: 8,
+    width: 3,
+    height: 3,
+    fields: ['cell', 'x', 'y', 'kills', 'deaths'],
+  },
+  layers: {
+    total: [['c0.1', 0, 1, 2, 0], ['c1.1', 1, 1, 2, 0], ['c2.1', 2, 1, 2, 0]],
+    me: [['c0.1', 0, 1, 2, 0], ['c1.1', 1, 1, 2, 0], ['c2.1', 2, 1, 2, 0]],
+    others: [['c0.1', 0, 1, 0, 0], ['c1.1', 1, 1, 0, 0], ['c2.1', 2, 1, 0, 0]],
+  },
+  comparison: {
+    fields: ['cell', 'x', 'y', 'killDelta', 'deathDelta', 'sample'],
+    bins: [['c0.1', 0, 1, 0, 0, 2], ['c1.1', 1, 1, 0.2, 0, 2], ['c2.1', 2, 1, 0, 0, 2]],
+    personalSample: 6,
+    otherSample: 0,
+  },
+  summary: {rowsRead: 3, sourceRows: 3, personalSample: 6, otherSample: 0},
+});
+const sparseDifferenceScene = new HeatmapExplorerScene(sparseDifferencePayload);
+const sparseDifferenceGl = fakeGl();
+const sparseDifferenceDom = makeDom(sparseDifferenceGl);
+const sparseDifferenceRenderer = new HeatmapGlRenderer(sparseDifferenceDom.root, sparseDifferenceScene, {
+  window: sparseDifferenceDom.window,
+});
+sparseDifferenceRenderer.mount();
+const sparseDifferenceUpload = sparseDifferenceGl.calls.texImages[sparseDifferenceGl.calls.texImages.length - 1].at(-1);
+const sparseDifferenceDense = sparseDifferenceScene.dense('difference', 'kills');
+const sparseCenter = sparseDifferenceUpload[4];
+const sparseSmoothed = kernelAverage(sparseDifferenceUpload, 3, 3, 1, 1);
+assert.ok(Math.abs(sparseCenter - Math.fround(0.2 * 0.22)) < 1e-6, 'difference upload should preserve the sparse signed delta after the existing low-sample opacity cap');
+assert.ok(
+  normalizedAmount(sparseCenter, sparseDifferenceDense.maxAbs) > normalizedAmount(sparseSmoothed, sparseDifferenceDense.maxAbs),
+  'difference center sampling should keep isolated sparse deltas visible instead of forcing them through the shared 3x3 average'
+);
+sparseDifferenceRenderer.destroy();
+
 const asymmetricPayload = explorerSceneFixture();
 asymmetricPayload.query = Object.assign({}, asymmetricPayload.query, {lens: 'overview', event: 'kills'});
 asymmetricPayload.grid = {
