@@ -2034,6 +2034,50 @@ function heatmap_inspect_weapon($value): string
     return strlen($value) <= 64 && preg_match('/^[A-Za-z0-9_.:$-]*$/D', $value) === 1 ? $value : '';
 }
 
+function heatmap_inspect_aggregates(array $rows): array
+{
+    $weaponCounts = array();
+    $killerIds = array();
+    $victimIds = array();
+    $participantIds = array();
+    foreach ($rows as $row) {
+        $weapon = strval($row['weapon'] ?? '');
+        if ($weapon !== '') {
+            $weaponCounts[$weapon] = intval($weaponCounts[$weapon] ?? 0) + 1;
+        }
+        $killerId = intval($row['killer']['id'] ?? 0);
+        if ($killerId > 0) {
+            $killerIds[$killerId] = true;
+            $participantIds[$killerId] = true;
+        }
+        $victimId = intval($row['victim']['id'] ?? 0);
+        if ($victimId > 0) {
+            $victimIds[$victimId] = true;
+            $participantIds[$victimId] = true;
+        }
+    }
+
+    $topWeapons = array();
+    foreach ($weaponCounts as $weapon => $count) {
+        $topWeapons[] = array('weapon' => $weapon, 'count' => $count);
+    }
+    usort($topWeapons, function (array $left, array $right): int {
+        $countCompare = intval($right['count']) <=> intval($left['count']);
+        return $countCompare !== 0 ? $countCompare : strcmp($left['weapon'], $right['weapon']);
+    });
+
+    return array(
+        'scope' => 'returned_rows',
+        'sampleRows' => count($rows),
+        'topWeapons' => array_slice($topWeapons, 0, 5),
+        'participantCounts' => array(
+            'unique' => count($participantIds),
+            'killers' => count($killerIds),
+            'victims' => count($victimIds),
+        ),
+    );
+}
+
 function heatmap_build_inspect_payload(array $rows, bool $truncated): array
 {
     $payloadRows = array();
@@ -2062,6 +2106,7 @@ function heatmap_build_inspect_payload(array $rows, bool $truncated): array
         'operation' => 'inspect',
         'state' => 'ok',
         'rows' => $payloadRows,
+        'aggregates' => heatmap_inspect_aggregates($payloadRows),
         'truncated' => $truncated,
         'warnings' => array(),
     );

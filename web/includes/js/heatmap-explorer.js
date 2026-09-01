@@ -2022,6 +2022,41 @@
     };
   }
 
+  function inspectAggregates(value) {
+    if (!isRecord(value) || !exactKeys(value, ['scope', 'sampleRows', 'topWeapons', 'participantCounts'])
+      || value.scope !== 'returned_rows' || !nonNegativeInteger(value.sampleRows)
+      || !compactArray(value.topWeapons) || value.topWeapons.length > 5
+      || !isRecord(value.participantCounts)
+      || !exactKeys(value.participantCounts, ['unique', 'killers', 'victims'])) {
+      invalidInspect();
+    }
+    var participantKeys = ['unique', 'killers', 'victims'];
+    var participantCounts = {};
+    for (var participantIndex = 0; participantIndex < participantKeys.length; participantIndex += 1) {
+      var participantKey = participantKeys[participantIndex];
+      if (!nonNegativeInteger(value.participantCounts[participantKey])) {
+        invalidInspect();
+      }
+      participantCounts[participantKey] = value.participantCounts[participantKey];
+    }
+    var topWeapons = [];
+    for (var weaponIndex = 0; weaponIndex < value.topWeapons.length; weaponIndex += 1) {
+      var weapon = value.topWeapons[weaponIndex];
+      if (!isRecord(weapon) || !exactKeys(weapon, ['weapon', 'count'])
+        || typeof weapon.weapon !== 'string' || weapon.weapon.length === 0 || weapon.weapon.length > 64
+        || !nonNegativeInteger(weapon.count) || weapon.count === 0) {
+        invalidInspect();
+      }
+      topWeapons.push({weapon: weapon.weapon, count: weapon.count});
+    }
+    return {
+      scope: value.scope,
+      sampleRows: value.sampleRows,
+      topWeapons: topWeapons,
+      participantCounts: participantCounts
+    };
+  }
+
   function HeatmapExplorerInspect(payload) {
     if (!isRecord(payload) || payload.schemaVersion !== 2 || payload.operation !== 'inspect'
       || payload.state !== 'ok' || !Array.isArray(payload.rows) || payload.rows.length > 100
@@ -2029,6 +2064,10 @@
       invalidInspect();
     }
     this.rows = payload.rows.map(inspectRow);
+    this.aggregates = inspectAggregates(payload.aggregates);
+    if (this.aggregates.sampleRows !== this.rows.length) {
+      invalidInspect();
+    }
     this.truncated = payload.truncated;
     this.warnings = payload.warnings.map(function (warning) {
       return inspectText(warning, 256);
@@ -2708,9 +2747,31 @@
     var rows = [];
     for (var index = 0; index < inspect.rows.length; index += 1) {
       var row = inspect.rows[index];
-      rows.push(row.killer.name + ' → ' + row.victim.name + (row.weapon ? ' (' + row.weapon + ')' : ''));
+      var details = [];
+      if (row.weapon) {
+        details.push(row.weapon);
+      }
+      if (row.headshot) {
+        details.push(this._message('headshot'));
+      }
+      if (row.teamkill) {
+        details.push(this._message('teamkill'));
+      }
+      rows.push(row.eventTime + ' ' + this._message(row.event === 'kill' ? 'kills' : 'deaths') + ': '
+        + row.killer.name + ' → ' + row.victim.name + (details.length ? ' (' + details.join(', ') + ')' : ''));
     }
-    workspaceSetText(this._nodes.inspectOutput, this._message('inspect') + ' ' + this.state.cell + ': ' + rows.join('; '));
+    var topWeapons = inspect.aggregates.topWeapons.map(function (item) {
+      return item.weapon + ' × ' + String(item.count);
+    });
+    var counts = inspect.aggregates.participantCounts;
+    var sample = this._message('inspectSample') + ': ' + String(inspect.aggregates.sampleRows)
+      + (inspect.truncated ? ' (' + this._message('truncated') + ')' : '');
+    var participants = this._message('participants') + ': ' + String(counts.unique)
+      + ' (' + this._message('killers') + ' ' + String(counts.killers)
+      + ', ' + this._message('victims') + ' ' + String(counts.victims) + ')';
+    var weapons = this._message('topWeapons') + ': ' + (topWeapons.length ? topWeapons.join(', ') : '—');
+    workspaceSetText(this._nodes.inspectOutput, sample + '; ' + weapons + '; ' + participants + '. '
+      + this._message('inspect') + ' ' + this.state.cell + ': ' + rows.join('; '));
   };
 
   HeatmapExplorerWorkspace.prototype._loadInspect = function (cell, exactUrl) {

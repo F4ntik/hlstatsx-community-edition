@@ -1834,13 +1834,23 @@ assert_same(true, $inspectPayload['rows'][0]['headshot'], 'inspect payload shoul
 assert_same(false, $inspectPayload['rows'][0]['teamkill'], 'inspect payload should expose teamkill as a real boolean');
 assert_same('', $inspectPayload['rows'][1]['weapon'], 'inspect payload should reject non-token weapons');
 assert_same(array('eventTime', 'event', 'killer', 'victim', 'weapon', 'headshot', 'teamkill'), array_keys($inspectPayload['rows'][0]), 'inspect rows should expose only the public allowlist');
-assert_same(array('schemaVersion', 'operation', 'state', 'rows', 'truncated', 'warnings'), array_keys($inspectPayload), 'inspect payload should retain the canonical envelope allowlist');
+assert_same(array(
+    'scope' => 'returned_rows',
+    'sampleRows' => 2,
+    'topWeapons' => array(array('weapon' => 'ak47', 'count' => 1)),
+    'participantCounts' => array('unique' => 3, 'killers' => 2, 'victims' => 1),
+), $inspectPayload['aggregates'], 'inspect aggregates should describe only the sanitized bounded sample');
+assert_same(array('schemaVersion', 'operation', 'state', 'rows', 'aggregates', 'truncated', 'warnings'), array_keys($inspectPayload), 'inspect payload should retain the canonical envelope allowlist');
 $inspectOverflowPayload = heatmap_build_inspect_payload(array_merge($inspectRows, array_fill(0, 99, $inspectRows[0])), true);
 assert_same(100, count($inspectOverflowPayload['rows']), 'inspect payload should return no more than 100 rows');
+assert_same(100, $inspectOverflowPayload['aggregates']['sampleRows'], 'inspect aggregate sample should match the returned row cap');
+assert_same(array(array('weapon' => 'ak47', 'count' => 99)), $inspectOverflowPayload['aggregates']['topWeapons'], 'inspect top weapons should be computed from the returned sample only');
 assert_same(true, $inspectOverflowPayload['truncated'], 'inspect payload should preserve the overflow flag');
 $inspectEmptyPayload = heatmap_build_inspect_payload(array(), false);
 assert_same('ok', $inspectEmptyPayload['state'], 'empty inspect should be a successful response');
 assert_same(array(), $inspectEmptyPayload['rows'], 'empty inspect should return an empty row list');
+assert_same(0, $inspectEmptyPayload['aggregates']['sampleRows'], 'empty inspect should publish an empty aggregate sample');
+assert_same(0, $inspectEmptyPayload['aggregates']['participantCounts']['unique'], 'empty inspect should publish zero unique participants');
 assert_same(false, $inspectEmptyPayload['truncated'], 'empty inspect should not be truncated');
 
 $inspectRouteSource = file_get_contents(ROOT_PATH . '/heatmap_points.php');

@@ -1323,7 +1323,9 @@ const workspaceMessages = {
   projectionCoverage: 'Projection', coverage: 'Coverage', freshness: 'Freshness',
   allFloors: 'All floors',
   empty: 'Empty', pinned: 'Pinned', unpinned: 'Unpinned', noCell: 'No cell',
-  inspect: 'Inspect', kills: 'Kills', deaths: 'Deaths', pan: 'Pan', navigation: 'Navigation',
+  inspect: 'Inspect', inspectSample: 'Returned events', topWeapons: 'Top weapons',
+  participants: 'Participants', killers: 'killers', victims: 'victims', truncated: 'truncated',
+  headshot: 'headshot', teamkill: 'teamkill', kills: 'Kills', deaths: 'Deaths', pan: 'Pan', navigation: 'Navigation',
 };
 const workspaceState = new HeatmapExplorerWorkspace(
   workspaceRoot({
@@ -1838,6 +1840,12 @@ function inspectPayload() {
       headshot: true,
       teamkill: false,
     }],
+    aggregates: {
+      scope: 'returned_rows',
+      sampleRows: 1,
+      topWeapons: [{weapon: 'ak47', count: 1}],
+      participantCounts: {unique: 2, killers: 1, victims: 1},
+    },
     truncated: false,
     warnings: [],
   };
@@ -1940,6 +1948,9 @@ async function assertSeparateInspectAndDeepLinkFlow() {
   deepLinkTransport.requests[1].resolve(jsonResponse(inspectPayload()));
   await settleWorkspace();
   assert.match(deepLink.nodes.inspectOutput.textContent, /Alice.*ak47/, 'validated inspect rows should render in the inspector');
+  assert.match(deepLink.nodes.inspectOutput.textContent, /Top weapons: ak47 × 1/, 'inspect should render top weapons from the bounded server sample');
+  assert.match(deepLink.nodes.inspectOutput.textContent, /Participants: 2 \(killers 1, victims 1\)/, 'inspect should render unique participant counts');
+  assert.match(deepLink.nodes.inspectOutput.textContent, /Returned events: 1/, 'inspect should label the aggregate sample size');
 
   const pinned = workspaceHarness();
   const pinnedTransport = deferredTransport();
