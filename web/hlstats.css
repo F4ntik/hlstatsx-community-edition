@@ -728,6 +728,10 @@ nav{
 	background: #000;
 }
 
+.heatmap-explorer__stage[data-heatmap-sized="1"] {
+	min-height: 0;
+}
+
 .heatmap-explorer__stage[data-heatmap-pan-active="1"],
 .heatmap-explorer__stage[data-heatmap-pan-active="1"] [data-heatmap-canvas="1"],
 [data-heatmap-canvas="1"][data-heatmap-pan-active="1"] {
@@ -803,12 +807,6 @@ nav{
 	color: var(--hm-text);
 }
 
-@media (min-width: 901px) {
-	.heatmap-explorer__stage {
-		min-height: 620px;
-	}
-}
-
 @media (max-width: 900px) {
 	.heatmap-explorer {
 		grid-template-columns: minmax(0, 1fr);
@@ -859,7 +857,7 @@ nav{
 		min-height: 44px;
 	}
 
-	.heatmap-explorer__stage {
+	.heatmap-explorer__stage:not([data-heatmap-sized="1"]) {
 		min-height: 320px;
 	}
 }

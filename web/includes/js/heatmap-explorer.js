@@ -1092,6 +1092,7 @@
     this._program = null;
     this._buffer = null;
     this._texture = null;
+    this._opacityTexture = null;
     this._uniforms = null;
     this._camera = null;
     this._selection = null;
@@ -1103,6 +1104,7 @@
     this._startedAt = 0;
     this._pointer = null;
     this._suppressClick = false;
+    this._opaqueUpload = null;
   }
 
   HeatmapGlRenderer.prototype._now = function () {
@@ -1229,6 +1231,9 @@
       return;
     }
     try {
+      if (this._opacityTexture && typeof gl.deleteTexture === 'function') {
+        gl.deleteTexture(this._opacityTexture);
+      }
       if (this._texture && typeof gl.deleteTexture === 'function') {
         gl.deleteTexture(this._texture);
       }
@@ -1241,6 +1246,7 @@
     } catch (error) {
       // Cleanup is best effort and never changes a safe fallback decision.
     }
+    this._opacityTexture = null;
     this._texture = null;
     this._buffer = null;
     this._program = null;
@@ -1299,6 +1305,7 @@
     var fragmentSource = '#version 300 es\n'
       + 'precision highp float;\n'
       + 'uniform sampler2D u_density;\n'
+      + 'uniform sampler2D u_opacity;\n'
       + 'uniform vec2 u_gridSize;\n'
       + 'uniform float u_maxAbs;\n'
       + 'uniform int u_palette;\n'
@@ -1325,13 +1332,14 @@
       + '  float center = texture(u_density, sampleUv).r;\n'
       + '  float value = u_palette == 2 ? center : sum / 9.0;\n'
       + '  float amount = clamp(abs(value) / max(u_maxAbs, 0.000001), 0.0, 1.0);\n'
+      + '  float confidence = u_palette == 2 ? clamp(texture(u_opacity, sampleUv).r, 0.0, 1.0) : 1.0;\n'
       + '  vec3 color = u_palette == 2 ? differenceBlueNeutralAmber(clamp(value / max(u_maxAbs, 0.000001), -1.0, 1.0))\n'
       + '    : (u_palette == 1 ? cyanBlue(amount) : amberOrange(amount));\n'
       + '  float contour = 0.0;\n'
       + '  if (u_contours == 1) {\n'
       + '    contour = step(0.245, amount) * 0.10 + step(0.495, amount) * 0.10 + step(0.745, amount) * 0.10;\n'
       + '  }\n'
-      + '  outputColor = vec4(mix(color, vec3(1.0), contour), amount);\n'
+      + '  outputColor = vec4(mix(color, vec3(1.0), contour), amount * confidence);\n'
       + '}\n';
 
     var vertex = null;
@@ -1339,6 +1347,7 @@
     var program = null;
     var buffer = null;
     var texture = null;
+    var opacityTexture = null;
     function release(method, handle) {
       if (handle && typeof gl[method] === 'function') {
         try {
@@ -1347,6 +1356,13 @@
           // Cleanup is best effort and the original initialization error wins.
         }
       }
+    }
+    function configureTexture(handle) {
+      gl.bindTexture(gl.TEXTURE_2D, handle);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     }
     try {
       vertex = this._createShader(gl, gl.VERTEX_SHADER, vertexSource);
@@ -1374,20 +1390,22 @@
       if (!texture) {
         throw new Error('resource_unavailable');
       }
+      opacityTexture = gl.createTexture();
+      if (!opacityTexture) {
+        throw new Error('resource_unavailable');
+      }
       gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
-      gl.bindTexture(gl.TEXTURE_2D, texture);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      configureTexture(texture);
+      configureTexture(opacityTexture);
 
       var uniforms = {
         gridSize: gl.getUniformLocation(program, 'u_gridSize'),
         maxAbs: gl.getUniformLocation(program, 'u_maxAbs'),
         palette: gl.getUniformLocation(program, 'u_palette'),
         contours: gl.getUniformLocation(program, 'u_contours'),
-        density: gl.getUniformLocation(program, 'u_density')
+        density: gl.getUniformLocation(program, 'u_density'),
+        opacity: gl.getUniformLocation(program, 'u_opacity')
       };
       var position = gl.getAttribLocation(program, 'a_position');
       if (position < 0) {
@@ -1400,9 +1418,12 @@
       buffer = null;
       this._texture = texture;
       texture = null;
+      this._opacityTexture = opacityTexture;
+      opacityTexture = null;
       this._uniforms = uniforms;
       this._position = position;
     } catch (error) {
+      release('deleteTexture', opacityTexture);
       release('deleteTexture', texture);
       release('deleteBuffer', buffer);
       release('deleteProgram', program);
@@ -1430,6 +1451,19 @@
       throw new Error('invalid_dense_selection');
     }
     return {layer: layer, channel: channel};
+  };
+
+  HeatmapGlRenderer.prototype._opacityUploadFor = function (length, layer, dense) {
+    if (layer === 'difference' && dense && dense.opacity) {
+      return dense.opacity;
+    }
+    if (!this._opaqueUpload || this._opaqueUpload.length !== length) {
+      this._opaqueUpload = new Float32Array(length);
+      for (var index = 0; index < length; index += 1) {
+        this._opaqueUpload[index] = 1;
+      }
+    }
+    return this._opaqueUpload;
   };
 
   HeatmapGlRenderer.prototype._readyAfterFrame = function (dense) {
@@ -1464,22 +1498,31 @@
       var next = this._normalSelection(selection);
       var dense = this.scene.dense(next.layer, next.channel);
       var upload = dense.values;
-      if (next.layer === 'difference') {
-        upload = new Float32Array(dense.values.length);
-        for (var index = 0; index < upload.length; index += 1) {
-          upload[index] = dense.values[index] * dense.opacity[index];
-        }
-      }
+      var opacityUpload = this._opacityUploadFor(dense.values.length, next.layer, dense);
       var gl = this._gl;
       gl.useProgram(this._program);
       gl.bindBuffer(gl.ARRAY_BUFFER, this._buffer);
       gl.enableVertexAttribArray(this._position);
       gl.vertexAttribPointer(this._position, 2, gl.FLOAT, false, 0, 0);
+      if (typeof gl.activeTexture === 'function' && typeof gl.TEXTURE0 === 'number') {
+        gl.activeTexture(gl.TEXTURE0);
+      }
       gl.bindTexture(gl.TEXTURE_2D, this._texture);
       gl.texImage2D(
         gl.TEXTURE_2D, 0, gl.R32F, this.scene.grid.width, this.scene.grid.height,
         0, gl.RED, gl.FLOAT, upload
       );
+      if (typeof gl.activeTexture === 'function' && typeof gl.TEXTURE1 === 'number') {
+        gl.activeTexture(gl.TEXTURE1);
+      }
+      gl.bindTexture(gl.TEXTURE_2D, this._opacityTexture);
+      gl.texImage2D(
+        gl.TEXTURE_2D, 0, gl.R32F, this.scene.grid.width, this.scene.grid.height,
+        0, gl.RED, gl.FLOAT, opacityUpload
+      );
+      if (typeof gl.activeTexture === 'function' && typeof gl.TEXTURE0 === 'number') {
+        gl.activeTexture(gl.TEXTURE0);
+      }
       if (this._uniforms.gridSize !== null) {
         gl.uniform2f(this._uniforms.gridSize, this.scene.grid.width, this.scene.grid.height);
       }
@@ -1494,6 +1537,9 @@
       }
       if (this._uniforms.density !== null) {
         gl.uniform1i(this._uniforms.density, 0);
+      }
+      if (this._uniforms.opacity !== null) {
+        gl.uniform1i(this._uniforms.opacity, 1);
       }
       if (typeof gl.clearColor === 'function') {
         gl.clearColor(0, 0, 0, 0);
@@ -1525,6 +1571,13 @@
       var stage = this._nodes.stage;
       var width = Math.max(1, Math.round(numeric(stage.clientWidth, numeric(this._nodes.canvas.clientWidth, 1))));
       var height = Math.max(1, Math.round(numeric(stage.clientHeight, numeric(this._nodes.canvas.clientHeight, 1))));
+      var image = this.scene && this.scene.map && this.scene.map.image ? this.scene.map.image : null;
+      var contentWidth = Math.max(1, workspaceInteger(image && image.width, width));
+      var contentHeight = Math.max(1, workspaceInteger(image && image.height, height));
+      if (this._camera && typeof this._camera.setViewport === 'function') {
+        this._camera.setViewport(width, height, contentWidth, contentHeight);
+        this.setCamera(this._camera);
+      }
       var view = this.options.window || (typeof window !== 'undefined' ? window : null);
       var ratio = view && finiteNumber(view.devicePixelRatio) ? view.devicePixelRatio : 1;
       ratio = Math.max(1, Math.min(2, ratio));
@@ -1777,6 +1830,28 @@
 
   function workspaceTextValue(value) {
     return typeof value === 'string' && value.length > 0 ? value : null;
+  }
+
+  function workspaceSceneImageSize(scene, imageNode) {
+    var sceneImage = scene && scene.map && scene.map.image ? scene.map.image : null;
+    var width = workspaceInteger(sceneImage && sceneImage.width, 0);
+    var height = workspaceInteger(sceneImage && sceneImage.height, 0);
+    if (!(width > 0)) {
+      width = workspaceInteger(imageNode && own(imageNode, 'naturalWidth') ? imageNode.naturalWidth : null, 0);
+    }
+    if (!(height > 0)) {
+      height = workspaceInteger(imageNode && own(imageNode, 'naturalHeight') ? imageNode.naturalHeight : null, 0);
+    }
+    if (!(width > 0)) {
+      width = workspaceInteger(imageNode && typeof imageNode.getAttribute === 'function' ? imageNode.getAttribute('width') : null, 1);
+    }
+    if (!(height > 0)) {
+      height = workspaceInteger(imageNode && typeof imageNode.getAttribute === 'function' ? imageNode.getAttribute('height') : null, 1);
+    }
+    return {
+      width: width > 0 ? width : 1,
+      height: height > 0 ? height : 1
+    };
   }
 
   function legacyEventValue(value) {
@@ -2386,13 +2461,29 @@
     this._renderer = null;
   };
 
+  HeatmapExplorerWorkspace.prototype._syncStageAspect = function (scene) {
+    if (!this._nodes || !this._nodes.stage) {
+      return workspaceSceneImageSize(scene, null);
+    }
+    var size = workspaceSceneImageSize(scene, this._nodes.image);
+    if (this._nodes.stage.style) {
+      this._nodes.stage.style.aspectRatio = size.width + ' / ' + size.height;
+    }
+    workspaceSetAttribute(this._nodes.stage, 'data-heatmap-sized', '1');
+    if (this._nodes.image) {
+      workspaceSetAttribute(this._nodes.image, 'width', size.width);
+      workspaceSetAttribute(this._nodes.image, 'height', size.height);
+    }
+    return size;
+  };
+
   HeatmapExplorerWorkspace.prototype._createRenderer = function (scene) {
     this._destroyRenderer();
     var self = this;
     var stage = this._nodes.stage;
-    var image = this._nodes.image;
-    var width = workspaceInteger(image && image.getAttribute ? image.getAttribute('width') : null, scene.map.image.width);
-    var height = workspaceInteger(image && image.getAttribute ? image.getAttribute('height') : null, scene.map.image.height);
+    var size = this._syncStageAspect(scene);
+    var width = size.width;
+    var height = size.height;
     this._camera = new HeatmapExplorerCamera({
       viewportWidth: stage && finiteNumber(stage.clientWidth) ? stage.clientWidth : scene.map.image.width,
       viewportHeight: stage && finiteNumber(stage.clientHeight) ? stage.clientHeight : scene.map.image.height,
@@ -2408,6 +2499,9 @@
       },
       message: this._message.bind(this)
     });
+    if (typeof this._renderer.setCamera === 'function') {
+      this._renderer.setCamera(this._camera);
+    }
     this._renderer.mount();
     if (typeof this._renderer.setCamera === 'function') {
       this._renderer.setCamera(this._camera);

@@ -541,16 +541,29 @@ assertInvalidUrl(() => HeatmapExplorerUrlState.parse({hm_range: '7d'}), 'object 
 assertInvalidUrl(() => HeatmapExplorerUrlState.serialize('', {range: ['7d']}), 'array state values should fail');
 assertInvalidUrl(() => HeatmapExplorerUrlState.serialize('', {lens: {value: 'me'}}), 'object state values should fail');
 
+function parseAspectRatioValue(value) {
+  const match = /^([0-9]+(?:\.[0-9]+)?)\s*\/\s*([0-9]+(?:\.[0-9]+)?)$/.exec(String(value || ''));
+  if (!match) {
+    return null;
+  }
+  const width = Number(match[1]);
+  const height = Number(match[2]);
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    return null;
+  }
+  return {width, height};
+}
+
 function makeDom(gl) {
   const listenerMap = () => Object.create(null);
   function element(attributes = {}) {
     const listeners = listenerMap();
+    let clientWidth = 320;
+    let clientHeight = 240;
     const node = {
       attributes: Object.assign({}, attributes),
       style: {},
       hidden: false,
-      clientWidth: 320,
-      clientHeight: 240,
       width: 0,
       height: 0,
       textContent: '',
@@ -572,6 +585,22 @@ function makeDom(gl) {
       },
       getContext() { return gl; },
     };
+    Object.defineProperty(node, 'clientWidth', {
+      enumerable: true,
+      get() { return clientWidth; },
+      set(value) { clientWidth = value; },
+    });
+    Object.defineProperty(node, 'clientHeight', {
+      enumerable: true,
+      get() {
+        const aspect = parseAspectRatioValue(node.style && node.style.aspectRatio);
+        if (aspect && node.attributes['data-heatmap-sized'] === '1') {
+          return Math.round(clientWidth * aspect.height / aspect.width);
+        }
+        return clientHeight;
+      },
+      set(value) { clientHeight = value; },
+    });
     return node;
   }
   const nodes = {
@@ -615,6 +644,7 @@ function makeDom(gl) {
 
 function fakeGl(options = {}) {
   let nextId = 0;
+  let textureCreates = 0;
   const calls = {
     textures: [],
     texImages: [],
@@ -622,13 +652,20 @@ function fakeGl(options = {}) {
     draws: 0,
     programs: 0,
     buffers: 0,
+    activeTextures: [],
+    boundTextures: [],
+    uniform1f: [],
+    uniform1i: [],
+    uniform2f: [],
+    viewports: [],
     deleted: {shaders: [], programs: [], buffers: [], textures: []},
   };
   const gl = {
     VERTEX_SHADER: 35633, FRAGMENT_SHADER: 35632, COMPILE_STATUS: 35713, LINK_STATUS: 35714,
     ARRAY_BUFFER: 34962, STATIC_DRAW: 35044, FLOAT: 5126, TEXTURE_2D: 3553,
     TEXTURE_MIN_FILTER: 10241, TEXTURE_MAG_FILTER: 10240, TEXTURE_WRAP_S: 10242,
-    TEXTURE_WRAP_T: 10243, NEAREST: 9728, CLAMP_TO_EDGE: 33071, R32F: 33326,
+    TEXTURE_WRAP_T: 10243, TEXTURE0: 33984, TEXTURE1: 33985,
+    NEAREST: 9728, CLAMP_TO_EDGE: 33071, R32F: 33326,
     RED: 6403, TRIANGLE_STRIP: 5, COLOR_BUFFER_BIT: 16384, NO_ERROR: 0,
     createShader(type) { return {id: ++nextId, type}; },
     shaderSource(shader, source) { shader.source = source; calls.shaderSources.push(source); },
@@ -655,12 +692,19 @@ function fakeGl(options = {}) {
     bufferData() {},
     deleteBuffer(buffer) { calls.deleted.buffers.push(buffer.id); },
     createTexture() {
-      if (options.createTextureFailure) return null;
+      textureCreates += 1;
+      if (options.createTextureFailure || options.createTextureFailureAt === textureCreates) return null;
       const texture = {id: ++nextId};
       calls.textures.push(texture);
       return texture;
     },
-    bindTexture() {},
+    bindTexture(target, texture) {
+      calls.boundTextures.push({
+        activeTexture: calls.activeTextures.length > 0 ? calls.activeTextures[calls.activeTextures.length - 1] : gl.TEXTURE0,
+        target,
+        texture: texture ? texture.id : null,
+      });
+    },
     texParameteri() {},
     texImage2D(...args) { calls.texImages.push(args); if (options.textureFailure) throw new Error('texture failure'); },
     deleteTexture(texture) { calls.deleted.textures.push(texture.id); },
@@ -669,12 +713,12 @@ function fakeGl(options = {}) {
     enableVertexAttribArray() {},
     vertexAttribPointer() {},
     getUniformLocation(_program, name) { return {name}; },
-    uniform1f() {},
-    uniform1i() {},
-    uniform2f() {},
-    activeTexture() {},
+    uniform1f(location, value) { calls.uniform1f.push({name: location ? location.name : null, value}); },
+    uniform1i(location, value) { calls.uniform1i.push({name: location ? location.name : null, value}); },
+    uniform2f(location, x, y) { calls.uniform2f.push({name: location ? location.name : null, value: [x, y]}); },
+    activeTexture(value) { calls.activeTextures.push(value); },
     drawArrays() { calls.draws += 1; if (options.drawFailure) throw new Error('draw failure'); },
-    viewport() {},
+    viewport(x, y, width, height) { calls.viewports.push([x, y, width, height]); },
     clearColor() {},
     clear() {},
     getError() { return options.errorCode || 0; },
@@ -722,10 +766,10 @@ const renderer = new HeatmapGlRenderer(dom.root, validScene, {
   onState: code => rendererStates.push(code),
 });
 renderer.mount();
-assert.strictEqual(goodGl.calls.textures.length, 1, 'renderer should create one texture');
+assert.strictEqual(goodGl.calls.textures.length, 2, 'renderer should create separate density and opacity textures');
 assert.strictEqual(goodGl.calls.buffers, 1, 'renderer should create one full-quad buffer');
 assert.strictEqual(goodGl.calls.programs, 1, 'renderer should create one program');
-assert.strictEqual(goodGl.calls.texImages.length, 1, 'initial render should upload one dense texture');
+assert.strictEqual(goodGl.calls.texImages.length, 2, 'initial render should upload density and opacity textures');
 assert.strictEqual(dom.nodes.canvas.width, 640, 'resize should cap device pixel ratio at two');
 assert.strictEqual(dom.root.attributes['data-heatmap-render-ms'] !== undefined, true);
 assert.strictEqual(dom.root.dispatches.length, 1);
@@ -736,11 +780,25 @@ assert.strictEqual(
   dom.root.attributes['data-heatmap-render-ms'] * 1
 );
 assert.strictEqual(rendererStates.length, 0);
+const initialDensityUpload = goodGl.calls.texImages[0].at(-1);
+const initialOpacityUpload = goodGl.calls.texImages[1].at(-1);
+assert.strictEqual(initialDensityUpload[2], Math.fround(-0.1333333333), 'difference density uploads should preserve raw signed values');
+assert.strictEqual(initialOpacityUpload[2], Math.fround(0.22), 'difference opacity uploads should carry low-sample confidence separately');
+assert.deepStrictEqual(
+  goodGl.calls.uniform1i
+    .filter(call => call.name === 'u_density' || call.name === 'u_opacity')
+    .slice(-2),
+  [{name: 'u_density', value: 0}, {name: 'u_opacity', value: 1}],
+  'difference rendering should bind density and opacity samplers to separate texture units'
+);
 renderer.render({layer: 'difference', channel: 'kills'});
-const uploaded = goodGl.calls.texImages[goodGl.calls.texImages.length - 1].at(-1);
-assert.strictEqual(Object.prototype.toString.call(uploaded), '[object Float32Array]', 'difference upload should remain one Float32Array');
-assert.strictEqual(uploaded[2], Math.fround(Math.fround(-0.1333333333) * Math.fround(0.22)));
-assert.strictEqual(goodGl.calls.textures.length, 1);
+const rerenderDensityUpload = goodGl.calls.texImages[goodGl.calls.texImages.length - 2].at(-1);
+const rerenderOpacityUpload = goodGl.calls.texImages[goodGl.calls.texImages.length - 1].at(-1);
+assert.strictEqual(Object.prototype.toString.call(rerenderDensityUpload), '[object Float32Array]', 'difference density upload should remain Float32Array');
+assert.strictEqual(Object.prototype.toString.call(rerenderOpacityUpload), '[object Float32Array]', 'difference opacity upload should remain Float32Array');
+assert.strictEqual(rerenderDensityUpload[2], Math.fround(-0.1333333333));
+assert.strictEqual(rerenderOpacityUpload[2], Math.fround(0.22));
+assert.strictEqual(goodGl.calls.textures.length, 2);
 renderer.render({layer: 'difference', channel: 'kills'});
 assert.strictEqual(dom.root.dispatches.length, 1, 'ready should fire only once per mount');
 const sharedCamera = {transform: () => ({css: 'translate3d(-8px,0,0) scale(2)', animate: false})};
@@ -756,6 +814,11 @@ assert.match(
 const differenceFragment = fragmentShaderSource(goodGl);
 assert.match(
   differenceFragment,
+  /uniform sampler2D u_opacity;/,
+  'difference rendering should sample a dedicated opacity texture'
+);
+assert.match(
+  differenceFragment,
   /float center = texture\(u_density, sampleUv\)\.r;/,
   'difference rendering should sample the center texel directly'
 );
@@ -763,6 +826,16 @@ assert.match(
   differenceFragment,
   /float value = u_palette == 2 \? center : sum \/ 9\.0;/,
   'difference palette should bypass the shared 3x3 smoothing while total\/me\/others keep it'
+);
+assert.match(
+  differenceFragment,
+  /float confidence = u_palette == 2 \? clamp\(texture\(u_opacity, sampleUv\)\.r, 0\.0, 1\.0\) : 1\.0;/,
+  'difference alpha should come from the dedicated opacity texture while non-difference layers remain fully opaque'
+);
+assert.match(
+  differenceFragment,
+  /outputColor = vec4\(mix\(color, vec3\(1\.0\), contour\), amount \* confidence\);/,
+  'difference alpha should combine normalized amount with confidence'
 );
 const signedDifferencePayload = explorerSceneFixture({
   grid: {
@@ -791,7 +864,7 @@ const signedDifferenceRenderer = new HeatmapGlRenderer(signedDifferenceDom.root,
   window: signedDifferenceDom.window,
 });
 signedDifferenceRenderer.mount();
-const signedDifferenceUpload = signedDifferenceGl.calls.texImages[signedDifferenceGl.calls.texImages.length - 1].at(-1);
+const signedDifferenceUpload = signedDifferenceGl.calls.texImages[signedDifferenceGl.calls.texImages.length - 2].at(-1);
 const signedDifferenceDense = signedDifferenceScene.dense('difference', 'kills');
 const signedCenter = signedDifferenceUpload[4];
 const signedSmoothed = kernelAverage(signedDifferenceUpload, 3, 3, 1, 1);
@@ -830,11 +903,13 @@ const sparseDifferenceRenderer = new HeatmapGlRenderer(sparseDifferenceDom.root,
   window: sparseDifferenceDom.window,
 });
 sparseDifferenceRenderer.mount();
-const sparseDifferenceUpload = sparseDifferenceGl.calls.texImages[sparseDifferenceGl.calls.texImages.length - 1].at(-1);
+const sparseDifferenceUpload = sparseDifferenceGl.calls.texImages[sparseDifferenceGl.calls.texImages.length - 2].at(-1);
+const sparseDifferenceOpacityUpload = sparseDifferenceGl.calls.texImages[sparseDifferenceGl.calls.texImages.length - 1].at(-1);
 const sparseDifferenceDense = sparseDifferenceScene.dense('difference', 'kills');
 const sparseCenter = sparseDifferenceUpload[4];
 const sparseSmoothed = kernelAverage(sparseDifferenceUpload, 3, 3, 1, 1);
-assert.ok(Math.abs(sparseCenter - Math.fround(0.2 * 0.22)) < 1e-6, 'difference upload should preserve the sparse signed delta after the existing low-sample opacity cap');
+assert.ok(Math.abs(sparseCenter - Math.fround(0.2)) < 1e-6, 'difference density upload should preserve the sparse signed delta before confidence is applied');
+assert.ok(Math.abs(sparseDifferenceOpacityUpload[4] - Math.fround(0.22)) < 1e-6, 'difference opacity upload should preserve the existing low-sample opacity cap');
 assert.ok(
   normalizedAmount(sparseCenter, sparseDifferenceDense.maxAbs) > normalizedAmount(sparseSmoothed, sparseDifferenceDense.maxAbs),
   'difference center sampling should keep isolated sparse deltas visible instead of forcing them through the shared 3x3 average'
@@ -881,13 +956,24 @@ dom.nodes.canvas.dispatchEvent({type: 'webglcontextlost', preventDefault() { pre
 assert.strictEqual(prevented, true);
 assert.strictEqual(dom.root.attributes['data-heatmap-state'], 'context_lost');
 assert.notStrictEqual(dom.nodes.static.style.display, 'none');
+assert.deepStrictEqual(
+  deletedResources(goodGl).textures,
+  goodGl.calls.textures.slice(0, 2).map(texture => texture.id),
+  'context loss should release both density and opacity textures before restore'
+);
 dom.nodes.canvas.dispatchEvent({type: 'webglcontextrestored'});
 assert.ok(goodGl.calls.programs >= 2, 'context restore should rebuild resources');
+assert.strictEqual(goodGl.calls.textures.length, 4, 'context restore should rebuild both density and opacity textures');
 renderer.destroy();
 renderer.destroy();
 assert.strictEqual((dom.nodes.canvas.listeners.webglcontextlost || []).length, 0);
 assert.strictEqual((dom.nodes.canvas.listeners.webglcontextrestored || []).length, 0);
 assert.strictEqual((dom.window.listeners.resize || []).length, 0);
+assert.deepStrictEqual(
+  deletedResources(goodGl).textures,
+  goodGl.calls.textures.map(texture => texture.id),
+  'destroy should release both original and restored density/opacity textures exactly once'
+);
 
 const extensionlessGl = fakeGl({extensionNull: true});
 const extensionlessDom = makeDom(extensionlessGl);
@@ -973,7 +1059,12 @@ assertResourceCleanup(
 assertResourceCleanup(
   {createTextureFailure: true},
   {shaders: [1, 2], programs: [3], buffers: [4], textures: []},
-  'texture allocation failure'
+  'first texture allocation failure'
+);
+assertResourceCleanup(
+  {createTextureFailureAt: 2},
+  {shaders: [1, 2], programs: [3], buffers: [4], textures: [5]},
+  'second texture allocation failure'
 );
 
 assert.strictEqual(/innerHTML|outerHTML|insertAdjacentHTML|document\.write|\beval\s*\(|new\s+Function/.test(explorerSource), false, 'renderer source must not use unsafe HTML/eval APIs');
@@ -989,16 +1080,39 @@ assert.match(explorerSource, /consumeSuppressedClick/, 'renderer should expose d
 assert.match(explorerSource, /data-heatmap-pan-active/, 'workspace should expose a scoped pan-active hook');
 assert.match(explorerSource, /data-heatmap-v1-url/, 'workspace should expose a trustworthy legacy route hook');
 assert.match(cssSource, /touch-action:\s*none/, 'pan mode should explicitly disable touch scrolling only while active');
+assert.match(
+  cssSource,
+  /\.heatmap-explorer__stage\s*\{[\s\S]*?min-height:\s*360px;/,
+  'desktop placeholder stage should remain 360px before authoritative sizing'
+);
+assert.match(cssSource, /\.heatmap-explorer__stage\[data-heatmap-sized="1"\]/, 'sized stages should have an explicit aspect-driven CSS contract');
+assert.match(
+  cssSource,
+  /\.heatmap-explorer__stage\[data-heatmap-sized="1"\]\s*\{[\s\S]*?min-height:\s*0;/,
+  'sized stages should intentionally drop placeholder min-height once authoritative aspect sizing is known'
+);
+assert.match(
+  cssSource,
+  /@media \(max-width: 540px\)\s*\{[\s\S]*?\.heatmap-explorer__stage:not\(\[data-heatmap-sized="1"\]\)\s*\{[\s\S]*?min-height:\s*320px;/,
+  'mobile placeholder stage should use 320px only while the stage is still unsized'
+);
+assert.doesNotMatch(
+  cssSource,
+  /@media \(max-width: 540px\)\s*\{[\s\S]*?\.heatmap-explorer__stage\s*\{[\s\S]*?min-height:\s*320px;/,
+  'mobile 320px placeholder must not reapply to sized stages and reintroduce aspect drift'
+);
+assert.doesNotMatch(cssSource, /min-height:\s*620px/, 'desktop stages should no longer be pinned to 620px after sizing');
+assert.match(cssSource, /min-height:\s*44px/, 'mobile 44px tap-target rules should remain intact');
 
 function workspaceElement(attributes = {}) {
   const listeners = Object.create(null);
   const classes = new Set();
+  let clientWidth = 320;
+  let clientHeight = 240;
   const node = {
     attributes: Object.assign({}, attributes),
     style: {},
     hidden: false,
-    clientWidth: 320,
-    clientHeight: 240,
     textContent: '',
     value: '',
     children: [],
@@ -1052,6 +1166,22 @@ function workspaceElement(attributes = {}) {
       return child;
     },
   };
+  Object.defineProperty(node, 'clientWidth', {
+    enumerable: true,
+    get() { return clientWidth; },
+    set(value) { clientWidth = value; },
+  });
+  Object.defineProperty(node, 'clientHeight', {
+    enumerable: true,
+    get() {
+      const aspect = parseAspectRatioValue(node.style && node.style.aspectRatio);
+      if (aspect && node.attributes['data-heatmap-sized'] === '1') {
+        return Math.round(clientWidth * aspect.height / aspect.width);
+      }
+      return clientHeight;
+    },
+    set(value) { clientHeight = value; },
+  });
   Object.defineProperty(node, 'firstChild', {
     enumerable: true,
     get() {
@@ -1288,6 +1418,7 @@ function richWorkspaceHarness(search = '?page=4', rootAttributes = {}) {
   const nodes = {
     interactive: workspaceEventElement(),
     stage: workspaceEventElement(),
+    camera: workspaceEventElement(),
     image: workspaceEventElement({src: './client.jpg', alt: 'client map'}),
     canvas: workspaceEventElement(),
     static: workspaceEventElement(),
@@ -1326,6 +1457,7 @@ function richWorkspaceHarness(search = '?page=4', rootAttributes = {}) {
   const selectors = {
     '[data-heatmap-interactive]': nodes.interactive,
     '[data-heatmap-stage]': nodes.stage,
+    '[data-heatmap-camera]': nodes.camera,
     '[data-heatmap-image]': nodes.image,
     '[data-heatmap-canvas]': nodes.canvas,
     '[data-heatmap-static]': nodes.static,
@@ -1393,6 +1525,7 @@ function workspaceNodeBag(nodes) {
   return {
     interactive: nodes.interactive,
     stage: nodes.stage,
+    camera: nodes.camera,
     image: nodes.image,
     canvas: nodes.canvas,
     static: nodes.static,
@@ -1762,6 +1895,40 @@ async function assertFailureActionsUseKnownV1Route() {
   assert.strictEqual(harness.nodes.alert.children[0].children[1].textContent, 'Open legacy view');
 }
 
+function assertWorkspaceStageAspectUsesAuthoritativeSceneDimensions() {
+  const aspectGl = fakeGl();
+  const harness = richWorkspaceHarness('?page=4');
+  harness.nodes.stage.clientWidth = 609;
+  harness.nodes.stage.clientHeight = 620;
+  harness.nodes.canvas.getContext = () => aspectGl;
+  const workspace = new HeatmapExplorerWorkspace(harness.root, {
+    window: harness.window,
+    document: harness.document,
+    messages: workspaceMessages,
+  });
+  workspace._nodes = workspaceNodeBag(harness.nodes);
+  const aspectScene = new HeatmapExplorerScene(explorerSceneFixture({
+    map: {
+      game: 'cstrike',
+      realgame: 'cstrike',
+      name: 'de_dust2',
+      image: {url: './map.jpg', width: 1280, height: 1024},
+      projectionHash: 'a4dd45e46d84a12f',
+      floorConfigHash: '97d170e1550eee4a',
+    },
+  }));
+  workspace._applyScene(aspectScene, 'map');
+  assert.strictEqual(harness.nodes.stage.attributes['data-heatmap-sized'], '1', 'stage sizing should be marked explicitly after a scene is applied');
+  assert.strictEqual(harness.nodes.stage.style.aspectRatio, '1280 / 1024', 'stage sizing should follow authoritative scene dimensions');
+  assert.ok(Math.abs(workspace._camera.viewportWidth - 609) <= 0.01, 'camera viewport width should follow the measured stage width');
+  assert.ok(Math.abs(workspace._camera.viewportHeight - 487) <= 1, 'camera viewport height should follow the authoritative aspect ratio, not the old 620px placeholder');
+  assert.deepStrictEqual(aspectGl.calls.viewports.at(-1), [0, 0, 609, 487], 'renderer viewport should use the sized stage height after aspect sync');
+  assert.strictEqual(harness.nodes.canvas.style.width, '609px', 'canvas CSS width should follow the measured stage width');
+  assert.strictEqual(harness.nodes.canvas.style.height, '487px', 'canvas CSS height should follow the authoritative aspect ratio');
+  assert.match(harness.nodes.camera.style.transform, /^translate3d\(/, 'camera transform should be reapplied after viewport sync');
+  workspace.destroy();
+}
+
 async function assertInitialFailureUsesServerV1RouteWhenSceneIsMissing() {
   for (const scenario of [
     {
@@ -2129,6 +2296,7 @@ function assertPanModeSuppressesDragClicks() {
   await assertCustomWindowApplyValidation();
   assertExplicitStateAlertsStayLocalized();
   assertPanModeSuppressesDragClicks();
+  assertWorkspaceStageAspectUsesAuthoritativeSceneDimensions();
   console.log('heatmap explorer contract smoke ok');
 }()).catch(error => {
   console.error(error && error.stack ? error.stack : error);
