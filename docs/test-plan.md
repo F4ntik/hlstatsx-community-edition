@@ -290,12 +290,19 @@ Use the already populated DB for visual/projection iteration first.
 
 ### Modern Heatmap Explorer
 
-#### Background-grading runtime acceptance (`0b6a875`)
+#### Background-grading runtime acceptance (`735bda5`)
 
 - Passing local runtime rows: default/reversible Color and Mono without a scene
-  request or URL mutation; keyboard focus and `aria-pressed`; Russian mobile
-  `44px` style targets without horizontal overflow; 200% scale; reduced
-  motion; and WebGL-unavailable unfiltered static JPEG with hidden controls.
+  request or URL mutation; keyboard focus and `aria-pressed`; reduced motion;
+  and WebGL-unavailable unfiltered static JPEG with hidden controls. The prior
+  mobile `44px`/no-overflow and 200% rows were invalidated because they used
+  Chromium's fallback `980px` layout viewport and page scale. Fix round 1 adds
+  the viewport header contract and records corrected rebuilt-image evidence:
+  mobile `clientWidth=390`, `innerWidth=scrollWidth=393`, DPR `3`, one-column
+  mobile sheet and 19 touch targets at least `44x44`; the `720px @ 2x` proxy
+  has `innerWidth=720`, `clientWidth=scrollWidth=705`, reflow and usable
+  controls without page scale. The inner/client difference is the scrollbar
+  boundary, not horizontal content overflow.
 - The committed JavaScript smoke is the deterministic no-`fetch` proof; a
   route-abort tests a different failure path. Difference invariance is accepted
   at the CSS/JS seam (image/pseudo-layer only, no renderer/fetch/URL call) and

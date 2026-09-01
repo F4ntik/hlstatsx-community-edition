@@ -2,7 +2,7 @@
 
 Status on 2026-09-01: `BLOCKED`
 
-## Background-grading Task 3 readback (exact HEAD `0b6a875`)
+## Background-grading Task 3 readback (exact HEAD `735bda5`)
 
 This is a partial, restored browser pass for the `Color / Mono` presentation
 slice only. It does not change the Task 12 status below: the broader Explorer
@@ -14,16 +14,27 @@ and release remain blocked.
   replay-route (`13 passed`), projection (`6 passed`), and replay (`91 passed`)
   also passed. The earlier `286 passed, 16 failed` invocation omitted that
   required path and is retained only as invalid-environment diagnostic evidence.
-- Runtime rows that passed on the rebuilt current web image: Color default,
-  keyboard Space/Enter Mono then Color reversal, `aria-pressed`, one unchanged
-  v2 request and URL across style changes, Russian mobile controls at least
-  `44px`, no mobile/200% horizontal overflow, reduced-motion transition `0s`,
-  and WebGL-unavailable static fallback with hidden controls and JPEG
-  `filter:none`.
-- Canonical screenshots were replaced from that pass:
+- Runtime rows for Color/Mono, keyboard/ARIA, one unchanged v2 request and
+  URL, reduced motion, and WebGL-unavailable static fallback pass at their
+  captured desktop/browser seam. The old mobile/200% claims are invalidated:
+  Chromium used a `980px` layout viewport at nominal `390x844`
+  (`visualScale=0.397959`), and the old 200% row used page scale rather than a
+  reflow viewport.
+- Fix round 1 adds the standard viewport contract in `web/pages/header.php`,
+  guarded by a RED/GREEN PHP smoke source contract, and repeats the corrected
+  browser proof. True touch mobile is `clientWidth=390`, `innerWidth=393`,
+  `scrollWidth=393`, DPR `3`, and visual scale `1`: it is one-column with the
+  inspector mobile sheet open and all 19 visible targets at least `44x44` CSS
+  px. The three-pixel inner/client difference is the scrollbar boundary, so
+  `scrollWidth <= innerWidth` establishes no horizontal overflow. The 2x
+  reflow proxy is `innerWidth=720`, `clientWidth=scrollWidth=705`, DPR `2`,
+  one-column, usable controls, no horizontal overflow, and `0s` reduced-motion
+  transition; no page-scale factor was used.
+- Canonical screenshots were replaced from the evidence passes:
   `map-overview-en.png` (`1139x935`), `map-overview-mono-en.png`
   (`1139x935`), `player-difference-ru.png` (`1197x1010`), and
-  `mobile-inspector-ru.png` (`2352x2925`).
+  `mobile-inspector-ru.png` (`936x5460`, SHA-256
+  `eba4515c55854c7e2e6c2838deadf9f5f25a8318b59af036666e2e3a1d8b684c`).
 - The committed JavaScript smoke deterministically covers the no-browser-fetch
   branch; the failed route-abort experiment is not a substitute for that branch
   and is not a product failure. The first active browser pass visually exercised
@@ -40,11 +51,18 @@ and release remain blocked.
   `task3-restore-20260901T192353Z.json`. Restore readback is exact for
   `HeatmapExplorerBeta=0`, config, asset/JPEG/thumb hashes, temporary users,
   fixture rows, `AUTO_INCREMENT`, sessions, and mounts.
+- Fix round 1 source preflight/restore before a transient Docker Hub TLS
+  timeout is preserved as `task3-preflight-20260901T204454Z.json` /
+  `task3-restore-20260901T204454Z.json` (`exact: true`). The serialized
+  accepted browser pair is `task3-preflight-20260901T204537Z.json` /
+  `task3-browser-20260901T204537Z.json` /
+  `task3-restore-20260901T204537Z.json`, normalized by
+  `task3-fix-round1-browser-acceptance-20260901T204537Z.json`; its baseline
+  and restore have `sessions=[]` and `exact: true`.
 - No Steam/Valve/GoldSrc asset was copied; v1/JPEG remain preserved. No push or
   external publication occurred.
 - The grading source line is `40b8f58` / `bf2af84` runtime hardening followed
-  by `de5b836`, `7366b07`, and `0b6a875`; only the latter three implement this
-  background-style contract.
+  by `de5b836`, `7366b07`, `0b6a875`, and viewport remediation `735bda5`.
 
 This Task 12 pass did not reach `RUNTIME-ACCEPTED` or `RELEASE-READY`.
 Implementation, schema, and harness source stayed frozen at

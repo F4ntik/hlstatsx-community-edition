@@ -90,15 +90,16 @@ Historical autonomy follow-up context:
   no accepted player/mobile Explorer flow, and no authenticated admin matrix.
   Use `docs/audits/modern-heatmap-explorer/runtime-acceptance.md` as the
   current runtime truth before any correction pass.
-- The later background-grading Task 3 pass at `0b6a875` is source- and
-  browser-runtime accepted for the presentation-only Color/Mono seam. It
-  records the documented `302 passed` Python environment, no-request/URL
-  reversibility, keyboard/ARIA, responsive/reduced-motion, and unfiltered
-  WebGL fallback. The route-abort experiment is not the no-fetch branch (that
-  branch is committed-smoke coverage), and the attempted isolated Difference
-  proof could not load under the restored baseline without a prohibited third
-  activation. Keep GoldSrc import and any Steam/Valve provenance decision
-  outside this presentation-only slice; this is not a broader Task 12 release
+- The later background-grading Task 3 pass records the documented `302 passed`
+  Python environment, no-request/URL reversibility, keyboard/ARIA, and
+  unfiltered WebGL fallback. Its former mobile/200% acceptance was invalidated:
+  the missing viewport meta caused a `980px` mobile layout viewport, and the
+  old 200% row used page scale. Fix round 1 at `735bda5` adds the standard
+  header contract with a RED/GREEN smoke test and corrected rebuilt-image
+  evidence: true touch mobile `clientWidth=390` (with scrollbar-boundary
+  `innerWidth=scrollWidth=393`) and real `720px @ 2x` reflow without page
+  scale. Keep GoldSrc import and any Steam/Valve provenance decision outside
+  this presentation-only slice; this is not a broader Task 12 release
   promotion.
 - The autonomy/release-readiness follow-up through Phase 9 is complete for the
   current scope. For release-candidate preparation, use

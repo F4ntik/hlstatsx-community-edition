@@ -3,16 +3,18 @@
 ## Snapshot
 
 - Last updated: `2026-09-01`
-- The `Color / Mono` background-grading slice at exact HEAD `0b6a875` is
-  source- and browser-runtime accepted on the tested local stack: the documented
-  Python environment gives `302 passed`, Color/Mono is request/URL-free and
-  reversible with keyboard/ARIA, responsive/reduced-motion rows pass, and the
-  WebGL-unavailable JPEG is unfiltered with controls hidden. Difference palette
-  invariance is accepted at the CSS/JS seam plus a visual scene; the isolated
-  canvas readback could not load under the restored `1.26` baseline and was not
-  retried with a third activation. Restore returned mode `0` and the exact
-  config/assets/users/fixtures/auto-increments/mounts/sessions=`[]`. This does
-  not promote the broader Task 12/Explorer release boundary.
+- The `Color / Mono` background-grading slice at exact HEAD `735bda5` has
+  source-tested viewport remediation: the documented Python environment gives
+  `302 passed`, and a RED/GREEN PHP smoke contract requires the standard mobile
+  viewport meta. Color/Mono request/URL reversibility, keyboard/ARIA, and the
+  unfiltered WebGL fallback retain their prior bounded evidence. The previous
+  mobile/200% pass was invalidated because it used Chromium's `980px` fallback
+  layout viewport and page scaling; the corrected rebuilt proof establishes
+  mobile `clientWidth=390`, one-column sheet, 19 `44x44` targets, and no
+  overflow (`innerWidth=scrollWidth=393` at the scrollbar boundary), plus real
+  `720px @ 2x` CSS reflow without page scaling. Restore returned mode `0` and
+  the exact config/assets/users/fixtures/auto-increments/mounts/sessions=`[]`.
+  This does not promote the broader Task 12/Explorer release boundary.
 - Task 12 runtime acceptance for the Modern Heatmap Explorer is currently
   blocked, not `RUNTIME-ACCEPTED`, and not `RELEASE-READY`. The frozen
   browser/runtime pass on 2026-09-01 preserved exact evidence in
