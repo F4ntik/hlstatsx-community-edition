@@ -290,28 +290,19 @@ Use the already populated DB for visual/projection iteration first.
 
 ### Modern Heatmap Explorer
 
-#### Background-grading runtime acceptance (`735bda5`)
+#### Final runtime acceptance (`cc11662` product runtime)
 
-- Passing local runtime rows: default/reversible Color and Mono without a scene
-  request or URL mutation; keyboard focus and `aria-pressed`; reduced motion;
-  and WebGL-unavailable unfiltered static JPEG with hidden controls. The prior
-  mobile `44px`/no-overflow and 200% rows were invalidated because they used
-  Chromium's fallback `980px` layout viewport and page scale. Fix round 1 adds
-  the viewport header contract and records corrected rebuilt-image evidence:
-  mobile `clientWidth=390`, `innerWidth=scrollWidth=393`, DPR `3`, one-column
-  mobile sheet and 19 touch targets at least `44x44`; the `720px @ 2x` proxy
-  has `innerWidth=720`, `clientWidth=scrollWidth=705`, reflow and usable
-  controls without page scale. The inner/client difference is the scrollbar
-  boundary, not horizontal content overflow.
-- The committed JavaScript smoke is the deterministic no-`fetch` proof; a
-  route-abort tests a different failure path. Difference invariance is accepted
-  at the CSS/JS seam (image/pseudo-layer only, no renderer/fetch/URL call) and
-  visual runtime scene. The isolated-canvas attempt on baseline `1.26` is
-  retained as a bounded non-loading residual, with no third activation.
-- Record the exact restore readback and the documented whole-suite source
-  result (`302 passed` with `PYTHONPATH=scripts;scripts/replay_baseline`) in the
-  runtime acceptance receipt. The earlier `286/16` was the invalid no-PYTHONPATH
-  invocation, not a source regression.
+- Required browser rows: reversible Color/Mono without request or URL change;
+  map/player/custom/Difference/inspector/floor flows; keyboard pin/pan/reset/
+  unpin; reduced motion; JS-off and WebGL failure fallbacks; static JPEG;
+  legacy rollback; true 390px mobile and 720px @2x reflow. Measure only visible,
+  enabled Explorer controls for the 44×44 target gate.
+- Required admin rows: authenticated EN/RU preview/upload/save/readback, two
+  stale sessions, non-admin denial, CSRF rejection, invalid floor/token/type/
+  dimension/body size and HTTP generation denial.
+- Required restoration: mode, config, counter, source/JPEG/thumb hashes,
+  temporary users, fixture rows, both AUTO_INCREMENT values, sessions, mounts,
+  custom overview and disposable resources.
 
 - Focused RED/GREEN source contract: `python -m pytest
   scripts/replay_baseline/tests/test_heatmap_coordinate_acceptance_script.py -q`.
@@ -326,23 +317,17 @@ Use the already populated DB for visual/projection iteration first.
   `node scripts/heatmap_js_smoke.js`.
 - Route smoke: `python -m pytest
   scripts/replay_baseline/tests/test_web_route_smoke.py -q`. Migration checks
-  include the focused source assertions and `php -l web/updater/80.php` plus
-  `php -l web/updater/81.php`.
+  include the focused source assertions and `php -l` for
+  `web/updater/80.php`, `81.php`, and `82.php`.
 - Coordinate runner: `powershell -NoProfile -ExecutionPolicy Bypass -File
   scripts/replay_baseline/comparison/Run-HeatmapCoordinateAcceptance.ps1` only
   against the disposable `bench_ephemeral` contour; it is deliberately not a
   normal source test.
-- Current runtime truth for the frozen 2026-09-01 pass is
-  `docs/audits/modern-heatmap-explorer/runtime-acceptance.md`. That pass
-  remained blocked at release/runtime acceptance because the disposable runner
-  did not produce a persisted-row receipt (`Unknown column 'uniqueId'` on the
-  restored schema), the live player/mobile browser surface did not produce an
-  accepted Explorer interaction path or any
-  `heatmap-explorer-ready.detail.durationMs` receipt, and the live image did
-  not contain `scripts/web_heatmap_smoke.php` even though `php -l
-  /var/www/html/heatmap_points.php` and `php -l
-  /var/www/html/includes/heatmap_points.php` passed inside the running web
-  container.
+- Current runtime truth is
+  `docs/audits/modern-heatmap-explorer/runtime-acceptance.md`. The 2026-09-01
+  final pass closes source, coordinate, MyISAM, performance, public browser,
+  admin, map-identity and exact-restore gates. The local candidate is release
+  ready; deployment acceptance still requires staged promotion and monitoring.
 
 **Source gate:** static contract, Python, PHP, JavaScript, route, migration,
 and diff checks pass without Docker DB execution. **Runtime acceptance:** a

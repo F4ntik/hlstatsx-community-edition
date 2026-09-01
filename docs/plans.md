@@ -80,27 +80,18 @@ Historical autonomy follow-up context:
   web, static JPEG compatibility fallback, player-scoped kill/death widgets,
   and per-map projection calibration from overview seeds plus DB-first manual
   diagnostics.
-- Modern Heatmap Explorer runtime/release acceptance is currently blocked by
-  live evidence, not by missing source gates. The frozen Task 12 runtime pass
-  on 2026-09-01 proved modes `0/1/2`, direct v2 disablement in mode `0`, and
-  one-request rollback to v1, but it did not produce the required disposable
-  coordinate-runner receipt and it surfaced release-blocking browser/runtime
-  gaps: generic handling for `empty` / `weak_projection`, no visible custom
-  period control, no working Explorer alert fallback to v1, `pointerPan=false`,
-  no accepted player/mobile Explorer flow, and no authenticated admin matrix.
-  Use `docs/audits/modern-heatmap-explorer/runtime-acceptance.md` as the
-  current runtime truth before any correction pass.
-- The later background-grading Task 3 pass records the documented `302 passed`
-  Python environment, no-request/URL reversibility, keyboard/ARIA, and
-  unfiltered WebGL fallback. Its former mobile/200% acceptance was invalidated:
-  the missing viewport meta caused a `980px` mobile layout viewport, and the
-  old 200% row used page scale. Fix round 1 at `735bda5` adds the standard
-  header contract with a RED/GREEN smoke test and corrected rebuilt-image
-  evidence: true touch mobile `clientWidth=390` (with scrollbar-boundary
-  `innerWidth=scrollWidth=393`) and real `720px @ 2x` reflow without page
-  scale. Keep GoldSrc import and any Steam/Valve provenance decision outside
-  this presentation-only slice; this is not a broader Task 12 release
-  promotion.
+- Modern Heatmap Explorer implementation and all 12 planned gates are complete
+  for the local release candidate. Source, disposable coordinates, MyISAM
+  install/update/performance, public EN/RU browser, authenticated admin,
+  accessibility/fallback/rollback, cache identity, and exact restoration are
+  accepted. Use `docs/audits/modern-heatmap-explorer/runtime-acceptance.md` as
+  the current truth. Remaining work is operational promotion through mode 0,
+  migration readback, mode 1 observation and production monitoring; it is not
+  an implementation correction pass.
+- Keep GoldSrc import and Steam/Valve provenance outside this release. Local
+  source research validated the overview coordinate model, but no Valve asset
+  is shipped. The accepted product path uses repository maps with reversible
+  map-only Color/Mono grading and preserves v1/JPEG compatibility.
 - The autonomy/release-readiness follow-up through Phase 9 is complete for the
   current scope. For release-candidate preparation, use
   [`docs/release-readiness.md`](release-readiness.md) and update

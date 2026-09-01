@@ -3,33 +3,24 @@
 ## Snapshot
 
 - Last updated: `2026-09-01`
-- The `Color / Mono` background-grading slice at exact HEAD `735bda5` has
-  source-tested viewport remediation: the documented Python environment gives
-  `302 passed`, and a RED/GREEN PHP smoke contract requires the standard mobile
-  viewport meta. Color/Mono request/URL reversibility, keyboard/ARIA, and the
-  unfiltered WebGL fallback retain their prior bounded evidence. The previous
-  mobile/200% pass was invalidated because it used Chromium's `980px` fallback
-  layout viewport and page scaling; the corrected rebuilt proof establishes
-  mobile `clientWidth=390`, one-column sheet, 19 `44x44` targets, and no
-  overflow (`innerWidth=scrollWidth=393` at the scrollbar boundary), plus real
-  `720px @ 2x` CSS reflow without page scaling. Restore returned mode `0` and
-  the exact config/assets/users/fixtures/auto-increments/mounts/sessions=`[]`.
-  This does not promote the broader Task 12/Explorer release boundary.
-- Task 12 runtime acceptance for the Modern Heatmap Explorer is currently
-  blocked, not `RUNTIME-ACCEPTED`, and not `RELEASE-READY`. The frozen
-  browser/runtime pass on 2026-09-01 preserved exact evidence in
-  `docs/audits/modern-heatmap-explorer/runtime-acceptance.md` and
-  `docs/audits/modern-heatmap-explorer/screenshots/`. The direct v2 mode gate
-  and one-request rollback were proven, but the required fresh disposable
-  coordinate runner did not produce a persisted-row receipt because the frozen
-  harness queried `hlstats_Players.uniqueId` against a restored schema that did
-  not contain that column. Live browser evidence also confirmed release-blocking
-  UI/runtime gaps: specialized `empty` / `weak_projection` handling collapsed
-  into the generic load error, no visible custom period control, no working
-  fallback-to-v1 action from the Explorer alert, `pointerPan=false`, no
-  accepted player/mobile explorer path, no authenticated admin matrix, and no
-  accepted `heatmap-explorer-ready.detail.durationMs` receipt. The stack was
-  restored to `HeatmapExplorerBeta=0` at the end of the pass.
+- Modern Heatmap Explorer is `SOURCE-READY`, `RUNTIME-ACCEPTED`, and
+  `RELEASE-READY` as a local candidate at product runtime `cc11662` plus the
+  PowerShell-compatible coordinate runner `3dc6330`. The final pass includes
+  302 product tests, 91 replay tests, 13 route tests, PHP/JS gates, a passing
+  disposable five-case coordinate receipt, fresh-install and populated MyISAM
+  updater acceptance, 65/65 performance metrics, authenticated EN/RU admin
+  acceptance, and live browser proof for map/player/mobile/floor/keyboard/
+  fallback/rollback paths. Color/Mono is map-only, reversible, and causes no
+  request or URL change. True mobile is `clientWidth=390`, DPR 3, one column,
+  no content overflow, and 19 enabled targets at least 44×44; the 200% reflow
+  proxy is `720px @ 2x` without page scaling. The final restore returned exact
+  mode `0`, config/assets/counter/users/fixtures/auto-increments/sessions and
+  mounts. See `docs/audits/modern-heatmap-explorer/runtime-acceptance.md` and
+  its sanitized JSON evidence. No push, deployment, or publication occurred.
+- Counter-Strike/GoldSrc color overview BMP/TXT files were researched locally,
+  but no Valve/Steam asset was copied or shipped. The product uses repository
+  images with Color/Mono grading. Optional operator-side GoldSrc import remains
+  a separate licensing and feature decision.
 - The release-clean P1 hardening closure for post-ingest maintenance is
   accepted. The canonical runner now stages only the selected FTP logs,
   performs legacy-compatible `inactive -> awards -> ribbons -> strict GeoIP`
@@ -340,13 +331,15 @@ Current parity state:
   time. The next performance boundary is parity-safe SQL reduction/batching;
   any first Rust stage should remain an optional parser backend behind the
   existing rollback seam.
-- Updated the heatmap admin calibration editor so the visual selection box now
+- In the historical Windows source-only pass, updated the heatmap admin
+  calibration editor so the visual selection box now
   follows the actual overlay point bounds instead of the full map canvas,
   resize handles adjust projection scale with offset compensation, and rotate
   cycles through `0/90/180/270` quarter-turn states while preserving existing
   `rotate=1` compatibility. Targeted Python heatmap tests, JS syntax check, and
-  Python compile checks passed; local PHP heatmap smoke remains blocked because
-  `php` is not available on this Windows `PATH`.
+  Python compile checks passed; that pass could not run local PHP because
+  `php` was unavailable on the Windows `PATH`. The final candidate later passed
+  the mounted Docker PHP smoke and lint recorded in the current acceptance.
 - Added `docs/README.md` as the documentation map for this product lane so
   canonical task entrypoints are separated from historical migration and i18n
   notes.
@@ -592,11 +585,9 @@ Current parity state:
 
 - Docker API access can still block single-log or narrow replay verification
   even when the local unit slice is already green.
-- The Modern Heatmap Explorer remains blocked at the runtime/release boundary
-  until a corrected disposable coordinate runner, specialized browser-state
-  handling, custom period control, working v1 fallback action, pointer/touch
-  pan, and the authenticated admin/accessibility matrices are evidenced on the
-  live stack.
+- Modern Heatmap Explorer is locally release-ready, but production promotion
+  still requires the documented mode-0 deployment, migration readback, staged
+  mode-1 observation, reverse-proxy inspect rate limit, and rollback monitoring.
 - Some Python test commands still require explicit `PYTHONPATH` setup because
   the imported package roots do not yet have a unified developer bootstrap.
 - `PlayerNames`, `Players`, and `Players_History` are no longer open

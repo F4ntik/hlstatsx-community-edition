@@ -15,8 +15,31 @@ preserved and the comparator was not changed to hide them. No synthetic events,
 raw schema injection into the contour, server-specific index, Suicides index,
 second index, or second table was used.
 
-The source change is uncommitted pending independent review. This report is
-source/disposable-runtime evidence, not a production deployment record.
+The source change and updater are committed and independently reviewed. This
+report remains source/disposable-runtime evidence, not a production deployment
+record.
+
+## Final MyISAM release-candidate acceptance
+
+The final exact product runtime (`cc11662`) repeated the retained decision in
+an isolated MariaDB 10.11 contour. Receipt:
+`.superpowers/sdd/2026-08-31-modern-heatmap-explorer/task-11-evidence/`
+`task11-myisam-current-20260901T221141Z.json`.
+
+- Fresh install read back `dbversion=82`, Teamkills `MyISAM`, Config `InnoDB`,
+  one `floors_json` column, mode `0`, and exact index parts
+  `1:map,2:eventTime`.
+- A populated MyISAM table was reset to dbversion 81 with the index absent.
+  The normal HTTP updater returned 200 while 120 concurrent reads completed.
+  Checksum and row fingerprint remained unchanged.
+- A second HTTP updater call returned 200 without duplicating the index or
+  changing data.
+- Fixed 5 cold + 30 warm + 30 inspect requests produced 65/65 structured
+  metric lines. Cold p95 was 55.5241 ms, warm p95 10.3528 ms, inspect p95
+  13.6879 ms, payload gzip 4,009 bytes, and 301 bins.
+- EXPLAIN used `range` on `mapEventTime` with `Using index condition`.
+- The temporary web container, DB container, network, volume and image were
+  all removed.
 
 ## Immutable identities
 
@@ -255,9 +278,10 @@ state, and did not perform a second restore/infra run.
    awards 998, player awards 9, player ribbons 8, and GeoIP
    flag/country/city/state/coordinates 250/250/219/221/250. Both SQL snapshots
    are 1,107 bytes.
-8. The runner stopped at the deliberately red strict comparison. The contour
-   <code>web_smoke</code> stage is pending and was **not run**. It is recorded
-   as absent, not treated as a pass.
+8. The runner stopped at the deliberately red strict comparison. In this
+   historical dual-contour run, the contour <code>web_smoke</code> stage was
+   **not run**. It is recorded as absent, not treated as a pass or reused as
+   final Explorer acceptance.
 
 The fresh contour proves migration/install-before-import, import, maintenance,
 and comparison evidence. It is not a post-comparison browser acceptance.
@@ -410,7 +434,7 @@ It then resumed the same state, not a second restore/infra run, from
 rtk powershell -NoProfile -ExecutionPolicy Bypass -Command '& { $env:HLSTATS_GEOIP_DIR_HOST_PATH = "D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\scripts\GeoLiteCity"; & rtk powershell -NoProfile -ExecutionPolicy Bypass -File "D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n-heatmap-explorer\scripts\replay_baseline\comparison\Run-DualContour-1000.ps1" -MaxImportFiles 1000 -ArtifactLabel narrow-1000 -EvidenceRunId "bad9b5ea-6dd3-494d-b8b3-0ceaa2fd4cc8" -ArtifactsDir "D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n\docs\audits\legacy-python-parity-20260423\legacy-window-1000" -UseDumpRestore -StatePath "D:\PyProjects\hlstatx-ce\hlstatsx-community-edition-python-i18n-heatmap-explorer\.superpowers\sdd\2026-08-31-modern-heatmap-explorer\task-11-evidence\dual-contour-index82-bad9b5ea-6dd3-494d-b8b3-0ceaa2fd4cc8.state.json" -FromStage legacy_import; exit $LASTEXITCODE }'
 ~~~
 
-### Current source-validation boundary and engine caveat
+### Historical source-validation boundary and closed engine caveat
 
 The current source-only checks were run against an immutable checkout mount:
 
@@ -422,15 +446,16 @@ rtk git diff --check
 
 They passed: Docker PHP lint reported no syntax errors, the mounted-source
 <code>web_heatmap_smoke.php</code> reported <code>web heatmap smoke ok</code>,
-and the diff check was clean. This is a source/mounted smoke boundary only; it
-does not convert the pending contour <code>web_smoke</code> stage into a pass.
+and the diff check was clean. This historical source/mounted smoke did not
+convert that contour's pending <code>web_smoke</code> stage into a pass; later
+final browser acceptance is recorded separately in `runtime-acceptance.md`.
 
-The measured candidate database's <code>hlstats_Events_Teamkills</code> table
-was InnoDB. Fresh <code>sql/install.sql</code> intentionally remains MyISAM.
-Therefore the historical A/B timing result is not a fresh-install MyISAM
-performance claim. Before a release, a maintenance-window acceptance must
-verify the actual production table engine, DDL locking/availability behavior,
-and runtime performance; no timing result is transferred across those engines.
+The earlier candidate database's <code>hlstats_Events_Teamkills</code> table was
+InnoDB, so that A/B timing remains an InnoDB-only historical result. The final
+isolated acceptance at the top of this report closes the release-candidate
+engine gap with a populated MyISAM 81→82 update, 120 concurrent reads, exact
+fingerprint readback and a separate 65-request MyISAM performance sample. No
+timing was transferred between engines.
 
 ## Explicit acceptance and non-claims
 
@@ -446,9 +471,10 @@ Accepted at this boundary:
 - the fresh narrow contour imported, maintained, and matched all
   non-coordinate anchors/snapshots before the known red residual.
 
-Not accepted or claimed:
+Not accepted or claimed for this historical dual-contour run:
 
 - strict logical comparator green;
-- contour <code>web_smoke</code> success;
+- contour <code>web_smoke</code> success (the final mounted PHP smoke and live
+  browser acceptance are separate evidence, not a retroactive contour pass);
 - production migration, calibration, deploy, teardown, or commit;
 - scope expansion beyond this one Teamkills composite index.

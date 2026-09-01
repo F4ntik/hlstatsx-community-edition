@@ -73,6 +73,12 @@ Read them only when you need historical rationale.
 ## Evidence And Audit Artifacts
 
 - `docs/audits/legacy-python-parity-20260423/`
+- `docs/audits/modern-heatmap-explorer/runtime-acceptance.md` — current local
+  release-candidate gates, rollout boundary, and raw-receipt index.
+- `docs/audits/modern-heatmap-explorer/performance.md` — index decision,
+  MyISAM updater/performance evidence, and historical contour non-claims.
+- `docs/audits/modern-heatmap-explorer/evidence/acceptance-2026-09-01.json` —
+  sanitized machine-readable final acceptance summary.
 
 Keep detailed replay transcripts, compare outputs, and retained parity evidence
 there rather than expanding `status.md`.

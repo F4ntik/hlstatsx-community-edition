@@ -1,0 +1,32 @@
+{
+  "schema": "modern-heatmap-explorer-acceptance/v1",
+  "recordedAtUtc": "2026-09-01T22:56:11Z",
+  "productRuntimeHead": "cc116620422182d20ebb29df9c3518693a551da7",
+  "coordinateRunnerHead": "3dc6330",
+  "verdicts": {"sourceReady": true, "runtimeAccepted": true, "releaseReadyLocalCandidate": true, "deployedOrPublished": false},
+  "source": {"pythonProductTests": 302, "replayTests": 91, "routeTests": 13, "coordinateRunnerTests": 5, "phpSmoke": "pass", "phpLint": "pass", "javascriptCheckAndSmoke": "pass", "compileAll": "pass", "diffCheck": "pass"},
+  "coordinateAcceptance": {"verdict": "pass", "target": "bench_ephemeral", "fixtureSha256": "407edae920e3d31f208b13a90633c642166376b0ac3d30b3bb9ec2ccd5697fbb", "assertions": 5, "cleanup": "automatic"},
+  "myisam": {"verdict": "pass", "freshInstallDbVersion": 82, "engine": "MyISAM", "index": "mapEventTime(map,eventTime)", "updaterFrom": 81, "updaterHttpStatus": 200, "concurrentReadProbes": 120, "idempotentSecondRun": true, "teamkillsFingerprintPreserved": true, "coldP95Ms": 55.5241, "warmP95Ms": 10.3528, "inspectP95Ms": 13.6879, "gzipBytes": 4009, "bins": 301, "metricLines": 65, "isolatedResourcesRemoved": true},
+  "browser": {
+    "verdict": "pass",
+    "mapColor": true,
+    "mapMono": true,
+    "gradingReversibleWithoutRequestOrUrlChange": true,
+    "playerDifference": {"state": "ok", "personalSample": 5, "otherSample": 170, "premultipliedAlpha": false},
+    "mobile": {"clientWidth": 390, "innerWidth": 393, "scrollWidth": 393, "devicePixelRatio": 3, "visualScale": 1, "oneColumn": true, "inspectorOpen": true, "targetsAtLeast44": true},
+    "zoom200Reflow": {"innerWidth": 720, "clientWidth": 705, "scrollWidth": 705, "devicePixelRatio": 2, "enabledControls": 19, "controlsUsable": true, "reducedMotionTransition": "0s"},
+    "legacyMobileRepresentativeSmoke": true,
+    "javascriptDisabledStaticLink": true,
+    "webgl2DisabledStaticFallback": true,
+    "webglContextLossAndRestore": true,
+    "legacyUrlRollback": true,
+    "keyboardPinPanResetUnpin": true,
+    "floorKeyboard": true,
+    "insufficientSample": {"apiState": "insufficient_sample", "localizedOperatorMessage": true},
+    "staticJpeg": {"width": 1024, "height": 768}
+  },
+  "admin": {"verdict": "pass", "validUpload": "uploaded", "validSave": "saved", "readbackMatched": true, "englishAndRussian": true, "nonAdmin": "access_denied", "missingCsrf": "csrf_required", "wrongCsrf": "csrf_required", "staleSave": "stale_config", "staleUpload": "stale_config", "wrongTypeUpload": "invalid_request", "excessiveDimensions": "invalid_request", "oversizeUpload": "invalid_request", "postMaxUpload": "invalid_request", "generateOverHttp": "invalid_request", "temporaryAdminRemoved": true},
+  "mapIdentity": {"verdict": "pass", "versionA": "ef05c0fae9d8e73eaeab92f4c119dc6d3eeb5c946ad5da7946a49dcba2d5ca15", "versionB": "0dcff2bcfcf5a8909538e92c37b50ad3606d8d6f9d5926b125810e54fed286f4", "aStatus": 200, "staleAStatus": 409, "staleACacheControl": "no-store", "bStatus": 200, "bCacheControl": "public, max-age=3600, immutable", "bEtagMatchedVersion": true},
+  "restore": {"verdict": "exact", "heatmapExplorerBeta": 0, "counterHits": 293725, "temporaryUsers": 0, "fixtureRows": 0, "sessions": 0, "mounts": [], "customOverview": "missing", "mapAssetSha256": "ef05c0fae9d8e73eaeab92f4c119dc6d3eeb5c946ad5da7946a49dcba2d5ca15"},
+  "assetPolicy": {"valveOrSteamAssetsShipped": false, "goldSrcImport": "optional future operator feature requiring separate licensing acceptance", "shippedPresentation": "repository map images with reversible map-only Color/Mono grading"}
+}

@@ -146,19 +146,17 @@ release-readiness artifacts when present.
 
 ## Modern Heatmap Explorer rollout notes
 
-Current status on 2026-09-01: blocked at Task 12 runtime acceptance. Use
-`docs/audits/modern-heatmap-explorer/runtime-acceptance.md` before promoting
-any rollout beyond mode `0`.
+Current status on 2026-09-01: local candidate `RELEASE-READY`. Source,
+coordinate persistence, MyISAM install/update/performance, public EN/RU
+browser, authenticated admin, cache identity and exact restoration are
+accepted at product runtime `cc11662`; see
+`docs/audits/modern-heatmap-explorer/runtime-acceptance.md`. This is not a
+production deployment or publication record.
 
-The exact-HEAD `0b6a875` background-grading browser pass is accepted for its
-presentation-only seam, but does not change that broader release decision. It
-restored `HeatmapExplorerBeta=0` and the original config/assets/JPEG/thumb/
-users/fixtures/auto-increments/mounts with sessions `[]`. The committed JS
-smoke is the no-browser-fetch proof; a route-abort is not equivalent. The
-Difference invariant is bounded by the scoped CSS/JS contract and visual
-scene because an isolated-canvas attempt on the restored `1.26` baseline did
-not load and no third activation was authorized. No Steam/Valve asset is
-shipped and optional GoldSrc import needs separate acceptance.
+No Steam/Valve asset is shipped. Local GoldSrc research validated overview
+coordinates, while the release uses repository images with reversible map-only
+Color/Mono grading. Optional GoldSrc import needs separate licensing and
+feature acceptance.
 
 `HeatmapExplorerBeta` meanings:
 
@@ -234,10 +232,9 @@ rtk python -m hlstats_py.heatmaps --game <validated-game> --map <validated-map> 
   scope ad hoc
 - shipped telemetry claim: the cstrike grammar is verified; other mods may use
   only the coordinates actually present in their logs
-- current blocked-release reminder: do not promote beyond mode `0` until the
-  coordinate runner, accepted player/mobile browser path, fallback action,
-  custom period, pointer/touch pan, accessibility, and authenticated admin
-  gates are closed
+- local acceptance gates are closed; production promotion must still follow
+  mode `0` deploy/readback, mode `1` internal observation, public beta, and the
+  rollback thresholds above
 
 ## Deployment And Configuration Notes
 
