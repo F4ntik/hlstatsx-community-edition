@@ -2655,6 +2655,9 @@
   };
 
   HeatmapExplorerWorkspace.prototype._applyScene = function (scene, reason) {
+    if (reason !== 'map-image-retry') {
+      this._mapImageReloadAttempted = false;
+    }
     this._syncAuthoritativeMap(scene, reason);
     this.state.game = scene.map.game;
     this.state.map = scene.map.name;
@@ -2863,8 +2866,10 @@
     }
     this._mapImageReloadAttempted = true;
     var failedUrl = workspaceAttribute(this._nodes.image, 'src', '');
-    this._loadScene('map-image-retry').then(function (loaded) {
-      if (self._destroyed) {
+    var recovery = this._loadScene('map-image-retry');
+    var recoveryGeneration = this._sceneGeneration;
+    recovery.then(function (loaded) {
+      if (self._destroyed || self._sceneGeneration !== recoveryGeneration) {
         return;
       }
       var currentUrl = workspaceAttribute(self._nodes.image, 'src', '');

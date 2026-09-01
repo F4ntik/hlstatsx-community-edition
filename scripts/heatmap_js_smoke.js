@@ -2118,6 +2118,39 @@ async function assertStaleMapImageRecoversOnceThenFallsBack() {
   assert.ok(harness.nodes.alert.children.length > 0, 'failed replacement loading should expose retry and legacy actions');
 }
 
+async function assertSupersededMapRecoveryCannotHideNewestScene() {
+  const harness = richWorkspaceHarness();
+  const transport = deferredTransport();
+  const workspace = new HeatmapExplorerWorkspace(harness.root, {
+    window: harness.window,
+    document: harness.document,
+    fetch: transport.fetch,
+    messages: workspaceMessages,
+    Renderer: WorkspaceRenderer,
+  });
+  workspace.mount();
+  await settleWorkspace();
+  transport.requests[0].resolve(jsonResponse(sceneForMap('de_dust2')));
+  await settleWorkspace();
+
+  harness.nodes.image.dispatch('error');
+  await settleWorkspace();
+  assert.strictEqual(transport.requests.length, 2, 'image recovery should start one scene refresh');
+  const staleRecovery = transport.requests[1];
+  workspace._setState({map: 'de_nuke', floor: 'all', cell: null}, 'map');
+  await settleWorkspace();
+  assert.strictEqual(transport.requests.length, 3, 'a user map choice should supersede the pending recovery');
+  transport.requests[2].resolve(jsonResponse(sceneForMap('de_nuke')));
+  await settleWorkspace();
+  staleRecovery.resolve(jsonResponse(sceneForMap('de_dust2')));
+  await settleWorkspace();
+
+  assert.strictEqual(workspace.state.map, 'de_nuke', 'the newest user-selected scene should remain authoritative');
+  assert.strictEqual(harness.nodes.image.attributes.src, './de_nuke.jpg', 'a stale recovery must not replace the newest image');
+  assert.notStrictEqual(harness.root.attributes['data-heatmap-state'], 'static_fallback', 'a stale recovery failure must not hide a valid newer Explorer');
+  assert.notStrictEqual(harness.nodes.interactive.style.display, 'none', 'the valid newer interactive view should remain visible');
+}
+
 async function assertMapStyleStaysInstanceLocalAndDoesNotReload() {
   const transport = deferredTransport();
   const harness = richWorkspaceHarness();
@@ -3017,6 +3050,7 @@ async function assertInspect422StaysFailClosed() {
   await assertClearedInspectCannotRetry();
   await assertLatestSceneRequestWins();
   await assertStaleMapImageRecoversOnceThenFallsBack();
+  await assertSupersededMapRecoveryCannotHideNewestScene();
   await assertFloorFocusPersistsThroughEnabledReload();
   await assertFloorFocusDoesNotTargetUnavailableReload();
   await assertFloorFocusDoesNotStealMovedFocus();
