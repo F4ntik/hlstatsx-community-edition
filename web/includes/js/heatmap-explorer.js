@@ -2535,7 +2535,7 @@
     } else {
       this._setCoverageStatus(scene);
     }
-    if (this.state.cell) {
+    if (this.state.cell && !BLOCKED_SCENE_STATES[scene.state]) {
       this._renderPinnedCell(this.state.cell);
       this._loadInspect(this.state.cell);
     }
@@ -2543,6 +2543,7 @@
 
   HeatmapExplorerWorkspace.prototype._loadScene = function (reason, exactUrl) {
     var self = this;
+    var acceptsScene422 = false;
     if (this._destroyed || !this.fetch) {
       return Promise.resolve(false);
     }
@@ -2559,7 +2560,8 @@
     return Promise.resolve().then(function () {
       return self.fetch(requestUrl, {credentials: 'same-origin'});
     }).then(function (response) {
-      if (!response || response.ok === false || typeof response.json !== 'function') {
+      acceptsScene422 = !!(response && response.ok === false && response.status === 422);
+      if (!response || typeof response.json !== 'function' || (response.ok === false && !acceptsScene422)) {
         throw new Error('request_failed');
       }
       return response.json();
@@ -2568,6 +2570,9 @@
         return false;
       }
       var scene = new self.Scene(payload);
+      if (acceptsScene422 && scene.state !== 'too_many_events') {
+        throw new Error('request_failed');
+      }
       if (self._destroyed || generation !== self._sceneGeneration) {
         return false;
       }

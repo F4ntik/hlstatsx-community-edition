@@ -1676,6 +1676,14 @@ function jsonResponse(payload) {
   return {ok: true, json() { return Promise.resolve(payload); }};
 }
 
+function httpJsonResponse(status, payload) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    json() { return Promise.resolve(payload); },
+  };
+}
+
 function sceneForMap(map) {
   const payload = explorerSceneFixture();
   payload.query.map = map;
@@ -2051,6 +2059,238 @@ async function assertInitialFailureUsesServerV1RouteWhenSceneIsMissing() {
   }
 }
 
+async function assertScene422TooManyEventsUsesSpecializedStatePresentation() {
+  const transport = deferredTransport();
+  const harness = richWorkspaceHarness('?page=4&hm_event=both&hm_cell=c2.0', {
+    'data-heatmap-v1-url': 'heatmap_points.php?game=cstrike&map=de_dust2&player=42&event=kills',
+  });
+  const workspace = new HeatmapExplorerWorkspace(harness.root, {
+    window: harness.window,
+    document: harness.document,
+    fetch: transport.fetch,
+    messages: workspaceMessages,
+    Renderer: WorkspaceRenderer,
+  });
+  const payload = sceneWithState('too_many_events', {
+    query: {
+      game: 'cstrike',
+      map: 'de_nuke',
+      player: 42,
+      from: 1785456000,
+      to: 1788048000,
+      event: 'both',
+      lens: 'overview',
+      floor: 'all',
+      lang: 'en',
+    },
+    map: {
+      game: 'cstrike',
+      realgame: 'cstrike',
+      name: 'de_nuke',
+      image: {url: './de_nuke.jpg', width: 64, height: 32},
+      projectionHash: 'a4dd45e46d84a12f',
+      floorConfigHash: '97d170e1550eee4a',
+    },
+    fallback: {
+      v1: 'heatmap_points.php?game=cstrike&map=de_nuke',
+      jpeg: './de_nuke-kill.jpg',
+      thumbnail: './de_nuke-kill-thumb.jpg',
+    },
+    coverage: {
+      sourceRows: 4000,
+      candidate: 4000,
+      validXY: 4000,
+      validZ: 4000,
+      zHistogram: [{z: 0, count: 4000}],
+      missingCoordinates: 0,
+      malformedCoordinates: 0,
+      assigned: 4000,
+      unassigned: 0,
+      xyCoverage: 1,
+      zCoverage: 1,
+      projected: 4000,
+      inBounds: 4000,
+      outOfBounds: 0,
+      projectionCoverage: 1,
+    },
+    summary: {rowsRead: 4000, sourceRows: 4000, personalSample: 0, otherSample: 0},
+  });
+
+  workspace.mount();
+  await settleWorkspace();
+  assert.strictEqual(transport.requests.length, 1, 'initial mount should request one scene before the 422 seam is exercised');
+  assert.strictEqual(workspace.state.cell, 'c2.0', 'deep-link cell should be preserved before the blocked scene arrives');
+
+  transport.requests[0].resolve(httpJsonResponse(422, payload));
+  await settleWorkspace();
+
+  assert.ok(workspace._scene, 'the accepted 422 seam should still install a validated scene');
+  assert.strictEqual(workspace._scene.state, 'too_many_events', 'only the specialized too_many_events scene should pass the 422 seam');
+  assert.strictEqual(workspace._scene.map.name, 'de_nuke', 'the accepted 422 scene should update authoritative map state');
+  assert.strictEqual(transport.requests.length, 1, 'blocked 422 deep-link scenes must not start a second inspect request');
+  assert.strictEqual(workspace.state.cell, 'c2.0', 'blocked 422 deep-link scenes should preserve the selected cell in state');
+  assert.strictEqual(harness.nodes.image.attributes.src, './de_nuke.jpg', 'the accepted 422 scene should still render authoritative scene media');
+  assert.strictEqual(harness.nodes.status.textContent, 'Too many events matched this view', 'accepted 422 scenes should publish the localized blocked-state status');
+  assert.strictEqual(harness.nodes.alert.hidden, false, 'accepted 422 blocked states should remain visible');
+  assert.strictEqual(harness.nodes.alert.textContent, 'Too many events matched this view', 'accepted 422 blocked states should keep the specialized localized alert');
+  assert.notStrictEqual(harness.nodes.status.textContent, 'Loading', 'blocked 422 deep-link scenes must not remain stuck in loading');
+  assert.notStrictEqual(harness.nodes.status.textContent, 'Failed', 'blocked 422 deep-link scenes must not collapse into generic failure');
+  assert.match(harness.nodes.summary.textContent, /Period: 1785456000–1788048000 UTC/, 'accepted 422 blocked states should still refresh the textual summary');
+  assert.match(harness.nodes.coverage.textContent, /Coverage: XY 100%; Z 100%; Projection 100%/, 'accepted 422 blocked states should still refresh the scene footer coverage');
+  assert.strictEqual(harness.nodes.freshness.textContent, 'Freshness: Loaded', 'accepted 422 blocked states should still refresh the footer freshness state');
+  assert.match(harness.nodes.share.attributes.href, /hm_cell=c2\.0/, 'blocked 422 deep-link scenes should preserve the pinned-cell URL state');
+  assert.strictEqual(harness.nodes.inspectOutput.textContent, '', 'blocked 422 deep-link scenes should not render a provisional inspect summary');
+  assert.strictEqual(harness.nodes.alert.children.length, 1, 'accepted 422 blocked states should expose one action group');
+  assert.strictEqual(harness.nodes.alert.children[0].children.length, 1, 'accepted 422 blocked states should expose only the legacy action, not generic retry');
+  assert.strictEqual(harness.nodes.alert.children[0].children[0].textContent, 'Open legacy view');
+  assert.strictEqual(
+    harness.nodes.alert.children[0].children[0].attributes.href,
+    'heatmap_points.php?game=cstrike&map=de_nuke&player=42&event=both',
+    'accepted 422 blocked states should preserve authoritative player/map/event scope in the legacy action'
+  );
+}
+
+async function assertBlockedDeepLinkScenesDoNotAutoInspect() {
+  const transport = deferredTransport();
+  const harness = richWorkspaceHarness('?page=4&hm_event=both&hm_cell=c2.0', {
+    'data-heatmap-v1-url': 'heatmap_points.php?game=cstrike&map=de_dust2&player=42&event=kills',
+  });
+  const workspace = new HeatmapExplorerWorkspace(harness.root, {
+    window: harness.window,
+    document: harness.document,
+    fetch: transport.fetch,
+    messages: workspaceMessages,
+    Renderer: WorkspaceRenderer,
+  });
+  const payload = sceneWithState('weak_projection', {
+    query: {
+      game: 'cstrike',
+      map: 'de_nuke',
+      player: 42,
+      from: 1785456000,
+      to: 1788048000,
+      event: 'both',
+      lens: 'overview',
+      floor: 'all',
+      lang: 'en',
+    },
+    map: {
+      game: 'cstrike',
+      realgame: 'cstrike',
+      name: 'de_nuke',
+      image: {url: './de_nuke.jpg', width: 64, height: 32},
+      projectionHash: 'a4dd45e46d84a12f',
+      floorConfigHash: '97d170e1550eee4a',
+    },
+    fallback: {
+      v1: 'heatmap_points.php?game=cstrike&map=de_nuke',
+      jpeg: './de_nuke-kill.jpg',
+      thumbnail: './de_nuke-kill-thumb.jpg',
+    },
+    coverage: {
+      sourceRows: 175,
+      candidate: 350,
+      validXY: 350,
+      validZ: 350,
+      zHistogram: [{z: -128, count: 4}, {z: 32, count: 152}, {z: 192, count: 1}],
+      missingCoordinates: 0,
+      malformedCoordinates: 0,
+      assigned: 0,
+      unassigned: 0,
+      xyCoverage: 1,
+      zCoverage: 1,
+      projected: 350,
+      inBounds: 30,
+      outOfBounds: 320,
+      projectionCoverage: 0.08571428571428572,
+    },
+    summary: {rowsRead: 175, sourceRows: 175, personalSample: 0, otherSample: 0},
+  });
+
+  workspace.mount();
+  await settleWorkspace();
+  assert.strictEqual(transport.requests.length, 1, 'blocked 200 deep-link scenes should begin with one scene request');
+
+  transport.requests[0].resolve(jsonResponse(payload));
+  await settleWorkspace();
+
+  assert.ok(workspace._scene, 'blocked 200 deep-link scenes should still install the validated scene');
+  assert.strictEqual(workspace._scene.state, 'weak_projection');
+  assert.strictEqual(transport.requests.length, 1, 'blocked 200 deep-link scenes must not auto-start an inspect request');
+  assert.strictEqual(workspace.state.cell, 'c2.0', 'blocked 200 deep-link scenes should preserve the selected cell in state');
+  assert.strictEqual(harness.nodes.status.textContent, 'Projection is too weak for Explorer rendering', 'blocked 200 deep-link scenes should keep the specialized blocked status');
+  assert.strictEqual(harness.nodes.alert.hidden, false, 'blocked 200 deep-link scenes should keep the blocked alert visible');
+  assert.strictEqual(harness.nodes.alert.textContent, 'Projection is too weak for Explorer rendering', 'blocked 200 deep-link scenes should keep the specialized blocked alert');
+  assert.notStrictEqual(harness.nodes.status.textContent, 'Loading', 'blocked 200 deep-link scenes must not remain stuck in loading');
+  assert.notStrictEqual(harness.nodes.status.textContent, 'Failed', 'blocked 200 deep-link scenes must not collapse into generic failure');
+  assert.match(harness.nodes.share.attributes.href, /hm_cell=c2\.0/, 'blocked 200 deep-link scenes should preserve the pinned-cell URL state');
+  assert.strictEqual(harness.nodes.inspectOutput.textContent, '', 'blocked 200 deep-link scenes should not render a provisional inspect summary');
+}
+
+async function assertSceneNonOkFailuresStayFailClosedExceptTooManyEvents422() {
+  const cases = [
+    {
+      name: 'malformed 422 payload',
+      response: httpJsonResponse(422, {schemaVersion: 2, state: 'too_many_events'}),
+    },
+    {
+      name: 'wrong-state 422 payload',
+      response: httpJsonResponse(422, sceneWithState('weak_projection')),
+    },
+    {
+      name: '403 payload with too_many_events scene data',
+      response: httpJsonResponse(403, sceneWithState('too_many_events')),
+    },
+    {
+      name: '500 response with too_many_events scene data',
+      response: httpJsonResponse(500, sceneWithState('too_many_events')),
+    },
+    {
+      name: '422 missing json handler',
+      response: {ok: false, status: 422, text() { return Promise.resolve('<html>'); }},
+    },
+    {
+      name: '422 json parse failure',
+      response: {ok: false, status: 422, json() { return Promise.reject(new Error('invalid json')); }},
+    },
+  ];
+
+  for (const testCase of cases) {
+    const transport = deferredTransport();
+    const harness = richWorkspaceHarness('?page=4&hm_event=both', {
+      'data-heatmap-v1-url': 'heatmap_points.php?game=cstrike&map=de_dust2&player=42&event=kills',
+    });
+    const workspace = new HeatmapExplorerWorkspace(harness.root, {
+      window: harness.window,
+      document: harness.document,
+      fetch: transport.fetch,
+      messages: workspaceMessages,
+      Renderer: WorkspaceRenderer,
+    });
+
+    workspace.mount();
+    await settleWorkspace();
+    assert.strictEqual(transport.requests.length, 1, testCase.name + ': mount should start exactly one scene request');
+
+    transport.requests[0].resolve(testCase.response);
+    await settleWorkspace();
+
+    assert.strictEqual(workspace._scene, null, testCase.name + ': invalid non-ok payloads must not install a scene');
+    assert.strictEqual(harness.nodes.status.textContent, 'Failed', testCase.name + ': invalid non-ok payloads must stay on generic failure status');
+    assert.strictEqual(harness.nodes.alert.hidden, false, testCase.name + ': invalid non-ok payloads must keep the failure alert visible');
+    assert.strictEqual(harness.nodes.alert.textContent, 'Failed', testCase.name + ': invalid non-ok payloads must not publish specialized state text');
+    assert.strictEqual(harness.nodes.alert.children.length, 1, testCase.name + ': generic failures should expose one action group');
+    assert.strictEqual(harness.nodes.alert.children[0].children.length, 2, testCase.name + ': generic failures should keep retry plus legacy actions');
+    assert.strictEqual(harness.nodes.alert.children[0].children[0].textContent, 'Retry', testCase.name + ': generic failures must keep the retry action');
+    assert.strictEqual(harness.nodes.alert.children[0].children[1].textContent, 'Open legacy view', testCase.name + ': generic failures must keep the legacy fallback action');
+    assert.strictEqual(
+      harness.nodes.alert.children[0].children[1].attributes.href,
+      'heatmap_points.php?game=cstrike&map=de_dust2&player=42&event=both',
+      testCase.name + ': generic failures before a scene exists must preserve the trusted legacy route rewrite'
+    );
+  }
+}
+
 async function assertFetchPathPublishesSpecializedStates() {
   const cases = [
     {
@@ -2366,6 +2606,39 @@ function assertPanModeSuppressesDragClicks() {
   assert.strictEqual(workspace.state.cell, 'c2.0', 'tap/click pinning should remain available after suppression clears');
 }
 
+async function assertInspect422StaysFailClosed() {
+  const transport = deferredTransport();
+  const harness = richWorkspaceHarness('?page=4&hm_event=both', {
+    'data-heatmap-v1-url': 'heatmap_points.php?game=cstrike&map=de_dust2&player=42&event=kills',
+  });
+  const workspace = new HeatmapExplorerWorkspace(harness.root, {
+    window: harness.window,
+    document: harness.document,
+    fetch: transport.fetch,
+    messages: workspaceMessages,
+    Renderer: WorkspaceRenderer,
+  });
+
+  workspace.mount();
+  await settleWorkspace();
+  transport.requests[0].resolve(jsonResponse(sceneForMap('de_dust2')));
+  await settleWorkspace();
+  const retainedScene = workspace._scene;
+
+  workspace.pin('c2.0');
+  await settleWorkspace();
+  assert.strictEqual(transport.requests.length, 2, 'pinning should issue a dedicated inspect request');
+  transport.requests[1].resolve(httpJsonResponse(422, sceneWithState('too_many_events')));
+  await settleWorkspace();
+
+  assert.strictEqual(workspace._scene, retainedScene, 'inspect 422 responses must not replace the validated scene');
+  assert.strictEqual(harness.nodes.status.textContent, 'Failed', 'inspect 422 responses must stay generic failures');
+  assert.strictEqual(harness.nodes.alert.hidden, false, 'inspect 422 failures should remain visible');
+  assert.strictEqual(harness.nodes.alert.textContent, 'Failed', 'inspect 422 failures must not borrow the scene-specific too_many_events message');
+  assert.strictEqual(harness.nodes.alert.children.length, 1, 'inspect 422 failures should expose one generic action group');
+  assert.strictEqual(harness.nodes.alert.children[0].children[0].textContent, 'Retry', 'inspect 422 failures should keep retry available for inspect');
+}
+
 (async function runFixRoundOneRegressions() {
   await assertSeparateInspectAndDeepLinkFlow();
   await assertClearedInspectCannotRetry();
@@ -2373,12 +2646,16 @@ function assertPanModeSuppressesDragClicks() {
   assertZoomUsesReversibleFactors();
   await assertFailureActionsUseKnownV1Route();
   await assertInitialFailureUsesServerV1RouteWhenSceneIsMissing();
+  await assertScene422TooManyEventsUsesSpecializedStatePresentation();
+  await assertBlockedDeepLinkScenesDoNotAutoInspect();
+  await assertSceneNonOkFailuresStayFailClosedExceptTooManyEvents422();
   await assertFetchPathPublishesSpecializedStates();
   assertUnavailableFloorsStayVisible();
   assertAllFloorsAggregateLabelOmitsMisleadingZeroCount();
   await assertCustomWindowApplyValidation();
   assertExplicitStateAlertsStayLocalized();
   assertPanModeSuppressesDragClicks();
+  await assertInspect422StaysFailClosed();
   assertWorkspaceStageAspectUsesAuthoritativeSceneDimensions();
   console.log('heatmap explorer contract smoke ok');
 }()).catch(error => {
