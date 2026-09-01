@@ -502,7 +502,7 @@ assert_contains("hef.pos_victim_x IS NOT NULL AND hef.pos_victim_y IS NOT NULL",
 
 $installSql = file_get_contents(dirname(__DIR__) . '/sql/install.sql');
 assert_true($installSql !== false, 'installer SQL should be readable');
-assert_contains('SET @DBVERSION="81";', $installSql, 'fresh install should set dbversion 81');
+assert_contains('SET @DBVERSION="82";', $installSql, 'fresh install should set dbversion 82');
 assert_true(
     preg_match(
         "/`cropy2` int\\(11\\) NOT NULL default '0',\\s+`floors_json` TEXT NULL,/",
@@ -516,6 +516,14 @@ assert_true(
         $installSql
     ) === 1,
     'fresh heatmap config should use InnoDB'
+);
+$smokeBacktick = chr(96);
+$teamkillsIndexPattern = '/CREATE TABLE IF NOT EXISTS ' . $smokeBacktick . 'hlstats_Events_Teamkills' . $smokeBacktick
+    . ' \(.*?KEY ' . $smokeBacktick . 'mapEventTime' . $smokeBacktick
+    . ' \(' . $smokeBacktick . 'map' . $smokeBacktick . ', ' . $smokeBacktick . 'eventTime' . $smokeBacktick . '\).*?\) ENGINE=MyISAM/s';
+assert_true(
+    preg_match($teamkillsIndexPattern, $installSql) === 1,
+    'fresh Teamkills schema should include the exact mapEventTime composite index'
 );
 assert_contains("('HeatmapExplorerBeta', '0',2)", $installSql, 'fresh options should include the beta rollout flag');
 assert_same(4, substr_count($installSql, 'HeatmapExplorerBeta'), 'fresh install should define one beta flag and three choices');
@@ -596,6 +604,106 @@ foreach (array(
 ) as $choice) {
     assert_contains($choice, $updater81, 'updater 81 should insert each beta choice idempotently');
 }
+
+$updater82Path = ROOT_PATH . '/updater/82.php';
+assert_true(is_file($updater82Path), 'updater 82 migration should exist');
+$updater82 = file_get_contents($updater82Path);
+assert_true($updater82 !== false, 'updater 82 migration should be readable');
+assert_contains("defined('IN_UPDATER')", $updater82, 'updater 82 should guard direct access');
+assert_contains('$dbversion = 82;', $updater82, 'updater 82 should set dbversion 82');
+assert_contains('$version = "1.7.0";', $updater82, 'updater 82 should retain product version 1.7.0');
+$updater82IndexCheck = "SHOW INDEX FROM hlstats_Events_Teamkills WHERE Key_name = 'mapEventTime'";
+$updater82IndexAdd = 'ALTER TABLE hlstats_Events_Teamkills ADD KEY ' . $smokeBacktick . 'mapEventTime' . $smokeBacktick
+    . ' (' . $smokeBacktick . 'map' . $smokeBacktick . ', ' . $smokeBacktick . 'eventTime' . $smokeBacktick . ')';
+$updater82IndexCheckOffset = strpos($updater82, $updater82IndexCheck);
+$updater82RowCountOffset = strpos($updater82, '$db->calc_rows($indexResult)');
+$updater82IndexAddOffset = strpos($updater82, $updater82IndexAdd);
+$updater82VersionUpdate = strpos($updater82, $smokeBacktick . 'keyname' . $smokeBacktick . " = 'version'");
+$updater82DbversionUpdate = strpos($updater82, $smokeBacktick . 'keyname' . $smokeBacktick . " = 'dbversion'");
+assert_true(
+    $updater82IndexCheckOffset !== false
+        && $updater82RowCountOffset !== false
+        && $updater82IndexAddOffset !== false
+        && $updater82VersionUpdate !== false
+        && $updater82DbversionUpdate !== false
+        && $updater82IndexCheckOffset < $updater82RowCountOffset
+        && $updater82RowCountOffset < $updater82IndexAddOffset
+        && $updater82IndexAddOffset < $updater82VersionUpdate
+        && $updater82VersionUpdate < $updater82DbversionUpdate
+        && strrpos($updater82, '$db->query(') < $updater82DbversionUpdate,
+    'updater 82 should check and add the index before writing dbversion last'
+);
+
+final class Task11Updater82SmokeDb
+{
+    public bool $indexPresent;
+    public array $queries = array();
+
+    public function __construct(bool $indexPresent)
+    {
+        $this->indexPresent = $indexPresent;
+    }
+
+    public function query($sql, ...$ignored)
+    {
+        $sql = (string)$sql;
+        $this->queries[] = $sql;
+        if (strpos($sql, "SHOW INDEX FROM hlstats_Events_Teamkills WHERE Key_name = 'mapEventTime'") !== false) {
+            return $this->indexPresent ? array(array('mapEventTime')) : array();
+        }
+        return true;
+    }
+
+    public function calc_rows($result): int
+    {
+        return is_array($result) ? count($result) : 0;
+    }
+}
+
+function task11_run_updater82(bool $indexPresent): array
+{
+    $db = new Task11Updater82SmokeDb($indexPresent);
+    ob_start();
+    include ROOT_PATH . '/updater/82.php';
+    $output = (string)ob_get_clean();
+    return array(
+        'db' => $db,
+        'dbversion' => $dbversion,
+        'version' => $version,
+        'output' => $output,
+    );
+}
+
+if (!defined('IN_UPDATER')) {
+    define('IN_UPDATER', true);
+}
+$updater82MissingIndex = task11_run_updater82(false);
+assert_same(82, $updater82MissingIndex['dbversion'], 'updater 82 should expose dbversion 82 at the updater seam');
+assert_same('1.7.0', $updater82MissingIndex['version'], 'updater 82 should preserve the product version');
+$updater82MissingDdl = array_values(array_filter(
+    $updater82MissingIndex['db']->queries,
+    static function (string $query) use ($updater82IndexAdd): bool {
+        return strpos($query, $updater82IndexAdd) !== false;
+    }
+));
+assert_same(1, count($updater82MissingDdl), 'updater 82 should add mapEventTime exactly once when absent');
+$updater82MissingLastQuery = $updater82MissingIndex['db']->queries[count($updater82MissingIndex['db']->queries) - 1];
+assert_true(
+    strpos($updater82MissingIndex['db']->queries[0], $updater82IndexCheck) !== false
+        && array_search($updater82MissingDdl[0], $updater82MissingIndex['db']->queries, true)
+            < count($updater82MissingIndex['db']->queries) - 1
+        && strpos($updater82MissingLastQuery, $smokeBacktick . 'keyname' . $smokeBacktick . " = 'dbversion'") !== false,
+    'updater 82 should perform schema work before its terminal dbversion update'
+);
+$updater82ExistingIndex = task11_run_updater82(true);
+$updater82ExistingDdl = array_values(array_filter(
+    $updater82ExistingIndex['db']->queries,
+    static function (string $query) use ($updater82IndexAdd): bool {
+        return strpos($query, $updater82IndexAdd) !== false;
+    }
+));
+assert_same(0, count($updater82ExistingDdl), 'updater 82 should be idempotent when mapEventTime already exists');
+assert_same(82, $updater82ExistingIndex['dbversion'], 'idempotent updater 82 should still finish at dbversion 82');
 
 assert_same('de_dust2', heatmap_clean_token('de_dust2'), 'valid map token should pass');
 assert_same('$2000$', heatmap_clean_token('$2000$'), 'dollar map token should pass');

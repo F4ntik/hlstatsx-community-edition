@@ -2,7 +2,7 @@
 
 -- This file is only needed for new installations.
 
-SET @DBVERSION="81";
+SET @DBVERSION="82";
 SET @VERSION="1.7.0";
 
 -- --------------------------------------------------------
@@ -2501,7 +2501,8 @@ CREATE TABLE IF NOT EXISTS `hlstats_Events_Teamkills` (
   `pos_victim_y` MEDIUMINT default NULL,
   `pos_victim_z` MEDIUMINT default NULL,
   PRIMARY KEY  (`id`),
-  KEY `killerId` (`killerId`)
+  KEY `killerId` (`killerId`),
+  KEY `mapEventTime` (`map`, `eventTime`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
