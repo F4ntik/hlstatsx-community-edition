@@ -31,6 +31,8 @@ def test_heatmap_explorer_mount_contract_has_a_shared_strict_rollout_helper() ->
     assert "<noscript>" in helper
     assert "heatmap_should_render_explorer" in mapinfo
     assert "heatmap_should_render_explorer" in player
+    assert "heatmap_render_explorer_workspace(array(" in mapinfo
+    assert "heatmap_render_explorer_workspace(array(" in player
 
 
 def test_heatmap_explorer_human_legacy_actions_stay_on_page_routes() -> None:

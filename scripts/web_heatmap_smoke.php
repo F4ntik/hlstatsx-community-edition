@@ -237,6 +237,10 @@ foreach (array(
 ) as $token) {
     assert_contains($token, $workspaceHtml, 'explorer workspace should publish the custom-period and explicit-state hooks: ' . $token);
 }
+assert_contains('data-heatmap-map-style="color"', $workspaceHtml, 'Explorer should default to the color map style');
+assert_contains('data-heatmap-map-style-controls="1"', $workspaceHtml, 'Explorer should render the background style group');
+assert_contains('data-heatmap-map-style-option="color" aria-pressed="true"', $workspaceHtml, 'Color should be selected initially');
+assert_contains('data-heatmap-map-style-option="mono" aria-pressed="false"', $workspaceHtml, 'Mono should be available but unselected');
 
 $legacyRouteHtml = heatmap_render_explorer_workspace(array(
     'game' => 'cstrike',

@@ -201,6 +201,7 @@ function heatmap_render_explorer_workspace(array $context): string
         : '';
 
     $html = '<section class="heatmap-explorer" data-heatmap-explorer="1"'
+        . ' data-heatmap-map-style="color"'
         . ' data-heatmap-game="' . $game . '" data-heatmap-map="' . $map . '"'
         . ' data-heatmap-player="' . $player . '" data-heatmap-endpoint="' . $endpoint . '"'
         . ' data-heatmap-v1-url="' . $v1Url . '"'
@@ -246,7 +247,13 @@ function heatmap_render_explorer_workspace(array $context): string
     $html .= '<button type="button" class="heatmap-explorer__control" data-heatmap-event="deaths" aria-pressed="false">'
         . heatmap_explorer_html(heatmap_explorer_label('deaths')) . '</button>';
     $html .= '<button type="button" class="heatmap-explorer__control is-selected" data-heatmap-event="both" aria-pressed="true">'
-        . heatmap_explorer_html(heatmap_explorer_label('both')) . '</button></fieldset></header>';
+        . heatmap_explorer_html(heatmap_explorer_label('both')) . '</button></fieldset>';
+    $html .= '<fieldset class="heatmap-explorer__group" data-heatmap-map-style-controls="1"><legend>'
+        . heatmap_explorer_html(heatmap_explorer_label('mapStyle')) . '</legend>';
+    $html .= '<button type="button" class="heatmap-explorer__control is-selected" data-heatmap-map-style-option="color" aria-pressed="true">'
+        . heatmap_explorer_html(heatmap_explorer_label('color')) . '</button>';
+    $html .= '<button type="button" class="heatmap-explorer__control" data-heatmap-map-style-option="mono" aria-pressed="false">'
+        . heatmap_explorer_html(heatmap_explorer_label('mono')) . '</button></fieldset></header>';
     $html .= '<aside id="' . $floorSheetId . '" class="heatmap-explorer__floors" data-heatmap-floor-sheet="1" aria-label="' . heatmap_explorer_html(heatmap_explorer_label('floor')) . '">';
     $html .= '<span class="heatmap-explorer__label">' . heatmap_explorer_html(heatmap_explorer_label('floor')) . '</span>';
     $html .= '<div data-heatmap-floor-options="1"><label><input type="radio" name="heatmap-floor-' . $player . '" value="all" data-heatmap-floor="all" checked="checked" />'
