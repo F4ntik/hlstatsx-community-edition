@@ -25,9 +25,17 @@ var Tabs = new Class({
 	},
 	updateTab: function(txt) {
 		$(this.loading).destroy();
-		this.elements[this.currentRequest.options.currentTab] = new Element('div').set('html', txt).injectInside(this.container);
+		var wrapper = new Element('div').set('html', txt).injectInside(this.container);
+		this.elements[this.currentRequest.options.currentTab] = wrapper;
 		//Evaluate the response AFTER it's been created
 		txt.stripScripts(true);
+		if ( window.HeatmapExplorerWorkspace
+			&& typeof window.HeatmapExplorerWorkspace.mountAll == 'function'
+			&& wrapper.getElement
+			&& wrapper.getElement('[data-heatmap-explorer="1"]') )
+		{
+			window.HeatmapExplorerWorkspace.mountAll(wrapper, {'window': window});
+		}
 		this.currentRequest = false;
 	},
 	refreshTab: function(change) {

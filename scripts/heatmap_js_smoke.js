@@ -62,6 +62,128 @@ assert.match(source, /request\('preview', token\);/, 'scheduled preview should s
 
 console.log('heatmap JS projection smoke ok');
 
+const tabsSource = fs.readFileSync('web/includes/js/tabs.js', 'utf8');
+function tabsUpdateTabHarness(html, options = {}) {
+  const events = [];
+  let documentScans = 0;
+  const mountCalls = [];
+  const container = {children: []};
+  const loading = {
+    destroyed: false,
+    destroy() {
+      this.destroyed = true;
+      events.push('destroyLoading');
+    },
+  };
+  function FakeElement(tag) {
+    return {
+      tag,
+      html: '',
+      containsExplorer: false,
+      set(name, value) {
+        if (name === 'html') {
+          this.html = String(value);
+          this.containsExplorer = /data-heatmap-explorer=(["'])1\1/.test(this.html);
+          events.push('setHtml');
+        }
+        return this;
+      },
+      injectInside(parent) {
+        parent.children.push(this);
+        events.push('injectInside');
+        return this;
+      },
+      getElement(selector) {
+        events.push(`getElement:${selector}`);
+        if (selector === '[data-heatmap-explorer="1"]' && this.containsExplorer) {
+          return {nodeType: 1};
+        }
+        return null;
+      },
+    };
+  }
+  const tabsWindow = {
+    HeatmapExplorerWorkspace: {
+      mountAll(root, mountOptions) {
+        events.push('mountAll');
+        mountCalls.push({root, mountOptions});
+      },
+    },
+  };
+  const tabsContext = {
+    console,
+    window: tabsWindow,
+    document: {
+      querySelectorAll() {
+        documentScans += 1;
+        return [];
+      },
+    },
+    Options: function Options() {},
+    Class: function Class(definition) {
+      function Klass() {}
+      Object.assign(Klass.prototype, definition);
+      return Klass;
+    },
+    Element: FakeElement,
+    $: value => value,
+  };
+  vm.runInNewContext(tabsSource, tabsContext, {filename: 'tabs.js'});
+  const responseText = new String(html);
+  responseText.stripScripts = flag => {
+    events.push(`stripScripts:${flag}`);
+    return String(responseText).replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+  };
+  const instance = {
+    loading,
+    elements: [],
+    currentRequest: {options: {currentTab: options.currentTab ?? 1}},
+    container,
+  };
+  tabsContext.Tabs.prototype.updateTab.call(instance, responseText);
+  return {
+    container,
+    currentTab: options.currentTab ?? 1,
+    documentScans,
+    events,
+    instance,
+    mountCalls,
+    tabsWindow,
+  };
+}
+
+const ajaxExplorerTab = tabsUpdateTabHarness(
+  '<div class="tab-pane"><div data-heatmap-explorer="1"></div><script>window.__ajaxInline = true;</script></div>'
+);
+assert.strictEqual(ajaxExplorerTab.instance.loading.destroyed, true, 'Tabs.updateTab should remove the loading placeholder before mounting AJAX content');
+assert.strictEqual(ajaxExplorerTab.container.children.length, 1, 'Tabs.updateTab should inject exactly one wrapper for the AJAX response');
+assert.strictEqual(ajaxExplorerTab.instance.elements[ajaxExplorerTab.currentTab], ajaxExplorerTab.container.children[0], 'Tabs.updateTab should cache the newly injected wrapper for the current tab');
+assert.ok(
+  ajaxExplorerTab.events.indexOf('injectInside') < ajaxExplorerTab.events.indexOf('stripScripts:true'),
+  'Tabs.updateTab should keep the existing AJAX insertion-before-stripScripts order'
+);
+assert.ok(
+  ajaxExplorerTab.events.indexOf('stripScripts:true') < ajaxExplorerTab.events.indexOf('mountAll'),
+  'Tabs.updateTab should mount the explorer only after inline scripts stay on the stripScripts(true) path'
+);
+assert.strictEqual(ajaxExplorerTab.mountCalls.length, 1, 'Tabs.updateTab should mount exactly once when the AJAX subtree contains an explorer root');
+assert.strictEqual(ajaxExplorerTab.mountCalls[0].root, ajaxExplorerTab.container.children[0], 'Tabs.updateTab should mount on the newly inserted wrapper, not on the whole document');
+assert.strictEqual(ajaxExplorerTab.mountCalls[0].mountOptions.window, ajaxExplorerTab.tabsWindow, 'Tabs.updateTab should pass the live window object through to mountAll');
+assert.strictEqual(ajaxExplorerTab.documentScans, 0, 'Tabs.updateTab should not rescan the whole document after AJAX insertion');
+assert.strictEqual(ajaxExplorerTab.instance.currentRequest, false, 'Tabs.updateTab should clear currentRequest after a successful AJAX update');
+
+const ajaxPlainTab = tabsUpdateTabHarness(
+  '<div class="tab-pane"><p>Plain AJAX content</p><script>window.__ajaxPlain = true;</script></div>'
+);
+assert.deepStrictEqual(ajaxPlainTab.mountCalls, [], 'Tabs.updateTab should not call explorer mountAll for plain non-explorer AJAX HTML');
+assert.ok(
+  ajaxPlainTab.events.includes('stripScripts:true'),
+  'Tabs.updateTab should keep the existing inline script execution path for plain AJAX HTML'
+);
+assert.strictEqual(ajaxPlainTab.instance.currentRequest, false, 'Tabs.updateTab should still clear currentRequest for plain AJAX HTML');
+
+console.log('tabs JS contract smoke ok');
+
 const explorerSource = fs.readFileSync('web/includes/js/heatmap-explorer.js', 'utf8');
 const cssSource = fs.readFileSync('web/hlstats.css', 'utf8');
 const explorerContext = {

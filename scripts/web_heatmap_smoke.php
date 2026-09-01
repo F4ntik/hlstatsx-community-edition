@@ -191,6 +191,18 @@ foreach (array(false, true, '', ' ', '01', '1.0', '1e0', -1, 3, 1.5, array(1), n
     assert_same(0, heatmap_explorer_mode(array('HeatmapExplorerBeta' => $invalidMode)), 'invalid explorer mode should fail closed');
 }
 
+$playerinfoSource = file_get_contents(ROOT_PATH . '/pages/playerinfo.php');
+assert_true($playerinfoSource !== false, 'playerinfo source should be readable');
+assert_contains('$playerInfoTabsExtra = array(', $playerinfoSource, 'playerinfo AJAX tabs should assemble a dedicated extras payload');
+assert_contains("'player' => strval(\$player)", $playerinfoSource, 'playerinfo AJAX tabs should keep the selected player in extras');
+assert_contains("'killLimit' => strval(\$killLimit)", $playerinfoSource, 'playerinfo AJAX tabs should keep the selected killLimit in extras');
+assert_contains("'lang' => current_lang()", $playerinfoSource, 'playerinfo AJAX tabs should preserve the current validated language in extras');
+assert_contains("array_key_exists('heatmap_explorer', \$_GET)", $playerinfoSource, 'playerinfo AJAX tabs should check the explicit heatmap explorer opt-in flag');
+assert_contains("is_string(\$_GET['heatmap_explorer'])", $playerinfoSource, 'playerinfo AJAX tabs should validate the explicit heatmap explorer opt-in flag as a string');
+assert_contains("\$_GET['heatmap_explorer'] === '1'", $playerinfoSource, 'playerinfo AJAX tabs should preserve only the exact heatmap explorer opt-in flag');
+assert_contains("\$playerInfoTabsExtra['heatmap_explorer'] = '1';", $playerinfoSource, 'playerinfo AJAX tabs should forward the exact explorer opt-in flag when it is active');
+assert_contains("json_encode(\$playerInfoTabsExtra, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT)", $playerinfoSource, 'playerinfo AJAX tabs should serialize extras safely for the browser');
+
 $workspaceHtml = heatmap_render_explorer_workspace(array(
     'game' => 'cstrike',
     'map' => 'de_dust2',

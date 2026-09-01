@@ -240,6 +240,18 @@ $db->query("
 <?php	
 	if ($g_options['playerinfo_tabs']=='1')
 	{
+		$playerInfoTabsExtra = array(
+			'player' => strval($player),
+			'killLimit' => strval($killLimit),
+			'lang' => current_lang(),
+		);
+		if (
+			array_key_exists('heatmap_explorer', $_GET)
+			&& is_string($_GET['heatmap_explorer'])
+			&& $_GET['heatmap_explorer'] === '1'
+		) {
+			$playerInfoTabsExtra['heatmap_explorer'] = '1';
+		}
 ?>
 	<ul class="subsection_tabs" id="tabs_playerinfo">
 		<li>
@@ -268,10 +280,7 @@ $db->query("
 				'game': '<?php echo $game; ?>',
 				'loadingImage': '<?php echo IMAGE_PATH; ?>/ajax.gif',
 				'defaultTab': 'general_aliases',
-				'extra':
-				{
-					'player': '<?php echo $player; ?>', 'killLimit': '<?php echo $killLimit; ?>'
-				}
+				'extra': <?php echo json_encode($playerInfoTabsExtra, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>
 			}
 		);
 	</script>
