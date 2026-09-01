@@ -1514,16 +1514,23 @@ function explorerMessageAttributes() {
 }
 
 function workspaceDocument() {
-  return {
+  const document = {
+    activeElement: null,
     createElement(tagName) {
       const node = workspaceEventElement();
       node.tagName = String(tagName).toUpperCase();
+      node.focusCalls = 0;
+      node.focus = function () {
+        node.focusCalls += 1;
+        document.activeElement = node;
+      };
       return node;
     },
     createTextNode(text) {
       return {nodeType: 3, textContent: String(text)};
     },
   };
+  return document;
 }
 
 function richWorkspaceHarness(search = '?page=4', rootAttributes = {}) {
@@ -1819,6 +1826,51 @@ function overviewSceneForWindow(from, to, overrides = {}) {
   }, overrides));
 }
 
+function floorSceneForFocus(activeFloor, upperAvailable) {
+  const overrides = {
+    query: {
+      game: 'cstrike',
+      map: 'de_dust2',
+      player: 42,
+      from: 1785456000,
+      to: 1788048000,
+      event: 'kills',
+      lens: 'difference',
+      floor: activeFloor,
+      lang: 'en',
+    },
+    floors: [{
+      id: 'upper',
+      label: 'Upper',
+      count: upperAvailable ? 4 : 0,
+      available: upperAvailable,
+    }],
+    activeFloor,
+  };
+  return upperAvailable
+    ? explorerSceneFixture(overrides)
+    : sceneWithState('floors_unavailable', overrides);
+}
+
+function renderedFloorControl(harness, id) {
+  return harness.root.querySelectorAll('[data-heatmap-floor]').find(control =>
+    control.getAttribute('data-heatmap-floor') === id
+  );
+}
+
+function floorFocusWorkspace() {
+  const transport = deferredTransport();
+  const harness = richWorkspaceHarness();
+  const workspace = new HeatmapExplorerWorkspace(harness.root, {
+    window: harness.window,
+    document: harness.document,
+    fetch: transport.fetch,
+    messages: workspaceMessages,
+    Renderer: WorkspaceRenderer,
+  });
+  return {transport, harness, workspace};
+}
+
 async function settleWorkspace() {
   for (let turn = 0; turn < 6; turn += 1) await Promise.resolve();
 }
@@ -2100,6 +2152,72 @@ async function assertInitialFailureUsesServerV1RouteWhenSceneIsMissing() {
     assert.strictEqual(harness.nodes.alert.children[0].children[1].attributes.href, scenario.expectedHref);
     assert.notStrictEqual(harness.nodes.alert.children[0].children[1].attributes.href, harness.nodes.staticLink.attributes.href);
   }
+}
+
+async function assertFloorFocusPersistsThroughEnabledReload() {
+  const {transport, harness, workspace} = floorFocusWorkspace();
+  workspace.mount();
+  await settleWorkspace();
+  transport.requests[0].resolve(jsonResponse(floorSceneForFocus('all', true)));
+  await settleWorkspace();
+
+  const initialUpper = renderedFloorControl(harness, 'upper');
+  const initialAll = renderedFloorControl(harness, 'all');
+  assert.ok(initialAll && !initialAll.disabled, 'the all-floor control should remain available alongside upper');
+  assert.ok(initialUpper, 'the initial available upper floor control should render');
+  initialUpper.focus();
+  initialUpper.checked = true;
+  harness.nodes.floors.dispatch('change', {target: initialUpper});
+  await settleWorkspace();
+
+  assert.strictEqual(transport.requests.length, 2, 'keyboard-style floor selection should request a replacement scene');
+  assert.match(transport.requests[1].url, /floor=upper/, 'the replacement scene request should retain the selected upper floor');
+  transport.requests[1].resolve(jsonResponse(floorSceneForFocus('upper', true)));
+  await settleWorkspace();
+
+  const refreshedUpper = renderedFloorControl(harness, 'upper');
+  assert.notStrictEqual(refreshedUpper, initialUpper, 'the refreshed scene should replace the old floor radio');
+  assert.strictEqual(refreshedUpper.disabled, false, 'the matching available floor radio should stay enabled');
+  assert.strictEqual(harness.document.activeElement, refreshedUpper, 'the refreshed matching enabled floor radio should retain keyboard focus');
+}
+
+async function assertFloorFocusDoesNotTargetUnavailableReload() {
+  const {transport, harness, workspace} = floorFocusWorkspace();
+  workspace.mount();
+  await settleWorkspace();
+  transport.requests[0].resolve(jsonResponse(floorSceneForFocus('all', true)));
+  await settleWorkspace();
+
+  const initialUpper = renderedFloorControl(harness, 'upper');
+  initialUpper.focus();
+  harness.nodes.floors.dispatch('change', {target: initialUpper});
+  await settleWorkspace();
+  transport.requests[1].resolve(jsonResponse(floorSceneForFocus('upper', false)));
+  await settleWorkspace();
+
+  const unavailableUpper = renderedFloorControl(harness, 'upper');
+  assert.strictEqual(unavailableUpper.disabled, true, 'an unavailable upper floor should render as disabled');
+  assert.strictEqual(unavailableUpper.focusCalls, 0, 'a replacement unavailable floor radio must not receive forced focus');
+}
+
+async function assertFloorFocusDoesNotStealMovedFocus() {
+  const {transport, harness, workspace} = floorFocusWorkspace();
+  workspace.mount();
+  await settleWorkspace();
+  transport.requests[0].resolve(jsonResponse(floorSceneForFocus('all', true)));
+  await settleWorkspace();
+
+  const initialUpper = renderedFloorControl(harness, 'upper');
+  initialUpper.focus();
+  harness.nodes.floors.dispatch('change', {target: initialUpper});
+  await settleWorkspace();
+  harness.document.activeElement = harness.nodes.mapSelect;
+  transport.requests[1].resolve(jsonResponse(floorSceneForFocus('upper', true)));
+  await settleWorkspace();
+
+  const refreshedUpper = renderedFloorControl(harness, 'upper');
+  assert.strictEqual(refreshedUpper.focusCalls, 0, 'a new floor radio must not reclaim focus after the user moved elsewhere');
+  assert.strictEqual(harness.document.activeElement, harness.nodes.mapSelect, 'an async scene reload must preserve focus moved outside the floor controls');
 }
 
 async function assertScene422TooManyEventsUsesSpecializedStatePresentation() {
@@ -2686,6 +2804,9 @@ async function assertInspect422StaysFailClosed() {
   await assertSeparateInspectAndDeepLinkFlow();
   await assertClearedInspectCannotRetry();
   await assertLatestSceneRequestWins();
+  await assertFloorFocusPersistsThroughEnabledReload();
+  await assertFloorFocusDoesNotTargetUnavailableReload();
+  await assertFloorFocusDoesNotStealMovedFocus();
   assertZoomUsesReversibleFactors();
   await assertFailureActionsUseKnownV1Route();
   await assertInitialFailureUsesServerV1RouteWhenSceneIsMissing();

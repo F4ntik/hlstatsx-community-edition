@@ -1460,6 +1460,8 @@ function heatmap_finalize_scene(array $state): array
     if (in_array($stateName, array('too_many_events', 'missing_coordinates', 'floors_unavailable', 'weak_projection'), true)) {
         $layers = array('total' => array(), 'me' => array(), 'others' => array());
         $comparison['bins'] = array();
+        $comparison['personalSample'] = 0;
+        $comparison['otherSample'] = 0;
     } elseif ($stateName === 'insufficient_sample') {
         $comparison['bins'] = array();
     }

@@ -1498,6 +1498,8 @@ $lowFloorCoveragePayload = scene_payload(array(
 ), scene_query(array('event' => 'kills', 'floor' => 'lower')));
 assert_same('floors_unavailable', $lowFloorCoveragePayload['state'], 'a selected floor should fail closed below global Z coverage');
 assert_same(array(), $lowFloorCoveragePayload['layers']['total'], 'unavailable floors should not expose partial bins');
+assert_same(0, $lowFloorCoveragePayload['comparison']['personalSample'], 'unavailable floors should discard personal comparison samples with their layers');
+assert_same(0, $lowFloorCoveragePayload['comparison']['otherSample'], 'unavailable floors should discard other comparison samples with their layers');
 
 $diagnosticPayload = scene_payload(array(
     scene_row(array('eventId' => '1', 'attackerX' => '8', 'attackerY' => '8', 'attackerZ' => '5')),
@@ -1518,6 +1520,8 @@ assert_same(2, $diagnosticPayload['coverage']['projected'], 'coverage should pro
 assert_same(1, $diagnosticPayload['coverage']['inBounds'], 'coverage should count bounded projected contributions');
 assert_same(1, $diagnosticPayload['coverage']['outOfBounds'], 'coverage should count projected but out-of-bounds contributions');
 assert_same(array(), $diagnosticPayload['layers']['total'], 'weak projection should not expose biased partial bins');
+assert_same(0, $diagnosticPayload['comparison']['personalSample'], 'weak projection should discard personal comparison samples with its layers');
+assert_same(0, $diagnosticPayload['comparison']['otherSample'], 'weak projection should discard other comparison samples with its layers');
 
 $missingCoordinatesPayload = scene_payload(array(scene_row(array('attackerX' => null, 'attackerY' => null))), scene_query(array('event' => 'kills')));
 assert_same('missing_coordinates', $missingCoordinatesPayload['state'], 'combat rows without requested-channel XY should expose the coordinate state');
@@ -1610,6 +1614,8 @@ $insufficientPayload = scene_payload(array_slice($comparisonRows, 0, 3), scene_q
 assert_same('insufficient_sample', $insufficientPayload['state'], 'comparison scenes below three personal events should be terminal but complete');
 assert_true(count($insufficientPayload['layers']['total']) > 0, 'insufficient comparison scenes should retain count layers');
 assert_same(array(), $insufficientPayload['comparison']['bins'], 'insufficient comparison scenes should not expose unstable comparison bins');
+assert_same(2, $insufficientPayload['comparison']['personalSample'], 'insufficient comparison scenes should retain their personal sample');
+assert_same(1, $insufficientPayload['comparison']['otherSample'], 'insufficient comparison scenes should retain their other sample');
 
 $inspectGrid = array(
     'bucketSize' => 8,

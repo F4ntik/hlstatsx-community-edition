@@ -2368,10 +2368,20 @@
       return;
     }
     var options = this._nodes.floorOptions;
+    var activeElement = this.document.activeElement;
+    var activeFloor = null;
+    var existingControls = workspaceNodes(this.root, '[data-heatmap-floor]');
+    for (var controlIndex = 0; controlIndex < existingControls.length; controlIndex += 1) {
+      if (existingControls[controlIndex] === activeElement && typeof activeElement.getAttribute === 'function') {
+        activeFloor = activeElement.getAttribute('data-heatmap-floor');
+        break;
+      }
+    }
     while (options.firstChild && typeof options.removeChild === 'function') {
       options.removeChild(options.firstChild);
     }
     var self = this;
+    var replacementFocus = null;
     function appendFloor(id, label, available, count) {
       var control = self.document.createElement('input');
       var wrapper = self.document.createElement('label');
@@ -2388,6 +2398,9 @@
       control.disabled = available === false;
       workspaceSetAttribute(control, 'data-heatmap-floor', id);
       control.checked = id === self.state.floor;
+      if (id === activeFloor && !control.disabled) {
+        replacementFocus = control;
+      }
       wrapper.appendChild(control);
       if (typeof self.document.createTextNode === 'function') {
         wrapper.appendChild(self.document.createTextNode(description));
@@ -2400,6 +2413,9 @@
     for (var index = 0; index < scene.floors.length; index += 1) {
       var floor = scene.floors[index];
       appendFloor(floor.id, floor.label, floor.available, floor.count);
+    }
+    if (replacementFocus && typeof replacementFocus.focus === 'function') {
+      replacementFocus.focus();
     }
   };
 
