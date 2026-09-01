@@ -2406,6 +2406,10 @@ function heatmap_config_hash(array $config, array $image = null)
 {
     $projection = heatmap_projection_config($config);
     $sourcePath = heatmap_source_path($config, $config['map'] ?? '');
+    $sourceIdentity = strval($image['sourceIdentity'] ?? '');
+    if ($sourceIdentity === '' && is_file($sourcePath)) {
+        $sourceIdentity = heatmap_map_source_identity($sourcePath);
+    }
     $payload = array(
         'projection' => $projection,
         'floorParserSchema' => HEATMAP_FLOOR_PARSER_SCHEMA,
@@ -2413,6 +2417,7 @@ function heatmap_config_hash(array $config, array $image = null)
         'days' => intval($config['days'] ?? 30),
         'brush' => strval($config['brush'] ?? 'small'),
         'imageMtime' => is_file($sourcePath) ? filemtime($sourcePath) : 0,
+        'imageIdentity' => $sourceIdentity,
     );
     if ($image) {
         $payload['image'] = array(
@@ -2423,6 +2428,34 @@ function heatmap_config_hash(array $config, array $image = null)
     }
 
     return substr(sha1(json_encode($payload, JSON_UNESCAPED_SLASHES)), 0, 16);
+}
+
+function heatmap_map_source_identity(string $path): string
+{
+    clearstatcache(true, $path);
+    if (!is_file($path)) {
+        return '';
+    }
+
+    $digest = hash_file('sha256', $path);
+    if (!is_string($digest) || preg_match('/^[a-f0-9]{64}$/D', $digest) !== 1) {
+        throw new RuntimeException('map_asset_unreadable');
+    }
+
+    return $digest;
+}
+
+function heatmap_version_fallback_image(array $image): array
+{
+    $sourceIdentity = heatmap_map_source_identity(strval($image['path'] ?? ''));
+    if ($sourceIdentity === '') {
+        throw new RuntimeException('map_asset_unreadable');
+    }
+    $url = strval($image['url'] ?? '');
+    $image['url'] = $url . (strpos($url, '?') === false ? '?' : '&') . 'v=' . $sourceIdentity;
+    $image['sourceIdentity'] = $sourceIdentity;
+
+    return $image;
 }
 
 function heatmap_admin_file_identity(string $path): array
@@ -2553,6 +2586,7 @@ function heatmap_image_metadata($game, $map, array $config)
     $sourcePath = heatmap_source_path($config, $map);
     if (is_file($sourcePath)) {
         $sourceSize = getimagesize($sourcePath);
+        $sourceIdentity = heatmap_map_source_identity($sourcePath);
         $config = heatmap_normalize_crop($config, intval($sourceSize[0] ?? 0), intval($sourceSize[1] ?? 0));
         $base = array(
             'url' => 'heatmap_map.php?game=' . rawurlencode($game) . '&map=' . rawurlencode($map),
@@ -2561,6 +2595,7 @@ function heatmap_image_metadata($game, $map, array $config)
             'sourceWidth' => intval($sourceSize[0] ?? 0),
             'sourceHeight' => intval($sourceSize[1] ?? 0),
             'source' => 'heatmaps/src',
+            'sourceIdentity' => $sourceIdentity,
         );
         if (heatmap_has_crop($config)) {
             $base['url'] .= '&crop=1'
@@ -2568,7 +2603,7 @@ function heatmap_image_metadata($game, $map, array $config)
                 . '&cropy1=' . intval($config['cropy1'])
                 . '&cropx2=' . intval($config['cropx2'])
                 . '&cropy2=' . intval($config['cropy2'])
-                . '&v=' . (is_file($sourcePath) ? intval(filemtime($sourcePath)) : 0);
+                . '&v=' . $sourceIdentity;
             list($base['width'], $base['height']) = heatmap_projected_image_size($base, $config);
             $base['crop'] = array(
                 'x' => intval($config['cropx1']),
@@ -2577,7 +2612,7 @@ function heatmap_image_metadata($game, $map, array $config)
                 'height' => intval($config['cropy2']),
             );
         } else {
-            $base['url'] .= '&v=' . (is_file($sourcePath) ? intval(filemtime($sourcePath)) : 0);
+            $base['url'] .= '&v=' . $sourceIdentity;
         }
         return $base;
     }
@@ -2587,6 +2622,7 @@ function heatmap_image_metadata($game, $map, array $config)
         $image = getImage('/games/' . $config['realgame'] . '/maps/' . $map);
     }
     if ($image) {
+        $image = heatmap_version_fallback_image($image);
         $image['source'] = 'hlstatsimg';
         $image['crop'] = null;
     }

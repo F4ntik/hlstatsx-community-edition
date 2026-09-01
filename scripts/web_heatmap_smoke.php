@@ -313,6 +313,41 @@ $sceneKeyImage = array(
     'source' => 'hlstatsimg',
     'sourceIdentity' => 'asset-a',
 );
+$mapIdentityDirectory = smoke_temp_directory('map-identity');
+$mapIdentityPath = $mapIdentityDirectory . DIRECTORY_SEPARATOR . 'de_dust2.jpg';
+$fixedMapMtime = 1788297600;
+assert_true(file_put_contents($mapIdentityPath, 'map-a') !== false, 'map identity fixture should be written');
+assert_true(touch($mapIdentityPath, $fixedMapMtime), 'map identity fixture should use a fixed second');
+$firstMapIdentity = heatmap_map_source_identity($mapIdentityPath);
+assert_true(file_put_contents($mapIdentityPath, 'map-b') !== false, 'same-size replacement fixture should be written');
+assert_true(touch($mapIdentityPath, $fixedMapMtime), 'same-size replacement should preserve the same mtime second');
+$secondMapIdentity = heatmap_map_source_identity($mapIdentityPath);
+assert_true(preg_match('/^[a-f0-9]{64}$/D', $firstMapIdentity) === 1, 'map source identity should be a SHA-256 token');
+assert_true(preg_match('/^[a-f0-9]{64}$/D', $secondMapIdentity) === 1, 'replacement map source identity should be a SHA-256 token');
+assert_true($firstMapIdentity !== $secondMapIdentity, 'same-second same-size replacement should change map source identity');
+$fallbackMetadata = heatmap_version_fallback_image(array(
+    'url' => './hlstatsimg/games/cstrike/maps/de_dust2.jpg',
+    'path' => $mapIdentityPath,
+    'width' => 1024,
+    'height' => 768,
+));
+assert_same($secondMapIdentity, $fallbackMetadata['sourceIdentity'], 'fallback metadata should publish the resolved file identity');
+assert_contains('?v=' . $secondMapIdentity, $fallbackMetadata['url'], 'fallback map URL should be content-versioned');
+$oldWriterImage = $sceneKeyImage;
+$oldWriterImage['sourceIdentity'] = $firstMapIdentity;
+$newReaderImage = $sceneKeyImage;
+$newReaderImage['sourceIdentity'] = $secondMapIdentity;
+assert_true(
+    heatmap_scene_cache_key($sceneKeyQuery, $sceneKeyConfig, $oldWriterImage)
+        !== heatmap_scene_cache_key($sceneKeyQuery, $sceneKeyConfig, $newReaderImage),
+    'an in-flight old scene writer must not share the replacement map cache key'
+);
+assert_true(
+    heatmap_config_hash($sceneKeyConfig, $oldWriterImage)
+        !== heatmap_config_hash($sceneKeyConfig, $newReaderImage),
+    'projection identity should change when the resolved map bytes change'
+);
+smoke_remove_directory($mapIdentityDirectory);
 $sceneKey = heatmap_scene_cache_key($sceneKeyQuery, $sceneKeyConfig, $sceneKeyImage);
 assert_true(preg_match('/^[a-f0-9]{64}$/D', $sceneKey) === 1, 'scene cache key should be a stable SHA-256 token');
 $sceneKeyDimensions = array(
