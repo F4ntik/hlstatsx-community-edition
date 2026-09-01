@@ -33,6 +33,32 @@ def test_heatmap_explorer_mount_contract_has_a_shared_strict_rollout_helper() ->
     assert "heatmap_should_render_explorer" in player
 
 
+def test_heatmap_explorer_human_legacy_actions_stay_on_page_routes() -> None:
+    """Explorer fallback actions should return to the intended legacy pages, not an API payload."""
+
+    helper = (REPOSITORY_ROOT / "web/includes/heatmap_points.php").read_text(
+        encoding="utf-8"
+    )
+    mapinfo = (REPOSITORY_ROOT / "web/pages/mapinfo.php").read_text(
+        encoding="utf-8"
+    )
+    player_map = (
+        REPOSITORY_ROOT / "web/pages/playerinfo_mapperformance.php"
+    ).read_text(encoding="utf-8")
+    player_tabs = (REPOSITORY_ROOT / "web/pages/playerinfo.php").read_text(
+        encoding="utf-8"
+    )
+    explorer_js = (
+        REPOSITORY_ROOT / "web/includes/js/heatmap-explorer.js"
+    ).read_text(encoding="utf-8")
+
+    assert "function heatmap_explorer_legacy_page_url" in helper
+    assert "'legacyPage' => 'mapinfo'" in mapinfo
+    assert "'legacyPage' => 'playerinfo'" in player_map
+    assert "heatmap_legacy" in player_tabs
+    assert "legacyHumanRoute" in explorer_js
+
+
 def test_heatmap_explorer_public_contract_keeps_i18n_controls_and_safe_shells_in_sync() -> None:
     """The two public mounts, dictionaries, and responsive shell stay one contract."""
 

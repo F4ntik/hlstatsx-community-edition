@@ -71,8 +71,35 @@ function heatmap_explorer_label(string $key): string
     return t('heatmapExplorer.' . $key);
 }
 
+function heatmap_explorer_legacy_page_url(array $context): string
+{
+    $legacyPage = strval($context['legacyPage'] ?? '');
+    if ($legacyPage === 'mapinfo') {
+        $game = strval($context['game'] ?? '');
+        $map = strval($context['map'] ?? '');
+        if ($game === '' || $map === '') {
+            return '';
+        }
+        return 'hlstats.php?mode=mapinfo&game=' . rawurlencode($game)
+            . '&map=' . rawurlencode($map) . '&heatmap_legacy=1';
+    }
+    if ($legacyPage === 'playerinfo') {
+        $player = strval($context['player'] ?? '');
+        if (preg_match('/^[1-9][0-9]{0,9}$/D', $player) !== 1) {
+            return '';
+        }
+        return 'hlstats.php?mode=playerinfo&player=' . rawurlencode($player)
+            . '&heatmap_legacy=1';
+    }
+    return '';
+}
+
 function heatmap_explorer_v1_url(array $context): string
 {
+    $legacyPageUrl = heatmap_explorer_legacy_page_url($context);
+    if ($legacyPageUrl !== '') {
+        return $legacyPageUrl;
+    }
     $endpoint = strval($context['endpoint'] ?? 'heatmap_points.php');
     $parts = parse_url($endpoint);
     $base = isset($parts['path']) && is_string($parts['path']) && $parts['path'] !== ''
@@ -126,6 +153,7 @@ function heatmap_render_explorer_workspace(array $context): string
         'image' => '',
         'imageAlt' => '',
         'endpoint' => 'heatmap_points.php',
+        'legacyPage' => '',
         'jpeg' => '',
         'lang' => 'en',
         'lenses' => array('overview'),

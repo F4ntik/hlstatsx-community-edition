@@ -256,6 +256,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	'image' => $defaultImage['url'],
 	'imageAlt' => $defaultMap,
 	'endpoint' => 'heatmap_points.php',
+	'legacyPage' => 'playerinfo',
 	'jpeg' => $heatmapJpeg,
 	'lang' => current_lang(),
 	'lenses' => array('overview', 'me', 'difference'),

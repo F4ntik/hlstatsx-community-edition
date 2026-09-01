@@ -1100,6 +1100,7 @@
     this._destroyed = false;
     this._fallback = false;
     this._contextLost = false;
+    this._contextUi = null;
     this._ready = false;
     this._startedAt = 0;
     this._pointer = null;
@@ -1201,6 +1202,39 @@
     }
   };
 
+  HeatmapGlRenderer.prototype._rememberContextUi = function () {
+    if (this._contextUi) {
+      return;
+    }
+    var state = null;
+    if (this.root && typeof this.root.getAttribute === 'function') {
+      var currentState = this.root.getAttribute('data-heatmap-state');
+      state = typeof currentState === 'string' ? currentState : null;
+    }
+    var status = this._nodes && this._nodes.status && typeof this._nodes.status.textContent === 'string'
+      ? this._nodes.status.textContent
+      : '';
+    this._contextUi = {state: state, status: status};
+  };
+
+  HeatmapGlRenderer.prototype._restoreContextUi = function () {
+    var previous = this._contextUi;
+    this._contextUi = null;
+    if (!previous) {
+      return;
+    }
+    if (this.root) {
+      if (previous.state === null && typeof this.root.removeAttribute === 'function') {
+        this.root.removeAttribute('data-heatmap-state');
+      } else if (previous.state !== null && typeof this.root.setAttribute === 'function') {
+        this.root.setAttribute('data-heatmap-state', previous.state);
+      }
+    }
+    if (this._nodes && this._nodes.status) {
+      this._nodes.status.textContent = previous.status;
+    }
+  };
+
   HeatmapGlRenderer.prototype._showStatic = function () {
     if (!this._nodes) {
       return;
@@ -1257,6 +1291,7 @@
     this._fallback = true;
     this._mounted = false;
     this._contextLost = false;
+    this._contextUi = null;
     this._releaseResources();
     this._gl = null;
     this._removeListeners();
@@ -1621,6 +1656,7 @@
       if (self._destroyed || !self._mounted) {
         return;
       }
+      self._rememberContextUi();
       self._contextLost = true;
       self._releaseResources();
       self._showStatic();
@@ -1634,7 +1670,9 @@
       try {
         self._createResources();
         self._showInteractive();
-        self.resize();
+        if (self.resize()) {
+          self._restoreContextUi();
+        }
       } catch (error) {
         self._fallbackToStatic();
       }
@@ -1761,6 +1799,7 @@
     this._destroyed = true;
     this._mounted = false;
     this._contextLost = false;
+    this._contextUi = null;
     this._pointer = null;
     this._suppressClick = false;
     this._removeListeners();
@@ -1862,6 +1901,26 @@
     return typeof value === 'string' && TOKEN.test(value) ? value : '';
   }
 
+  function legacyHumanRoute(path, values, state) {
+    if (path !== 'hlstats.php' || values.heatmapLegacy !== true) {
+      return null;
+    }
+    if (values.mode === 'mapinfo') {
+      var game = legacyMapValue(values.game);
+      var map = legacyMapValue(state && state.map) || legacyMapValue(values.map);
+      if (game === '' || map === '') {
+        return '';
+      }
+      return path + '?mode=mapinfo&game=' + encodeURIComponent(game)
+        + '&map=' + encodeURIComponent(map) + '&heatmap_legacy=1';
+    }
+    if (values.mode === 'playerinfo' && /^(?:[1-9][0-9]*)$/.test(values.player || '')) {
+      return path + '?mode=playerinfo&player=' + encodeURIComponent(values.player)
+        + '&heatmap_legacy=1';
+    }
+    return '';
+  }
+
   function rewriteLegacyFallbackUrl(baseUrl, state) {
     if (typeof baseUrl !== 'string' || baseUrl === '' || /^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(baseUrl)
       || baseUrl.slice(0, 2) === '//') {
@@ -1898,8 +1957,18 @@
           if (!own(values, key) && baseEvent !== '') {
             values[key] = baseEvent;
           }
+        } else if (key === 'mode') {
+          if (!own(values, key) && (value === 'mapinfo' || value === 'playerinfo')) {
+            values[key] = value;
+          }
+        } else if (key === 'heatmap_legacy' && !own(values, 'heatmapLegacy') && value === '1') {
+          values.heatmapLegacy = true;
         }
       }
+    }
+    var humanRoute = legacyHumanRoute(path, values, state);
+    if (humanRoute !== null) {
+      return humanRoute;
     }
     var currentMap = legacyMapValue(state && state.map);
     if (currentMap !== '') {

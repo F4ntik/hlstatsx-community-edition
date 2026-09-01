@@ -201,7 +201,17 @@ assert_contains("array_key_exists('heatmap_explorer', \$_GET)", $playerinfoSourc
 assert_contains("is_string(\$_GET['heatmap_explorer'])", $playerinfoSource, 'playerinfo AJAX tabs should validate the explicit heatmap explorer opt-in flag as a string');
 assert_contains("\$_GET['heatmap_explorer'] === '1'", $playerinfoSource, 'playerinfo AJAX tabs should preserve only the exact heatmap explorer opt-in flag');
 assert_contains("\$playerInfoTabsExtra['heatmap_explorer'] = '1';", $playerinfoSource, 'playerinfo AJAX tabs should forward the exact explorer opt-in flag when it is active');
+assert_contains("array_key_exists('heatmap_legacy', \$_GET)", $playerinfoSource, 'playerinfo AJAX tabs should check the explicit legacy-page flag');
+assert_contains("is_string(\$_GET['heatmap_legacy'])", $playerinfoSource, 'playerinfo AJAX tabs should validate the explicit legacy-page flag as a string');
+assert_contains("\$_GET['heatmap_legacy'] === '1'", $playerinfoSource, 'playerinfo AJAX tabs should preserve only the exact legacy-page flag');
+assert_contains("\$playerInfoTabsExtra['heatmap_legacy'] = '1';", $playerinfoSource, 'playerinfo AJAX tabs should forward the exact legacy-page flag so Explorer does not remount');
 assert_contains("json_encode(\$playerInfoTabsExtra, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT)", $playerinfoSource, 'playerinfo AJAX tabs should serialize extras safely for the browser');
+$mapinfoSource = file_get_contents(ROOT_PATH . '/pages/mapinfo.php');
+assert_true($mapinfoSource !== false, 'mapinfo source should be readable');
+assert_contains("'legacyPage' => 'mapinfo'", $mapinfoSource, 'map Explorer should publish a trusted human legacy map page route');
+$playerMapPerformanceSource = file_get_contents(ROOT_PATH . '/pages/playerinfo_mapperformance.php');
+assert_true($playerMapPerformanceSource !== false, 'player map performance source should be readable');
+assert_contains("'legacyPage' => 'playerinfo'", $playerMapPerformanceSource, 'player Explorer should publish a trusted human legacy player page route');
 
 $workspaceHtml = heatmap_render_explorer_workspace(array(
     'game' => 'cstrike',
@@ -244,6 +254,27 @@ assert_contains(
     'data-heatmap-v1-url="heatmap_points.php?game=cstrike&amp;map=de_dust2&amp;player=42&amp;event=kills"',
     $legacyRouteHtml,
     'explorer workspace should expose a trustworthy legacy route separate from the JPEG fallback'
+);
+$mapLegacyPageHtml = heatmap_render_explorer_workspace(array(
+    'game' => 'cstrike',
+    'map' => 'de_dust2',
+    'legacyPage' => 'mapinfo',
+));
+assert_contains(
+    'data-heatmap-v1-url="hlstats.php?mode=mapinfo&amp;game=cstrike&amp;map=de_dust2&amp;heatmap_legacy=1"',
+    $mapLegacyPageHtml,
+    'map Explorer should emit the trusted human legacy map page route'
+);
+$playerLegacyPageHtml = heatmap_render_explorer_workspace(array(
+    'game' => 'cstrike',
+    'map' => 'de_dust2',
+    'player' => 42,
+    'legacyPage' => 'playerinfo',
+));
+assert_contains(
+    'data-heatmap-v1-url="hlstats.php?mode=playerinfo&amp;player=42&amp;heatmap_legacy=1"',
+    $playerLegacyPageHtml,
+    'player Explorer should emit the trusted human legacy player page route'
 );
 
 $sceneKeyQuery = array(

@@ -194,6 +194,7 @@ error(t('literal.invalid_game'));
 						'image' => $mapimg,
 						'imageAlt' => $map,
 						'endpoint' => 'heatmap_points.php',
+						'legacyPage' => 'mapinfo',
 						'jpeg' => $heatmapJpeg,
 						'lang' => current_lang(),
 						'lenses' => array('overview'),

@@ -573,6 +573,7 @@ function makeDom(gl) {
       listeners,
       setAttribute(name, value) { this.attributes[name] = String(value); },
       getAttribute(name) { return this.attributes[name]; },
+      removeAttribute(name) { delete this.attributes[name]; },
       addEventListener(type, handler) { (listeners[type] || (listeners[type] = [])).push(handler); },
       removeEventListener(type, handler) {
         if (!listeners[type]) return;
@@ -987,9 +988,16 @@ assert.deepStrictEqual(
 );
 asymmetricRenderer.destroy();
 let prevented = false;
+const stateBeforeContextLoss = 'scene_ready';
+const statusBeforeContextLoss = 'Loaded: Coverage 100%';
+const drawsBeforeContextLoss = goodGl.calls.draws;
+const selectionBeforeContextLoss = Object.assign({}, renderer._selection);
+dom.root.setAttribute('data-heatmap-state', stateBeforeContextLoss);
+dom.nodes.status.textContent = statusBeforeContextLoss;
 dom.nodes.canvas.dispatchEvent({type: 'webglcontextlost', preventDefault() { prevented = true; }});
 assert.strictEqual(prevented, true);
 assert.strictEqual(dom.root.attributes['data-heatmap-state'], 'context_lost');
+assert.strictEqual(dom.nodes.status.textContent, '<context_lost>');
 assert.notStrictEqual(dom.nodes.static.style.display, 'none');
 assert.deepStrictEqual(
   deletedResources(goodGl).textures,
@@ -1000,6 +1008,11 @@ dom.nodes.canvas.dispatchEvent({type: 'webglcontextrestored'});
 assert.ok(goodGl.calls.programs >= 2, 'context restore should rebuild resources');
 assert.strictEqual(goodGl.calls.textures.length, 4, 'context restore should rebuild both density and opacity textures');
 assert.strictEqual(dom.nodes.canvas.contextCalls.length, 1, 'context restore should reuse the original WebGL2 context instead of calling getContext again');
+assert.strictEqual(dom.root.attributes['data-heatmap-state'], stateBeforeContextLoss, 'successful context restore should clear the transient context-loss state');
+assert.strictEqual(dom.nodes.status.textContent, statusBeforeContextLoss, 'successful context restore should restore the pre-loss status text');
+assert.ok(goodGl.calls.draws > drawsBeforeContextLoss, 'successful context restore should redraw the preserved scene');
+assert.strictEqual(renderer._selection.layer, selectionBeforeContextLoss.layer, 'successful context restore should preserve the active layer');
+assert.strictEqual(renderer._selection.channel, selectionBeforeContextLoss.channel, 'successful context restore should preserve the active channel');
 renderer.destroy();
 renderer.destroy();
 assert.strictEqual((dom.nodes.canvas.listeners.webglcontextlost || []).length, 0);
@@ -1010,6 +1023,22 @@ assert.deepStrictEqual(
   goodGl.calls.textures.map(texture => texture.id),
   'destroy should release both original and restored density/opacity textures exactly once'
 );
+
+const restoreFailureGl = fakeGl({createTextureFailureAt: 3});
+const restoreFailureDom = makeDom(restoreFailureGl);
+const restoreFailureRenderer = new HeatmapGlRenderer(restoreFailureDom.root, validScene, {
+  window: restoreFailureDom.window,
+  message: code => `<${code}>`,
+});
+restoreFailureRenderer.mount();
+restoreFailureDom.nodes.status.textContent = 'Loaded: Coverage 100%';
+restoreFailureDom.nodes.canvas.dispatchEvent({type: 'webglcontextlost', preventDefault() {}});
+restoreFailureDom.nodes.canvas.dispatchEvent({type: 'webglcontextrestored'});
+assert.strictEqual(restoreFailureDom.root.attributes['data-heatmap-state'], 'static_fallback', 'failed context restore should retain the static fallback state');
+assert.strictEqual(restoreFailureDom.nodes.status.textContent, '<static_fallback>', 'failed context restore should keep the localized static fallback status');
+assert.strictEqual(restoreFailureDom.nodes.interactive.style.display, 'none', 'failed context restore should hide the unusable interactive canvas');
+assert.strictEqual(restoreFailureDom.nodes.static.style.display, '', 'failed context restore should keep the JPEG fallback visible');
+restoreFailureRenderer.destroy();
 
 const extensionlessGl = fakeGl({extensionNull: true});
 const extensionlessDom = makeDom(extensionlessGl);
@@ -2025,17 +2054,31 @@ async function assertInitialFailureUsesServerV1RouteWhenSceneIsMissing() {
     {
       label: 'deaths deep-link should override the trusted base event',
       search: '?page=4&hm_event=deaths',
+      v1Url: 'heatmap_points.php?game=cstrike&map=de_dust2&player=42&event=kills',
       expectedHref: 'heatmap_points.php?game=cstrike&map=de_dust2&player=42&event=deaths',
     },
     {
       label: 'both deep-link should override the trusted base event',
       search: '?page=4&hm_event=both',
+      v1Url: 'heatmap_points.php?game=cstrike&map=de_dust2&player=42&event=kills',
       expectedHref: 'heatmap_points.php?game=cstrike&map=de_dust2&player=42&event=both',
+    },
+    {
+      label: 'map legacy page should retain only its human map route fields',
+      search: '?page=4&hm_event=deaths',
+      v1Url: 'hlstats.php?mode=mapinfo&game=cstrike&map=de_dust2&heatmap_legacy=1&ignored=1',
+      expectedHref: 'hlstats.php?mode=mapinfo&game=cstrike&map=de_dust2&heatmap_legacy=1',
+    },
+    {
+      label: 'player legacy page should retain only its human player route fields',
+      search: '?page=4&hm_event=deaths',
+      v1Url: 'hlstats.php?mode=playerinfo&player=42&heatmap_legacy=1&ignored=1',
+      expectedHref: 'hlstats.php?mode=playerinfo&player=42&heatmap_legacy=1',
     },
   ]) {
     const transport = deferredTransport();
     const harness = richWorkspaceHarness(scenario.search, {
-      'data-heatmap-v1-url': 'heatmap_points.php?game=cstrike&map=de_dust2&player=42&event=kills',
+      'data-heatmap-v1-url': scenario.v1Url,
     });
     const workspace = new HeatmapExplorerWorkspace(harness.root, {
       window: harness.window,

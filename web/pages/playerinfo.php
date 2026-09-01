@@ -252,6 +252,13 @@ $db->query("
 		) {
 			$playerInfoTabsExtra['heatmap_explorer'] = '1';
 		}
+		if (
+			array_key_exists('heatmap_legacy', $_GET)
+			&& is_string($_GET['heatmap_legacy'])
+			&& $_GET['heatmap_legacy'] === '1'
+		) {
+			$playerInfoTabsExtra['heatmap_legacy'] = '1';
+		}
 ?>
 	<ul class="subsection_tabs" id="tabs_playerinfo">
 		<li>
