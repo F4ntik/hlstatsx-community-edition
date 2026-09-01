@@ -1699,6 +1699,42 @@ function mountedWorkspace(search = '?page=4', fetchImpl = null, options = {}) {
   return {harness, workspace};
 }
 
+function assertWorkspaceUsesCanonicalCoverageRatios() {
+  const {harness, workspace} = mountedWorkspace();
+  const payload = explorerSceneFixture();
+  payload.coverage = Object.assign({}, payload.coverage, {
+    candidate: 16,
+    validXY: 8,
+    validZ: 5,
+    assigned: 5,
+    unassigned: 3,
+    xyCoverage: 0.5,
+    zCoverage: 0.625,
+    projected: 8,
+    inBounds: 6,
+    outOfBounds: 2,
+    projectionCoverage: 0.75,
+  });
+  const scene = new HeatmapExplorerScene(payload);
+
+  workspace._updateSceneText(scene);
+  workspace._setCoverageStatus(scene);
+
+  assert.match(harness.nodes.summary.textContent, /XY: 50%/, 'summary should use the canonical XY coverage ratio');
+  assert.match(
+    harness.nodes.coverage.textContent,
+    /Coverage: XY 50%; Z 63%; Projection 75%/,
+    'footer should use the canonical server coverage ratios when one source row yields multiple candidates'
+  );
+  assert.strictEqual(
+    harness.nodes.status.textContent,
+    'Loaded: Coverage 50%',
+    'loaded status should use the canonical XY coverage ratio'
+  );
+}
+
+assertWorkspaceUsesCanonicalCoverageRatios();
+
 function deferredTransport() {
   const requests = [];
   return {

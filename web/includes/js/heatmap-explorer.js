@@ -2514,7 +2514,7 @@
     var summary = scene.summary || {};
     return this._message('period') + ': ' + String(query.from) + '–' + String(query.to) + ' UTC; '
       + this._message('sample') + ': ' + String(summary.sourceRows || 0) + '; '
-      + this._message('xyCoverage') + ': ' + this._formatPercent(coverage.validXY / Math.max(1, coverage.sourceRows || 0));
+      + this._message('xyCoverage') + ': ' + this._formatPercent(coverage.xyCoverage);
   };
 
   HeatmapExplorerWorkspace.prototype._updateSceneText = function (scene) {
@@ -2524,9 +2524,9 @@
     workspaceSetText(this._nodes.window, this._message('utcWindow') + ': ' + String(scene.query.from) + '–' + String(scene.query.to));
     workspaceSetText(this._nodes.sample, this._message('sample') + ': ' + String(scene.summary.sourceRows || 0));
     workspaceSetText(this._nodes.coverage, this._message('coverage') + ': '
-      + this._message('xyCoverage') + ' ' + this._formatPercent((scene.coverage.validXY || 0) / Math.max(1, scene.coverage.sourceRows || 0))
-      + '; ' + this._message('zCoverage') + ' ' + this._formatPercent((scene.coverage.validZ || 0) / Math.max(1, scene.coverage.sourceRows || 0))
-      + '; ' + this._message('projectionCoverage') + ' ' + this._formatPercent((scene.coverage.projected || 0) / Math.max(1, scene.coverage.sourceRows || 0)));
+      + this._message('xyCoverage') + ' ' + this._formatPercent(scene.coverage.xyCoverage)
+      + '; ' + this._message('zCoverage') + ' ' + this._formatPercent(scene.coverage.zCoverage)
+      + '; ' + this._message('projectionCoverage') + ' ' + this._formatPercent(scene.coverage.projectionCoverage));
     workspaceSetText(this._nodes.freshness, this._message('freshness') + ': ' + this._message('loaded'));
   };
 
@@ -2538,7 +2538,7 @@
     workspaceSetText(
       this._nodes.status,
       this._message('loaded') + ': ' + this._message('coverage') + ' '
-        + this._formatPercent((coverage.validXY || 0) / Math.max(1, coverage.sourceRows || 0))
+        + this._formatPercent(coverage.xyCoverage)
     );
   };
 
