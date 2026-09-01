@@ -2773,6 +2773,7 @@
 
   HeatmapExplorerWorkspace.prototype.showFallback = function () {
     this._destroyRenderer();
+    workspaceSetAttribute(this.root, 'data-heatmap-state', 'static_fallback');
     if (this._nodes && this._nodes.static && this._nodes.static.style) {
       this._nodes.static.style.display = '';
     }

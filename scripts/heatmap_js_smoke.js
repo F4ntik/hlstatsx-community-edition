@@ -1425,16 +1425,18 @@ const noFetchNodes = {
   '[data-heatmap-alert]': workspaceElement(),
   '[data-heatmap-summary]': workspaceElement(),
 };
+const noFetchRoot = mountedWorkspaceRoot({
+  'data-heatmap-game': 'cstrike', 'data-heatmap-map': 'de_dust2',
+  'data-heatmap-player': '0', 'data-heatmap-endpoint': 'heatmap_points.php',
+}, noFetchNodes);
 const noFetchWorkspace = new HeatmapExplorerWorkspace(
-  mountedWorkspaceRoot({
-    'data-heatmap-game': 'cstrike', 'data-heatmap-map': 'de_dust2',
-    'data-heatmap-player': '0', 'data-heatmap-endpoint': 'heatmap_points.php',
-  }, noFetchNodes),
+  noFetchRoot,
   {messages: workspaceMessages}
 );
 noFetchWorkspace.mount();
 assert.strictEqual(noFetchNodes['[data-heatmap-status]'].textContent, 'Fallback', 'no-fetch environments should immediately expose the usable static fallback');
 assert.strictEqual(noFetchNodes['[data-heatmap-interactive]'].style.display, 'none');
+assert.strictEqual(noFetchRoot.attributes['data-heatmap-state'], 'static_fallback', 'no-fetch mounts should publish static fallback state so map-style controls are hidden with the JPEG');
 
 function workspaceEventElement(attributes = {}) {
   const node = workspaceElement(attributes);
