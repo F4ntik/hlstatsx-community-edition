@@ -2490,14 +2490,44 @@ function heatmap_map_source_identity(string $path): string
     return $digest;
 }
 
-function heatmap_version_fallback_image(array $image): array
+function heatmap_map_source_snapshot(string $path): array
 {
-    $sourceIdentity = heatmap_map_source_identity(strval($image['path'] ?? ''));
-    if ($sourceIdentity === '') {
+    clearstatcache(true, $path);
+    $bytes = @file_get_contents($path);
+    if (!is_string($bytes)) {
         throw new RuntimeException('map_asset_unreadable');
     }
+    $size = @getimagesizefromstring($bytes);
+    if (!is_array($size) || intval($size[0] ?? 0) <= 0 || intval($size[1] ?? 0) <= 0) {
+        throw new RuntimeException('map_asset_unreadable');
+    }
+
+    return array(
+        'bytes' => $bytes,
+        'width' => intval($size[0]),
+        'height' => intval($size[1]),
+        'sourceIdentity' => hash('sha256', $bytes),
+    );
+}
+
+function heatmap_map_request_version_state($requested, string $sourceIdentity): string
+{
+    $requested = is_string($requested) ? $requested : '';
+    if (preg_match('/^[a-f0-9]{64}$/D', $requested) !== 1) {
+        return 'unversioned';
+    }
+
+    return hash_equals($sourceIdentity, $requested) ? 'current' : 'stale';
+}
+
+function heatmap_version_fallback_image(array $image): array
+{
+    $snapshot = heatmap_map_source_snapshot(strval($image['path'] ?? ''));
+    $sourceIdentity = $snapshot['sourceIdentity'];
     $url = strval($image['url'] ?? '');
     $image['url'] = $url . (strpos($url, '?') === false ? '?' : '&') . 'v=' . $sourceIdentity;
+    $image['width'] = $snapshot['width'];
+    $image['height'] = $snapshot['height'];
     $image['sourceIdentity'] = $sourceIdentity;
 
     return $image;
@@ -2630,15 +2660,15 @@ function heatmap_image_metadata($game, $map, array $config)
 {
     $sourcePath = heatmap_source_path($config, $map);
     if (is_file($sourcePath)) {
-        $sourceSize = getimagesize($sourcePath);
-        $sourceIdentity = heatmap_map_source_identity($sourcePath);
-        $config = heatmap_normalize_crop($config, intval($sourceSize[0] ?? 0), intval($sourceSize[1] ?? 0));
+        $sourceSnapshot = heatmap_map_source_snapshot($sourcePath);
+        $sourceIdentity = $sourceSnapshot['sourceIdentity'];
+        $config = heatmap_normalize_crop($config, $sourceSnapshot['width'], $sourceSnapshot['height']);
         $base = array(
             'url' => 'heatmap_map.php?game=' . rawurlencode($game) . '&map=' . rawurlencode($map),
-            'width' => intval($sourceSize[0] ?? 0),
-            'height' => intval($sourceSize[1] ?? 0),
-            'sourceWidth' => intval($sourceSize[0] ?? 0),
-            'sourceHeight' => intval($sourceSize[1] ?? 0),
+            'width' => $sourceSnapshot['width'],
+            'height' => $sourceSnapshot['height'],
+            'sourceWidth' => $sourceSnapshot['width'],
+            'sourceHeight' => $sourceSnapshot['height'],
             'source' => 'heatmaps/src',
             'sourceIdentity' => $sourceIdentity,
         );

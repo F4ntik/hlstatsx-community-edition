@@ -325,14 +325,26 @@ $secondMapIdentity = heatmap_map_source_identity($mapIdentityPath);
 assert_true(preg_match('/^[a-f0-9]{64}$/D', $firstMapIdentity) === 1, 'map source identity should be a SHA-256 token');
 assert_true(preg_match('/^[a-f0-9]{64}$/D', $secondMapIdentity) === 1, 'replacement map source identity should be a SHA-256 token');
 assert_true($firstMapIdentity !== $secondMapIdentity, 'same-second same-size replacement should change map source identity');
+$realMapPath = heatmap_source_path(array('game' => 'cstrike'), 'de_dust2');
+$realMapSnapshot = heatmap_map_source_snapshot($realMapPath);
+$realMapSize = getimagesize($realMapPath);
+assert_same(intval($realMapSize[0]), $realMapSnapshot['width'], 'map snapshot width should come from the hashed bytes');
+assert_same(intval($realMapSize[1]), $realMapSnapshot['height'], 'map snapshot height should come from the hashed bytes');
+assert_same(hash_file('sha256', $realMapPath), $realMapSnapshot['sourceIdentity'], 'map snapshot identity should match its immutable bytes');
+assert_same($realMapSnapshot['sourceIdentity'], hash('sha256', $realMapSnapshot['bytes']), 'map snapshot bytes and identity should stay coupled');
+assert_same('current', heatmap_map_request_version_state($realMapSnapshot['sourceIdentity'], $realMapSnapshot['sourceIdentity']), 'matching content version should be cacheable');
+assert_same('stale', heatmap_map_request_version_state(str_repeat('0', 64), $realMapSnapshot['sourceIdentity']), 'old content version should fail closed');
+assert_same('unversioned', heatmap_map_request_version_state('1788297600', $realMapSnapshot['sourceIdentity']), 'legacy mtime versions should remain compatible but uncacheable');
 $fallbackMetadata = heatmap_version_fallback_image(array(
     'url' => './hlstatsimg/games/cstrike/maps/de_dust2.jpg',
-    'path' => $mapIdentityPath,
-    'width' => 1024,
-    'height' => 768,
+    'path' => $realMapPath,
+    'width' => 1,
+    'height' => 1,
 ));
-assert_same($secondMapIdentity, $fallbackMetadata['sourceIdentity'], 'fallback metadata should publish the resolved file identity');
-assert_contains('?v=' . $secondMapIdentity, $fallbackMetadata['url'], 'fallback map URL should be content-versioned');
+assert_same($realMapSnapshot['sourceIdentity'], $fallbackMetadata['sourceIdentity'], 'fallback metadata should publish the resolved file identity');
+assert_same($realMapSnapshot['width'], $fallbackMetadata['width'], 'fallback metadata should publish dimensions from the hashed bytes');
+assert_same($realMapSnapshot['height'], $fallbackMetadata['height'], 'fallback metadata should publish dimensions from the hashed bytes');
+assert_contains('?v=' . $realMapSnapshot['sourceIdentity'], $fallbackMetadata['url'], 'fallback map URL should be content-versioned');
 $oldWriterImage = $sceneKeyImage;
 $oldWriterImage['sourceIdentity'] = $firstMapIdentity;
 $newReaderImage = $sceneKeyImage;

@@ -33,13 +33,18 @@ try {
         exit;
     }
 
-    $sourceSize = getimagesize($sourcePath);
-    $sourceWidth = intval($sourceSize[0] ?? 0);
-    $sourceHeight = intval($sourceSize[1] ?? 0);
-    if ($sourceWidth <= 0 || $sourceHeight <= 0) {
-        http_response_code(500);
+    $sourceSnapshot = heatmap_map_source_snapshot($sourcePath);
+    $sourceWidth = $sourceSnapshot['width'];
+    $sourceHeight = $sourceSnapshot['height'];
+    $versionState = heatmap_map_request_version_state($_GET['v'] ?? '', $sourceSnapshot['sourceIdentity']);
+    if ($versionState === 'stale') {
+        header('Cache-Control: no-store');
+        http_response_code(409);
         exit;
     }
+    $cacheControl = $versionState === 'current'
+        ? 'public, max-age=3600, immutable'
+        : 'no-store';
     $cropConfig = array(
         'cropx1' => isset($_GET['cropx1']) ? intval($_GET['cropx1']) : intval($config['cropx1'] ?? 0),
         'cropy1' => isset($_GET['cropy1']) ? intval($_GET['cropy1']) : intval($config['cropy1'] ?? 0),
@@ -53,7 +58,7 @@ try {
             http_response_code(500);
             exit;
         }
-        $image = imagecreatefromjpeg($sourcePath);
+        $image = imagecreatefromstring($sourceSnapshot['bytes']);
         if (!$image) {
             http_response_code(500);
             exit;
@@ -70,7 +75,8 @@ try {
             $cropConfig['cropy2']
         );
         header('Content-Type: image/jpeg');
-        header('Cache-Control: public, max-age=3600');
+        header('Cache-Control: ' . $cacheControl);
+        header('ETag: "' . $sourceSnapshot['sourceIdentity'] . '"');
         imagejpeg($cropped, null, 90);
         imagedestroy($cropped);
         imagedestroy($image);
@@ -78,8 +84,10 @@ try {
     }
 
     header('Content-Type: image/jpeg');
-    header('Cache-Control: public, max-age=3600');
-    readfile($sourcePath);
+    header('Cache-Control: ' . $cacheControl);
+    header('ETag: "' . $sourceSnapshot['sourceIdentity'] . '"');
+    header('Content-Length: ' . strlen($sourceSnapshot['bytes']));
+    echo $sourceSnapshot['bytes'];
 } catch (Throwable $exc) {
     http_response_code(500);
 }
