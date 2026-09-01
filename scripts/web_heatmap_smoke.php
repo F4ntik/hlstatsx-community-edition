@@ -191,6 +191,10 @@ foreach (array(false, true, '', ' ', '01', '1.0', '1e0', -1, 3, 1.5, array(1), n
     assert_same(0, heatmap_explorer_mode(array('HeatmapExplorerBeta' => $invalidMode)), 'invalid explorer mode should fail closed');
 }
 
+$headerSource = file_get_contents(ROOT_PATH . '/pages/header.php');
+assert_true($headerSource !== false, 'page header source should be readable');
+assert_contains('<meta name="viewport" content="width=device-width, initial-scale=1">', $headerSource, 'page header should publish the mobile layout viewport contract');
+
 $playerinfoSource = file_get_contents(ROOT_PATH . '/pages/playerinfo.php');
 assert_true($playerinfoSource !== false, 'playerinfo source should be readable');
 assert_contains('$playerInfoTabsExtra = array(', $playerinfoSource, 'playerinfo AJAX tabs should assemble a dedicated extras payload');
