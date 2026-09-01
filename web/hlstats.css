@@ -616,6 +616,12 @@ nav{
 	padding: 0;
 }
 
+.heatmap-explorer__period-controls {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
 .heatmap-explorer__sheet-toggle {
 	display: none;
 }
@@ -648,6 +654,17 @@ nav{
 
 .heatmap-explorer select {
 	padding: 8px;
+}
+
+.heatmap-explorer__input {
+	min-height: 36px;
+	min-width: 12ch;
+	padding: 8px;
+	border: 1px solid var(--hm-border);
+	border-radius: 0;
+	background: var(--hm-panel-raised);
+	color: var(--hm-text);
+	font: inherit;
 }
 
 .heatmap-explorer button[aria-pressed="true"],
@@ -687,6 +704,10 @@ nav{
 	color: var(--hm-text);
 }
 
+.heatmap-explorer__floor-option[data-unavailable="1"] {
+	opacity: 0.65;
+}
+
 .heatmap-explorer__stage-column {
 	display: flex;
 	min-width: 0;
@@ -705,6 +726,12 @@ nav{
 	overflow: hidden;
 	min-height: 360px;
 	background: #000;
+}
+
+.heatmap-explorer__stage[data-heatmap-pan-active="1"],
+.heatmap-explorer__stage[data-heatmap-pan-active="1"] [data-heatmap-canvas="1"],
+[data-heatmap-canvas="1"][data-heatmap-pan-active="1"] {
+	touch-action: none;
 }
 
 .heatmap-explorer [data-heatmap-camera] {
@@ -752,6 +779,13 @@ nav{
 .heatmap-explorer__alert {
 	border-color: var(--hm-kill);
 	color: var(--hm-text);
+}
+
+.heatmap-explorer__alert-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 12px;
 }
 
 .heatmap-explorer__inspector h3,
@@ -811,7 +845,8 @@ nav{
 	.heatmap-explorer__header,
 	.heatmap-explorer__footer,
 	.heatmap-explorer__controls,
-	.heatmap-explorer__group {
+	.heatmap-explorer__group,
+	.heatmap-explorer__period-controls {
 		align-items: stretch;
 		flex-direction: column;
 	}
@@ -819,7 +854,8 @@ nav{
 	.heatmap-explorer select,
 	.heatmap-explorer button,
 	.heatmap-explorer a,
-	.heatmap-explorer__floors label {
+	.heatmap-explorer__floors label,
+	.heatmap-explorer__input {
 		min-height: 44px;
 	}
 

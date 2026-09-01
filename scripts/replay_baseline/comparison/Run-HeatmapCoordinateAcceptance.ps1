@@ -56,13 +56,25 @@ function Get-ComposeValue {
     return $match.Groups[1].Value.Trim()
 }
 
+function Invoke-NativeCapture {
+    param([Parameter(Mandatory = $true)][scriptblock]$Command)
+
+    $previousPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        return @(& $Command 2>&1)
+    } finally {
+        $ErrorActionPreference = $previousPreference
+    }
+}
+
 function Invoke-CheckedDocker {
     param(
         [Parameter(Mandatory = $true)][string[]]$Arguments,
         [Parameter(Mandatory = $true)][string]$FailureMessage
     )
 
-    $discardedOutput = @(& docker @Arguments 2>&1)
+    $discardedOutput = @(Invoke-NativeCapture { docker @Arguments })
     if ($LASTEXITCODE -ne 0) {
         throw $FailureMessage
     }
@@ -93,8 +105,10 @@ function Assert-UnoccupiedDisposableTarget {
 
 function Wait-ForDisposableDatabase {
     for ($attempt = 1; $attempt -le 60; $attempt++) {
-        $discardedOutput = @(& docker exec -e "MYSQL_PWD=$script:dbPassword" $script:containerName `
-                mariadb-admin --protocol=socket -u $script:dbUsername ping 2>&1)
+        $discardedOutput = @(Invoke-NativeCapture {
+                docker exec -e "MYSQL_PWD=$script:dbPassword" $script:containerName `
+                    mariadb-admin --protocol=socket -u $script:dbUsername ping
+            })
         if ($LASTEXITCODE -eq 0) {
             return
         }
@@ -103,19 +117,74 @@ function Wait-ForDisposableDatabase {
     throw "Disposable MariaDB did not become ready."
 }
 
+function Wait-ForRestoreRoute {
+    for ($attempt = 1; $attempt -le 30; $attempt++) {
+        $discardedOutput = @(Invoke-NativeCapture {
+                docker run --rm --network "container:$script:containerName" `
+                    -e "MYSQL_PWD=$script:rootPassword" `
+                    mariadb:10.11 mariadb-admin --protocol=TCP -h 127.0.0.1 -u root ping
+            })
+        if ($LASTEXITCODE -eq 0) {
+            return
+        }
+        Start-Sleep -Seconds 1
+    }
+    throw "Disposable MariaDB root TCP route did not become ready."
+}
+
 function Invoke-DatabaseRows {
     param([Parameter(Mandatory = $true)][string]$Sql)
 
-    $rows = @($Sql | & docker exec -i -e "MYSQL_PWD=$script:dbPassword" $script:containerName `
-            mariadb --protocol=socket -u $script:dbUsername --batch --skip-column-names $script:dbName 2>&1)
+    $rows = @(Invoke-NativeCapture {
+            $Sql | docker exec -i -e "MYSQL_PWD=$script:dbPassword" $script:containerName `
+                mariadb --protocol=socket -u $script:dbUsername --batch --skip-column-names $script:dbName
+        })
     if ($LASTEXITCODE -ne 0) {
         throw "A coordinate assertion database command failed."
     }
     return @($rows | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ -ne "" })
 }
 
+function Get-CanonicalUniqueId {
+    param([Parameter(Mandatory = $true)][string]$UniqueId)
+
+    return [regex]::Replace($UniqueId.Trim(), '^STEAM_\d+:', '', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+}
+
+function Resolve-PlayerIdByUniqueId {
+    param(
+        [Parameter(Mandatory = $true)][string]$UniqueId,
+        [Parameter(Mandatory = $true)][string]$Game
+    )
+
+    $gameId = $Game.Replace("'", "''")
+    $candidates = [System.Collections.Generic.List[string]]::new()
+    $null = $candidates.Add($UniqueId)
+    $canonicalUnique = Get-CanonicalUniqueId -UniqueId $UniqueId
+    if ($canonicalUnique -ne $UniqueId) {
+        $null = $candidates.Add($canonicalUnique)
+    }
+
+    foreach ($candidate in $candidates) {
+        $escapedCandidate = $candidate.Replace("'", "''")
+        $rows = @(Invoke-DatabaseRows -Sql @"
+SELECT CAST(lookup.playerId AS CHAR)
+FROM hlstats_PlayerUniqueIds AS lookup
+WHERE lookup.uniqueId = '$escapedCandidate'
+  AND lookup.game = '$gameId'
+"@
+        )
+        if ($rows.Count -gt 0) {
+            return $rows[0]
+        }
+    }
+
+    return $null
+}
+
 function Get-FragCoordinates {
     param(
+        [Parameter(Mandatory = $true)][string]$Game,
         [Parameter(Mandatory = $true)][string]$KillerUniqueId,
         [Parameter(Mandatory = $true)][string]$VictimUniqueId,
         [Parameter(Mandatory = $true)][string]$Weapon,
@@ -132,18 +201,19 @@ CONCAT_WS('|',
   COALESCE(CAST(frag.pos_victim_z AS CHAR), 'NULL')
 )
 "@
-    $killerId = $KillerUniqueId.Replace("'", "''")
-    $victimId = $VictimUniqueId.Replace("'", "''")
     $weaponName = $Weapon.Replace("'", "''")
+    $killerPlayerId = Resolve-PlayerIdByUniqueId -UniqueId $KillerUniqueId -Game $Game
+    $victimPlayerId = Resolve-PlayerIdByUniqueId -UniqueId $VictimUniqueId -Game $Game
+    if ($null -eq $killerPlayerId -or $null -eq $victimPlayerId) {
+        return @()
+    }
 
     $headshotPredicate = if ($Headshot) { "AND frag.headshot = 1" } else { "" }
     $sql = @"
 SELECT $coordinateProjection
 FROM hlstats_Events_Frags AS frag
-INNER JOIN hlstats_Players AS killer ON killer.playerId = frag.killerId
-INNER JOIN hlstats_Players AS victim ON victim.playerId = frag.victimId
-WHERE killer.uniqueId = '$killerId'
-  AND victim.uniqueId = '$victimId'
+WHERE frag.killerId = $killerPlayerId
+  AND frag.victimId = $victimPlayerId
   AND frag.weapon = '$weaponName'
   $headshotPredicate
 ORDER BY frag.id
@@ -153,12 +223,16 @@ ORDER BY frag.id
 
 function Get-SuicideCoordinates {
     param(
+        [Parameter(Mandatory = $true)][string]$Game,
         [Parameter(Mandatory = $true)][string]$VictimUniqueId,
         [Parameter(Mandatory = $true)][string]$Weapon
     )
 
-    $victimId = $VictimUniqueId.Replace("'", "''")
     $weaponName = $Weapon.Replace("'", "''")
+    $victimPlayerId = Resolve-PlayerIdByUniqueId -UniqueId $VictimUniqueId -Game $Game
+    if ($null -eq $victimPlayerId) {
+        return @()
+    }
     $sql = @"
 SELECT CONCAT_WS('|',
   'NULL', 'NULL', 'NULL',
@@ -167,8 +241,7 @@ SELECT CONCAT_WS('|',
   COALESCE(CAST(suicide.pos_z AS CHAR), 'NULL')
 )
 FROM hlstats_Events_Suicides AS suicide
-INNER JOIN hlstats_Players AS victim ON victim.playerId = suicide.playerId
-WHERE victim.uniqueId = '$victimId'
+WHERE suicide.playerId = $victimPlayerId
   AND suicide.weapon = '$weaponName'
 ORDER BY suicide.id
 "@
@@ -201,6 +274,7 @@ try {
         -FailureMessage "Unable to start the disposable coordinate database."
     $started = $true
     Wait-ForDisposableDatabase
+    Wait-ForRestoreRoute
 
     $absoluteDumpPath = (Resolve-Path -LiteralPath $dumpPath).Path
     Invoke-CheckedDocker -Arguments @(
@@ -213,29 +287,31 @@ try {
 
     $env:PYTHONPATH = "scripts;scripts/replay_baseline"
     $fixtureContent = Get-Content -LiteralPath $fixturePath -Raw
-    $discardedImportOutput = @($fixtureContent | & python -m hlstats_py.runtime `
-            --configfile $benchConfigPath --stdin --server-ip 172.19.0.1 --server-port 27015 2>&1)
+    $discardedImportOutput = @(Invoke-NativeCapture {
+            $fixtureContent | python -m hlstats_py.runtime `
+                --configfile $benchConfigPath --stdin --server-ip 172.19.0.1 --server-port 27015
+        })
     if ($LASTEXITCODE -ne 0) {
         throw "Fixture import failed."
     }
 
     $coordinateCases = @(
-        [ordered]@{ name = "shipped_cstrike_distinct"; source = "frag"; killer = "STEAM_1:0:900001"; victim = "STEAM_1:0:900002"; weapon = "ak47"; headshot = $true; expected = "101|202|303|404|505|606" },
-        [ordered]@{ name = "sourcemod_suicide_victim_only"; source = "suicide"; victim = "STEAM_1:0:900003"; weapon = "worldspawn"; expected = "NULL|NULL|NULL|707|808|909" },
-        [ordered]@{ name = "staged_pair_consumed_once"; source = "frag"; killer = "STEAM_1:0:900004"; victim = "STEAM_1:0:900005"; weapon = "m4a1"; headshot = $false; expected = "1001|1002|1003|1101|1102|1103" },
-        [ordered]@{ name = "staged_pair_not_reused"; source = "frag"; killer = "STEAM_1:0:900006"; victim = "STEAM_1:0:900007"; weapon = "m4a1"; headshot = $false; expected = "NULL|NULL|NULL|NULL|NULL|NULL" },
-        [ordered]@{ name = "source_boundary_clears_staged_pair"; source = "frag"; killer = "STEAM_1:0:900008"; victim = "STEAM_1:0:900009"; weapon = "m4a1"; headshot = $false; expected = "NULL|NULL|NULL|NULL|NULL|NULL" }
+        [ordered]@{ name = "shipped_cstrike_distinct"; game = "cstrike"; source = "frag"; killer = "STEAM_1:0:900001"; victim = "STEAM_1:0:900002"; weapon = "ak47"; headshot = $true; expected = "101|202|303|404|505|606" },
+        [ordered]@{ name = "sourcemod_suicide_victim_only"; game = "cstrike"; source = "suicide"; victim = "STEAM_1:0:900003"; weapon = "worldspawn"; expected = "NULL|NULL|NULL|707|808|909" },
+        [ordered]@{ name = "staged_pair_consumed_once"; game = "cstrike"; source = "frag"; killer = "STEAM_1:0:900004"; victim = "STEAM_1:0:900005"; weapon = "m4a1"; headshot = $false; expected = "1001|1002|1003|1101|1102|1103" },
+        [ordered]@{ name = "staged_pair_not_reused"; game = "cstrike"; source = "frag"; killer = "STEAM_1:0:900006"; victim = "STEAM_1:0:900007"; weapon = "m4a1"; headshot = $false; expected = "NULL|NULL|NULL|NULL|NULL|NULL" },
+        [ordered]@{ name = "source_boundary_clears_staged_pair"; game = "cstrike"; source = "frag"; killer = "STEAM_1:0:900008"; victim = "STEAM_1:0:900009"; weapon = "m4a1"; headshot = $false; expected = "NULL|NULL|NULL|NULL|NULL|NULL" }
     )
 
     $rowCounts = [ordered]@{}
     $assertedCoordinateTuples = [ordered]@{}
     foreach ($case in $coordinateCases) {
-        $rows = if ($case.source -eq "suicide") {
-            @(Get-SuicideCoordinates -VictimUniqueId $case.victim -Weapon $case.weapon)
-        } else {
-            @(Get-FragCoordinates -KillerUniqueId $case.killer -VictimUniqueId $case.victim `
-                    -Weapon $case.weapon -Headshot:$case.headshot)
-        }
+        $rows = @(if ($case.source -eq "suicide") {
+                Get-SuicideCoordinates -Game $case.game -VictimUniqueId $case.victim -Weapon $case.weapon
+            } else {
+                Get-FragCoordinates -Game $case.game -KillerUniqueId $case.killer -VictimUniqueId $case.victim `
+                    -Weapon $case.weapon -Headshot:$case.headshot
+            })
         if ($rows.Count -ne 1 -or $rows[0] -ne $case.expected) {
             throw "Coordinate assertion failed."
         }
@@ -265,7 +341,7 @@ try {
 }
 finally {
     if ($started) {
-        $discardedCleanupOutput = @(& docker compose -p $composeProject -f $composeFile down -v 2>&1)
+        $discardedCleanupOutput = @(Invoke-NativeCapture { docker compose -p $composeProject -f $composeFile down -v })
         if ($LASTEXITCODE -ne 0) {
             Write-Warning "Disposable cleanup did not complete; inspect only the named bench_ephemeral resources."
         }

@@ -6,6 +6,7 @@ define('IN_HLSTATS', true);
 define('ROOT_PATH', dirname(__DIR__) . '/web');
 
 require ROOT_PATH . '/includes/heatmap_points.php';
+require ROOT_PATH . '/includes/i18n.php';
 
 function assert_same($expected, $actual, string $message): void
 {
@@ -101,6 +102,7 @@ function smoke_remove_directory(string $directory): void
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
+init_i18n();
 unset($_SESSION['heatmap_admin_csrf']);
 $adminCsrfToken = heatmap_admin_session_csrf_token();
 assert_true(preg_match('/^[a-f0-9]{64}$/D', $adminCsrfToken) === 1, 'admin CSRF token should be a 32-byte random hex token');
@@ -121,6 +123,49 @@ foreach ($explorerModeCases as $case) {
 foreach (array(false, true, '', ' ', '01', '1.0', '1e0', -1, 3, 1.5, array(1), new stdClass()) as $invalidMode) {
     assert_same(0, heatmap_explorer_mode(array('HeatmapExplorerBeta' => $invalidMode)), 'invalid explorer mode should fail closed');
 }
+
+$workspaceHtml = heatmap_render_explorer_workspace(array(
+    'game' => 'cstrike',
+    'map' => 'de_dust2',
+    'player' => 42,
+    'image' => './hlstatsimg/games/cstrike/maps/de_dust2.jpg',
+    'imageAlt' => 'de_dust2',
+    'endpoint' => 'heatmap_points.php',
+    'jpeg' => './hlstatsimg/games/cstrike/heatmaps/de_dust2-kill.jpg',
+    'lang' => 'en',
+    'lenses' => array('overview', 'me', 'difference'),
+    'maps' => array(array('map' => 'de_dust2', 'label' => 'de_dust2')),
+));
+foreach (array(
+    'data-heatmap-from="1"',
+    'data-heatmap-to="1"',
+    'data-heatmap-apply="1"',
+    'data-heatmap-v1-url=',
+    'data-heatmap-message-insufficient-sample=',
+    'data-heatmap-message-weak-projection=',
+    'data-heatmap-message-open-v1=',
+    '<option value="custom">',
+) as $token) {
+    assert_contains($token, $workspaceHtml, 'explorer workspace should publish the custom-period and explicit-state hooks: ' . $token);
+}
+
+$legacyRouteHtml = heatmap_render_explorer_workspace(array(
+    'game' => 'cstrike',
+    'map' => 'de_dust2',
+    'player' => 42,
+    'image' => './hlstatsimg/games/cstrike/maps/de_dust2.jpg',
+    'imageAlt' => 'de_dust2',
+    'endpoint' => 'heatmap_points.php?game=cstrike&map=de_dust2&player=42&event=kills&v=2&inspect=c0.0&lang=ru',
+    'jpeg' => './hlstatsimg/games/cstrike/heatmaps/de_dust2-kill.jpg',
+    'lang' => 'en',
+    'lenses' => array('overview', 'me', 'difference'),
+    'maps' => array(array('map' => 'de_dust2', 'label' => 'de_dust2')),
+));
+assert_contains(
+    'data-heatmap-v1-url="heatmap_points.php?game=cstrike&amp;map=de_dust2&amp;player=42&amp;event=kills"',
+    $legacyRouteHtml,
+    'explorer workspace should expose a trustworthy legacy route separate from the JPEG fallback'
+);
 
 $sceneKeyQuery = array(
     'game' => 'cstrike',

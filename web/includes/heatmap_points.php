@@ -71,6 +71,52 @@ function heatmap_explorer_label(string $key): string
     return t('heatmapExplorer.' . $key);
 }
 
+function heatmap_explorer_v1_url(array $context): string
+{
+    $endpoint = strval($context['endpoint'] ?? 'heatmap_points.php');
+    $parts = parse_url($endpoint);
+    $base = isset($parts['path']) && is_string($parts['path']) && $parts['path'] !== ''
+        ? $parts['path']
+        : 'heatmap_points.php';
+    $query = array(
+        'game' => strval($context['game'] ?? ''),
+        'map' => strval($context['map'] ?? ''),
+    );
+
+    if (isset($parts['query']) && is_string($parts['query'])) {
+        $endpointQuery = array();
+        parse_str($parts['query'], $endpointQuery);
+        if (is_array($endpointQuery)) {
+            foreach (array('game', 'map', 'player', 'event') as $key) {
+                if (isset($endpointQuery[$key]) && is_scalar($endpointQuery[$key])) {
+                    $query[$key] = strval($endpointQuery[$key]);
+                }
+            }
+        }
+    }
+
+    if (!isset($query['player']) && intval($context['player'] ?? 0) > 0) {
+        $query['player'] = strval(intval($context['player']));
+    }
+    if (isset($query['player']) && preg_match('/^[1-9][0-9]{0,9}$/D', $query['player']) !== 1) {
+        unset($query['player']);
+    }
+    if (isset($query['event']) && !in_array($query['event'], array('kills', 'deaths', 'both'), true)) {
+        unset($query['event']);
+    }
+
+    $pairs = array();
+    foreach (array('game', 'map', 'player', 'event') as $key) {
+        $value = strval($query[$key] ?? '');
+        if ($value === '') {
+            continue;
+        }
+        $pairs[] = rawurlencode($key) . '=' . rawurlencode($value);
+    }
+
+    return $base . (count($pairs) > 0 ? '?' . implode('&', $pairs) : '');
+}
+
 function heatmap_render_explorer_workspace(array $context): string
 {
     $context = array_merge(array(
@@ -94,6 +140,7 @@ function heatmap_render_explorer_workspace(array $context): string
     $image = heatmap_explorer_html($context['image']);
     $imageAlt = heatmap_explorer_html($context['imageAlt'] === '' ? $context['map'] : $context['imageAlt']);
     $endpoint = heatmap_explorer_html($context['endpoint']);
+    $v1Url = heatmap_explorer_html(heatmap_explorer_v1_url($context));
     $jpeg = heatmap_explorer_html($context['jpeg']);
     $lang = $context['lang'] === 'ru' ? 'ru' : 'en';
     $lenses = is_array($context['lenses']) ? $context['lenses'] : array('overview');
@@ -128,9 +175,18 @@ function heatmap_render_explorer_workspace(array $context): string
     $html = '<section class="heatmap-explorer" data-heatmap-explorer="1"'
         . ' data-heatmap-game="' . $game . '" data-heatmap-map="' . $map . '"'
         . ' data-heatmap-player="' . $player . '" data-heatmap-endpoint="' . $endpoint . '"'
+        . ' data-heatmap-v1-url="' . $v1Url . '"'
         . ' data-heatmap-lang="' . $lang . '"'
         . ' data-heatmap-initial-lens="overview" data-heatmap-allow-me="' . ($hasMe ? '1' : '0') . '"'
-        . ' data-heatmap-allow-difference="' . ($hasDifference ? '1' : '0') . '">';
+        . ' data-heatmap-allow-difference="' . ($hasDifference ? '1' : '0') . '"'
+        . ' data-heatmap-message-insufficient-sample="' . heatmap_explorer_html(heatmap_explorer_label('insufficient_sample')) . '"'
+        . ' data-heatmap-message-missing-coordinates="' . heatmap_explorer_html(heatmap_explorer_label('missing_coordinates')) . '"'
+        . ' data-heatmap-message-floors-unavailable="' . heatmap_explorer_html(heatmap_explorer_label('floors_unavailable')) . '"'
+        . ' data-heatmap-message-weak-projection="' . heatmap_explorer_html(heatmap_explorer_label('weak_projection')) . '"'
+        . ' data-heatmap-message-too-many-events="' . heatmap_explorer_html(heatmap_explorer_label('too_many_events')) . '"'
+        . ' data-heatmap-message-range-custom="' . heatmap_explorer_html(heatmap_explorer_label('rangeCustom')) . '"'
+        . ' data-heatmap-message-open-v1="' . heatmap_explorer_html(heatmap_explorer_label('openV1')) . '"'
+        . ' data-heatmap-message-unavailable="' . heatmap_explorer_html(heatmap_explorer_label('unavailable')) . '">';
     $html .= '<header class="heatmap-explorer__header">';
     $html .= '<div><h2 data-heatmap-map-title="1">' . $map . '</h2>';
     $html .= '<p data-heatmap-period="1">' . heatmap_explorer_html(heatmap_explorer_label('loading')) . '</p></div>';
@@ -140,7 +196,15 @@ function heatmap_render_explorer_workspace(array $context): string
     $html .= '<select data-heatmap-range="1"><option value="7d">' . heatmap_explorer_html(heatmap_explorer_label('range7d')) . '</option>';
     $html .= '<option value="30d" selected="selected">' . heatmap_explorer_html(heatmap_explorer_label('range30d')) . '</option>';
     $html .= '<option value="90d">' . heatmap_explorer_html(heatmap_explorer_label('range90d')) . '</option>';
-    $html .= '<option value="365d">' . heatmap_explorer_html(heatmap_explorer_label('range365d')) . '</option></select></label>';
+    $html .= '<option value="365d">' . heatmap_explorer_html(heatmap_explorer_label('range365d')) . '</option>';
+    $html .= '<option value="custom">' . heatmap_explorer_html(heatmap_explorer_label('rangeCustom')) . '</option></select></label>';
+    $html .= '<div class="heatmap-explorer__period-controls">';
+    $html .= '<label class="heatmap-explorer__map-label">' . heatmap_explorer_html(heatmap_explorer_label('fromUtc'));
+    $html .= '<input type="text" class="heatmap-explorer__input" inputmode="numeric" pattern="[0-9]*" data-heatmap-from="1" value="" /></label>';
+    $html .= '<label class="heatmap-explorer__map-label">' . heatmap_explorer_html(heatmap_explorer_label('toUtc'));
+    $html .= '<input type="text" class="heatmap-explorer__input" inputmode="numeric" pattern="[0-9]*" data-heatmap-to="1" value="" /></label>';
+    $html .= '<button type="button" class="heatmap-explorer__control" data-heatmap-apply="1">'
+        . heatmap_explorer_html(heatmap_explorer_label('apply')) . '</button></div>';
     $html .= '<button type="button" class="heatmap-explorer__sheet-toggle" data-heatmap-sheet-toggle="floors"'
         . ' aria-controls="' . $floorSheetId . '" aria-expanded="false">' . heatmap_explorer_html(heatmap_explorer_label('floor')) . '</button>';
     $html .= '<button type="button" class="heatmap-explorer__sheet-toggle" data-heatmap-sheet-toggle="inspector"'

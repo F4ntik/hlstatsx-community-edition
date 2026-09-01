@@ -63,6 +63,7 @@ assert.match(source, /request\('preview', token\);/, 'scheduled preview should s
 console.log('heatmap JS projection smoke ok');
 
 const explorerSource = fs.readFileSync('web/includes/js/heatmap-explorer.js', 'utf8');
+const cssSource = fs.readFileSync('web/hlstats.css', 'utf8');
 const explorerContext = {
   module: {exports: {}},
   window: {},
@@ -250,6 +251,35 @@ assertInvalidScene(payload => { payload.comparison.bins[0][3] = NaN; }, 'deltas 
 assertInvalidScene(payload => { payload.comparison.bins[0][5] = -1; }, 'samples should be nonnegative integers');
 assertInvalidScene(payload => { payload.activeFloor = 'main'; }, 'active floor should match query floor');
 
+function blockedSceneFixture(state, overrides = {}) {
+  const payload = explorerSceneFixture({
+    state,
+    layers: {total: [], me: [], others: []},
+    comparison: {
+      fields: ['cell', 'x', 'y', 'killDelta', 'deathDelta', 'sample'],
+      bins: [],
+      personalSample: 0,
+      otherSample: 0,
+    },
+  });
+  if (state === 'floors_unavailable') {
+    payload.query = Object.assign({}, payload.query, {floor: 'upper'});
+    payload.activeFloor = 'upper';
+    payload.floors = [
+      {id: 'main', label: 'Main', count: 3, available: true},
+      {id: 'upper', label: 'Upper', count: 1, available: false},
+    ];
+  }
+  return Object.assign(payload, overrides);
+}
+
+for (const state of ['missing_coordinates', 'floors_unavailable', 'weak_projection', 'too_many_events']) {
+  assert.doesNotThrow(
+    () => new HeatmapExplorerScene(blockedSceneFixture(state)),
+    `scene state ${state} should remain a valid explicit terminal payload`
+  );
+}
+
 const emptyScenePayload = explorerSceneFixture({
   state: 'empty',
   layers: {total: [], me: [], others: []},
@@ -263,6 +293,22 @@ const emptyScenePayload = explorerSceneFixture({
 const emptyScene = new HeatmapExplorerScene(emptyScenePayload);
 assert.strictEqual(emptyScene.dense('total', 'both').maxAbs, 0);
 assert.strictEqual(emptyScene.dense('total', 'both').occupied.length, 0);
+const insufficientScene = new HeatmapExplorerScene(explorerSceneFixture({
+  state: 'insufficient_sample',
+  query: Object.assign({}, explorerSceneFixture().query, {lens: 'difference', event: 'kills'}),
+  layers: {
+    total: [['c0.0', 0, 0, 5, 0]],
+    me: [['c0.0', 0, 0, 2, 0]],
+    others: [['c0.0', 0, 0, 3, 0]],
+  },
+  comparison: {
+    fields: ['cell', 'x', 'y', 'killDelta', 'deathDelta', 'sample'],
+    bins: [],
+    personalSample: 2,
+    otherSample: 3,
+  },
+}));
+assert.strictEqual(insufficientScene.state, 'insufficient_sample');
 
 const camera = new HeatmapExplorerCamera({
   viewportWidth: 200,
@@ -343,6 +389,8 @@ function makeDom(gl) {
       width: 0,
       height: 0,
       textContent: '',
+      captures: [],
+      releasedCaptures: [],
       listeners,
       setAttribute(name, value) { this.attributes[name] = String(value); },
       getAttribute(name) { return this.attributes[name]; },
@@ -351,6 +399,8 @@ function makeDom(gl) {
         if (!listeners[type]) return;
         listeners[type] = listeners[type].filter(candidate => candidate !== handler);
       },
+      setPointerCapture(pointerId) { this.captures.push(pointerId); },
+      releasePointerCapture(pointerId) { this.releasedCaptures.push(pointerId); },
       dispatchEvent(event) {
         (listeners[event.type] || []).slice().forEach(handler => handler(event));
         return true;
@@ -655,10 +705,16 @@ assert.match(explorerSource, /for \(var offsetY = -1; offsetY <= 1; offsetY\+\+\
 assert.match(explorerSource, /amber|orange/i);
 assert.match(explorerSource, /cyan|blue/i);
 assert.match(explorerSource, /contour/i);
+assert.doesNotMatch(explorerSource, /pointerPan:\s*false/, 'workspace should not hard-code pointer pan off');
+assert.match(explorerSource, /consumeSuppressedClick/, 'renderer should expose drag-based click suppression');
+assert.match(explorerSource, /data-heatmap-pan-active/, 'workspace should expose a scoped pan-active hook');
+assert.match(explorerSource, /data-heatmap-v1-url/, 'workspace should expose a trustworthy legacy route hook');
+assert.match(cssSource, /touch-action:\s*none/, 'pan mode should explicitly disable touch scrolling only while active');
 
 function workspaceElement(attributes = {}) {
   const listeners = Object.create(null);
-  return {
+  const classes = new Set();
+  const node = {
     attributes: Object.assign({}, attributes),
     style: {},
     hidden: false,
@@ -666,13 +722,64 @@ function workspaceElement(attributes = {}) {
     clientHeight: 240,
     textContent: '',
     value: '',
+    children: [],
+    disabled: false,
+    checked: false,
+    classList: {
+      add(name) { classes.add(name); },
+      remove(name) { classes.delete(name); },
+      contains(name) { return classes.has(name); },
+      toggle(name, force) {
+        if (force === undefined) {
+          if (classes.has(name)) {
+            classes.delete(name);
+            return false;
+          }
+          classes.add(name);
+          return true;
+        }
+        if (force) {
+          classes.add(name);
+          return true;
+        }
+        classes.delete(name);
+        return false;
+      },
+    },
     setAttribute(name, value) { this.attributes[name] = String(value); },
     getAttribute(name) { return this.attributes[name]; },
     addEventListener(type, handler) { (listeners[type] || (listeners[type] = [])).push(handler); },
     removeEventListener(type, handler) {
       if (listeners[type]) listeners[type] = listeners[type].filter(candidate => candidate !== handler);
     },
+    appendChild(child) {
+      this.children.push(child);
+      if (child && typeof child.textContent === 'string' && child.nodeType === 3) {
+        this.textContent += child.textContent;
+      }
+      return child;
+    },
+    removeChild(child) {
+      const index = this.children.indexOf(child);
+      if (index >= 0) {
+        this.children.splice(index, 1);
+      }
+      if (child && typeof child.textContent === 'string' && child.nodeType === 3) {
+        this.textContent = this.children
+          .filter(candidate => candidate && candidate.nodeType === 3 && typeof candidate.textContent === 'string')
+          .map(candidate => candidate.textContent)
+          .join('');
+      }
+      return child;
+    },
   };
+  Object.defineProperty(node, 'firstChild', {
+    enumerable: true,
+    get() {
+      return node.children.length > 0 ? node.children[0] : null;
+    },
+  });
+  return node;
 }
 
 function workspaceRoot(attributes) {
@@ -693,6 +800,7 @@ const workspaceMessages = {
   retry: 'Retry', fallback: 'Fallback', differenceBothCorrected: 'Kills selected',
   period: 'Period', sample: 'Sample', xyCoverage: 'XY', zCoverage: 'Z',
   projectionCoverage: 'Projection', coverage: 'Coverage', freshness: 'Freshness',
+  allFloors: 'All floors',
   empty: 'Empty', pinned: 'Pinned', unpinned: 'Unpinned', noCell: 'No cell',
   inspect: 'Inspect', kills: 'Kills', deaths: 'Deaths', pan: 'Pan', navigation: 'Navigation',
 };
@@ -741,6 +849,7 @@ function WorkspaceRenderer() {}
 WorkspaceRenderer.prototype.mount = function () {};
 WorkspaceRenderer.prototype.destroy = function () {};
 WorkspaceRenderer.prototype.setCamera = function () {};
+WorkspaceRenderer.prototype.consumeSuppressedClick = function () { return false; };
 const imageNode = workspaceElement({src: './client.jpg', alt: 'client map'});
 const staticLinkNode = workspaceElement({href: './client-kill.jpg'});
 const staticImageNode = workspaceElement({src: './client-kill.jpg', alt: 'client map'});
@@ -870,6 +979,187 @@ function workspaceHarness(search = '?page=4') {
   };
 }
 
+function explorerMessageAttributes() {
+  return {
+    'data-heatmap-message-insufficient-sample': 'Need at least three personal events',
+    'data-heatmap-message-missing-coordinates': 'Coordinates are missing for this view',
+    'data-heatmap-message-floors-unavailable': 'Selected floor is unavailable for this view',
+    'data-heatmap-message-weak-projection': 'Projection is too weak for Explorer rendering',
+    'data-heatmap-message-too-many-events': 'Too many events matched this view',
+    'data-heatmap-message-range-custom': 'Custom UTC window',
+    'data-heatmap-message-open-v1': 'Open legacy view',
+    'data-heatmap-message-unavailable': 'Unavailable',
+  };
+}
+
+function workspaceDocument() {
+  return {
+    createElement(tagName) {
+      const node = workspaceEventElement();
+      node.tagName = String(tagName).toUpperCase();
+      return node;
+    },
+    createTextNode(text) {
+      return {nodeType: 3, textContent: String(text)};
+    },
+  };
+}
+
+function richWorkspaceHarness(search = '?page=4', rootAttributes = {}) {
+  const nodes = {
+    interactive: workspaceEventElement(),
+    stage: workspaceEventElement(),
+    image: workspaceEventElement({src: './client.jpg', alt: 'client map'}),
+    canvas: workspaceEventElement(),
+    static: workspaceEventElement(),
+    staticLink: workspaceEventElement({href: './client-kill.jpg'}),
+    staticImage: workspaceEventElement({src: './client-kill.jpg', alt: 'client map'}),
+    status: workspaceEventElement(),
+    alert: workspaceEventElement(),
+    summary: workspaceEventElement(),
+    period: workspaceEventElement(),
+    window: workspaceEventElement(),
+    sample: workspaceEventElement(),
+    coverage: workspaceEventElement(),
+    freshness: workspaceEventElement(),
+    inspectOutput: workspaceEventElement(),
+    floors: workspaceEventElement(),
+    floorOptions: workspaceEventElement(),
+    inspector: workspaceEventElement(),
+    mapTitle: workspaceEventElement(),
+    mapSelect: workspaceEventElement(),
+    range: workspaceEventElement(),
+    from: workspaceEventElement(),
+    to: workspaceEventElement(),
+    apply: workspaceEventElement(),
+    zoomIn: workspaceEventElement(),
+    zoomOut: workspaceEventElement(),
+    reset: workspaceEventElement(),
+    pan: workspaceEventElement(),
+    share: workspaceEventElement(),
+  };
+  nodes.range.value = '30d';
+  nodes.mapSelect.value = 'de_dust2';
+  nodes.canvas.getBoundingClientRect = () => ({left: 100, top: 50, width: 400, height: 300});
+  nodes.static.appendChild(nodes.staticLink);
+  nodes.staticLink.appendChild(nodes.staticImage);
+
+  const selectors = {
+    '[data-heatmap-interactive]': nodes.interactive,
+    '[data-heatmap-stage]': nodes.stage,
+    '[data-heatmap-image]': nodes.image,
+    '[data-heatmap-canvas]': nodes.canvas,
+    '[data-heatmap-static]': nodes.static,
+    '[data-heatmap-static] a': nodes.staticLink,
+    '[data-heatmap-static] img': nodes.staticImage,
+    '[data-heatmap-status]': nodes.status,
+    '[data-heatmap-alert]': nodes.alert,
+    '[data-heatmap-summary]': nodes.summary,
+    '[data-heatmap-period]': nodes.period,
+    '[data-heatmap-window]': nodes.window,
+    '[data-heatmap-sample]': nodes.sample,
+    '[data-heatmap-coverage]': nodes.coverage,
+    '[data-heatmap-freshness]': nodes.freshness,
+    '[data-heatmap-inspect-output]': nodes.inspectOutput,
+    '[data-heatmap-floor-sheet]': nodes.floors,
+    '[data-heatmap-floor-options]': nodes.floorOptions,
+    '[data-heatmap-inspector]': nodes.inspector,
+    '[data-heatmap-map-title]': nodes.mapTitle,
+    '[data-heatmap-map-select]': nodes.mapSelect,
+    '[data-heatmap-range]': nodes.range,
+    '[data-heatmap-from]': nodes.from,
+    '[data-heatmap-to]': nodes.to,
+    '[data-heatmap-apply]': nodes.apply,
+    '[data-heatmap-zoom="in"]': nodes.zoomIn,
+    '[data-heatmap-zoom="out"]': nodes.zoomOut,
+    '[data-heatmap-reset]': nodes.reset,
+    '[data-heatmap-pan]': nodes.pan,
+    '[data-heatmap-share]': nodes.share,
+  };
+
+  const historyWrites = [];
+  const root = workspaceEventElement(Object.assign({
+    'data-heatmap-game': 'cstrike',
+    'data-heatmap-map': 'de_dust2',
+    'data-heatmap-player': '42',
+    'data-heatmap-endpoint': 'heatmap_points.php',
+    'data-heatmap-v1-url': 'heatmap_points.php?game=cstrike&map=de_dust2',
+    'data-heatmap-lang': 'en',
+    'data-heatmap-allow-me': '1',
+    'data-heatmap-allow-difference': '1',
+  }, explorerMessageAttributes(), rootAttributes));
+  root.querySelector = selector => selectors[selector] || null;
+  root.querySelectorAll = selector => {
+    if (selector === '[data-heatmap-floor]') {
+      return nodes.floorOptions.children
+        .flatMap(child => Array.isArray(child.children) ? child.children : [])
+        .filter(child => child && typeof child.getAttribute === 'function'
+          && child.getAttribute('data-heatmap-floor'));
+    }
+    return [];
+  };
+  return {
+    root,
+    nodes,
+    document: workspaceDocument(),
+    historyWrites,
+    window: {
+      location: {search, pathname: '/hlstats.php'},
+      history: {replaceState(_state, _title, href) { historyWrites.push(href); }},
+    },
+  };
+}
+
+function workspaceNodeBag(nodes) {
+  return {
+    interactive: nodes.interactive,
+    stage: nodes.stage,
+    image: nodes.image,
+    canvas: nodes.canvas,
+    static: nodes.static,
+    staticLink: nodes.staticLink,
+    staticImage: nodes.staticImage,
+    jpegLink: nodes.share,
+    status: nodes.status,
+    alert: nodes.alert,
+    summary: nodes.summary,
+    period: nodes.period,
+    window: nodes.window,
+    sample: nodes.sample,
+    coverage: nodes.coverage,
+    freshness: nodes.freshness,
+    inspectOutput: nodes.inspectOutput,
+    floors: nodes.floors,
+    floorOptions: nodes.floorOptions,
+    inspector: nodes.inspector,
+    mapTitle: nodes.mapTitle,
+    mapSelect: nodes.mapSelect,
+    range: nodes.range,
+    from: nodes.from,
+    to: nodes.to,
+    apply: nodes.apply,
+    zoomIn: nodes.zoomIn,
+    zoomOut: nodes.zoomOut,
+    reset: nodes.reset,
+    pan: nodes.pan,
+    share: nodes.share,
+  };
+}
+
+function mountedWorkspace(search = '?page=4', fetchImpl = null, options = {}) {
+  const harness = richWorkspaceHarness(search, options.rootAttributes);
+  const workspace = new HeatmapExplorerWorkspace(harness.root, Object.assign({
+    window: harness.window,
+    fetch: fetchImpl,
+    messages: workspaceMessages,
+    Renderer: WorkspaceRenderer,
+  }, options.workspaceOptions || {}));
+  workspace.document = harness.document;
+  workspace._nodes = workspaceNodeBag(harness.nodes);
+  workspace._mounted = true;
+  return {harness, workspace};
+}
+
 function deferredTransport() {
   const requests = [];
   return {
@@ -921,6 +1211,33 @@ function inspectPayload() {
     truncated: false,
     warnings: [],
   };
+}
+
+function overviewSceneForWindow(from, to, overrides = {}) {
+  return explorerSceneFixture(Object.assign({
+    query: {
+      game: 'cstrike',
+      map: 'de_dust2',
+      player: 42,
+      from,
+      to,
+      event: 'both',
+      lens: 'overview',
+      floor: 'all',
+      lang: 'en',
+    },
+    layers: {
+      total: [['c0.0', 0, 0, 5, 1]],
+      me: [['c0.0', 0, 0, 3, 1]],
+      others: [['c0.0', 0, 0, 2, 0]],
+    },
+    comparison: {
+      fields: ['cell', 'x', 'y', 'killDelta', 'deathDelta', 'sample'],
+      bins: [],
+      personalSample: 0,
+      otherSample: 0,
+    },
+  }, overrides));
 }
 
 async function settleWorkspace() {
@@ -1081,11 +1398,304 @@ function assertZoomUsesReversibleFactors() {
   assert.strictEqual(cameraForControls.state.zoom, 1, 'zoom in followed by zoom out must return to the prior zoom level');
 }
 
+async function assertFailureActionsUseKnownV1Route() {
+  const transport = deferredTransport();
+  const harness = richWorkspaceHarness('?page=4&hm_event=deaths', {
+    'data-heatmap-v1-url': 'heatmap_points.php?game=cstrike&map=de_dust2&player=42&event=kills',
+  });
+  const workspace = new HeatmapExplorerWorkspace(harness.root, {
+    window: harness.window,
+    document: harness.document,
+    fetch: transport.fetch,
+    messages: workspaceMessages,
+    Renderer: WorkspaceRenderer,
+  });
+  workspace.mount();
+  await settleWorkspace();
+  assert.strictEqual(transport.requests.length, 1, 'the initial scene should load before a later failure is exercised');
+  transport.requests[0].resolve(jsonResponse(sceneForMap('de_dust2')));
+  await settleWorkspace();
+  workspace._setState({map: 'de_nuke', event: 'deaths', floor: 'all', cell: null}, 'map');
+  await settleWorkspace();
+  assert.strictEqual(transport.requests.length, 2, 'changing the current map and event after a successful scene should start a new request');
+  transport.requests[1].reject(new Error('later scene failed'));
+  await settleWorkspace();
+  assert.strictEqual(harness.nodes.alert.children.length, 1, 'failure actions should render one grouped action row');
+  assert.strictEqual(harness.nodes.alert.children[0].children.length, 2, 'failure actions should append retry plus the known v1 route');
+  assert.strictEqual(harness.nodes.alert.children[0].children[0].textContent, 'Retry');
+  assert.strictEqual(harness.nodes.alert.children[0].children[1].tagName, 'A');
+  assert.strictEqual(
+    harness.nodes.alert.children[0].children[1].attributes.href,
+    'heatmap_points.php?game=cstrike&map=de_nuke&player=42&event=deaths'
+  );
+  assert.notStrictEqual(
+    harness.nodes.alert.children[0].children[1].attributes.href,
+    workspace._scene.fallback.v1,
+    'later failures must not fall back to the loaded scene generic route'
+  );
+  assert.strictEqual(harness.nodes.alert.children[0].children[1].textContent, 'Open legacy view');
+}
+
+async function assertInitialFailureUsesServerV1RouteWhenSceneIsMissing() {
+  for (const scenario of [
+    {
+      label: 'deaths deep-link should override the trusted base event',
+      search: '?page=4&hm_event=deaths',
+      expectedHref: 'heatmap_points.php?game=cstrike&map=de_dust2&player=42&event=deaths',
+    },
+    {
+      label: 'both deep-link should override the trusted base event',
+      search: '?page=4&hm_event=both',
+      expectedHref: 'heatmap_points.php?game=cstrike&map=de_dust2&player=42&event=both',
+    },
+  ]) {
+    const transport = deferredTransport();
+    const harness = richWorkspaceHarness(scenario.search, {
+      'data-heatmap-v1-url': 'heatmap_points.php?game=cstrike&map=de_dust2&player=42&event=kills',
+    });
+    const workspace = new HeatmapExplorerWorkspace(harness.root, {
+      window: harness.window,
+      document: harness.document,
+      fetch: transport.fetch,
+      messages: workspaceMessages,
+      Renderer: WorkspaceRenderer,
+    });
+
+    workspace.mount();
+    await settleWorkspace();
+    assert.strictEqual(transport.requests.length, 1, scenario.label + ': initial mount should begin with one scene request');
+    assert.strictEqual(workspace._scene, null, scenario.label + ': the initial failing request must happen before a scene is available');
+
+    transport.requests[0].resolve({ok: false, json() { throw new Error('not used'); }});
+    await settleWorkspace();
+    assert.strictEqual(harness.nodes.alert.hidden, false, scenario.label + ': initial request failures should remain visible');
+    assert.strictEqual(harness.nodes.alert.children.length, 1, scenario.label + ': initial request failures should still expose failure actions');
+    assert.strictEqual(harness.nodes.alert.children[0].children[1].attributes.href, scenario.expectedHref);
+    assert.notStrictEqual(harness.nodes.alert.children[0].children[1].attributes.href, harness.nodes.staticLink.attributes.href);
+  }
+}
+
+function assertUnavailableFloorsStayVisible() {
+  const {workspace, harness} = mountedWorkspace();
+  const floorScene = new HeatmapExplorerScene(blockedSceneFixture('floors_unavailable'));
+  workspace.state.floor = 'upper';
+  workspace._renderFloors(floorScene);
+  const floorControls = harness.root.querySelectorAll('[data-heatmap-floor]');
+  assert.strictEqual(floorControls.length, 3, 'all configured floors should remain in the control list');
+  assert.strictEqual(floorControls[2].disabled, true, 'unavailable floors should remain visible but disabled');
+  assert.strictEqual(floorControls[2].checked, true, 'the selected unavailable floor should remain explainable');
+  assert.match(harness.nodes.floorOptions.children[2].textContent, /Upper/);
+  assert.match(harness.nodes.floorOptions.children[2].textContent, /Unavailable/);
+}
+
+function assertAllFloorsAggregateLabelOmitsMisleadingZeroCount() {
+  const {workspace, harness} = mountedWorkspace();
+  workspace._renderFloors(validScene);
+  assert.strictEqual(harness.nodes.floorOptions.children[0].textContent, 'All floors');
+  assert.doesNotMatch(harness.nodes.floorOptions.children[0].textContent, /\(0\)/, 'aggregate floor label must not claim an empty count');
+}
+
+async function assertCustomWindowApplyValidation() {
+  const transport = deferredTransport();
+  assert.deepStrictEqual(
+    plain(HeatmapExplorerUrlState.parse('?hm_from=900&hm_to=1300', {nowSeconds: 1000})),
+    {from: 900, to: 1300},
+    'custom windows up to now+300 should parse like the backend contract'
+  );
+  assertInvalidUrl(
+    () => HeatmapExplorerUrlState.parse('?hm_from=900&hm_to=1301', {nowSeconds: 1000}),
+    'custom windows above now+300 should fail during deep-link hydration'
+  );
+
+  const futureTransport = deferredTransport();
+  const futureHarness = richWorkspaceHarness('?page=4&hm_from=900&hm_to=1301', {'data-heatmap-v1-url': 'heatmap_points.php?game=cstrike&map=de_dust2'});
+  const futureWorkspace = new HeatmapExplorerWorkspace(futureHarness.root, {
+    window: futureHarness.window,
+    document: futureHarness.document,
+    fetch: futureTransport.fetch,
+    messages: workspaceMessages,
+    Renderer: WorkspaceRenderer,
+    nowSeconds() { return 1000; },
+  });
+  futureWorkspace.mount();
+  await settleWorkspace();
+  assert.strictEqual(futureTransport.requests.length, 0, 'deep-linked future windows must fail before the first fetch');
+  assert.strictEqual(futureHarness.nodes.status.textContent, 'Invalid URL');
+
+  const {workspace, harness} = mountedWorkspace('?page=4&hm_from=100&hm_to=200&hm_event=both', transport.fetch, {
+    workspaceOptions: {nowSeconds() { return 1000; }},
+  });
+  workspace._bindEvents();
+  workspace._syncControls();
+  assert.strictEqual(harness.nodes.range.value, 'custom', 'deep-linked custom windows should hydrate the custom selector');
+  assert.strictEqual(harness.nodes.from.value, '100');
+  assert.strictEqual(harness.nodes.to.value, '200');
+
+  const writesBefore = harness.historyWrites.length;
+  harness.nodes.from.value = '200';
+  harness.nodes.to.value = '100';
+  harness.nodes.apply.dispatch('click');
+  await settleWorkspace();
+  assert.strictEqual(transport.requests.length, 0, 'invalid custom windows must not fetch');
+  assert.strictEqual(harness.historyWrites.length, writesBefore, 'invalid custom windows must not rewrite history');
+  assert.strictEqual(harness.nodes.status.textContent, 'Invalid URL');
+  assert.strictEqual(harness.nodes.alert.hidden, false);
+
+  harness.nodes.from.value = '900';
+  harness.nodes.to.value = '1301';
+  harness.nodes.apply.dispatch('click');
+  await settleWorkspace();
+  assert.strictEqual(transport.requests.length, 0, 'future custom windows beyond backend tolerance must not fetch');
+  assert.strictEqual(harness.historyWrites.length, writesBefore, 'future custom windows must not rewrite history');
+  assert.strictEqual(harness.nodes.status.textContent, 'Invalid URL');
+
+  harness.nodes.from.value = '900';
+  harness.nodes.to.value = '1300';
+  harness.nodes.apply.dispatch('click');
+  await settleWorkspace();
+  assert.strictEqual(transport.requests.length, 1, 'valid custom windows should request a fresh scene');
+  assert.match(transport.requests[0].url, /from=900&to=1300/);
+  transport.requests[0].resolve(jsonResponse(overviewSceneForWindow(900, 1300)));
+  await settleWorkspace();
+  assert.match(harness.nodes.share.attributes.href, /hm_from=900&hm_to=1300/);
+  assert.doesNotMatch(harness.nodes.share.attributes.href, /hm_range=/);
+  assert.strictEqual(harness.nodes.range.value, 'custom');
+}
+
+function assertExplicitStateAlertsStayLocalized() {
+  const {workspace, harness} = mountedWorkspace('?page=4&hm_event=both', null, {
+    rootAttributes: {
+      'data-heatmap-v1-url': 'heatmap_points.php?game=cstrike&map=de_dust2&player=42&event=kills',
+    },
+  });
+  const blockedScene = new HeatmapExplorerScene(blockedSceneFixture('weak_projection', {
+    query: {
+      game: 'cstrike',
+      map: 'de_nuke',
+      player: 42,
+      from: 1785456000,
+      to: 1788048000,
+      event: 'both',
+      lens: 'overview',
+      floor: 'all',
+      lang: 'en',
+    },
+    map: {
+      game: 'cstrike',
+      realgame: 'cstrike',
+      name: 'de_nuke',
+      image: {url: './de_nuke.jpg', width: 64, height: 32},
+      projectionHash: 'a4dd45e46d84a12f',
+      floorConfigHash: '97d170e1550eee4a',
+    },
+    fallback: {
+      v1: 'heatmap_points.php?game=cstrike&map=de_nuke',
+      jpeg: './de_nuke-kill.jpg',
+      thumbnail: './de_nuke-kill-thumb.jpg',
+    },
+  }));
+  workspace._applyScene(blockedScene, 'map');
+  assert.strictEqual(harness.nodes.alert.hidden, false, 'blocked explicit states should remain visible');
+  assert.strictEqual(harness.nodes.alert.textContent, 'Projection is too weak for Explorer rendering');
+  assert.match(harness.nodes.summary.textContent, /Period:/, 'blocked states should preserve the textual summary');
+  assert.strictEqual(
+    harness.nodes.alert.children[0].children[0].attributes.href,
+    'heatmap_points.php?game=cstrike&map=de_nuke&player=42&event=both'
+  );
+  assert.notStrictEqual(
+    harness.nodes.alert.children[0].children[0].attributes.href,
+    blockedScene.fallback.v1,
+    'blocked-state action must preserve player scope and current event from the trusted base'
+  );
+  assert.strictEqual(harness.nodes.status.textContent, 'Projection is too weak for Explorer rendering');
+
+  const emptyHarness = mountedWorkspace();
+  emptyHarness.workspace._applyScene(new HeatmapExplorerScene(emptyScenePayload), 'map');
+  assert.strictEqual(emptyHarness.harness.nodes.alert.hidden, true, 'empty should remain a truthful non-error state');
+  assert.strictEqual(emptyHarness.harness.nodes.status.textContent, 'Empty');
+}
+
+function assertPanModeSuppressesDragClicks() {
+  const panGl = fakeGl();
+  const panDom = makeDom(panGl);
+  let panEnabled = false;
+  const panRenderer = new HeatmapGlRenderer(panDom.root, validScene, {
+    window: panDom.window,
+    pointerPan() { return panEnabled; },
+  });
+  const panCamera = new HeatmapExplorerCamera({
+    viewportWidth: 320,
+    viewportHeight: 240,
+    contentWidth: 640,
+    contentHeight: 480,
+  });
+  panCamera.zoomAt(2, 160, 120);
+  panRenderer.mount();
+  panRenderer.setCamera(panCamera);
+  const disabledPanX = panCamera.state.panX;
+  let disabledMovePrevented = false;
+  panDom.nodes.canvas.dispatchEvent({type: 'pointerdown', clientX: 10, clientY: 10, pointerId: 7});
+  panDom.nodes.canvas.dispatchEvent({type: 'pointermove', clientX: 40, clientY: 40, pointerId: 7, preventDefault() { disabledMovePrevented = true; }});
+  panDom.nodes.canvas.dispatchEvent({type: 'pointerup', clientX: 40, clientY: 40, pointerId: 7});
+  assert.strictEqual(panCamera.state.panX, disabledPanX, 'pan mode should stay disabled until requested');
+  assert.strictEqual(disabledMovePrevented, false, 'non-pan pointer movement should preserve default scrolling');
+
+  panEnabled = true;
+  let thresholdMovePrevented = false;
+  let activeDragPrevented = false;
+  panDom.nodes.canvas.dispatchEvent({type: 'pointerdown', clientX: 60, clientY: 60, pointerId: 8});
+  panDom.nodes.canvas.dispatchEvent({type: 'pointermove', clientX: 58, clientY: 58, pointerId: 8, preventDefault() { thresholdMovePrevented = true; }});
+  assert.strictEqual(panCamera.state.panX, disabledPanX, 'sub-threshold movement should not pan the camera');
+  assert.strictEqual(thresholdMovePrevented, false, 'threshold probe should not cancel default scrolling yet');
+  panDom.nodes.canvas.dispatchEvent({type: 'pointermove', clientX: 28, clientY: 34, pointerId: 8, preventDefault() { activeDragPrevented = true; }});
+  assert.notStrictEqual(panCamera.state.panX, 0, 'dragging in pan mode should move the camera');
+  assert.strictEqual(activeDragPrevented, true, 'active drag should prevent default scrolling once pan actually starts');
+  panDom.nodes.canvas.dispatchEvent({type: 'pointerup', clientX: 28, clientY: 34, pointerId: 8});
+  assert.deepStrictEqual(panDom.nodes.canvas.captures, [8], 'drag pan should use pointer capture');
+  assert.deepStrictEqual(panDom.nodes.canvas.releasedCaptures, [8], 'drag pan should release pointer capture on completion');
+  assert.strictEqual(panRenderer.consumeSuppressedClick(), true, 'dragging should suppress the trailing click');
+  assert.strictEqual(panRenderer.consumeSuppressedClick(), false, 'suppressed clicks should be one-shot');
+  panRenderer.destroy();
+
+  const {workspace, harness} = mountedWorkspace();
+  let suppressed = true;
+  workspace._scene = validScene;
+  workspace._renderer = {consumeSuppressedClick() { const value = suppressed; suppressed = false; return value; }};
+  workspace._bindEvents();
+  workspace._syncControls();
+  assert.strictEqual(harness.root.attributes['data-heatmap-pan-active'], '0');
+  assert.strictEqual(harness.nodes.stage.attributes['data-heatmap-pan-active'], '0');
+  assert.strictEqual(harness.nodes.canvas.attributes['data-heatmap-pan-active'], '0');
+  assert.strictEqual(harness.nodes.stage.style.touchAction, 'auto');
+  assert.strictEqual(harness.nodes.canvas.style.touchAction, 'auto');
+  harness.nodes.pan.dispatch('click');
+  assert.strictEqual(harness.root.attributes['data-heatmap-pan-active'], '1');
+  assert.strictEqual(harness.nodes.stage.attributes['data-heatmap-pan-active'], '1');
+  assert.strictEqual(harness.nodes.canvas.attributes['data-heatmap-pan-active'], '1');
+  assert.strictEqual(harness.nodes.stage.style.touchAction, 'none');
+  assert.strictEqual(harness.nodes.canvas.style.touchAction, 'none');
+  harness.nodes.pan.dispatch('click');
+  assert.strictEqual(harness.root.attributes['data-heatmap-pan-active'], '0');
+  assert.strictEqual(harness.nodes.stage.style.touchAction, 'auto');
+  assert.strictEqual(harness.nodes.canvas.style.touchAction, 'auto');
+  harness.nodes.canvas.dispatch('click', {clientX: 350, clientY: 60});
+  assert.strictEqual(workspace.state.cell, null, 'suppressed drag clicks must not pin a cell');
+  harness.nodes.canvas.dispatch('click', {clientX: 350, clientY: 60});
+  assert.strictEqual(workspace.state.cell, 'c2.0', 'tap/click pinning should remain available after suppression clears');
+}
+
 (async function runFixRoundOneRegressions() {
   await assertSeparateInspectAndDeepLinkFlow();
   await assertClearedInspectCannotRetry();
   await assertLatestSceneRequestWins();
   assertZoomUsesReversibleFactors();
+  await assertFailureActionsUseKnownV1Route();
+  await assertInitialFailureUsesServerV1RouteWhenSceneIsMissing();
+  assertUnavailableFloorsStayVisible();
+  assertAllFloorsAggregateLabelOmitsMisleadingZeroCount();
+  await assertCustomWindowApplyValidation();
+  assertExplicitStateAlertsStayLocalized();
+  assertPanModeSuppressesDragClicks();
   console.log('heatmap explorer contract smoke ok');
 }()).catch(error => {
   console.error(error && error.stack ? error.stack : error);

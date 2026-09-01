@@ -35,6 +35,7 @@
     '90d': 7776000,
     '365d': 31536000
   };
+  var MAX_CUSTOM_WINDOW_FUTURE_SECONDS = 300;
   var URL_KEYS = ['range', 'from', 'to', 'lens', 'event', 'floor', 'cell'];
   var URL_QUERY_KEYS = {
     hm_range: 'range',
@@ -44,6 +45,21 @@
     hm_event: 'event',
     hm_floor: 'floor',
     hm_cell: 'cell'
+  };
+  var SCENE_STATES = {
+    ok: true,
+    empty: true,
+    insufficient_sample: true,
+    missing_coordinates: true,
+    floors_unavailable: true,
+    weak_projection: true,
+    too_many_events: true
+  };
+  var BLOCKED_SCENE_STATES = {
+    missing_coordinates: true,
+    floors_unavailable: true,
+    weak_projection: true,
+    too_many_events: true
   };
 
   function isRecord(value) {
@@ -418,7 +434,7 @@
       'schemaVersion', 'state', 'query', 'map', 'floors', 'activeFloor', 'grid',
       'layers', 'comparison', 'coverage', 'summary', 'warnings', 'fallback'
     ]) || payload.schemaVersion !== 2
-      || (payload.state !== 'ok' && payload.state !== 'empty' && payload.state !== 'insufficient_sample')) {
+      || !SCENE_STATES[payload.state]) {
       invalidScene();
     }
 
@@ -857,7 +873,29 @@
     return number;
   }
 
-  function validateUrlValues(values, present) {
+  function normalizeNowSeconds(options) {
+    var value = options && own(options, 'nowSeconds') ? options.nowSeconds : null;
+    if (typeof value === 'function') {
+      try {
+        value = value();
+      } catch (error) {
+        value = null;
+      }
+    }
+    if (!finiteNumber(value)) {
+      value = Date.now() / 1000;
+    }
+    value = Math.floor(value);
+    return safeInteger(value) && value >= 0 ? value : 0;
+  }
+
+  function validateCustomWindow(from, to, nowSeconds) {
+    if (from >= to || to - from > 315360000 || to > nowSeconds + MAX_CUSTOM_WINDOW_FUTURE_SECONDS) {
+      invalidUrl();
+    }
+  }
+
+  function validateUrlValues(values, present, options) {
     var output = {};
     var hasRange = present.range;
     var hasFrom = present.from;
@@ -877,9 +915,7 @@
     if (hasFrom) {
       var from = canonicalWindowNumber(values.from);
       var to = canonicalWindowNumber(values.to);
-      if (from >= to || to - from > 315360000) {
-        invalidUrl();
-      }
+      validateCustomWindow(from, to, normalizeNowSeconds(options));
       output.from = from;
       output.to = to;
     }
@@ -915,14 +951,14 @@
     return output;
   }
 
-  function parseUrlState(search) {
+  function parseUrlState(search, options) {
     var inspected = inspectSearch(search);
     var values = inspected.known;
     var present = {};
     for (var index = 0; index < URL_KEYS.length; index += 1) {
       present[URL_KEYS[index]] = own(values, URL_KEYS[index]);
     }
-    return validateUrlValues(values, present);
+    return validateUrlValues(values, present, options);
   }
 
   function serializableValue(value, numberAllowed) {
@@ -941,7 +977,7 @@
     return value;
   }
 
-  function serializeUrlState(search, state) {
+  function serializeUrlState(search, state, options) {
     var inspected = inspectSearch(search);
     if (!isRecord(state)) {
       invalidUrl();
@@ -955,7 +991,7 @@
       present[key] = value !== null;
       values[key] = value;
     }
-    var normalized = validateUrlValues(values, present);
+    var normalized = validateUrlValues(values, present, options);
     var result = [];
     if (own(normalized, 'range')) {
       result.push('hm_range=' + encodeURIComponent(normalized.range));
@@ -1007,6 +1043,7 @@
     this._ready = false;
     this._startedAt = 0;
     this._pointer = null;
+    this._suppressClick = false;
   }
 
   HeatmapGlRenderer.prototype._now = function () {
@@ -1018,6 +1055,42 @@
       value = 0;
     }
     return finiteNumber(value) ? value : 0;
+  };
+
+  HeatmapGlRenderer.prototype._pointerPanEnabled = function () {
+    if (typeof this.options.pointerPan === 'function') {
+      try {
+        return this.options.pointerPan() === true;
+      } catch (error) {
+        return false;
+      }
+    }
+    return this.options.pointerPan !== false;
+  };
+
+  HeatmapGlRenderer.prototype._clearPointer = function () {
+    if (!this._pointer) {
+      return;
+    }
+    var canvas = this._nodes && this._nodes.canvas;
+    var pointerId = this._pointer.id;
+    if (this._pointer.dragged) {
+      this._suppressClick = true;
+    }
+    this._pointer = null;
+    if (canvas && typeof canvas.releasePointerCapture === 'function' && finiteNumber(pointerId)) {
+      try {
+        canvas.releasePointerCapture(pointerId);
+      } catch (error) {
+        // Pointer capture release is best effort only.
+      }
+    }
+  };
+
+  HeatmapGlRenderer.prototype.consumeSuppressedClick = function () {
+    var suppressed = this._suppressClick;
+    this._suppressClick = false;
+    return suppressed;
   };
 
   HeatmapGlRenderer.prototype._node = function (selector) {
@@ -1454,32 +1527,61 @@
       }
     });
     this._listen(canvas, 'pointerdown', function (event) {
-      if (self.options.pointerPan === false) {
+      if (!self._pointerPanEnabled()) {
         return;
       }
       if (!self._camera || !event) {
         return;
       }
-      self._pointer = {x: numeric(event.clientX, 0), y: numeric(event.clientY, 0)};
+      self._suppressClick = false;
+      self._pointer = {
+        id: finiteNumber(event.pointerId) ? event.pointerId : null,
+        startX: numeric(event.clientX, 0),
+        startY: numeric(event.clientY, 0),
+        lastX: numeric(event.clientX, 0),
+        lastY: numeric(event.clientY, 0),
+        dragged: false
+      };
       if (typeof canvas.setPointerCapture === 'function' && finiteNumber(event.pointerId)) {
         canvas.setPointerCapture(event.pointerId);
       }
     });
     this._listen(canvas, 'pointermove', function (event) {
-      if (self.options.pointerPan === false) {
+      if (!self._pointerPanEnabled()) {
         return;
       }
       if (!self._pointer || !self._camera || !event || typeof self._camera.panBy !== 'function') {
         return;
       }
-      var nextX = numeric(event.clientX, self._pointer.x);
-      var nextY = numeric(event.clientY, self._pointer.y);
-      self._camera.panBy(nextX - self._pointer.x, nextY - self._pointer.y);
-      self._pointer = {x: nextX, y: nextY};
+      if (self._pointer.id !== null && finiteNumber(event.pointerId) && event.pointerId !== self._pointer.id) {
+        return;
+      }
+      var nextX = numeric(event.clientX, self._pointer.lastX);
+      var nextY = numeric(event.clientY, self._pointer.lastY);
+      if (!self._pointer.dragged) {
+        var movedX = nextX - self._pointer.startX;
+        var movedY = nextY - self._pointer.startY;
+        if ((movedX * movedX) + (movedY * movedY) < 25) {
+          return;
+        }
+        self._pointer.dragged = true;
+      }
+      if (typeof event.preventDefault === 'function') {
+        event.preventDefault();
+      }
+      self._camera.panBy(nextX - self._pointer.lastX, nextY - self._pointer.lastY);
+      self._pointer.lastX = nextX;
+      self._pointer.lastY = nextY;
       self.setCamera(self._camera);
     });
     this._listen(canvas, 'pointerup', function () {
-      self._pointer = null;
+      self._clearPointer();
+    });
+    this._listen(canvas, 'pointercancel', function () {
+      self._clearPointer();
+    });
+    this._listen(canvas, 'lostpointercapture', function () {
+      self._clearPointer();
     });
     this._listen(target, 'keydown', function (event) {
       if (self.options.cameraKeys === false) {
@@ -1547,6 +1649,7 @@
     this._mounted = false;
     this._contextLost = false;
     this._pointer = null;
+    this._suppressClick = false;
     this._removeListeners();
     this._releaseResources();
     this._gl = null;
@@ -1597,6 +1700,13 @@
     }
   }
 
+  function workspaceMessageAttribute(key) {
+    return 'data-heatmap-message-' + String(key)
+      .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+      .replace(/_/g, '-')
+      .toLowerCase();
+  }
+
   function workspaceUrlBase(endpoint) {
     if (typeof endpoint !== 'string' || endpoint === '') {
       return 'heatmap_points.php';
@@ -1607,6 +1717,71 @@
 
   function workspaceTextValue(value) {
     return typeof value === 'string' && value.length > 0 ? value : null;
+  }
+
+  function legacyEventValue(value) {
+    return value === 'kills' || value === 'deaths' || value === 'both' ? value : '';
+  }
+
+  function legacyMapValue(value) {
+    return typeof value === 'string' && TOKEN.test(value) ? value : '';
+  }
+
+  function rewriteLegacyFallbackUrl(baseUrl, state) {
+    if (typeof baseUrl !== 'string' || baseUrl === '' || /^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(baseUrl)
+      || baseUrl.slice(0, 2) === '//') {
+      return '';
+    }
+    var hashIndex = baseUrl.indexOf('#');
+    var trimmed = hashIndex >= 0 ? baseUrl.slice(0, hashIndex) : baseUrl;
+    var question = trimmed.indexOf('?');
+    var path = question >= 0 ? trimmed.slice(0, question) : trimmed;
+    if (path === '') {
+      return '';
+    }
+    var values = {};
+    if (question >= 0 && question + 1 < trimmed.length) {
+      var parts = trimmed.slice(question + 1).split('&');
+      for (var index = 0; index < parts.length; index += 1) {
+        var raw = parts[index];
+        if (raw === '') {
+          continue;
+        }
+        var separator = raw.indexOf('=');
+        var key = decodeQueryPart(separator === -1 ? raw : raw.slice(0, separator));
+        var value = decodeQueryPart(separator === -1 ? '' : raw.slice(separator + 1));
+        if (key === 'game' || key === 'map') {
+          if (!own(values, key) && value !== '') {
+            values[key] = value;
+          }
+        } else if (key === 'player') {
+          if (!own(values, key) && /^(?:[1-9][0-9]*)$/.test(value)) {
+            values[key] = value;
+          }
+        } else if (key === 'event') {
+          var baseEvent = legacyEventValue(value);
+          if (!own(values, key) && baseEvent !== '') {
+            values[key] = baseEvent;
+          }
+        }
+      }
+    }
+    var currentMap = legacyMapValue(state && state.map);
+    if (currentMap !== '') {
+      values.map = currentMap;
+    }
+    var currentEvent = legacyEventValue(state && state.event);
+    if (currentEvent !== '') {
+      values.event = currentEvent;
+    }
+    var pairs = [];
+    for (var keyIndex = 0; keyIndex < 4; keyIndex += 1) {
+      var allowedKey = ['game', 'map', 'player', 'event'][keyIndex];
+      if (own(values, allowedKey)) {
+        pairs.push(encodeURIComponent(allowedKey) + '=' + encodeURIComponent(values[allowedKey]));
+      }
+    }
+    return pairs.length ? path + '?' + pairs.join('&') : path;
   }
 
   function invalidInspect() {
@@ -1671,6 +1846,7 @@
       : (this.window && this.window.HLX_I18N && isRecord(this.window.HLX_I18N.heatmapExplorer)
         ? this.window.HLX_I18N.heatmapExplorer : {});
     this.endpoint = workspaceUrlBase(workspaceAttribute(rootElement, 'data-heatmap-endpoint', 'heatmap_points.php'));
+    this.v1Url = workspaceAttribute(rootElement, 'data-heatmap-v1-url', '');
     this.lang = workspaceAttribute(rootElement, 'data-heatmap-lang', 'en') === 'ru' ? 'ru' : 'en';
     this.allowMe = workspaceAttribute(rootElement, 'data-heatmap-allow-me', '0') === '1';
     this.allowDifference = workspaceAttribute(rootElement, 'data-heatmap-allow-difference', '0') === '1';
@@ -1712,7 +1888,11 @@
       key = 'fallback';
     }
     var value = this.messages && this.messages[key];
-    return typeof value === 'string' && value !== '' ? value : key;
+    if (typeof value === 'string' && value !== '') {
+      return value;
+    }
+    value = workspaceAttribute(this.root, workspaceMessageAttribute(key), '');
+    return value !== '' ? value : key;
   };
 
   HeatmapExplorerWorkspace.prototype._listen = function (target, type, handler) {
@@ -1742,9 +1922,13 @@
     return '';
   };
 
+  HeatmapExplorerWorkspace.prototype._nowSeconds = function () {
+    return normalizeNowSeconds(this.options);
+  };
+
   HeatmapExplorerWorkspace.prototype._readUrlState = function () {
     try {
-      var parsed = parseUrlState(this._search());
+      var parsed = parseUrlState(this._search(), {nowSeconds: this._nowSeconds()});
       var keys = ['range', 'from', 'to', 'lens', 'event', 'floor', 'cell'];
       for (var index = 0; index < keys.length; index += 1) {
         var key = keys[index];
@@ -1784,7 +1968,7 @@
   HeatmapExplorerWorkspace.prototype._writeUrl = function () {
     var serialized;
     try {
-      serialized = serializeUrlState(this._search(), this._urlState());
+      serialized = serializeUrlState(this._search(), this._urlState(), {nowSeconds: this._nowSeconds()});
     } catch (error) {
       this._showAlert('invalidUrl');
       return '';
@@ -1876,27 +2060,86 @@
     this._nodes.alert.hidden = false;
   };
 
+  HeatmapExplorerWorkspace.prototype._knownFallbackUrl = function (scene) {
+    var activeScene = scene || this._scene;
+    var baseUrl = this.v1Url;
+    if ((typeof baseUrl !== 'string' || baseUrl === '') && activeScene && activeScene.fallback
+      && typeof activeScene.fallback.v1 === 'string' && activeScene.fallback.v1.length > 0) {
+      baseUrl = activeScene.fallback.v1;
+    }
+    return rewriteLegacyFallbackUrl(baseUrl, this.state);
+  };
+
+  HeatmapExplorerWorkspace.prototype._appendAlertAction = function (factory) {
+    if (!this._nodes || !this._nodes.alert || !this.document || typeof this.document.createElement !== 'function') {
+      return null;
+    }
+    var alert = this._nodes.alert;
+    var actions = this.document.createElement('div');
+    actions.className = 'heatmap-explorer__alert-actions';
+    actions.setAttribute('class', 'heatmap-explorer__alert-actions');
+    var created = factory(actions);
+    if (!created || typeof alert.appendChild !== 'function') {
+      return null;
+    }
+    alert.appendChild(actions);
+    return actions;
+  };
+
   HeatmapExplorerWorkspace.prototype._showFailureActions = function () {
     if (!this._nodes || !this._nodes.alert || !this.document || typeof this.document.createElement !== 'function') {
       return;
     }
-    var alert = this._nodes.alert;
     var self = this;
-    var retry = this.document.createElement('button');
-    retry.type = 'button';
-    retry.textContent = this._message('retry');
-    this._listen(retry, 'click', function () {
-      self.retry();
+    this._appendAlertAction(function (actions) {
+      var retry = self.document.createElement('button');
+      retry.type = 'button';
+      retry.textContent = self._message('retry');
+      self._listen(retry, 'click', function () {
+        self.retry();
+      });
+      actions.appendChild(retry);
+      var fallbackHref = self._knownFallbackUrl(null);
+      if (fallbackHref !== '') {
+        var openV1 = self.document.createElement('a');
+        openV1.textContent = self._message('openV1');
+        workspaceSetAttribute(openV1, 'href', fallbackHref);
+        actions.appendChild(openV1);
+      }
+      return true;
     });
-    var fallback = this.document.createElement('button');
-    fallback.type = 'button';
-    fallback.textContent = this._message('fallback');
-    this._listen(fallback, 'click', function () {
-      self.showFallback();
+  };
+
+  HeatmapExplorerWorkspace.prototype._showStateAlert = function (scene) {
+    var self = this;
+    this._showAlert(scene.state);
+    this._appendAlertAction(function (actions) {
+      var fallbackHref = self._knownFallbackUrl(scene);
+      if (fallbackHref === '') {
+        return false;
+      }
+      var openV1 = self.document.createElement('a');
+      openV1.textContent = self._message('openV1');
+      workspaceSetAttribute(openV1, 'href', fallbackHref);
+      actions.appendChild(openV1);
+      return true;
     });
-    if (typeof alert.appendChild === 'function') {
-      alert.appendChild(retry);
-      alert.appendChild(fallback);
+  };
+
+  HeatmapExplorerWorkspace.prototype._applyCustomWindow = function () {
+    try {
+      if (!this._nodes || !this._nodes.from || !this._nodes.to) {
+        invalidUrl();
+      }
+      var from = canonicalWindowNumber(this._nodes.from.value);
+      var to = canonicalWindowNumber(this._nodes.to.value);
+      validateCustomWindow(from, to, this._nowSeconds());
+      this._setState({range: null, from: from, to: to, cell: null}, 'range');
+      return true;
+    } catch (error) {
+      this._showAlert('invalidUrl');
+      this._setStatus('invalidUrl');
+      return false;
     }
   };
 
@@ -1925,28 +2168,34 @@
       options.removeChild(options.firstChild);
     }
     var self = this;
-    function appendFloor(id, label) {
+    function appendFloor(id, label, available, count) {
       var control = self.document.createElement('input');
       var wrapper = self.document.createElement('label');
+      var description = id === 'all' ? label : label + ' (' + String(count) + ')';
+      if (available === false) {
+        description += ' - ' + self._message('unavailable');
+        workspaceSetAttribute(wrapper, 'data-unavailable', '1');
+      }
+      wrapper.className = 'heatmap-explorer__floor-option';
+      workspaceSetAttribute(wrapper, 'class', 'heatmap-explorer__floor-option');
       control.type = 'radio';
       control.name = 'heatmap-floor-' + self.state.player;
       control.value = id;
+      control.disabled = available === false;
       workspaceSetAttribute(control, 'data-heatmap-floor', id);
       control.checked = id === self.state.floor;
       wrapper.appendChild(control);
       if (typeof self.document.createTextNode === 'function') {
-        wrapper.appendChild(self.document.createTextNode(label));
+        wrapper.appendChild(self.document.createTextNode(description));
       } else {
-        workspaceSetText(wrapper, label);
+        workspaceSetText(wrapper, description);
       }
       options.appendChild(wrapper);
     }
-    appendFloor('all', this._message('allFloors'));
+    appendFloor('all', this._message('allFloors'), true, 0);
     for (var index = 0; index < scene.floors.length; index += 1) {
       var floor = scene.floors[index];
-      if (floor.available) {
-        appendFloor(floor.id, floor.label);
-      }
+      appendFloor(floor.id, floor.label, floor.available, floor.count);
     }
   };
 
@@ -1980,12 +2229,34 @@
       var floor = floorControls[index].getAttribute ? floorControls[index].getAttribute('data-heatmap-floor') : '';
       floorControls[index].checked = floor === this.state.floor;
     }
-    if (this._nodes && this._nodes.range && this.state.range) {
-      this._nodes.range.value = this.state.range;
+    if (this._nodes && this._nodes.range) {
+      this._nodes.range.value = this.state.range || 'custom';
+    }
+    var windowFrom = this._scene && this._scene.query ? this._scene.query.from : this.state.from;
+    var windowTo = this._scene && this._scene.query ? this._scene.query.to : this.state.to;
+    if (this._nodes && this._nodes.from) {
+      this._nodes.from.value = safeInteger(windowFrom) ? String(windowFrom) : '';
+    }
+    if (this._nodes && this._nodes.to) {
+      this._nodes.to.value = safeInteger(windowTo) ? String(windowTo) : '';
     }
     if (this._nodes && this._nodes.pan) {
       workspaceSetAttribute(this._nodes.pan, 'aria-pressed', this._panMode ? 'true' : 'false');
       workspaceSetText(this._nodes.pan, this._message(this._panMode ? 'pan' : 'navigation'));
+    }
+    var panActive = this._panMode ? '1' : '0';
+    workspaceSetAttribute(this.root, 'data-heatmap-pan-active', panActive);
+    if (this._nodes && this._nodes.stage) {
+      workspaceSetAttribute(this._nodes.stage, 'data-heatmap-pan-active', panActive);
+      if (this._nodes.stage.style) {
+        this._nodes.stage.style.touchAction = this._panMode ? 'none' : 'auto';
+      }
+    }
+    if (this._nodes && this._nodes.canvas) {
+      workspaceSetAttribute(this._nodes.canvas, 'data-heatmap-pan-active', panActive);
+      if (this._nodes.canvas.style) {
+        this._nodes.canvas.style.touchAction = this._panMode ? 'none' : 'auto';
+      }
     }
   };
 
@@ -2057,6 +2328,7 @@
 
   HeatmapExplorerWorkspace.prototype._createRenderer = function (scene) {
     this._destroyRenderer();
+    var self = this;
     var stage = this._nodes.stage;
     var image = this._nodes.image;
     var width = workspaceInteger(image && image.getAttribute ? image.getAttribute('width') : null, scene.map.image.width);
@@ -2071,7 +2343,9 @@
     this._renderer = new this.Renderer(this.root, scene, {
       window: this.window,
       cameraKeys: false,
-      pointerPan: false,
+      pointerPan: function () {
+        return self._panMode;
+      },
       message: this._message.bind(this)
     });
     this._renderer.mount();
@@ -2099,8 +2373,11 @@
     this._syncControls();
     this._writeUrl();
     this._clearAlert();
-    if (scene.state === 'empty') {
-      this._setStatus('empty');
+    if (scene.state === 'empty' || scene.state === 'insufficient_sample') {
+      this._setStatus(scene.state);
+    } else if (BLOCKED_SCENE_STATES[scene.state]) {
+      this._showStateAlert(scene);
+      this._setStatus(scene.state);
     } else {
       this._setCoverageStatus(scene);
     }
@@ -2237,6 +2514,7 @@
     if (this._nodes && this._nodes.interactive && this._nodes.interactive.style) {
       this._nodes.interactive.style.display = 'none';
     }
+    this._clearAlert();
     this._setStatus('fallback');
   };
 
@@ -2434,6 +2712,9 @@
         self._setState({range: range, from: null, to: null, cell: null}, 'range');
       }
     });
+    this._listen(this._nodes.apply, 'click', function () {
+      self._applyCustomWindow();
+    });
     this._listen(this._nodes.zoomIn, 'click', function () {
       if (self._camera) {
         self._camera.zoomAt(1.25, 0, 0);
@@ -2460,6 +2741,9 @@
       self._handleStageKey(event);
     });
     this._listen(this._nodes.canvas, 'pointermove', function (event) {
+      if (self._panMode) {
+        return;
+      }
       var cell = self._pointerCell(event);
       if (cell) {
         self.state.focusedCell = cell.cell;
@@ -2467,6 +2751,10 @@
       }
     });
     this._listen(this._nodes.canvas, 'click', function (event) {
+      if (self._renderer && typeof self._renderer.consumeSuppressedClick === 'function'
+        && self._renderer.consumeSuppressedClick()) {
+        return;
+      }
       var cell = self._pointerCell(event);
       if (cell) {
         self.pin(cell.cell);
@@ -2502,6 +2790,9 @@
       mapTitle: workspaceNode(this.root, '[data-heatmap-map-title]'),
       mapSelect: workspaceNode(this.root, '[data-heatmap-map-select]'),
       range: workspaceNode(this.root, '[data-heatmap-range]'),
+      from: workspaceNode(this.root, '[data-heatmap-from]'),
+      to: workspaceNode(this.root, '[data-heatmap-to]'),
+      apply: workspaceNode(this.root, '[data-heatmap-apply]'),
       zoomIn: workspaceNode(this.root, '[data-heatmap-zoom="in"]'),
       zoomOut: workspaceNode(this.root, '[data-heatmap-zoom="out"]'),
       reset: workspaceNode(this.root, '[data-heatmap-reset]'),
