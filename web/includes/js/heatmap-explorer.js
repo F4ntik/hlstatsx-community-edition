@@ -2067,6 +2067,7 @@
       cell: null,
       focusedCell: null
     };
+    this._mapStyle = 'color';
     this._nodes = null;
     this._listeners = [];
     this._renderer = null;
@@ -2425,8 +2426,10 @@
     }
     var lensControls = workspaceNodes(this.root, '[data-heatmap-lens]');
     var eventControls = workspaceNodes(this.root, '[data-heatmap-event]');
+    var mapStyleControls = workspaceNodes(this.root, '[data-heatmap-map-style-option]');
     var floorControls = workspaceNodes(this.root, '[data-heatmap-floor]');
     var index;
+    workspaceSetAttribute(this.root, 'data-heatmap-map-style', this._mapStyle);
     for (index = 0; index < lensControls.length; index += 1) {
       var lens = lensControls[index].getAttribute ? lensControls[index].getAttribute('data-heatmap-lens') : '';
       var selectedLens = lens === this.state.lens;
@@ -2443,6 +2446,14 @@
       workspaceSetAttribute(eventControls[index], 'aria-pressed', selectedEvent ? 'true' : 'false');
       if (eventControls[index].classList && typeof eventControls[index].classList.toggle === 'function') {
         eventControls[index].classList.toggle('is-selected', selectedEvent);
+      }
+    }
+    for (index = 0; index < mapStyleControls.length; index += 1) {
+      var style = mapStyleControls[index].getAttribute ? mapStyleControls[index].getAttribute('data-heatmap-map-style-option') : '';
+      var selectedStyle = style === this._mapStyle;
+      workspaceSetAttribute(mapStyleControls[index], 'aria-pressed', selectedStyle ? 'true' : 'false');
+      if (mapStyleControls[index].classList && typeof mapStyleControls[index].classList.toggle === 'function') {
+        mapStyleControls[index].classList.toggle('is-selected', selectedStyle);
       }
     }
     for (index = 0; index < floorControls.length; index += 1) {
@@ -2478,6 +2489,16 @@
         this._nodes.canvas.style.touchAction = this._panMode ? 'none' : 'auto';
       }
     }
+  };
+
+  HeatmapExplorerWorkspace.prototype._setMapStyle = function (style) {
+    if (style !== 'color' && style !== 'mono') {
+      return false;
+    }
+    this._mapStyle = style;
+    workspaceSetAttribute(this.root, 'data-heatmap-map-style', style);
+    this._syncControls();
+    return true;
   };
 
   HeatmapExplorerWorkspace.prototype._formatPercent = function (value) {
@@ -2909,6 +2930,7 @@
     var index;
     var lensControls = workspaceNodes(this.root, '[data-heatmap-lens]');
     var eventControls = workspaceNodes(this.root, '[data-heatmap-event]');
+    var mapStyleControls = workspaceNodes(this.root, '[data-heatmap-map-style-option]');
     var sheetControls = workspaceNodes(this.root, '[data-heatmap-sheet-toggle]');
     for (index = 0; index < lensControls.length; index += 1) {
       this._listen(lensControls[index], 'click', function (event) {
@@ -2926,6 +2948,13 @@
         if (channel && !(self.state.lens === 'difference' && channel === 'both')) {
           self._setState({event: channel, cell: null}, 'channel');
         }
+      });
+    }
+    for (index = 0; index < mapStyleControls.length; index += 1) {
+      this._listen(mapStyleControls[index], 'click', function (event) {
+        var style = event && event.currentTarget && event.currentTarget.getAttribute
+          ? event.currentTarget.getAttribute('data-heatmap-map-style-option') : null;
+        self._setMapStyle(style);
       });
     }
     this._listen(this._nodes.floors, 'change', function (event) {

@@ -1566,6 +1566,9 @@ function richWorkspaceHarness(search = '?page=4', rootAttributes = {}) {
     reset: workspaceEventElement(),
     pan: workspaceEventElement(),
     share: workspaceEventElement(),
+    mapStyleColor: workspaceEventElement({'data-heatmap-map-style-option': 'color', 'aria-pressed': 'true'}),
+    mapStyleMono: workspaceEventElement({'data-heatmap-map-style-option': 'mono', 'aria-pressed': 'false'}),
+    mapStyleInvalid: workspaceEventElement({'data-heatmap-map-style-option': 'invalid', 'aria-pressed': 'false'}),
   };
   nodes.range.value = '30d';
   nodes.mapSelect.value = 'de_dust2';
@@ -1625,6 +1628,9 @@ function richWorkspaceHarness(search = '?page=4', rootAttributes = {}) {
         .flatMap(child => Array.isArray(child.children) ? child.children : [])
         .filter(child => child && typeof child.getAttribute === 'function'
           && child.getAttribute('data-heatmap-floor'));
+    }
+    if (selector === '[data-heatmap-map-style-option]') {
+      return [nodes.mapStyleColor, nodes.mapStyleMono, nodes.mapStyleInvalid];
     }
     return [];
   };
@@ -2027,6 +2033,129 @@ function assertZoomUsesReversibleFactors() {
   zoom.nodes.zoomOut.dispatch('click');
   assert.deepStrictEqual(observedFactors, [1.25, 0.8], 'zoom controls must pass stable inverse factors, never the current absolute zoom');
   assert.strictEqual(cameraForControls.state.zoom, 1, 'zoom in followed by zoom out must return to the prior zoom level');
+}
+
+async function assertMapStyleStaysInstanceLocalAndDoesNotReload() {
+  const transport = deferredTransport();
+  const harness = richWorkspaceHarness();
+  const workspace = new HeatmapExplorerWorkspace(harness.root, {
+    window: harness.window,
+    document: harness.document,
+    fetch: transport.fetch,
+    messages: workspaceMessages,
+    Renderer: WorkspaceRenderer,
+  });
+  workspace.mount();
+  await settleWorkspace();
+  assert.strictEqual(transport.requests.length, 1, 'mount should load one initial scene before style changes are exercised');
+  transport.requests[0].resolve(jsonResponse(sceneForMap('de_dust2')));
+  await settleWorkspace();
+
+  const colorButton = harness.nodes.mapStyleColor;
+  const monoButton = harness.nodes.mapStyleMono;
+  const invalidButton = harness.nodes.mapStyleInvalid;
+  const requestsBeforeStyleChange = transport.requests.length;
+  const historyWritesBeforeStyleChange = harness.historyWrites.length;
+  const searchBeforeStyleChange = harness.window.location.search;
+  const stateBeforeStyleChange = plain(workspace.state);
+  workspace._setState = function () {
+    throw new Error('map style controls must not mutate workspace state');
+  };
+  workspace._loadScene = function () {
+    throw new Error('map style controls must not reload the scene');
+  };
+  workspace._writeUrl = function () {
+    throw new Error('map style controls must not write the URL');
+  };
+  workspace._renderer = new Proxy({}, {
+    get() {
+      throw new Error('map style controls must not invoke renderer methods');
+    },
+  });
+
+  monoButton.dispatch('click', {currentTarget: monoButton});
+  assert.strictEqual(harness.root.getAttribute('data-heatmap-map-style'), 'mono');
+  assert.strictEqual(monoButton.getAttribute('aria-pressed'), 'true');
+  assert.strictEqual(colorButton.getAttribute('aria-pressed'), 'false');
+  assert.strictEqual(monoButton.classList.contains('is-selected'), true);
+  assert.strictEqual(colorButton.classList.contains('is-selected'), false);
+  assert.strictEqual(transport.requests.length, requestsBeforeStyleChange);
+  assert.strictEqual(harness.historyWrites.length, historyWritesBeforeStyleChange);
+  assert.strictEqual(harness.window.location.search, searchBeforeStyleChange);
+  assert.deepStrictEqual(plain(workspace.state), stateBeforeStyleChange);
+
+  colorButton.dispatch('click', {currentTarget: colorButton});
+  assert.strictEqual(harness.root.getAttribute('data-heatmap-map-style'), 'color');
+  assert.strictEqual(colorButton.getAttribute('aria-pressed'), 'true');
+  assert.strictEqual(monoButton.getAttribute('aria-pressed'), 'false');
+  assert.strictEqual(colorButton.classList.contains('is-selected'), true);
+  assert.strictEqual(monoButton.classList.contains('is-selected'), false);
+
+  invalidButton.dispatch('click', {currentTarget: invalidButton});
+  assert.strictEqual(harness.root.getAttribute('data-heatmap-map-style'), 'color');
+  assert.strictEqual(invalidButton.getAttribute('aria-pressed'), 'false');
+  assert.strictEqual(transport.requests.length, requestsBeforeStyleChange);
+  assert.strictEqual(harness.historyWrites.length, historyWritesBeforeStyleChange);
+  assert.strictEqual(harness.window.location.search, searchBeforeStyleChange);
+  assert.deepStrictEqual(plain(workspace.state), stateBeforeStyleChange);
+
+  const nextTransport = deferredTransport();
+  const nextHarness = richWorkspaceHarness();
+  const nextWorkspace = new HeatmapExplorerWorkspace(nextHarness.root, {
+    window: nextHarness.window,
+    document: nextHarness.document,
+    fetch: nextTransport.fetch,
+    messages: workspaceMessages,
+    Renderer: WorkspaceRenderer,
+  });
+  nextWorkspace.mount();
+  await settleWorkspace();
+  assert.strictEqual(nextHarness.root.getAttribute('data-heatmap-map-style'), 'color');
+  assert.strictEqual(nextHarness.nodes.mapStyleColor.getAttribute('aria-pressed'), 'true');
+  assert.strictEqual(nextHarness.nodes.mapStyleMono.getAttribute('aria-pressed'), 'false');
+}
+
+function assertMapStyleCssStaysScoped() {
+  assert.match(
+    cssSource,
+    /\.heatmap-explorer \[data-heatmap-image\]\s*\{[\s\S]*?position:\s*relative;[\s\S]*?z-index:\s*0;[\s\S]*?transition:\s*filter 120ms ease;[\s\S]*?\}/,
+    'the decorative grade should start on the map image below the canvas'
+  );
+  assert.match(
+    cssSource,
+    /\.heatmap-explorer \[data-heatmap-camera\]::after\s*\{[\s\S]*?position:\s*absolute;[\s\S]*?z-index:\s*1;[\s\S]*?pointer-events:\s*none;[\s\S]*?mix-blend-mode:\s*soft-light;[\s\S]*?\}/,
+    'the camera pseudo-element should add a non-interactive decorative grade below the canvas'
+  );
+  assert.match(
+    cssSource,
+    /\.heatmap-explorer \[data-heatmap-canvas\]\s*\{[\s\S]*?z-index:\s*2;[\s\S]*?\}/,
+    'the semantic WebGL canvas should remain above the decorative grade'
+  );
+  assert.match(
+    cssSource,
+    /\.heatmap-explorer\[data-heatmap-map-style="color"\] \[data-heatmap-image\]\s*\{[\s\S]*?filter:\s*sepia\(0\.22\) saturate\(1\.14\) hue-rotate\(346deg\) contrast\(1\.03\) brightness\(0\.94\);[\s\S]*?\}/,
+    'color mode should grade only the dynamic map image'
+  );
+  assert.match(
+    cssSource,
+    /\.heatmap-explorer\[data-heatmap-map-style="mono"\] \[data-heatmap-image\]\s*\{[\s\S]*?filter:\s*grayscale\(1\) contrast\(1\.05\) brightness\(0\.94\);[\s\S]*?\}/,
+    'mono mode should grade only the dynamic map image'
+  );
+  assert.match(
+    cssSource,
+    /\.heatmap-explorer\[data-heatmap-state="static_fallback"\] \[data-heatmap-map-style-controls\],[\s\S]*?\.heatmap-explorer\[data-heatmap-state="context_lost"\] \[data-heatmap-map-style-controls\]\s*\{\s*display:\s*none;/,
+    'style controls should hide when the explorer is unavailable'
+  );
+  assert.match(
+    cssSource,
+    /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.heatmap-explorer \[data-heatmap-image\] \{\s*transition:\s*none;\s*\}/,
+    'reduced motion should disable the map-image filter transition'
+  );
+  assert.doesNotMatch(
+    cssSource,
+    /(?:\.heatmap-explorer \[data-heatmap-canvas\]|(?:\.heatmap-explorer\s+)?\.heatmap-explorer__static img|\.heatmap-explorer \[data-heatmap-static\](?: img)?)\s*\{[^}]*\b(?:filter|mix-blend-mode)\s*:/,
+    'the canvas and static JPEG fallback must not receive filter or blend-mode styling'
+  );
 }
 
 async function assertFailureActionsUseKnownV1Route() {
@@ -2821,6 +2950,8 @@ async function assertInspect422StaysFailClosed() {
   assertPanModeSuppressesDragClicks();
   await assertInspect422StaysFailClosed();
   assertWorkspaceStageAspectUsesAuthoritativeSceneDimensions();
+  await assertMapStyleStaysInstanceLocalAndDoesNotReload();
+  assertMapStyleCssStaysScoped();
   console.log('heatmap explorer contract smoke ok');
 }()).catch(error => {
   console.error(error && error.stack ? error.stack : error);

@@ -749,6 +749,20 @@ nav{
 	display: block;
 	width: 100%;
 	height: auto;
+	position: relative;
+	z-index: 0;
+	transition: filter 120ms ease;
+}
+
+.heatmap-explorer [data-heatmap-camera]::after {
+	position: absolute;
+	z-index: 1;
+	inset: 0;
+	content: "";
+	pointer-events: none;
+	opacity: 0;
+	background: linear-gradient(135deg, rgba(213, 161, 94, 0.18), rgba(64, 94, 126, 0.14));
+	mix-blend-mode: soft-light;
 }
 
 .heatmap-explorer [data-heatmap-canvas] {
@@ -756,6 +770,24 @@ nav{
 	inset: 0;
 	width: 100%;
 	height: 100%;
+	z-index: 2;
+}
+
+.heatmap-explorer[data-heatmap-map-style="color"] [data-heatmap-image] {
+	filter: sepia(0.22) saturate(1.14) hue-rotate(346deg) contrast(1.03) brightness(0.94);
+}
+
+.heatmap-explorer[data-heatmap-map-style="color"] [data-heatmap-camera]::after {
+	opacity: 1;
+}
+
+.heatmap-explorer[data-heatmap-map-style="mono"] [data-heatmap-image] {
+	filter: grayscale(1) contrast(1.05) brightness(0.94);
+}
+
+.heatmap-explorer[data-heatmap-state="static_fallback"] [data-heatmap-map-style-controls],
+.heatmap-explorer[data-heatmap-state="context_lost"] [data-heatmap-map-style-controls] {
+	display: none;
 }
 
 .heatmap-explorer__static img {
@@ -878,6 +910,10 @@ nav{
 		animation: none !important;
 		transition: none !important;
 		scroll-behavior: auto !important;
+	}
+
+	.heatmap-explorer [data-heatmap-image] {
+		transition: none;
 	}
 }
 
