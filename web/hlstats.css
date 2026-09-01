@@ -864,6 +864,11 @@ nav{
 	.heatmap-explorer__input {
 		min-height: 44px;
 	}
+
+	.heatmap-explorer [data-heatmap-zoom="in"],
+	.heatmap-explorer [data-heatmap-zoom="out"] {
+		min-width: 44px;
+	}
 }
 
 @media (prefers-reduced-motion: reduce) {

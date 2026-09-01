@@ -761,6 +761,29 @@ function normalizedAmount(value, maxAbs) {
   return Math.max(0, Math.min(1, Math.abs(value) / Math.max(maxAbs, 0.000001)));
 }
 
+function cssAtRuleBlock(source, marker) {
+  const start = source.indexOf(marker);
+  assert.ok(start >= 0, `missing CSS block: ${marker}`);
+  const open = source.indexOf('{', start + marker.length);
+  assert.ok(open >= 0, `missing CSS block opener: ${marker}`);
+  let depth = 0;
+  for (let index = open; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === '{') {
+      depth += 1;
+    } else if (char === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        return {
+          full: source.slice(start, index + 1),
+          body: source.slice(open + 1, index),
+        };
+      }
+    }
+  }
+  throw new Error(`unterminated CSS block: ${marker}`);
+}
+
 const goodGl = fakeGl();
 const dom = makeDom(goodGl);
 let nowValue = 100;
@@ -1145,6 +1168,23 @@ assert.doesNotMatch(
   cssSource,
   /@media \(max-width: 540px\), \(hover: none\) and \(pointer: coarse\)\s*\{[\s\S]*?input\[type=(?:'|")radio(?:'|")\][\s\S]*?min-height:\s*44px;/,
   'mobile floor radio hit-area auditing should enlarge the label target without forcing the radio glyph itself to 44px'
+);
+const touchTargetBlock = cssAtRuleBlock(cssSource, '@media (max-width: 540px), (hover: none) and (pointer: coarse)');
+const narrowPhoneBlock = cssAtRuleBlock(cssSource, '@media (max-width: 540px)');
+assert.match(
+  touchTargetBlock.body,
+  /\.heatmap-explorer \[data-heatmap-zoom="in"\],[\s\S]*?\.heatmap-explorer \[data-heatmap-zoom="out"\][\s\S]*?min-width:\s*44px;/,
+  'touch-target media should give zoom controls a 44px minimum width'
+);
+assert.doesNotMatch(
+  narrowPhoneBlock.body,
+  /\[data-heatmap-zoom="in"\][\s\S]*?min-width:\s*44px;/,
+  'narrow-phone layout block should not set zoom min-width directly'
+);
+assert.doesNotMatch(
+  cssSource.replace(touchTargetBlock.full, ''),
+  /\[data-heatmap-zoom="in"\][\s\S]*?min-width:\s*44px;| \[data-heatmap-zoom="out"\][\s\S]*?min-width:\s*44px;/,
+  'zoom target min-width should stay scoped to the touch-target media block, not global CSS'
 );
 
 function workspaceElement(attributes = {}) {
