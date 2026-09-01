@@ -1070,6 +1070,8 @@ foreach ($floorAssignmentCases as $case) {
         'floor assignment should use exact half-open Z bands'
     );
 }
+assert_same(true, heatmap_floor_id_is_valid('upper'), 'shared floor-id predicate should accept published ids');
+assert_same(false, heatmap_floor_id_is_valid('upper floor'), 'shared floor-id predicate should reject syntactically invalid admin floor ids');
 assert_same('all', heatmap_validate_requested_floor('all', $canonicalFloors), 'all should remain valid for any floor configuration');
 assert_same('ground', heatmap_validate_requested_floor('ground', $canonicalFloors), 'configured floor id should remain valid');
 assert_throws('unknown_floor', function () use ($canonicalFloors): void {

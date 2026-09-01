@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 
 from scripts.replay_baseline import web_route_smoke
 
@@ -178,6 +179,51 @@ def test_heatmap_admin_mutation_boundary_is_fail_closed() -> None:
     assert "innerHTML" not in client
     for forbidden in ("regenerate", "proc_open", "'detail' =>", "'command' =>"):
         assert forbidden not in admin
+
+
+def test_heatmap_admin_preview_rejects_invalid_floor_before_scene_build() -> None:
+    """An invalid admin floor id must fail closed as invalid_request before scene assembly."""
+
+    helper = (REPOSITORY_ROOT / "web/includes/heatmap_points.php").read_text(
+        encoding="utf-8"
+    )
+    admin = (REPOSITORY_ROOT / "web/heatmap_admin.php").read_text(encoding="utf-8")
+
+    assert "function heatmap_floor_id_is_valid" in helper
+    assert "heatmap_floor_id_is_valid($floor)" in admin
+    preview_query = admin.index("function heatmap_admin_preview_query")
+    floor_validation = admin.index("heatmap_floor_id_is_valid($floor)")
+    build_scene = admin.index("heatmap_build_scene(")
+    invalid_request = admin.index(
+        "throw new HeatmapAdminException('invalid_request', 400);", floor_validation
+    )
+
+    assert preview_query < floor_validation < invalid_request < build_scene
+
+
+def test_python_web_dockerfiles_keep_php_upload_limits_above_the_20mib_app_guard() -> None:
+    """Local Python web images must let PHP reach the app-level 20 MiB guard."""
+
+    admin = (REPOSITORY_ROOT / "web/heatmap_admin.php").read_text(encoding="utf-8")
+    app_limit_match = re.search(
+        r"HEATMAP_ADMIN_MAX_IMAGE_BYTES\s*=\s*(\d+);", admin
+    )
+    assert app_limit_match is not None
+    app_limit = int(app_limit_match.group(1))
+    assert app_limit == 20 * 1024 * 1024
+
+    for dockerfile in (
+        REPOSITORY_ROOT / "scripts/replay_baseline/comparison/python/Dockerfile.web",
+        REPOSITORY_ROOT / "scripts/proxy_daemon_py/fullstack/Dockerfile.web",
+    ):
+        source = dockerfile.read_text(encoding="utf-8")
+        upload_match = re.search(r"upload_max_filesize=(\d+)M", source)
+        post_match = re.search(r"post_max_size=(\d+)M", source)
+
+        assert upload_match is not None, f"{dockerfile.name} should set upload_max_filesize"
+        assert post_match is not None, f"{dockerfile.name} should set post_max_size"
+        assert int(upload_match.group(1)) * 1024 * 1024 > app_limit
+        assert int(post_match.group(1)) * 1024 * 1024 > app_limit
 
 
 def test_representative_routes_include_populated_cstrike_award_tabs() -> None:

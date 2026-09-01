@@ -12,6 +12,11 @@ RUN apt-get update \
     && docker-php-ext-install gd mysqli pdo pdo_mysql \
     && rm -rf /var/lib/apt/lists/*
 
+RUN { \
+        echo 'upload_max_filesize=21M'; \
+        echo 'post_max_size=21M'; \
+    } > /usr/local/etc/php/conf.d/hlstats-upload-limits.ini
+
 WORKDIR /var/www/html
 
 COPY web /var/www/html

@@ -340,7 +340,11 @@ function heatmap_admin_preview_query(array $request, array $config, string $game
         $from = $requestedFrom;
         $to = $requestedTo;
     }
-    $floor = strval($request['floor'] ?? 'all');
+    $rawFloor = $request['floor'] ?? 'all';
+    $floor = is_string($rawFloor) ? $rawFloor : '';
+    if ($floor !== 'all' && !heatmap_floor_id_is_valid($floor)) {
+        throw new HeatmapAdminException('invalid_request', 400);
+    }
     $event = heatmap_clean_event($request['event'] ?? 'both');
     if ($event !== 'kills' && $event !== 'deaths' && $event !== 'both') {
         throw new HeatmapAdminException('invalid_request', 400);

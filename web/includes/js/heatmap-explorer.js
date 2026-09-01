@@ -29,6 +29,8 @@
   var TOKEN = /^[A-Za-z][A-Za-z0-9_-]{0,31}$/;
   var CELL = /^c(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/;
   var HASH = /^[a-f0-9]{16}$/;
+  var HEATMAP_Z_MIN = -8388608;
+  var HEATMAP_Z_MAX = 8388607;
   var RANGE_SECONDS = {
     '7d': 604800,
     '30d': 2592000,
@@ -400,6 +402,63 @@
     }
   }
 
+  function validateHistogramRows(rows) {
+    if (!compactArray(rows)) {
+      invalidScene();
+    }
+    for (var index = 0; index < rows.length; index += 1) {
+      var row = rows[index];
+      if (!exactKeys(row, ['z', 'count'])
+        || !safeInteger(row.z) || row.z < HEATMAP_Z_MIN || row.z > HEATMAP_Z_MAX
+        || !nonNegativeInteger(row.count)) {
+        invalidScene();
+      }
+    }
+  }
+
+  function cloneHistogramRows(rows) {
+    var output = [];
+    for (var index = 0; index < rows.length; index += 1) {
+      output.push({z: rows[index].z, count: rows[index].count});
+    }
+    return output;
+  }
+
+  function validateCoverage(metrics) {
+    if (!exactKeys(metrics, [
+      'sourceRows', 'candidate', 'validXY', 'validZ', 'zHistogram',
+      'missingCoordinates', 'malformedCoordinates', 'assigned', 'unassigned',
+      'xyCoverage', 'zCoverage', 'projected', 'inBounds', 'outOfBounds', 'projectionCoverage'
+    ])) {
+      invalidScene();
+    }
+    for (var index = 0; index < 9; index += 1) {
+      var countKey = [
+        'sourceRows', 'candidate', 'validXY', 'validZ', 'missingCoordinates',
+        'malformedCoordinates', 'assigned', 'unassigned', 'projected'
+      ][index];
+      if (!nonNegativeInteger(metrics[countKey])) {
+        invalidScene();
+      }
+    }
+    for (index = 0; index < 3; index += 1) {
+      var boundedKey = ['xyCoverage', 'zCoverage', 'projectionCoverage'][index];
+      if (!finiteNumber(metrics[boundedKey]) || metrics[boundedKey] < 0 || metrics[boundedKey] > 1) {
+        invalidScene();
+      }
+    }
+    if (!nonNegativeInteger(metrics.inBounds) || !nonNegativeInteger(metrics.outOfBounds)) {
+      invalidScene();
+    }
+    validateHistogramRows(metrics.zHistogram);
+  }
+
+  function cloneCoverage(metrics) {
+    var output = cloneMetricObject(metrics);
+    output.zHistogram = cloneHistogramRows(metrics.zHistogram);
+    return output;
+  }
+
   function cloneMetricObject(metrics) {
     var output = {};
     var keys = Object.keys(metrics);
@@ -459,7 +518,7 @@
     if ((payload.state === 'ok' || payload.state === 'insufficient_sample') && total.rows.length === 0) {
       invalidScene();
     }
-    validateMetricObject(payload.coverage, ['sourceRows', 'candidate', 'validXY']);
+    validateCoverage(payload.coverage);
     validateMetricObject(payload.summary, ['rowsRead', 'sourceRows', 'personalSample', 'otherSample']);
     validateWarnings(payload.warnings);
     validateFallback(payload.fallback);
@@ -492,7 +551,7 @@
         available: floor.available
       };
     });
-    this.coverage = cloneMetricObject(payload.coverage);
+    this.coverage = cloneCoverage(payload.coverage);
     this.summary = cloneMetricObject(payload.summary);
     this.warnings = payload.warnings.slice();
     this.fallback = {

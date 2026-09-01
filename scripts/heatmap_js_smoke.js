@@ -152,7 +152,23 @@ function explorerSceneFixture(overrides = {}) {
       personalSample: 5,
       otherSample: 3,
     },
-    coverage: {sourceRows: 8, candidate: 8, validXY: 8},
+    coverage: {
+      sourceRows: 8,
+      candidate: 8,
+      validXY: 8,
+      validZ: 8,
+      zHistogram: [{z: 0, count: 8}],
+      missingCoordinates: 0,
+      malformedCoordinates: 0,
+      assigned: 8,
+      unassigned: 0,
+      xyCoverage: 1,
+      zCoverage: 1,
+      projected: 8,
+      inBounds: 8,
+      outOfBounds: 0,
+      projectionCoverage: 1,
+    },
     summary: {rowsRead: 8, sourceRows: 8, personalSample: 5, otherSample: 3},
     warnings: [],
     fallback: {
@@ -167,7 +183,23 @@ function explorerSceneFixture(overrides = {}) {
 const validScene = new HeatmapExplorerScene(explorerSceneFixture());
 assert.deepStrictEqual(
   plain(validScene.coverage),
-  {sourceRows: 8, candidate: 8, validXY: 8},
+  {
+    sourceRows: 8,
+    candidate: 8,
+    validXY: 8,
+    validZ: 8,
+    zHistogram: [{z: 0, count: 8}],
+    missingCoordinates: 0,
+    malformedCoordinates: 0,
+    assigned: 8,
+    unassigned: 0,
+    xyCoverage: 1,
+    zCoverage: 1,
+    projected: 8,
+    inBounds: 8,
+    outOfBounds: 0,
+    projectionCoverage: 1,
+  },
   'workspace summaries should use the validated server coverage instead of reconstructing it'
 );
 assert.deepStrictEqual(
@@ -250,6 +282,17 @@ assertInvalidScene(payload => { payload.comparison.bins.push(['c0.0', 0, 0, 0, 0
 assertInvalidScene(payload => { payload.comparison.bins[0][3] = NaN; }, 'deltas should be finite');
 assertInvalidScene(payload => { payload.comparison.bins[0][5] = -1; }, 'samples should be nonnegative integers');
 assertInvalidScene(payload => { payload.activeFloor = 'main'; }, 'active floor should match query floor');
+assert.doesNotThrow(
+  () => new HeatmapExplorerScene(explorerSceneFixture({
+    coverage: Object.assign({}, explorerSceneFixture().coverage, {
+      zHistogram: [{z: -64, count: 1}, {z: 32, count: 2}],
+    }),
+  })),
+  'coverage should accept the authoritative zHistogram row shape'
+);
+assertInvalidScene(payload => { payload.coverage.zHistogram = [{z: '-64', count: 1}]; }, 'zHistogram z buckets should stay numeric');
+assertInvalidScene(payload => { payload.coverage.zHistogram = [{z: -64, count: -1}]; }, 'zHistogram counts should stay nonnegative');
+assertInvalidScene(payload => { payload.coverage.zHistogram = [{z: -64, count: 1, extra: 2}]; }, 'zHistogram rows should stay strict two-field objects');
 
 function blockedSceneFixture(state, overrides = {}) {
   const payload = explorerSceneFixture({
@@ -1194,6 +1237,53 @@ function sceneForMap(map) {
   return payload;
 }
 
+function sceneWithState(state, overrides = {}) {
+  return explorerSceneFixture(Object.assign({
+    state,
+    query: {
+      game: 'cstrike',
+      map: 'de_dust2',
+      player: 42,
+      from: 1785456000,
+      to: 1788048000,
+      event: 'both',
+      lens: 'overview',
+      floor: 'all',
+      lang: 'en',
+    },
+    layers: {total: [], me: [], others: []},
+    comparison: {
+      fields: ['cell', 'x', 'y', 'killDelta', 'deathDelta', 'sample'],
+      bins: [],
+      personalSample: 0,
+      otherSample: 0,
+    },
+    coverage: {
+      sourceRows: 0,
+      candidate: 0,
+      validXY: 0,
+      validZ: 0,
+      zHistogram: [],
+      missingCoordinates: 0,
+      malformedCoordinates: 0,
+      assigned: 0,
+      unassigned: 0,
+      xyCoverage: 0,
+      zCoverage: 0,
+      projected: 0,
+      inBounds: 0,
+      outOfBounds: 0,
+      projectionCoverage: 0,
+    },
+    summary: {
+      rowsRead: 0,
+      sourceRows: 0,
+      personalSample: 0,
+      otherSample: 0,
+    },
+  }, overrides));
+}
+
 function inspectPayload() {
   return {
     schemaVersion: 2,
@@ -1475,6 +1565,112 @@ async function assertInitialFailureUsesServerV1RouteWhenSceneIsMissing() {
   }
 }
 
+async function assertFetchPathPublishesSpecializedStates() {
+  const cases = [
+    {
+      name: 'empty fetch should stay a truthful complete state',
+      payload: sceneWithState('empty'),
+      expectStatus: 'Empty',
+      expectAlertHidden: true,
+      expectImage: './map.jpg',
+    },
+    {
+      name: 'weak projection fetch should publish the explicit blocked state',
+      payload: sceneWithState('weak_projection', {
+        coverage: {
+          sourceRows: 175,
+          candidate: 350,
+          validXY: 350,
+          validZ: 350,
+          zHistogram: [{z: -128, count: 4}, {z: 32, count: 152}, {z: 192, count: 1}],
+          missingCoordinates: 0,
+          malformedCoordinates: 0,
+          assigned: 0,
+          unassigned: 0,
+          xyCoverage: 1,
+          zCoverage: 1,
+          projected: 350,
+          inBounds: 30,
+          outOfBounds: 320,
+          projectionCoverage: 0.08571428571428572,
+        },
+        summary: {rowsRead: 175, sourceRows: 175, personalSample: 0, otherSample: 0},
+      }),
+      expectStatus: 'Projection is too weak for Explorer rendering',
+      expectAlertHidden: false,
+      expectAlertText: 'Projection is too weak for Explorer rendering',
+    },
+    {
+      name: 'floors unavailable fetch should publish the explicit blocked floor state',
+      payload: sceneWithState('floors_unavailable', {
+        query: {
+          game: 'cstrike',
+          map: 'de_dust2',
+          player: 42,
+          from: 1785456000,
+          to: 1788048000,
+          event: 'both',
+          lens: 'overview',
+          floor: 'upper',
+          lang: 'en',
+        },
+        activeFloor: 'upper',
+        floors: [
+          {id: 'lower', label: 'Lower', count: 0, available: false},
+          {id: 'upper', label: 'Upper', count: 0, available: false},
+        ],
+        coverage: {
+          sourceRows: 1,
+          candidate: 1,
+          validXY: 1,
+          validZ: 0,
+          zHistogram: [],
+          missingCoordinates: 1,
+          malformedCoordinates: 0,
+          assigned: 0,
+          unassigned: 0,
+          xyCoverage: 1,
+          zCoverage: 0,
+          projected: 0,
+          inBounds: 0,
+          outOfBounds: 0,
+          projectionCoverage: 0,
+        },
+        summary: {rowsRead: 1, sourceRows: 1, personalSample: 0, otherSample: 0},
+      }),
+      expectStatus: 'Selected floor is unavailable for this view',
+      expectAlertHidden: false,
+      expectAlertText: 'Selected floor is unavailable for this view',
+    },
+  ];
+
+  for (const testCase of cases) {
+    const transport = deferredTransport();
+    const harness = richWorkspaceHarness('?page=4');
+    const workspace = new HeatmapExplorerWorkspace(harness.root, {
+      window: harness.window,
+      document: harness.document,
+      fetch: transport.fetch,
+      messages: workspaceMessages,
+      Renderer: WorkspaceRenderer,
+    });
+    workspace.mount();
+    await settleWorkspace();
+    assert.strictEqual(transport.requests.length, 1, testCase.name + ': mount should request one scene');
+    transport.requests[0].resolve(jsonResponse(testCase.payload));
+    await settleWorkspace();
+    assert.strictEqual(harness.nodes.status.textContent, testCase.expectStatus, testCase.name);
+    assert.strictEqual(harness.nodes.alert.hidden, testCase.expectAlertHidden, testCase.name + ': alert visibility should match the explicit state');
+    if (Object.prototype.hasOwnProperty.call(testCase, 'expectAlertText')) {
+      assert.strictEqual(harness.nodes.alert.textContent, testCase.expectAlertText, testCase.name + ': alert text should stay specialized');
+    }
+    if (Object.prototype.hasOwnProperty.call(testCase, 'expectImage')) {
+      assert.strictEqual(harness.nodes.image.attributes.src, testCase.expectImage, testCase.name + ': complete states should keep the authoritative image');
+    }
+    assert.notStrictEqual(harness.nodes.status.textContent, 'Failed', testCase.name + ': explicit states must not collapse into generic failure');
+  }
+}
+
 function assertUnavailableFloorsStayVisible() {
   const {workspace, harness} = mountedWorkspace();
   const floorScene = new HeatmapExplorerScene(blockedSceneFixture('floors_unavailable'));
@@ -1691,6 +1887,7 @@ function assertPanModeSuppressesDragClicks() {
   assertZoomUsesReversibleFactors();
   await assertFailureActionsUseKnownV1Route();
   await assertInitialFailureUsesServerV1RouteWhenSceneIsMissing();
+  await assertFetchPathPublishesSpecializedStates();
   assertUnavailableFloorsStayVisible();
   assertAllFloorsAggregateLabelOmitsMisleadingZeroCount();
   await assertCustomWindowApplyValidation();
