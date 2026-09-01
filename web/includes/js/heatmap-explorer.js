@@ -1740,7 +1740,7 @@
     this._selection = this._selectionForScene();
     this._mounted = true;
     try {
-      this._gl = this._nodes.canvas.getContext('webgl2', {alpha: true, antialias: false});
+      this._gl = this._nodes.canvas.getContext('webgl2', {alpha: true, antialias: false, premultipliedAlpha: false});
       if (!this._gl) {
         throw new Error('webgl_unavailable');
       }

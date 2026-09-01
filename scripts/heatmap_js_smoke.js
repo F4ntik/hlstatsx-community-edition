@@ -568,6 +568,7 @@ function makeDom(gl) {
       height: 0,
       textContent: '',
       captures: [],
+      contextCalls: [],
       releasedCaptures: [],
       listeners,
       setAttribute(name, value) { this.attributes[name] = String(value); },
@@ -583,7 +584,13 @@ function makeDom(gl) {
         (listeners[event.type] || []).slice().forEach(handler => handler(event));
         return true;
       },
-      getContext() { return gl; },
+      getContext(type, attrs) {
+        node.contextCalls.push({
+          type,
+          attrs: attrs ? Object.assign({}, attrs) : attrs,
+        });
+        return gl;
+      },
     };
     Object.defineProperty(node, 'clientWidth', {
       enumerable: true,
@@ -766,6 +773,11 @@ const renderer = new HeatmapGlRenderer(dom.root, validScene, {
   onState: code => rendererStates.push(code),
 });
 renderer.mount();
+assert.deepStrictEqual(
+  dom.nodes.canvas.contextCalls,
+  [{type: 'webgl2', attrs: {alpha: true, antialias: false, premultipliedAlpha: false}}],
+  'renderer should request a straight-alpha WebGL2 context without antialiasing'
+);
 assert.strictEqual(goodGl.calls.textures.length, 2, 'renderer should create separate density and opacity textures');
 assert.strictEqual(goodGl.calls.buffers, 1, 'renderer should create one full-quad buffer');
 assert.strictEqual(goodGl.calls.programs, 1, 'renderer should create one program');
@@ -964,6 +976,7 @@ assert.deepStrictEqual(
 dom.nodes.canvas.dispatchEvent({type: 'webglcontextrestored'});
 assert.ok(goodGl.calls.programs >= 2, 'context restore should rebuild resources');
 assert.strictEqual(goodGl.calls.textures.length, 4, 'context restore should rebuild both density and opacity textures');
+assert.strictEqual(dom.nodes.canvas.contextCalls.length, 1, 'context restore should reuse the original WebGL2 context instead of calling getContext again');
 renderer.destroy();
 renderer.destroy();
 assert.strictEqual((dom.nodes.canvas.listeners.webglcontextlost || []).length, 0);
@@ -1093,16 +1106,46 @@ assert.match(
 );
 assert.match(
   cssSource,
+  /@media \(max-width: 540px\)\s*\{[\s\S]*?\.heatmap-explorer__header,[\s\S]*?\.heatmap-explorer__period-controls\s*\{[\s\S]*?flex-direction:\s*column;/,
+  'phone layout reflow should remain scoped to narrow viewports only'
+);
+assert.match(
+  cssSource,
   /@media \(max-width: 540px\)\s*\{[\s\S]*?\.heatmap-explorer__stage:not\(\[data-heatmap-sized="1"\]\)\s*\{[\s\S]*?min-height:\s*320px;/,
   'mobile placeholder stage should use 320px only while the stage is still unsized'
 );
+assert.match(
+  cssSource,
+  /@media \(max-width: 540px\), \(hover: none\) and \(pointer: coarse\)\s*\{/,
+  'Explorer mobile rules should activate on narrow viewports and coarse-pointer touch layouts'
+);
+assert.match(
+  cssSource,
+  /@media \(max-width: 540px\), \(hover: none\) and \(pointer: coarse\)\s*\{[\s\S]*?\.heatmap-explorer select,[\s\S]*?\.heatmap-explorer button,[\s\S]*?\.heatmap-explorer a,[\s\S]*?\.heatmap-explorer__map-label,[\s\S]*?\.heatmap-explorer__floors label,[\s\S]*?\.heatmap-explorer__input\s*\{[\s\S]*?min-height:\s*44px;/,
+  'mobile hit-area rules should cover select, button, links, map labels, floor labels, and explorer inputs'
+);
 assert.doesNotMatch(
   cssSource,
-  /@media \(max-width: 540px\)\s*\{[\s\S]*?\.heatmap-explorer__stage\s*\{[\s\S]*?min-height:\s*320px;/,
+  /@media \(max-width: 540px\), \(hover: none\) and \(pointer: coarse\)\s*\{[\s\S]*?\.heatmap-explorer__header,[\s\S]*?\.heatmap-explorer__period-controls\s*\{[\s\S]*?flex-direction:\s*column;/,
+  'wide coarse tablets must not inherit narrow phone layout reflow from the hit-target media block'
+);
+assert.doesNotMatch(
+  cssSource,
+  /@media \(max-width: 540px\), \(hover: none\) and \(pointer: coarse\)\s*\{[\s\S]*?\.heatmap-explorer__stage\s*\{[\s\S]*?min-height:\s*320px;/,
   'mobile 320px placeholder must not reapply to sized stages and reintroduce aspect drift'
+);
+assert.doesNotMatch(
+  cssSource,
+  /@media \(max-width: 540px\), \(hover: none\) and \(pointer: coarse\)\s*\{[\s\S]*?\.heatmap-explorer__stage:not\(\[data-heatmap-sized="1"\]\)\s*\{[\s\S]*?min-height:\s*320px;/,
+  'wide coarse tablets must not inherit the narrow placeholder stage height from the hit-target media block'
 );
 assert.doesNotMatch(cssSource, /min-height:\s*620px/, 'desktop stages should no longer be pinned to 620px after sizing');
 assert.match(cssSource, /min-height:\s*44px/, 'mobile 44px tap-target rules should remain intact');
+assert.doesNotMatch(
+  cssSource,
+  /@media \(max-width: 540px\), \(hover: none\) and \(pointer: coarse\)\s*\{[\s\S]*?input\[type=(?:'|")radio(?:'|")\][\s\S]*?min-height:\s*44px;/,
+  'mobile floor radio hit-area auditing should enlarge the label target without forcing the radio glyph itself to 44px'
+);
 
 function workspaceElement(attributes = {}) {
   const listeners = Object.create(null);

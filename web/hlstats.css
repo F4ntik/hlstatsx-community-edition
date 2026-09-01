@@ -843,22 +843,26 @@ nav{
 	.heatmap-explorer__header,
 	.heatmap-explorer__footer,
 	.heatmap-explorer__controls,
+	.heatmap-explorer__map-label,
 	.heatmap-explorer__group,
 	.heatmap-explorer__period-controls {
 		align-items: stretch;
 		flex-direction: column;
 	}
 
+	.heatmap-explorer__stage:not([data-heatmap-sized="1"]) {
+		min-height: 320px;
+	}
+}
+
+@media (max-width: 540px), (hover: none) and (pointer: coarse) {
 	.heatmap-explorer select,
 	.heatmap-explorer button,
 	.heatmap-explorer a,
+	.heatmap-explorer__map-label,
 	.heatmap-explorer__floors label,
 	.heatmap-explorer__input {
 		min-height: 44px;
-	}
-
-	.heatmap-explorer__stage:not([data-heatmap-sized="1"]) {
-		min-height: 320px;
 	}
 }
 
