@@ -10,11 +10,7 @@ $includeRoot = preg_match('/^([A-Za-z]:)?[\/\\\\]/', INCLUDE_PATH)
     : __DIR__ . '/' . ltrim(INCLUDE_PATH, './');
 require $includeRoot . '/functions.php';
 require $includeRoot . '/heatmap_points.php';
-
-if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_start();
-}
-
+require $includeRoot . '/heatmap_admin_transport.php';
 const HEATMAP_ADMIN_MAX_IMAGE_BYTES = 20971520;
 const HEATMAP_ADMIN_MAX_OVERVIEW_BYTES = 1048576;
 const HEATMAP_ADMIN_MAX_IMAGE_DIMENSION = 8192;
@@ -85,7 +81,6 @@ function heatmap_admin_message(string $code, string $language): string
 
     return $messages[$language][$code] ?? $messages[$language]['invalid_request'];
 }
-
 function heatmap_admin_result(string $code, string $language, array $extra = array()): array
 {
     return array_replace(array(
@@ -413,6 +408,8 @@ function heatmap_admin_preview_payload(PDO $pdo, array $request, array $storedCo
 
     try {
         $scene = heatmap_build_scene($pdo, heatmap_admin_preview_query($request, $config, $game, $map), $config, $image);
+    } catch (HeatmapAdminException $exception) {
+        throw $exception;
     } catch (InvalidArgumentException $exception) {
         throw new HeatmapAdminException('invalid_request', 400);
     } catch (Throwable $exception) {
@@ -795,6 +792,13 @@ function heatmap_admin_upload(PDO $pdo, $logger, array $request): void
     }
 
     heatmap_admin_json($response, $status);
+}
+
+if (heatmap_admin_reject_oversize_post($_SERVER)) {
+    exit;
+}
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
 }
 
 try {

@@ -7,6 +7,7 @@ define('ROOT_PATH', dirname(__DIR__) . '/web');
 
 require ROOT_PATH . '/includes/heatmap_points.php';
 require ROOT_PATH . '/includes/i18n.php';
+require ROOT_PATH . '/includes/heatmap_admin_transport.php';
 
 function assert_same($expected, $actual, string $message): void
 {
@@ -98,6 +99,72 @@ function smoke_remove_directory(string $directory): void
     }
     @rmdir($directory);
 }
+
+function assert_transport_guard_behavior(
+    array $server,
+    bool $expectedHandled,
+    int $expectedStatus,
+    string $expectedOutput,
+    string $message
+): void {
+    http_response_code(200);
+    ob_start();
+    $handled = heatmap_admin_reject_oversize_post($server);
+    $output = ob_get_clean();
+
+    assert_same($expectedHandled, $handled, $message . ' should report whether it handled the request');
+    assert_same($expectedStatus, http_response_code(), $message . ' should leave the expected HTTP status');
+    assert_same($expectedOutput, $output, $message . ' should emit only the expected bounded output');
+}
+
+$transportRejectJson = json_encode(array(
+    'ok' => false,
+    'code' => 'invalid_request',
+    'message' => 'The calibration request is invalid.',
+), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+assert_true(is_string($transportRejectJson), 'transport guard rejection fixture should encode to JSON');
+assert_transport_guard_behavior(
+    array('REQUEST_METHOD' => 'GET', 'CONTENT_LENGTH' => strval(HEATMAP_ADMIN_MAX_TRANSPORT_BYTES + 1)),
+    false,
+    200,
+    '',
+    'transport guard should ignore non-POST requests'
+);
+assert_transport_guard_behavior(
+    array('REQUEST_METHOD' => 'POST', 'CONTENT_LENGTH' => strval(HEATMAP_ADMIN_MAX_TRANSPORT_BYTES)),
+    false,
+    200,
+    '',
+    'transport guard should allow the exact 21 MiB boundary'
+);
+assert_transport_guard_behavior(
+    array('REQUEST_METHOD' => 'POST', 'CONTENT_LENGTH' => strval(HEATMAP_ADMIN_MAX_TRANSPORT_BYTES + 1)),
+    true,
+    413,
+    $transportRejectJson,
+    'transport guard should reject an oversized POST request'
+);
+assert_transport_guard_behavior(
+    array('REQUEST_METHOD' => 'POST'),
+    false,
+    200,
+    '',
+    'transport guard should ignore a POST request with no Content-Length'
+);
+assert_transport_guard_behavior(
+    array('REQUEST_METHOD' => 'POST', 'CONTENT_LENGTH' => '21MiB'),
+    false,
+    200,
+    '',
+    'transport guard should ignore malformed Content-Length values'
+);
+assert_transport_guard_behavior(
+    array('REQUEST_METHOD' => 'POST', 'HTTP_TRANSFER_ENCODING' => 'chunked'),
+    false,
+    200,
+    '',
+    'transport guard should ignore chunked requests without Content-Length and defer to the normal route boundary'
+);
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
@@ -414,6 +481,30 @@ assert_contains('explorer_disabled', $routeSource, 'disabled v2 mode should publ
 assert_contains('heatmap_build_scene(', $routeSource, 'v2 route should delegate scene construction to the Task 4 builder');
 assert_contains('heatmap_atomic_write_json', $routeSource . file_get_contents(ROOT_PATH . '/includes/heatmap_points.php'), 'route path should use the atomic cache writer');
 assert_true(substr_count($routeSource, 'heatmap_v2_emit(') >= 2, 'v2 responses should pass through one encode/log emission helper');
+
+$adminTransportSource = file_get_contents(ROOT_PATH . '/includes/heatmap_admin_transport.php');
+assert_true($adminTransportSource !== false, 'heatmap admin transport helper should be readable');
+assert_contains('function heatmap_admin_request_content_length(array $server): ?int', $adminTransportSource, 'heatmap admin transport helper should expose the content-length parser');
+assert_contains('function heatmap_admin_request_exceeds_transport_limit(array $server): bool', $adminTransportSource, 'heatmap admin transport helper should expose the bounded transport predicate');
+assert_contains('function heatmap_admin_reject_oversize_post(array $server): bool', $adminTransportSource, 'heatmap admin transport helper should expose the pre-session rejection entrypoint');
+assert_contains("'message' => 'The calibration request is invalid.'", $adminTransportSource, 'heatmap admin transport helper should emit the bounded fallback message directly');
+
+$adminRouteSource = file_get_contents(ROOT_PATH . '/heatmap_admin.php');
+assert_true($adminRouteSource !== false, 'heatmap admin route should be readable');
+$adminTransportRequire = strpos($adminRouteSource, 'require $includeRoot . \'/heatmap_admin_transport.php\';');
+$adminTransportGuard = strpos($adminRouteSource, 'if (heatmap_admin_reject_oversize_post($_SERVER)) {');
+$adminTransportExit = strpos($adminRouteSource, 'exit;', $adminTransportGuard === false ? 0 : $adminTransportGuard);
+$adminSessionBoot = strpos($adminRouteSource, 'session_start();');
+assert_true(
+    $adminTransportRequire !== false
+        && $adminTransportGuard !== false
+        && $adminTransportExit !== false
+        && $adminSessionBoot !== false
+        && $adminTransportRequire < $adminTransportGuard
+        && $adminTransportGuard < $adminTransportExit
+        && $adminTransportExit < $adminSessionBoot,
+    'heatmap admin should reject oversized POST requests before session start'
+);
 
 $cacheFixtureDirectory = smoke_temp_directory('payload-cache');
 $cacheFixtureKeys = array(

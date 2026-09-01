@@ -15,6 +15,9 @@ RUN apt-get update \
 RUN { \
         echo 'upload_max_filesize=21M'; \
         echo 'post_max_size=21M'; \
+        echo 'display_errors=Off'; \
+        echo 'display_startup_errors=Off'; \
+        echo 'log_errors=On'; \
     } > /usr/local/etc/php/conf.d/hlstats-upload-limits.ini
 
 WORKDIR /var/www/html

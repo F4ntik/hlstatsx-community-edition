@@ -201,8 +201,76 @@ def test_heatmap_admin_preview_rejects_invalid_floor_before_scene_build() -> Non
     assert preview_query < floor_validation < invalid_request < build_scene
 
 
-def test_python_web_dockerfiles_keep_php_upload_limits_above_the_20mib_app_guard() -> None:
-    """Local Python web images must let PHP reach the app-level 20 MiB guard."""
+def test_heatmap_admin_preview_preserves_domain_errors_before_preview_failed() -> None:
+    """Preview should preserve HeatmapAdminException before the generic preview_failed catch."""
+
+    admin = (REPOSITORY_ROOT / "web/heatmap_admin.php").read_text(encoding="utf-8")
+
+    preview_payload = admin.index("function heatmap_admin_preview_payload")
+    build_scene = admin.index("heatmap_build_scene(", preview_payload)
+    passthrough_catch = admin.index(
+        "catch (HeatmapAdminException $exception) {", build_scene
+    )
+    passthrough_throw = admin.index("throw $exception;", passthrough_catch)
+    invalid_request = admin.index(
+        "catch (InvalidArgumentException $exception) {", passthrough_throw
+    )
+    preview_failed = admin.index(
+        "throw new HeatmapAdminException('preview_failed', 500);", invalid_request
+    )
+
+    assert (
+        preview_payload
+        < build_scene
+        < passthrough_catch
+        < passthrough_throw
+        < invalid_request
+        < preview_failed
+    )
+
+
+def test_heatmap_admin_transport_guard_rejects_oversize_post_before_session_boot() -> None:
+    """The admin route must fail closed on oversized POST bodies before session/auth parsing."""
+
+    admin = (REPOSITORY_ROOT / "web/heatmap_admin.php").read_text(encoding="utf-8")
+    transport = (
+        REPOSITORY_ROOT / "web/includes/heatmap_admin_transport.php"
+    ).read_text(encoding="utf-8")
+    app_limit_match = re.search(
+        r"HEATMAP_ADMIN_MAX_IMAGE_BYTES\s*=\s*(\d+);", admin
+    )
+    transport_limit_match = re.search(
+        r"HEATMAP_ADMIN_MAX_TRANSPORT_BYTES\s*=\s*(\d+);", transport
+    )
+
+    assert app_limit_match is not None
+    assert transport_limit_match is not None
+    app_limit = int(app_limit_match.group(1))
+    transport_limit = int(transport_limit_match.group(1))
+
+    assert app_limit == 20 * 1024 * 1024
+    assert transport_limit == 21 * 1024 * 1024
+    assert transport_limit > app_limit
+    assert "function heatmap_admin_request_content_length(array $server): ?int" in transport
+    assert "function heatmap_admin_request_exceeds_transport_limit(array $server): bool" in transport
+    assert "function heatmap_admin_reject_oversize_post(array $server): bool" in transport
+    assert "CONTENT_LENGTH" in transport
+    assert "REQUEST_METHOD" in transport
+    assert "'message' => 'The calibration request is invalid.'" in transport
+    assert "'code' => 'invalid_request'" in transport
+    assert "413" in transport
+
+    require_transport = admin.index("require $includeRoot . '/heatmap_admin_transport.php';")
+    guard = admin.index("if (heatmap_admin_reject_oversize_post($_SERVER)) {")
+    guard_exit = admin.index("exit;", guard)
+    session_boot = admin.index("session_start();", guard)
+    access_boundary = admin.index("heatmap_admin_require_access();", guard)
+
+    assert require_transport < guard < guard_exit < session_boot < access_boundary
+
+
+def test_python_web_dockerfiles_pin_php_upload_limits_and_warning_visibility() -> None:
+    """Local Python web images must keep the exact 21 MiB transport ceiling and suppress output leaks."""
 
     admin = (REPOSITORY_ROOT / "web/heatmap_admin.php").read_text(encoding="utf-8")
     app_limit_match = re.search(
@@ -222,8 +290,13 @@ def test_python_web_dockerfiles_keep_php_upload_limits_above_the_20mib_app_guard
 
         assert upload_match is not None, f"{dockerfile.name} should set upload_max_filesize"
         assert post_match is not None, f"{dockerfile.name} should set post_max_size"
+        assert int(upload_match.group(1)) == 21
+        assert int(post_match.group(1)) == 21
         assert int(upload_match.group(1)) * 1024 * 1024 > app_limit
         assert int(post_match.group(1)) * 1024 * 1024 > app_limit
+        assert "display_errors=Off" in source
+        assert "display_startup_errors=Off" in source
+        assert "log_errors=On" in source
 
 
 def test_representative_routes_include_populated_cstrike_award_tabs() -> None:
