@@ -2506,6 +2506,7 @@ function heatmap_map_source_snapshot(string $path): array
         'bytes' => $bytes,
         'width' => intval($size[0]),
         'height' => intval($size[1]),
+        'mime' => is_string($size['mime'] ?? null) ? $size['mime'] : 'application/octet-stream',
         'sourceIdentity' => hash('sha256', $bytes),
     );
 }
@@ -2520,12 +2521,18 @@ function heatmap_map_request_version_state($requested, string $sourceIdentity): 
     return hash_equals($sourceIdentity, $requested) ? 'current' : 'stale';
 }
 
-function heatmap_version_fallback_image(array $image): array
+function heatmap_version_fallback_image(array $image, string $game, string $map): array
 {
     $snapshot = heatmap_map_source_snapshot(strval($image['path'] ?? ''));
     $sourceIdentity = $snapshot['sourceIdentity'];
-    $url = strval($image['url'] ?? '');
-    $image['url'] = $url . (strpos($url, '?') === false ? '?' : '&') . 'v=' . $sourceIdentity;
+    $game = heatmap_clean_token($game);
+    $map = heatmap_clean_token($map);
+    if ($game === '' || $map === '') {
+        throw new InvalidArgumentException('invalid_image');
+    }
+    $image['url'] = 'heatmap_map.php?game=' . rawurlencode($game)
+        . '&map=' . rawurlencode($map)
+        . '&source=hlstatsimg&v=' . $sourceIdentity;
     $image['width'] = $snapshot['width'];
     $image['height'] = $snapshot['height'];
     $image['sourceIdentity'] = $sourceIdentity;
@@ -2697,7 +2704,7 @@ function heatmap_image_metadata($game, $map, array $config)
         $image = getImage('/games/' . $config['realgame'] . '/maps/' . $map);
     }
     if ($image) {
-        $image = heatmap_version_fallback_image($image);
+        $image = heatmap_version_fallback_image($image, $game, $map);
         $image['source'] = 'hlstatsimg';
         $image['crop'] = null;
     }

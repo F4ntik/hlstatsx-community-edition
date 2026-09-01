@@ -330,6 +330,7 @@ $realMapSnapshot = heatmap_map_source_snapshot($realMapPath);
 $realMapSize = getimagesize($realMapPath);
 assert_same(intval($realMapSize[0]), $realMapSnapshot['width'], 'map snapshot width should come from the hashed bytes');
 assert_same(intval($realMapSize[1]), $realMapSnapshot['height'], 'map snapshot height should come from the hashed bytes');
+assert_same($realMapSize['mime'], $realMapSnapshot['mime'], 'map snapshot should retain the detected response MIME type');
 assert_same(hash_file('sha256', $realMapPath), $realMapSnapshot['sourceIdentity'], 'map snapshot identity should match its immutable bytes');
 assert_same($realMapSnapshot['sourceIdentity'], hash('sha256', $realMapSnapshot['bytes']), 'map snapshot bytes and identity should stay coupled');
 assert_same('current', heatmap_map_request_version_state($realMapSnapshot['sourceIdentity'], $realMapSnapshot['sourceIdentity']), 'matching content version should be cacheable');
@@ -340,11 +341,15 @@ $fallbackMetadata = heatmap_version_fallback_image(array(
     'path' => $realMapPath,
     'width' => 1,
     'height' => 1,
-));
+), 'cstrike', 'de_dust2');
 assert_same($realMapSnapshot['sourceIdentity'], $fallbackMetadata['sourceIdentity'], 'fallback metadata should publish the resolved file identity');
 assert_same($realMapSnapshot['width'], $fallbackMetadata['width'], 'fallback metadata should publish dimensions from the hashed bytes');
 assert_same($realMapSnapshot['height'], $fallbackMetadata['height'], 'fallback metadata should publish dimensions from the hashed bytes');
-assert_contains('?v=' . $realMapSnapshot['sourceIdentity'], $fallbackMetadata['url'], 'fallback map URL should be content-versioned');
+assert_contains('heatmap_map.php?game=cstrike&map=de_dust2&source=hlstatsimg&v=' . $realMapSnapshot['sourceIdentity'], $fallbackMetadata['url'], 'fallback map URL should use the validating content route');
+$mapRouteSource = file_get_contents(ROOT_PATH . '/heatmap_map.php');
+assert_contains("require \$includeRoot . '/functions.php'", $mapRouteSource, 'map route should load the canonical fallback resolver');
+assert_contains("\$source === 'hlstatsimg'", $mapRouteSource, 'map route should explicitly resolve fallback assets');
+assert_contains('heatmap_map_request_version_state', $mapRouteSource, 'map route should reject stale custom and fallback versions');
 $oldWriterImage = $sceneKeyImage;
 $oldWriterImage['sourceIdentity'] = $firstMapIdentity;
 $newReaderImage = $sceneKeyImage;

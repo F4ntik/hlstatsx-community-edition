@@ -2084,6 +2084,40 @@ function assertZoomUsesReversibleFactors() {
   assert.strictEqual(cameraForControls.state.zoom, 1, 'zoom in followed by zoom out must return to the prior zoom level');
 }
 
+async function assertStaleMapImageRecoversOnceThenFallsBack() {
+  const harness = richWorkspaceHarness();
+  const transport = deferredTransport();
+  const workspace = new HeatmapExplorerWorkspace(harness.root, {
+    window: harness.window,
+    document: harness.document,
+    fetch: transport.fetch,
+    messages: workspaceMessages,
+    Renderer: WorkspaceRenderer,
+  });
+  workspace.mount();
+  await settleWorkspace();
+  const sceneA = sceneForMap('de_dust2');
+  sceneA.map.image.url = 'heatmap_map.php?game=cstrike&map=de_dust2&v=' + 'a'.repeat(64);
+  transport.requests[0].resolve(jsonResponse(sceneA));
+  await settleWorkspace();
+
+  harness.nodes.image.dispatch('error');
+  await settleWorkspace();
+  assert.strictEqual(transport.requests.length, 2, 'a stale base-map response should trigger one fresh scene request');
+  const sceneB = sceneForMap('de_dust2');
+  sceneB.map.image.url = 'heatmap_map.php?game=cstrike&map=de_dust2&v=' + 'b'.repeat(64);
+  transport.requests[1].resolve(jsonResponse(sceneB));
+  await settleWorkspace();
+  assert.strictEqual(harness.nodes.image.attributes.src, sceneB.map.image.url, 'the bounded recovery should install the replacement content URL');
+
+  harness.nodes.image.dispatch('error');
+  await settleWorkspace();
+  assert.strictEqual(transport.requests.length, 2, 'a second base-map error before load must not loop scene requests');
+  assert.strictEqual(harness.root.attributes['data-heatmap-state'], 'static_fallback', 'failed replacement loading should expose the static JPEG fallback');
+  assert.strictEqual(harness.nodes.alert.hidden, false, 'failed replacement loading should keep recovery actions visible');
+  assert.ok(harness.nodes.alert.children.length > 0, 'failed replacement loading should expose retry and legacy actions');
+}
+
 async function assertMapStyleStaysInstanceLocalAndDoesNotReload() {
   const transport = deferredTransport();
   const harness = richWorkspaceHarness();
@@ -2982,6 +3016,7 @@ async function assertInspect422StaysFailClosed() {
   await assertSeparateInspectAndDeepLinkFlow();
   await assertClearedInspectCannotRetry();
   await assertLatestSceneRequestWins();
+  await assertStaleMapImageRecoversOnceThenFallsBack();
   await assertFloorFocusPersistsThroughEnabledReload();
   await assertFloorFocusDoesNotTargetUnavailableReload();
   await assertFloorFocusDoesNotStealMovedFocus();

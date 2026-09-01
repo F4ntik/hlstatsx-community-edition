@@ -8,13 +8,16 @@ require __DIR__ . '/config.php';
 $includeRoot = preg_match('/^([A-Za-z]:)?[\/\\\\]/', INCLUDE_PATH)
     ? INCLUDE_PATH
     : __DIR__ . '/' . ltrim(INCLUDE_PATH, './');
+require $includeRoot . '/functions.php';
 require $includeRoot . '/heatmap_points.php';
 
 $game = heatmap_clean_token($_GET['game'] ?? '');
 $map = heatmap_clean_token($_GET['map'] ?? '');
 $crop = intval($_GET['crop'] ?? 0) === 1;
+$source = $_GET['source'] ?? 'heatmaps/src';
 
-if ($game === '' || $map === '') {
+if ($game === '' || $map === '' || !is_string($source)
+    || !in_array($source, array('heatmaps/src', 'hlstatsimg'), true)) {
     http_response_code(400);
     exit;
 }
@@ -27,8 +30,17 @@ try {
         exit;
     }
 
-    $sourcePath = dirname(__DIR__) . '/heatmaps/src/' . $config['game'] . '/' . $map . '.jpg';
-    if (!is_file($sourcePath)) {
+    if ($source === 'hlstatsimg') {
+        $fallback = getImage('/games/' . $game . '/maps/' . $map);
+        if (!$fallback && !empty($config['realgame'])) {
+            $fallback = getImage('/games/' . $config['realgame'] . '/maps/' . $map);
+        }
+        $sourcePath = is_array($fallback) ? strval($fallback['path'] ?? '') : '';
+        $crop = false;
+    } else {
+        $sourcePath = dirname(__DIR__) . '/heatmaps/src/' . $config['game'] . '/' . $map . '.jpg';
+    }
+    if ($sourcePath === '' || !is_file($sourcePath)) {
         http_response_code(404);
         exit;
     }
@@ -83,7 +95,7 @@ try {
         exit;
     }
 
-    header('Content-Type: image/jpeg');
+    header('Content-Type: ' . $sourceSnapshot['mime']);
     header('Cache-Control: ' . $cacheControl);
     header('ETag: "' . $sourceSnapshot['sourceIdentity'] . '"');
     header('Content-Length: ' . strlen($sourceSnapshot['bytes']));

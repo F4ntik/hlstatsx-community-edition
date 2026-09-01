@@ -2122,6 +2122,7 @@
     this._inspectGeneration = 0;
     this._lastRequestType = null;
     this._lastInspectCell = null;
+    this._mapImageReloadAttempted = false;
     this._initialUrlError = false;
     this._readUrlState();
     this._normalizeSelection(false);
@@ -2845,6 +2846,34 @@
     this._setStatus('fallback');
   };
 
+  HeatmapExplorerWorkspace.prototype._showMapImageFallback = function () {
+    this.showFallback();
+    this._showAlert('failed');
+    this._showFailureActions();
+  };
+
+  HeatmapExplorerWorkspace.prototype._handleMapImageError = function () {
+    var self = this;
+    if (this._destroyed || !this._mounted) {
+      return;
+    }
+    if (this._mapImageReloadAttempted) {
+      this._showMapImageFallback();
+      return;
+    }
+    this._mapImageReloadAttempted = true;
+    var failedUrl = workspaceAttribute(this._nodes.image, 'src', '');
+    this._loadScene('map-image-retry').then(function (loaded) {
+      if (self._destroyed) {
+        return;
+      }
+      var currentUrl = workspaceAttribute(self._nodes.image, 'src', '');
+      if (!loaded || currentUrl === '' || currentUrl === failedUrl) {
+        self._showMapImageFallback();
+      }
+    });
+  };
+
   HeatmapExplorerWorkspace.prototype._renderPinnedCell = function (cell) {
     if (!this._scene || !this._nodes || !this._nodes.inspectOutput) {
       return;
@@ -2994,6 +3023,12 @@
     var eventControls = workspaceNodes(this.root, '[data-heatmap-event]');
     var mapStyleControls = workspaceNodes(this.root, '[data-heatmap-map-style-option]');
     var sheetControls = workspaceNodes(this.root, '[data-heatmap-sheet-toggle]');
+    this._listen(this._nodes.image, 'load', function () {
+      self._mapImageReloadAttempted = false;
+    });
+    this._listen(this._nodes.image, 'error', function () {
+      self._handleMapImageError();
+    });
     for (index = 0; index < lensControls.length; index += 1) {
       this._listen(lensControls[index], 'click', function (event) {
         var lens = event && event.currentTarget && event.currentTarget.getAttribute
