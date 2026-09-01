@@ -220,10 +220,23 @@ is:
       "teamkill": false
     }
   ],
+  "aggregates": {
+    "scope": "returned_rows",
+    "sampleRows": 1,
+    "topWeapons": [{"weapon": "ak47", "count": 1}],
+    "participantCounts": {"unique": 2, "killers": 1, "victims": 1}
+  },
   "truncated": false,
   "warnings": []
 }
 ```
+
+`rows` and `aggregates` describe the same sanitized returned sample, capped at
+100 rows. `topWeapons` contains at most five entries and is sorted by count
+descending, then weapon token. `participantCounts` counts distinct positive
+public player IDs in the returned sample; hidden or missing identities remain
+the public ID `0` and are not counted. If `truncated` is true, these aggregates
+remain sample-scoped and must not be presented as exact full-cell totals.
 
 The response never returns raw world coordinates, Steam ids, SQL ids outside
 existing public player ids, or a replacement scene.

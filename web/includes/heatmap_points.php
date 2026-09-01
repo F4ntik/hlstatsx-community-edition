@@ -2059,7 +2059,7 @@ function heatmap_inspect_aggregates(array $rows): array
 
     $topWeapons = array();
     foreach ($weaponCounts as $weapon => $count) {
-        $topWeapons[] = array('weapon' => $weapon, 'count' => $count);
+        $topWeapons[] = array('weapon' => strval($weapon), 'count' => $count);
     }
     usort($topWeapons, function (array $left, array $right): int {
         $countCompare = intval($right['count']) <=> intval($left['count']);

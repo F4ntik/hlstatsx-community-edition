@@ -1864,6 +1864,21 @@ assert_same(array(), $inspectEmptyPayload['rows'], 'empty inspect should return 
 assert_same(0, $inspectEmptyPayload['aggregates']['sampleRows'], 'empty inspect should publish an empty aggregate sample');
 assert_same(0, $inspectEmptyPayload['aggregates']['participantCounts']['unique'], 'empty inspect should publish zero unique participants');
 assert_same(false, $inspectEmptyPayload['truncated'], 'empty inspect should not be truncated');
+$inspectNumericWeaponPayload = heatmap_build_inspect_payload(array(array(
+    'eventTime' => '2026-08-29T17:12:30Z',
+    'event' => 'kill',
+    'killerId' => '7',
+    'killerName' => 'Gamma',
+    'victimId' => '84',
+    'victimName' => 'Beta',
+    'weapon' => '0',
+    'headshot' => 0,
+    'teamkill' => 0,
+)), false);
+$inspectNumericWeaponJson = json_encode($inspectNumericWeaponPayload);
+assert_true(is_string($inspectNumericWeaponJson), 'numeric weapon inspect payload should encode as JSON');
+$inspectNumericWeaponDecoded = json_decode($inspectNumericWeaponJson, true);
+assert_same('0', $inspectNumericWeaponDecoded['aggregates']['topWeapons'][0]['weapon'], 'numeric weapon aggregate should remain a JSON string');
 
 $inspectRouteSource = file_get_contents(ROOT_PATH . '/heatmap_points.php');
 assert_true($inspectRouteSource !== false, 'inspect route source should be readable');
