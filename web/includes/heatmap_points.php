@@ -1283,6 +1283,10 @@ function heatmap_accumulate_scene_row(array &$state, array $row): void
         $scene['overflow'] = true;
         $scene['totalBins'] = array();
         $scene['meBins'] = array();
+        if (isset($scene['exact'])) {
+            $scene['exact']['points'] = array();
+            $scene['exact']['overflow'] = true;
+        }
         return;
     }
 

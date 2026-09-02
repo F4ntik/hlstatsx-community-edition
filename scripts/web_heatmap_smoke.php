@@ -1483,6 +1483,21 @@ $overflowScene = scene_payload(
 assert_same(true, $overflowScene['exact']['overflow'], 'exact preview should fail closed after its bounded response limit');
 assert_same(array(), $overflowScene['exact']['points'], 'exact preview overflow should not expose a truncated coordinate subset');
 
+$sourceOverflowExactState = array(
+    'query' => scene_query(array('event' => 'kills')),
+    'config' => scene_config(),
+    'image' => scene_image(),
+    'options' => array('exact' => true, 'exactLimit' => 20000),
+);
+heatmap_accumulate_scene_row($sourceOverflowExactState, scene_row());
+$sourceOverflowRejectedRow = scene_row(array('attackerX' => null, 'attackerY' => null, 'attackerZ' => null));
+for ($sourceOverflowRow = 0; $sourceOverflowRow < HEATMAP_MAX_SOURCE_ROWS; $sourceOverflowRow++) {
+    heatmap_accumulate_scene_row($sourceOverflowExactState, $sourceOverflowRejectedRow);
+}
+$sourceOverflowExact = heatmap_finalize_scene($sourceOverflowExactState);
+assert_same(true, $sourceOverflowExact['exact']['overflow'], 'source-row overflow should fail closed even when exact rows remain below their own limit');
+assert_same(array(), $sourceOverflowExact['exact']['points'], 'source-row overflow should not return a misleading exact prefix');
+
 $weakExact = scene_payload(
     array(scene_row(array('eventId' => '1', 'attackerX' => '8')), scene_row(array('eventId' => '2', 'attackerX' => '130'))),
     scene_query(array('event' => 'kills')),
