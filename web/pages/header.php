@@ -124,6 +124,16 @@ For support and installation notes visit http://www.hlxcommunity.com
 		'heatmapRotate' => t('heatmap.rotate'),
 		'heatmapRotateLeft90' => t('heatmap.rotate_left_90'),
 		'heatmapRotateRight90' => t('heatmap.rotate_right_90'),
+		'heatmapAdmin' => array(
+			'landmarks' => t('admin.task.heatmaps.landmarks'),
+			'holdout' => t('admin.task.heatmaps.holdout'),
+			'landmarksRequired' => t('admin.task.heatmaps.landmarks_required'),
+			'registrationAccepted' => t('admin.task.heatmaps.registration_accepted'),
+			'candidateRefused' => t('admin.task.heatmaps.candidate_refused'),
+			'previewRequired' => t('admin.task.heatmaps.preview_required'),
+			'assetMismatch' => t('admin.task.heatmaps.asset_mismatch'),
+			'registrationCoverage' => t('admin.task.heatmaps.registration_coverage'),
+		),
 		'heatmapExplorer' => array(
 			'map' => t('heatmapExplorer.map'),
 			'loading' => t('heatmapExplorer.loading'),

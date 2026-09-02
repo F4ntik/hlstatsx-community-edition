@@ -22,7 +22,7 @@ $csrfToken = heatmap_admin_session_csrf_token();
 $adminLanguage = current_lang();
 ?>
 
-<div class="heatmap-admin-wizard" data-heatmap-admin="1" data-heatmap-game="<?php echo eHtml($selectedGame); ?>" data-heatmap-map="<?php echo eHtml($defaultMap); ?>" data-heatmap-csrf="<?php echo eHtml($csrfToken); ?>" data-heatmap-lang="<?php echo eHtml($adminLanguage); ?>" data-heatmap-admin-text-all-floors="<?php echo eHtml(t('admin.task.heatmaps.all_floors')); ?>" data-heatmap-admin-text-remove-floor="<?php echo eHtml(t('admin.task.heatmaps.remove_floor')); ?>" data-heatmap-admin-text-diagnostic-window-invalid="<?php echo eHtml(t('admin.task.heatmaps.diagnostic_window_invalid')); ?>" data-heatmap-admin-text-preview-ready="<?php echo eHtml(t('admin.task.heatmaps.preview_ready')); ?>" data-heatmap-admin-text-saved="<?php echo eHtml(t('admin.task.heatmaps.saved')); ?>" data-heatmap-admin-text-uploaded="<?php echo eHtml(t('admin.task.heatmaps.uploaded')); ?>" data-heatmap-admin-text-load-before-save="<?php echo eHtml(t('admin.task.heatmaps.load_before_save')); ?>">
+<div class="heatmap-admin-wizard" data-heatmap-admin="1" data-heatmap-game="<?php echo eHtml($selectedGame); ?>" data-heatmap-map="<?php echo eHtml($defaultMap); ?>" data-heatmap-csrf="<?php echo eHtml($csrfToken); ?>" data-heatmap-lang="<?php echo eHtml($adminLanguage); ?>" data-heatmap-admin-text-all-floors="<?php echo eHtml(t('admin.task.heatmaps.all_floors')); ?>" data-heatmap-admin-text-remove-floor="<?php echo eHtml(t('admin.task.heatmaps.remove_floor')); ?>" data-heatmap-admin-text-diagnostic-window-invalid="<?php echo eHtml(t('admin.task.heatmaps.diagnostic_window_invalid')); ?>" data-heatmap-admin-text-preview-ready="<?php echo eHtml(t('admin.task.heatmaps.preview_ready')); ?>" data-heatmap-admin-text-saved="<?php echo eHtml(t('admin.task.heatmaps.saved')); ?>" data-heatmap-admin-text-uploaded="<?php echo eHtml(t('admin.task.heatmaps.uploaded')); ?>" data-heatmap-admin-text-load-before-save="<?php echo eHtml(t('admin.task.heatmaps.load_before_save')); ?>" data-heatmap-admin-text-landmarks-required="<?php echo eHtml(t('admin.task.heatmaps.landmarks_required')); ?>" data-heatmap-admin-text-registration-accepted="<?php echo eHtml(t('admin.task.heatmaps.registration_accepted')); ?>" data-heatmap-admin-text-candidate-refused="<?php echo eHtml(t('admin.task.heatmaps.candidate_refused')); ?>" data-heatmap-admin-text-registration-coverage="<?php echo eHtml(t('admin.task.heatmaps.registration_coverage')); ?>">
 	<p><?php echo eHtml(t('admin.task.heatmaps.intro')); ?></p>
 	<div class="heatmap-admin-controls">
 		<label>
@@ -121,6 +121,14 @@ $adminLanguage = current_lang();
 				<button type="button" data-heatmap-admin-preview="1"><?php echo eHtml(t('admin.task.heatmaps.preview')); ?></button>
 				<button type="button" data-heatmap-admin-save="1"><?php echo eHtml(t('admin.task.heatmaps.save')); ?></button>
 			</div>
+			<fieldset class="heatmap-admin-landmarks">
+				<legend><?php echo eHtml(t('admin.task.heatmaps.landmarks')); ?></legend>
+				<label><?php echo eHtml(t('admin.task.heatmaps.tolerance')); ?> <input type="number" min="1" max="200" step="1" value="10" data-heatmap-landmark-tolerance="1" /></label>
+				<div class="heatmap-admin-floor-table-wrap"><table class="heatmap-admin-floor-table"><thead><tr><th><?php echo eHtml(t('admin.task.heatmaps.world_x')); ?></th><th><?php echo eHtml(t('admin.task.heatmaps.world_y')); ?></th><th><?php echo eHtml(t('admin.task.heatmaps.pixel_x')); ?></th><th><?php echo eHtml(t('admin.task.heatmaps.pixel_y')); ?></th><th><?php echo eHtml(t('admin.task.heatmaps.holdout')); ?></th></tr></thead><tbody data-heatmap-landmark-rows="1">
+				<?php for ($landmarkIndex = 0; $landmarkIndex < 6; $landmarkIndex++): ?><tr data-heatmap-landmark-row="1"><td><input type="number" data-heatmap-landmark="worldX" /></td><td><input type="number" data-heatmap-landmark="worldY" /></td><td><input type="number" data-heatmap-landmark="pixelX" /></td><td><input type="number" data-heatmap-landmark="pixelY" /></td><td><input type="checkbox" data-heatmap-landmark="holdout"<?php echo $landmarkIndex >= 4 ? ' checked="checked"' : ''; ?> /></td></tr><?php endfor; ?>
+				</tbody></table></div>
+				<p data-heatmap-landmark-status="1" aria-live="polite"></p>
+			</fieldset>
 			<p class="heatmap-admin-deployment" data-heatmap-deployment-note="1"><?php echo eHtml(t('admin.task.heatmaps.deployment')); ?></p>
 			<code class="heatmap-admin-deployment-command" data-heatmap-deployment-command="1">$env:PYTHONPATH='scripts'
 rtk python -m hlstats_py.heatmaps --game &lt;validated-game&gt; --map &lt;validated-map&gt; --disablecache</code>

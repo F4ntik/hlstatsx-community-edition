@@ -175,6 +175,30 @@ $adminCsrfToken = heatmap_admin_session_csrf_token();
 assert_true(preg_match('/^[a-f0-9]{64}$/D', $adminCsrfToken) === 1, 'admin CSRF token should be a 32-byte random hex token');
 assert_same($adminCsrfToken, heatmap_admin_session_csrf_token(), 'admin CSRF token should remain stable for the current session');
 
+$previewTokenConfig = array(
+    'game' => 'cstrike', 'map' => 'de_dust2', 'xoffset' => 376, 'yoffset' => 1207,
+    'scale' => 1.4285714285714286, 'flipx' => 0, 'flipy' => 1, 'rotate' => 0, 'floors_json' => '[]',
+);
+$previewTokenImage = array('path' => ROOT_PATH . '/images/nomap.png', 'width' => 1280, 'height' => 1024);
+$previewTokenQuery = array('game' => 'cstrike', 'map' => 'de_dust2', 'from' => 1700000000, 'to' => 1700003600, 'event' => 'both', 'floor' => 'all');
+unset($_SESSION['heatmap_admin_preview']);
+$previewToken = heatmap_admin_issue_preview_token($previewTokenConfig, $previewTokenImage, $previewTokenQuery, 1700000000);
+assert_true(preg_match('/^[a-f0-9]{64}$/D', $previewToken) === 1, 'preview token should be a random opaque token');
+assert_true(heatmap_admin_preview_token_is_valid($previewToken, $previewTokenConfig, $previewTokenImage, $previewTokenQuery, 1700000001), 'preview token should validate for the normalized candidate identity');
+$previewTokenChanged = $previewTokenConfig;
+$previewTokenChanged['scale'] = 1.5;
+assert_same(false, heatmap_admin_preview_token_is_valid($previewToken, $previewTokenChanged, $previewTokenImage, $previewTokenQuery, 1700000001), 'projection changes should invalidate a preview token');
+assert_same(false, heatmap_admin_preview_token_is_valid($previewToken, $previewTokenConfig, $previewTokenImage, array_merge($previewTokenQuery, array('floor' => 'upper')), 1700000001), 'query floor changes should invalidate a preview token');
+$previewTokenPalette = $previewTokenConfig;
+$previewTokenPalette['renderer'] = 'semantic';
+assert_true(heatmap_admin_preview_token_is_valid($previewToken, $previewTokenPalette, $previewTokenImage, $previewTokenQuery, 1700000001), 'palette choices should not alter preview identity');
+assert_same(false, heatmap_admin_preview_token_is_valid($previewToken, $previewTokenConfig, $previewTokenImage, $previewTokenQuery, 1700000601), 'expired preview tokens should fail closed');
+$previewToken = heatmap_admin_issue_preview_token($previewTokenConfig, $previewTokenImage, $previewTokenQuery, 1700000000);
+assert_true(heatmap_admin_preview_token_consume($previewToken, $previewTokenConfig, $previewTokenImage, $previewTokenQuery, 1700000001), 'matching preview token should be consumable once');
+assert_same(false, heatmap_admin_preview_token_is_valid($previewToken, $previewTokenConfig, $previewTokenImage, $previewTokenQuery, 1700000001), 'consumed preview tokens should fail closed');
+assert_contains('heatmap_admin_require_config_hash($request, $oldHash);', file_get_contents(ROOT_PATH . '/heatmap_admin.php'), 'save should keep stale config rejection before the preview-token gate');
+assert_contains("throw new HeatmapAdminException('preview_required', 409);", file_get_contents(ROOT_PATH . '/heatmap_admin.php'), 'save should reject missing or mismatched preview tokens before writes');
+
 $explorerModeCases = array(
     array('input' => array(), 'mode' => 0),
     array('input' => array('HeatmapExplorerBeta' => 0), 'mode' => 0),

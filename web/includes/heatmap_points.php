@@ -616,6 +616,57 @@ function heatmap_admin_session_csrf_token(): string
     return $token;
 }
 
+function heatmap_admin_preview_identity(array $config, array $image, array $query): string
+{
+    $queryIdentity = array(
+        'game' => strval($query['game'] ?? ''),
+        'map' => strval($query['map'] ?? ''),
+        'from' => intval($query['from'] ?? 0),
+        'to' => intval($query['to'] ?? 0),
+        'event' => strval($query['event'] ?? ''),
+        'floor' => strval($query['floor'] ?? ''),
+    );
+    $canonical = heatmap_admin_config_hash($config, $image) . "\n" . json_encode($queryIdentity, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    return hash('sha256', $canonical);
+}
+
+function heatmap_admin_issue_preview_token(array $config, array $image, array $query, int $now = null): string
+{
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        throw new RuntimeException('admin_session_unavailable');
+    }
+    $now = $now ?? time();
+    $token = bin2hex(random_bytes(32));
+    $_SESSION['heatmap_admin_preview'] = array(
+        'hash' => hash('sha256', $token),
+        'identity' => heatmap_admin_preview_identity($config, $image, $query),
+        'expires' => $now + 600,
+    );
+    return $token;
+}
+
+function heatmap_admin_preview_token_is_valid(string $token, array $config, array $image, array $query, int $now = null): bool
+{
+    $record = $_SESSION['heatmap_admin_preview'] ?? null;
+    $now = $now ?? time();
+    if (!is_array($record) || $now > intval($record['expires'] ?? 0)) {
+        unset($_SESSION['heatmap_admin_preview']);
+        return false;
+    }
+    return preg_match('/^[a-f0-9]{64}$/D', $token) === 1
+        && is_string($record['hash'] ?? null)
+        && is_string($record['identity'] ?? null)
+        && hash_equals($record['hash'], hash('sha256', $token))
+        && hash_equals($record['identity'], heatmap_admin_preview_identity($config, $image, $query));
+}
+
+function heatmap_admin_preview_token_consume(string $token, array $config, array $image, array $query, int $now = null): bool
+{
+    $valid = heatmap_admin_preview_token_is_valid($token, $config, $image, $query, $now);
+    unset($_SESSION['heatmap_admin_preview']);
+    return $valid;
+}
+
 function heatmap_floor_id_is_valid($value)
 {
     return is_string($value) && preg_match('/^[A-Za-z][A-Za-z0-9_-]{0,31}$/D', $value) === 1;

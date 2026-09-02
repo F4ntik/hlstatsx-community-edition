@@ -52,6 +52,7 @@ function heatmap_admin_message(string $code, string $language): string
             'csrf_required' => 'Reload the calibration page and try again.',
             'invalid_request' => 'The calibration request is invalid.',
             'stale_config' => 'The calibration changed elsewhere. Reload it before saving.',
+			'preview_required' => 'Preview and validate at least four landmarks plus two holdouts before saving.',
             'actor_required' => 'The authenticated administrator has no valid actor identity.',
             'image_missing' => 'A map image is required for preview.',
             'nothing_uploaded' => 'Choose a map image or overview file first.',
@@ -68,6 +69,7 @@ function heatmap_admin_message(string $code, string $language): string
             'csrf_required' => 'Обновите страницу настройки и повторите попытку.',
             'invalid_request' => 'Некорректный запрос настройки.',
             'stale_config' => 'Настройка изменилась в другом месте. Загрузите её заново перед сохранением.',
+			'preview_required' => 'Перед сохранением выполните предпросмотр и проверьте минимум четыре ориентира и две контрольные точки.',
             'actor_required' => 'У аутентифицированного администратора нет допустимого идентификатора.',
             'image_missing' => 'Для предпросмотра нужна карта изображения.',
             'nothing_uploaded' => 'Сначала выберите изображение карты или файл обзора.',
@@ -274,6 +276,39 @@ function heatmap_admin_require_config_hash(array $request, string $currentHash):
     }
 }
 
+function heatmap_admin_landmarks_accepted(array $request): bool
+{
+	if (strval($request['registrationAccepted'] ?? '') !== '1' || !is_array($request['landmarks'] ?? null)) {
+		return false;
+	}
+	$calibration = 0;
+	$holdouts = 0;
+	foreach ($request['landmarks'] as $landmark) {
+		if (!is_array($landmark)) {
+			return false;
+		}
+		foreach (array('worldX', 'worldY', 'pixelX', 'pixelY') as $field) {
+			if (!isset($landmark[$field]) || !is_numeric($landmark[$field]) || !is_finite(floatval($landmark[$field]))) {
+				return false;
+			}
+		}
+		if (!empty($landmark['holdout'])) {
+			$holdouts++;
+		} else {
+			$calibration++;
+		}
+	}
+	return $calibration >= 4 && $holdouts >= 2;
+}
+
+function heatmap_admin_require_preview_token(array $request, array $config, array $image, array $query): void
+{
+	$token = strval($request['previewToken'] ?? '');
+	if (!heatmap_admin_preview_token_consume($token, $config, $image, $query)) {
+		throw new HeatmapAdminException('preview_required', 409);
+	}
+}
+
 function heatmap_admin_invalidate_alias_payload_caches(string $game, string $map, array $config): void
 {
     $map = heatmap_clean_token($map);
@@ -407,9 +442,10 @@ function heatmap_admin_preview_payload(PDO $pdo, array $request, array $storedCo
     }
 
     try {
-        $scene = heatmap_build_scene(
+		$query = heatmap_admin_preview_query($request, $config, $game, $map);
+		$scene = heatmap_build_scene(
             $pdo,
-            heatmap_admin_preview_query($request, $config, $game, $map),
+			$query,
             $config,
             $image,
             array('exact' => true, 'exactLimit' => HEATMAP_EXACT_PREVIEW_LIMIT)
@@ -442,6 +478,9 @@ function heatmap_admin_preview_payload(PDO $pdo, array $request, array $storedCo
     ));
     $scene['suggestedFloors'] = heatmap_suggest_floor_bands($coverage['zHistogram'] ?? array());
     $scene['configHash'] = heatmap_admin_config_hash($storedConfig, heatmap_image_metadata($game, $map, $storedConfig));
+	if (heatmap_admin_landmarks_accepted($request) && empty($scene['exact']['overflow'])) {
+		$scene['previewToken'] = heatmap_admin_issue_preview_token($config, $image, $query);
+	}
     return $scene;
 }
 
@@ -484,6 +523,16 @@ function heatmap_admin_save(PDO $pdo, $logger, array $request): void
             $nextConfig = heatmap_parse_overview(heatmap_admin_bounded_overview($request['overviewText']), $nextConfig);
         }
         $nextConfig['map'] = $map;
+		$nextImage = heatmap_image_metadata($game, $map, $nextConfig);
+		if (!is_array($nextImage)) {
+			throw new HeatmapAdminException('image_missing', 404);
+		}
+		heatmap_admin_require_preview_token(
+			$request,
+			$nextConfig,
+			$nextImage,
+			heatmap_admin_preview_query($request, $nextConfig, $game, $map)
+		);
         if (!heatmap_save_config($pdo, $nextConfig)) {
             throw new HeatmapAdminException('save_failed', 500);
         }

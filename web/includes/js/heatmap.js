@@ -57,8 +57,168 @@ if (typeof module !== 'undefined' && module.exports) {
 	module.exports.HeatmapAdminGeometry = HeatmapAdminGeometry;
 }
 
+var HeatmapLandmarkSolver = (function() {
+	function finite(value) {
+		return typeof value === 'number' && isFinite(value);
+	}
+
+	function median(values) {
+		var sorted = values.slice().sort(function(left, right) { return left - right; });
+		var middle = Math.floor(sorted.length / 2);
+		return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+	}
+
+	function orient(anchor, flipY, rotate) {
+		var point = HeatmapProjection.rotate(anchor.worldX, flipY ? -anchor.worldY : anchor.worldY, rotate);
+		return {x: point.x, y: point.y};
+	}
+
+	function hasArea(anchors, flipY, rotate) {
+		var first;
+		var second;
+		var third;
+		var i;
+		for (i = 0; i < anchors.length - 2; i += 1) {
+			first = orient(anchors[i], flipY, rotate);
+			for (var j = i + 1; j < anchors.length - 1; j += 1) {
+				second = orient(anchors[j], flipY, rotate);
+				for (var k = j + 1; k < anchors.length; k += 1) {
+					third = orient(anchors[k], flipY, rotate);
+					if (Math.abs((second.x - first.x) * (third.y - first.y) - (second.y - first.y) * (third.x - first.x)) > 1e-7) {
+						return true;
+					}
+				}
+			}
+		}
+		return false;
+	}
+
+	function fit(anchors, flipY, rotate) {
+		var worldX = 0;
+		var worldY = 0;
+		var pixelX = 0;
+		var pixelY = 0;
+		var count = anchors.length;
+		var i;
+		var point;
+		var numerator = 0;
+		var denominator = 0;
+		if (!hasArea(anchors, flipY, rotate)) {
+			return null;
+		}
+		for (i = 0; i < count; i += 1) {
+			point = orient(anchors[i], flipY, rotate);
+			worldX += point.x;
+			worldY += point.y;
+			pixelX += anchors[i].pixelX;
+			pixelY += anchors[i].pixelY;
+		}
+		worldX /= count;
+		worldY /= count;
+		pixelX /= count;
+		pixelY /= count;
+		for (i = 0; i < count; i += 1) {
+			point = orient(anchors[i], flipY, rotate);
+			numerator += (point.x - worldX) * (anchors[i].pixelX - pixelX) + (point.y - worldY) * (anchors[i].pixelY - pixelY);
+			denominator += (point.x - worldX) * (point.x - worldX) + (point.y - worldY) * (point.y - worldY);
+		}
+		var a = numerator / denominator;
+		if (!finite(a) || a <= 0 || denominator <= 1e-12) {
+			return null;
+		}
+		return {a: a, xoffset: pixelX - a * worldX, yoffset: pixelY - a * worldY};
+	}
+
+	function residual(anchor, model, flipY, rotate) {
+		var point = orient(anchor, flipY, rotate);
+		var x = model.a * point.x + model.xoffset - anchor.pixelX;
+		var y = model.a * point.y + model.yoffset - anchor.pixelY;
+		return Math.sqrt(x * x + y * y);
+	}
+
+	function solve(rawAnchors, options) {
+		options = options || {};
+		var minimumAnchors = Math.max(4, Number(options.minimumAnchors) || 4);
+		var tolerance = Math.max(1, Number(options.outlierPixels) || 10);
+		var anchors = [];
+		var calibration = [];
+		var holdouts = [];
+		var best = null;
+		var i;
+		if (!Array.isArray(rawAnchors)) {
+			return {ok: false, reason: 'invalid_landmarks'};
+		}
+		for (i = 0; i < rawAnchors.length; i += 1) {
+			var raw = rawAnchors[i] || {};
+			var anchor = {worldX: Number(raw.worldX), worldY: Number(raw.worldY), pixelX: Number(raw.pixelX), pixelY: Number(raw.pixelY), holdout: raw.holdout === true || raw.holdout === 1 || raw.holdout === '1', index: i};
+			if (!finite(anchor.worldX) || !finite(anchor.worldY) || !finite(anchor.pixelX) || !finite(anchor.pixelY)) {
+				return {ok: false, reason: 'invalid_landmarks'};
+			}
+			anchors.push(anchor);
+			(anchor.holdout ? holdouts : calibration).push(anchor);
+		}
+		if (calibration.length < minimumAnchors || holdouts.length < 2) {
+			return {ok: false, reason: 'landmarks_required'};
+		}
+		for (var flip = 0; flip < 2; flip += 1) {
+			for (var rotate = 0; rotate < 4; rotate += 1) {
+				var seedGroups = [calibration];
+				for (var omitted = 0; omitted < calibration.length; omitted += 1) {
+					seedGroups.push(calibration.filter(function(anchor, index) { return index !== omitted; }));
+				}
+				var model = null;
+				var seedScore = Infinity;
+				for (var seedIndex = 0; seedIndex < seedGroups.length; seedIndex += 1) {
+					var seedModel = fit(seedGroups[seedIndex], Boolean(flip), rotate);
+					if (!seedModel) {
+						continue;
+					}
+					var seedResiduals = calibration.map(function(anchor) { return residual(anchor, seedModel, Boolean(flip), rotate); }).sort(function(left, right) { return left - right; });
+					var score = seedResiduals.slice(0, minimumAnchors).reduce(function(sum, value) { return sum + value * value; }, 0);
+					if (score < seedScore) {
+						seedScore = score;
+						model = seedModel;
+					}
+				}
+				if (!model) {
+					continue;
+				}
+				var calibrationResiduals = calibration.map(function(anchor) { return residual(anchor, model, Boolean(flip), rotate); });
+				var cutoff = Math.max(tolerance, median(calibrationResiduals) * 3);
+				var kept = calibration.filter(function(anchor, index) { return calibrationResiduals[index] <= cutoff; });
+				if (kept.length < minimumAnchors || !hasArea(kept, Boolean(flip), rotate)) {
+					continue;
+				}
+				model = fit(kept, Boolean(flip), rotate);
+				if (!model) {
+					continue;
+				}
+				var allResiduals = anchors.map(function(anchor) { return residual(anchor, model, Boolean(flip), rotate); });
+				var inliers = anchors.filter(function(anchor, index) { return allResiduals[index] <= cutoff; });
+				var holdoutResiduals = holdouts.map(function(anchor) { return residual(anchor, model, Boolean(flip), rotate); });
+				var holdoutRmse = Math.sqrt(holdoutResiduals.reduce(function(sum, value) { return sum + value * value; }, 0) / holdoutResiduals.length);
+				var maximumResidual = inliers.reduce(function(maximum, anchor) { return Math.max(maximum, residual(anchor, model, Boolean(flip), rotate)); }, 0);
+				var candidate = {ok: holdoutRmse <= tolerance && maximumResidual <= tolerance, xoffset: model.xoffset, yoffset: model.yoffset, scale: 1 / model.a, flipX: false, flipY: Boolean(flip), rotate: rotate, rmse: holdoutRmse, maximumResidual: maximumResidual, inliers: inliers.map(function(anchor) { return anchor.index; }), holdouts: holdouts.map(function(anchor) { return anchor.index; })};
+				if (!best || candidate.rmse < best.rmse || (candidate.rmse === best.rmse && candidate.maximumResidual < best.maximumResidual)) {
+					best = candidate;
+				}
+			}
+		}
+		if (best && !best.ok) {
+			best.reason = 'candidate_refused';
+		}
+		return best || {ok: false, reason: 'candidate_refused'};
+	}
+
+	return {solve: solve};
+}());
+
+if (typeof module !== 'undefined' && module.exports) {
+	module.exports.HeatmapLandmarkSolver = HeatmapLandmarkSolver;
+}
+
 var HeatmapAdminPayload = (function() {
-	function build(action, identity, controls, useCurrentControls, configHash) {
+	function build(action, identity, controls, useCurrentControls, configHash, previewToken) {
 		var payload = {
 			action: action || 'preview',
 			game: identity.game,
@@ -74,6 +234,9 @@ var HeatmapAdminPayload = (function() {
 		}
 		if ((payload.action === 'save' || payload.action === 'upload') && /^[a-f0-9]{64}$/i.test(configHash || '')) {
 			payload.configHash = configHash;
+		}
+		if (payload.action === 'save' && /^[a-f0-9]{64}$/i.test(previewToken || '')) {
+			payload.previewToken = previewToken;
 		}
 		return payload;
 	}
@@ -702,6 +865,12 @@ function setupHeatmapAdminWizard(wizard) {
 	var cropGuide = null;
 	var lastGuideRadius = 24;
 	var currentConfigHash = '';
+	var currentPreviewToken = '';
+	var landmarkResult = null;
+	var landmarkRows = wizard.querySelector('[data-heatmap-landmark-rows]');
+	var landmarkTolerance = wizard.querySelector('[data-heatmap-landmark-tolerance]');
+	var landmarkStatus = wizard.querySelector('[data-heatmap-landmark-status]');
+	var saveButton = wizard.querySelector('[data-heatmap-admin-save]');
 	var suggestedFloors = [];
 	var currentConfig = {
 		xoffset: 0,
@@ -723,6 +892,48 @@ function setupHeatmapAdminWizard(wizard) {
 		if (log) {
 			log.textContent = text || '';
 		}
+	}
+
+	function readLandmarks() {
+		var rows = landmarkRows ? landmarkRows.querySelectorAll('[data-heatmap-landmark-row]') : [];
+		var landmarks = [];
+		for (var rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+			var row = rows[rowIndex];
+			var worldX = row.querySelector('[data-heatmap-landmark="worldX"]');
+			var worldY = row.querySelector('[data-heatmap-landmark="worldY"]');
+			var pixelX = row.querySelector('[data-heatmap-landmark="pixelX"]');
+			var pixelY = row.querySelector('[data-heatmap-landmark="pixelY"]');
+			var holdout = row.querySelector('[data-heatmap-landmark="holdout"]');
+			if (!worldX || !worldY || !pixelX || !pixelY || (worldX.value === '' && worldY.value === '' && pixelX.value === '' && pixelY.value === '')) {
+				continue;
+			}
+			landmarks.push({worldX: Number(worldX.value), worldY: Number(worldY.value), pixelX: Number(pixelX.value), pixelY: Number(pixelY.value), holdout: Boolean(holdout && holdout.checked)});
+		}
+		return landmarks;
+	}
+
+	function evaluateLandmarks() {
+		return HeatmapLandmarkSolver.solve(readLandmarks(), {minimumAnchors: 4, outlierPixels: landmarkTolerance ? Number(landmarkTolerance.value) : 10});
+	}
+
+	function syncSaveGate() {
+		var accepted = landmarkResult && landmarkResult.ok === true && /^[a-f0-9]{64}$/i.test(currentPreviewToken);
+		if (saveButton) {
+			saveButton.disabled = !accepted;
+		}
+		if (landmarkStatus) {
+			landmarkStatus.textContent = accepted
+				? adminText('registration-accepted', 'Landmark registration accepted.') + ' ' + adminText('registration-coverage', 'Registration is separate from coverage.')
+				: (landmarkResult && landmarkResult.reason === 'candidate_refused'
+					? adminText('candidate-refused', 'The landmark residuals do not fit one uniform projection.')
+					: adminText('landmarks-required', 'Add four landmarks and two holdouts, then preview.'));
+		}
+	}
+
+	function invalidatePreviewToken() {
+		currentPreviewToken = '';
+		landmarkResult = evaluateLandmarks();
+		syncSaveGate();
 	}
 
 	function adminText(name, fallback) {
@@ -1373,6 +1584,7 @@ function setupHeatmapAdminWizard(wizard) {
 	}
 
 	function schedulePreview() {
+		invalidatePreviewToken();
 		var token = ++requestSeq;
 		if (previewTimer) {
 			clearTimeout(previewTimer);
@@ -1444,10 +1656,15 @@ function setupHeatmapAdminWizard(wizard) {
 				controls[checks[i].getAttribute('data-heatmap-check')] = checks[i].checked ? 1 : 0;
 			}
 		}
+		landmarkResult = evaluateLandmarks();
+		controls.landmarks = readLandmarks();
+		if (landmarkResult.ok) {
+			controls.registrationAccepted = 1;
+		}
 		return HeatmapAdminPayload.build(action, {
 			game: wizard.getAttribute('data-heatmap-game'),
 			map: activeMap()
-		}, controls, useCurrentControls, currentConfigHash);
+		}, controls, useCurrentControls, currentConfigHash, currentPreviewToken);
 	}
 
 	function responseMessage(data, fallback) {
@@ -1462,6 +1679,8 @@ function setupHeatmapAdminWizard(wizard) {
 		var imageUrl;
 		var points;
 		lastPayload = payload;
+		currentPreviewToken = landmarkResult && landmarkResult.ok && /^[a-f0-9]{64}$/i.test(payload.previewToken || '') ? payload.previewToken : '';
+		syncSaveGate();
 		if (isConfigHash(payload.configHash)) {
 			currentConfigHash = payload.configHash;
 		}
@@ -1514,7 +1733,7 @@ function setupHeatmapAdminWizard(wizard) {
 		if (!payload) {
 			return Promise.resolve(null);
 		}
-		if (action === 'save' && !isConfigHash(currentConfigHash)) {
+		if (action === 'save' && (!isConfigHash(currentConfigHash) || !landmarkResult || !landmarkResult.ok || !/^[a-f0-9]{64}$/i.test(currentPreviewToken))) {
 			setLog(adminText('load-before-save', 'Load the calibration before saving.'));
 			return Promise.resolve(null);
 		}
@@ -1717,6 +1936,17 @@ function setupHeatmapAdminWizard(wizard) {
 	if (diagnosticTo) {
 		diagnosticTo.onchange = schedulePreview;
 	}
+	if (landmarkRows) {
+		var landmarkInputs = landmarkRows.querySelectorAll('input');
+		for (var landmarkInputIndex = 0; landmarkInputIndex < landmarkInputs.length; landmarkInputIndex += 1) {
+			landmarkInputs[landmarkInputIndex].oninput = schedulePreview;
+			landmarkInputs[landmarkInputIndex].onchange = schedulePreview;
+		}
+	}
+	if (landmarkTolerance) {
+		landmarkTolerance.oninput = schedulePreview;
+		landmarkTolerance.onchange = schedulePreview;
+	}
 	if (canvas) {
 		canvas.onmousedown = function(event) {
 			var rect = canvas.getBoundingClientRect();
@@ -1778,6 +2008,7 @@ function setupHeatmapAdminWizard(wizard) {
 	syncFieldsFromConfig(currentConfig);
 	seedDiagnosticWindow();
 	updateGuides();
+	invalidatePreviewToken();
 	if (activeMap()) {
 		requestStoredConfig();
 	}

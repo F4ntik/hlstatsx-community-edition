@@ -19,6 +19,49 @@ const adminPayload = context.module.exports.HeatmapAdminPayload;
 assert.ok(adminPayload, 'heatmap admin payload helper should be exportable for smoke tests');
 const adminGeometry = context.module.exports.HeatmapAdminGeometry;
 assert.ok(adminGeometry, 'heatmap admin geometry helpers should be exportable for responsive calibration drags');
+const landmarkSolver = context.module.exports.HeatmapLandmarkSolver;
+assert.ok(landmarkSolver, 'landmark similarity solver should be exportable for calibration checks');
+const landmarkAnchors = [
+  {worldX: 0, worldY: 0, pixelX: 376, pixelY: 1207},
+  {worldX: 100, worldY: 0, pixelX: 446, pixelY: 1207},
+  {worldX: 0, worldY: 100, pixelX: 376, pixelY: 1137},
+  {worldX: 100, worldY: 100, pixelX: 446, pixelY: 1137},
+  {worldX: 50, worldY: 150, pixelX: 411, pixelY: 1102, holdout: true},
+  {worldX: 150, worldY: 50, pixelX: 481, pixelY: 1172, holdout: true}
+];
+const landmarkResult = landmarkSolver.solve(landmarkAnchors, {minimumAnchors: 4, outlierPixels: 10});
+assert.strictEqual(landmarkResult.ok, true, 'solver should accept a six-point similarity mapping');
+assert.strictEqual(landmarkResult.rotate, 0, 'solver should recover the unrotated orientation');
+assert.strictEqual(landmarkResult.flipX, false, 'solver should use the canonical reflection representation');
+assert.strictEqual(landmarkResult.flipY, true, 'solver should recover the Y reflection');
+assert.ok(Math.abs(landmarkResult.scale - 1.4285714285714286) < 1e-6, 'solver should recover the known uniform scale');
+assert.ok(landmarkResult.rmse < 0.001, 'solver should preserve exact holdout geometry');
+assert.strictEqual(landmarkResult.inliers.length, 6, 'solver should retain all clean landmarks');
+for (let rotation = 0; rotation < 4; rotation += 1) {
+  const rotatedAnchors = landmarkAnchors.map(anchor => {
+    const point = projection.rotate(anchor.worldX, -anchor.worldY, rotation);
+    return Object.assign({}, anchor, {pixelX: 300 + point.x * 0.7, pixelY: 900 + point.y * 0.7});
+  });
+  const rotatedResult = landmarkSolver.solve(rotatedAnchors, {minimumAnchors: 4, outlierPixels: 10});
+  assert.strictEqual(rotatedResult.ok, true, `solver should accept reflected rotation ${rotation}`);
+  assert.strictEqual(rotatedResult.rotate, rotation, `solver should recover rotation ${rotation}`);
+  assert.strictEqual(rotatedResult.flipY, true, `solver should recover reflection for rotation ${rotation}`);
+}
+const landmarkOutlier = landmarkAnchors.concat([{worldX: 220, worldY: 140, pixelX: -500, pixelY: 900}]);
+const landmarkOutlierResult = landmarkSolver.solve(landmarkOutlier, {minimumAnchors: 4, outlierPixels: 10});
+assert.strictEqual(landmarkOutlierResult.ok, true, 'solver should reject one gross calibration outlier');
+assert.strictEqual(landmarkOutlierResult.inliers.length, 6, 'solver should retain at least four calibration anchors and both holdouts');
+assert.strictEqual(landmarkSolver.solve(landmarkAnchors.slice(0, 3), {minimumAnchors: 4, outlierPixels: 10}).ok, false, 'solver should reject fewer than four calibration anchors');
+assert.strictEqual(landmarkSolver.solve(landmarkAnchors.slice(0, 4), {minimumAnchors: 4, outlierPixels: 10}).ok, false, 'solver should reject candidates without two holdouts');
+const collinearAnchors = landmarkAnchors.map(anchor => Object.assign({}, anchor, {
+  worldY: anchor.worldX * 2,
+  pixelX: 376 + anchor.worldX,
+  pixelY: 1207 + anchor.worldX * 2
+}));
+assert.strictEqual(landmarkSolver.solve(collinearAnchors, {minimumAnchors: 4, outlierPixels: 10}).ok, false, 'solver should reject collinear landmarks');
+assert.strictEqual(landmarkSolver.solve(landmarkAnchors.concat([{worldX: NaN, worldY: 0, pixelX: 0, pixelY: 0}]), {minimumAnchors: 4, outlierPixels: 10}).ok, false, 'solver should reject non-finite landmarks');
+const anisotropicAnchors = landmarkAnchors.map(anchor => Object.assign({}, anchor, {pixelX: 376 + anchor.worldX, pixelY: 1207 - anchor.worldY * 0.25}));
+assert.strictEqual(landmarkSolver.solve(anisotropicAnchors, {minimumAnchors: 4, outlierPixels: 10}).ok, false, 'solver should reject anisotropic residual growth');
 assert.deepStrictEqual(
   Array.from(adminGeometry.offsetDelta(10, 20, {width: 640, height: 512}, 1280, 1024, 4, 0)),
   [80, 160],
@@ -74,8 +117,8 @@ assert.deepStrictEqual(
   'edit preview should send current controls'
 );
 assert.deepStrictEqual(
-  plain(adminPayload.build('save', identity, controls, true, 'a'.repeat(64))),
-  {action: 'save', game: 'cstrike', map: 'de_dust2', overviewText: '', xoffset: '0', yoffset: '0', scale: '1', flipy: 0, configHash: 'a'.repeat(64)},
+  plain(adminPayload.build('save', identity, controls, true, 'a'.repeat(64), 'b'.repeat(64))),
+	{action: 'save', game: 'cstrike', map: 'de_dust2', overviewText: '', xoffset: '0', yoffset: '0', scale: '1', flipy: 0, configHash: 'a'.repeat(64), previewToken: 'b'.repeat(64)},
   'save should carry the last server-issued configuration hash'
 );
 assert.match(source, /'X-HLX-CSRF'/, 'admin mutations should carry the session-bound CSRF header');

@@ -26,6 +26,30 @@ assert_same('ru', i18n_normalize_lang(' RU '), 'language normalization lowercase
 assert_same('', i18n_normalize_lang('../ru'), 'language normalization rejects path-ish input');
 assert_same('', i18n_normalize_lang('ru.php'), 'language normalization rejects punctuation');
 
+$enCatalog = i18n_load_catalog('en');
+$ruCatalog = i18n_load_catalog('ru');
+foreach (array(
+    'admin.task.heatmaps.landmarks',
+    'admin.task.heatmaps.tolerance',
+    'admin.task.heatmaps.world_x',
+    'admin.task.heatmaps.world_y',
+    'admin.task.heatmaps.pixel_x',
+    'admin.task.heatmaps.pixel_y',
+    'admin.task.heatmaps.holdout',
+    'admin.task.heatmaps.landmarks_required',
+    'admin.task.heatmaps.registration_accepted',
+	'admin.task.heatmaps.anchor_count',
+	'admin.task.heatmaps.holdout_count',
+	'admin.task.heatmaps.residual',
+	'admin.task.heatmaps.candidate_refused',
+	'admin.task.heatmaps.preview_required',
+	'admin.task.heatmaps.asset_mismatch',
+	'admin.task.heatmaps.registration_coverage',
+) as $key) {
+    assert_same(true, isset($enCatalog['messages'][$key]) && $enCatalog['messages'][$key] !== '', 'English calibration copy should include ' . $key);
+    assert_same(true, isset($ruCatalog['messages'][$key]) && $ruCatalog['messages'][$key] !== '', 'Russian calibration copy should include ' . $key);
+}
+
 assert_same(
     'ru',
     i18n_resolve_request_lang(array('lang' => 'ru'), array('lang' => 'en'), array('lang' => 'en'), $available),
