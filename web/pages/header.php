@@ -128,7 +128,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			'landmarks' => t('admin.task.heatmaps.landmarks'),
 			'holdout' => t('admin.task.heatmaps.holdout'),
 			'landmarksRequired' => t('admin.task.heatmaps.landmarks_required'),
-			'registrationAccepted' => t('admin.task.heatmaps.registration_accepted'),
+			'registrationStatus' => t('admin.task.heatmaps.registration_accepted'),
 			'candidateRefused' => t('admin.task.heatmaps.candidate_refused'),
 			'previewRequired' => t('admin.task.heatmaps.preview_required'),
 			'assetMismatch' => t('admin.task.heatmaps.asset_mismatch'),

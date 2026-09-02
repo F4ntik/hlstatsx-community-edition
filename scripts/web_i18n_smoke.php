@@ -45,6 +45,7 @@ foreach (array(
 	'admin.task.heatmaps.preview_required',
 	'admin.task.heatmaps.asset_mismatch',
 	'admin.task.heatmaps.registration_coverage',
+	'admin.task.heatmaps.apply_candidate',
 ) as $key) {
     assert_same(true, isset($enCatalog['messages'][$key]) && $enCatalog['messages'][$key] !== '', 'English calibration copy should include ' . $key);
     assert_same(true, isset($ruCatalog['messages'][$key]) && $ruCatalog['messages'][$key] !== '', 'Russian calibration copy should include ' . $key);

@@ -160,7 +160,7 @@ function heatmap_admin_same_origin(): bool
 
 function heatmap_admin_require_mutation_allowed(string $action): void
 {
-    if (!in_array($action, array('save', 'upload'), true)) {
+    if (!in_array($action, array('preview', 'save', 'upload'), true)) {
         return;
     }
     if (strtoupper(strval($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'POST') {
@@ -276,29 +276,12 @@ function heatmap_admin_require_config_hash(array $request, string $currentHash):
     }
 }
 
-function heatmap_admin_landmarks_accepted(array $request): bool
+function heatmap_admin_landmark_registration(array $request, array $config): array
 {
-	if (strval($request['registrationAccepted'] ?? '') !== '1' || !is_array($request['landmarks'] ?? null)) {
-		return false;
+	if (!is_array($request['landmarks'] ?? null)) {
+		return array('ok' => false, 'reason' => 'landmarks_required', 'residuals' => array());
 	}
-	$calibration = 0;
-	$holdouts = 0;
-	foreach ($request['landmarks'] as $landmark) {
-		if (!is_array($landmark)) {
-			return false;
-		}
-		foreach (array('worldX', 'worldY', 'pixelX', 'pixelY') as $field) {
-			if (!isset($landmark[$field]) || !is_numeric($landmark[$field]) || !is_finite(floatval($landmark[$field]))) {
-				return false;
-			}
-		}
-		if (!empty($landmark['holdout'])) {
-			$holdouts++;
-		} else {
-			$calibration++;
-		}
-	}
-	return $calibration >= 4 && $holdouts >= 2;
+	return heatmap_admin_landmark_evidence($request['landmarks'], $config, $request['landmarkTolerance'] ?? 10);
 }
 
 function heatmap_admin_require_preview_token(array $request, array $config, array $image, array $query): void
@@ -476,9 +459,11 @@ function heatmap_admin_preview_payload(PDO $pdo, array $request, array $storedCo
         'queried' => intval($coverage['sourceRows'] ?? 0),
         'manualRequired' => floatval($coverage['projectionCoverage'] ?? 0.0) < HEATMAP_MIN_PROJECTION_COVERAGE,
     ));
+	$registration = heatmap_admin_landmark_registration($request, $config);
+	$scene['registration'] = $registration;
     $scene['suggestedFloors'] = heatmap_suggest_floor_bands($coverage['zHistogram'] ?? array());
     $scene['configHash'] = heatmap_admin_config_hash($storedConfig, heatmap_image_metadata($game, $map, $storedConfig));
-	if (heatmap_admin_landmarks_accepted($request) && empty($scene['exact']['overflow'])) {
+	if (strval($request['registrationRequested'] ?? '') === '1' && $registration['ok'] && empty($scene['exact']['overflow'])) {
 		$scene['previewToken'] = heatmap_admin_issue_preview_token($config, $image, $query);
 	}
     return $scene;

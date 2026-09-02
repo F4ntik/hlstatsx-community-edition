@@ -15,32 +15,54 @@ vm.runInNewContext(source, context, {filename: 'heatmap.js'});
 
 const projection = context.module.exports.HeatmapProjection;
 assert.ok(projection, 'heatmap projection helpers should be exportable for smoke tests');
+const plain = value => JSON.parse(JSON.stringify(value));
 const adminPayload = context.module.exports.HeatmapAdminPayload;
 assert.ok(adminPayload, 'heatmap admin payload helper should be exportable for smoke tests');
 const adminGeometry = context.module.exports.HeatmapAdminGeometry;
 assert.ok(adminGeometry, 'heatmap admin geometry helpers should be exportable for responsive calibration drags');
 const landmarkSolver = context.module.exports.HeatmapLandmarkSolver;
 assert.ok(landmarkSolver, 'landmark similarity solver should be exportable for calibration checks');
+assert.strictEqual(typeof landmarkSolver.project, 'function', 'solver should expose the authoritative persisted-projection round trip');
 const landmarkAnchors = [
-  {worldX: 0, worldY: 0, pixelX: 376, pixelY: 1207},
-  {worldX: 100, worldY: 0, pixelX: 446, pixelY: 1207},
-  {worldX: 0, worldY: 100, pixelX: 376, pixelY: 1137},
-  {worldX: 100, worldY: 100, pixelX: 446, pixelY: 1137},
-  {worldX: 50, worldY: 150, pixelX: 411, pixelY: 1102, holdout: true},
-  {worldX: 150, worldY: 50, pixelX: 481, pixelY: 1172, holdout: true}
+  {worldX: 0, worldY: 0, pixelX: 100, pixelY: 50},
+  {worldX: 100, worldY: 0, pixelX: 150, pixelY: 50},
+  {worldX: 0, worldY: 100, pixelX: 100, pixelY: 0},
+  {worldX: 100, worldY: 100, pixelX: 150, pixelY: 0},
+  {worldX: 50, worldY: 150, pixelX: 125, pixelY: -25, holdout: true},
+  {worldX: 150, worldY: 50, pixelX: 175, pixelY: 25, holdout: true}
 ];
 const landmarkResult = landmarkSolver.solve(landmarkAnchors, {minimumAnchors: 4, outlierPixels: 10});
 assert.strictEqual(landmarkResult.ok, true, 'solver should accept a six-point similarity mapping');
 assert.strictEqual(landmarkResult.rotate, 0, 'solver should recover the unrotated orientation');
 assert.strictEqual(landmarkResult.flipX, false, 'solver should use the canonical reflection representation');
 assert.strictEqual(landmarkResult.flipY, true, 'solver should recover the Y reflection');
-assert.ok(Math.abs(landmarkResult.scale - 1.4285714285714286) < 1e-6, 'solver should recover the known uniform scale');
+assert.ok(Math.abs(landmarkResult.scale - 2) < 1e-6, 'solver should recover the known uniform scale');
 assert.ok(landmarkResult.rmse < 0.001, 'solver should preserve exact holdout geometry');
 assert.strictEqual(landmarkResult.inliers.length, 6, 'solver should retain all clean landmarks');
+assert.deepStrictEqual(
+  plain(landmarkSolver.project({worldX: 100, worldY: 50}, landmarkResult)),
+  {x: 150, y: 25},
+  'solver candidate should round-trip through persisted projection fields'
+);
+const croppedRotationConfig = {xoffset: 200, yoffset: -300, scale: 2, flipX: false, flipY: true, rotate: 1, cropX: 30, cropY: 40};
+const croppedRotationAnchors = [
+  {worldX: 0, worldY: 0}, {worldX: 100, worldY: 0}, {worldX: 0, worldY: 100}, {worldX: 100, worldY: 100},
+  {worldX: 50, worldY: 150, holdout: true}, {worldX: 150, worldY: 50, holdout: true}
+].map(anchor => {
+  const point = landmarkSolver.project(anchor, croppedRotationConfig);
+  return Object.assign({}, anchor, {pixelX: point.x, pixelY: point.y});
+});
+const croppedRotationResult = landmarkSolver.solve(croppedRotationAnchors, {minimumAnchors: 4, outlierPixels: 1, cropX: 30, cropY: 40});
+assert.strictEqual(croppedRotationResult.ok, true, 'solver should recover an authoritative rotated and cropped projection');
+assert.deepStrictEqual(
+  plain(landmarkSolver.project({worldX: 150, worldY: 50}, croppedRotationResult)),
+  plain(landmarkSolver.project({worldX: 150, worldY: 50}, croppedRotationConfig)),
+  'rotated/cropped candidate must preserve the authoritative landmark pixel'
+);
 for (let rotation = 0; rotation < 4; rotation += 1) {
   const rotatedAnchors = landmarkAnchors.map(anchor => {
-    const point = projection.rotate(anchor.worldX, -anchor.worldY, rotation);
-    return Object.assign({}, anchor, {pixelX: 300 + point.x * 0.7, pixelY: 900 + point.y * 0.7});
+    const point = landmarkSolver.project(anchor, {xoffset: 200, yoffset: 100, scale: 2, flipX: false, flipY: true, rotate: rotation, cropX: 0, cropY: 0});
+    return Object.assign({}, anchor, {pixelX: point.x, pixelY: point.y});
   });
   const rotatedResult = landmarkSolver.solve(rotatedAnchors, {minimumAnchors: 4, outlierPixels: 10});
   assert.strictEqual(rotatedResult.ok, true, `solver should accept reflected rotation ${rotation}`);
@@ -55,13 +77,18 @@ assert.strictEqual(landmarkSolver.solve(landmarkAnchors.slice(0, 3), {minimumAnc
 assert.strictEqual(landmarkSolver.solve(landmarkAnchors.slice(0, 4), {minimumAnchors: 4, outlierPixels: 10}).ok, false, 'solver should reject candidates without two holdouts');
 const collinearAnchors = landmarkAnchors.map(anchor => Object.assign({}, anchor, {
   worldY: anchor.worldX * 2,
-  pixelX: 376 + anchor.worldX,
-  pixelY: 1207 + anchor.worldX * 2
+  pixelX: 100 + anchor.worldX,
+  pixelY: 50 + anchor.worldX * 2
 }));
 assert.strictEqual(landmarkSolver.solve(collinearAnchors, {minimumAnchors: 4, outlierPixels: 10}).ok, false, 'solver should reject collinear landmarks');
 assert.strictEqual(landmarkSolver.solve(landmarkAnchors.concat([{worldX: NaN, worldY: 0, pixelX: 0, pixelY: 0}]), {minimumAnchors: 4, outlierPixels: 10}).ok, false, 'solver should reject non-finite landmarks');
-const anisotropicAnchors = landmarkAnchors.map(anchor => Object.assign({}, anchor, {pixelX: 376 + anchor.worldX, pixelY: 1207 - anchor.worldY * 0.25}));
+const anisotropicAnchors = landmarkAnchors.map(anchor => Object.assign({}, anchor, {pixelX: 100 + anchor.worldX, pixelY: 50 - anchor.worldY * 0.25}));
 assert.strictEqual(landmarkSolver.solve(anisotropicAnchors, {minimumAnchors: 4, outlierPixels: 10}).ok, false, 'solver should reject anisotropic residual growth');
+const asymmetricHoldouts = landmarkAnchors.map(anchor => Object.assign({}, anchor));
+asymmetricHoldouts[5].pixelX += 14;
+const asymmetricHoldoutResult = landmarkSolver.solve(asymmetricHoldouts, {minimumAnchors: 4, outlierPixels: 10});
+assert.strictEqual(asymmetricHoldoutResult.ok, false, 'each mandatory holdout must stay within tolerance, not just aggregate RMSE');
+assert.ok(asymmetricHoldoutResult.maximumResidual >= 14, 'maximum residual should include every mandatory holdout');
 assert.deepStrictEqual(
   Array.from(adminGeometry.offsetDelta(10, 20, {width: 640, height: 512}, 1280, 1024, 4, 0)),
   [80, 160],
@@ -105,7 +132,6 @@ for (let steps = 0; steps < 4; steps += 1) {
 
 const identity = {game: 'cstrike', map: 'de_dust2'};
 const controls = {overviewText: '', xoffset: '0', yoffset: '0', scale: '1', flipy: 0};
-const plain = value => JSON.parse(JSON.stringify(value));
 assert.deepStrictEqual(
   plain(adminPayload.build('preview', identity, controls, false)),
   {action: 'preview', game: 'cstrike', map: 'de_dust2'},
@@ -125,7 +151,9 @@ assert.match(source, /'X-HLX-CSRF'/, 'admin mutations should carry the session-b
 assert.doesNotMatch(source, /innerHTML/, 'untrusted heatmap payloads must be rendered with DOM text nodes');
 assert.doesNotMatch(source, /data-heatmap-admin-regenerate/, 'the browser must not expose server-side regeneration');
 assert.match(source, /bindClick\('\[data-heatmap-admin-load\]', requestStoredConfig\);/, 'Load button should request stored config');
-assert.match(source, /mapSelect\.onchange = requestStoredConfig;/, 'map change should request stored config');
+assert.match(source, /mapSelect\.onchange = function\(\) \{ invalidatePreviewToken\(\); requestStoredConfig\(\); \};/, 'map change should invalidate authorization before requesting stored config');
+assert.match(source, /fields\[fieldIndex\]\.oninput = schedulePreview;/, 'new floor-row inputs should invalidate projection authorization');
+assert.match(source, /if \(error && error\.code === 'preview_required'\) \{\s*invalidatePreviewToken\(\);/, 'preview-required responses should clear the local authorization token');
 assert.match(source, /if \(activeMap\(\)\) \{\s*requestStoredConfig\(\);/, 'initial wizard load should request stored config');
 assert.match(source, /bindClick\('\[data-heatmap-admin-preview\]', function\(\) \{ request\('preview'\); \}\);/, 'Preview button should send current controls');
 assert.match(source, /request\('preview', token\);/, 'scheduled preview should send current controls');

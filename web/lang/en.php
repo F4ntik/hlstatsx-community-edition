@@ -869,6 +869,7 @@ RewriteRule sig-(.*)-(.*).png$ sig.php?player_id=$1&background=$2 [L]</textarea>
 		'admin.task.heatmaps.preview_required' => 'Preview is required before saving.',
 		'admin.task.heatmaps.asset_mismatch' => 'The map image or overview changed; preview again.',
 		'admin.task.heatmaps.registration_coverage' => 'Registration is separate from event coverage.',
+		'admin.task.heatmaps.apply_candidate' => 'Apply landmark candidate',
         'heatmap.events' => 'events',
         'heatmap.request_failed' => 'Heatmap request failed',
         'heatmap.killers' => 'Killers',

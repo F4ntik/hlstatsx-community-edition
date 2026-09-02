@@ -667,6 +667,72 @@ function heatmap_admin_preview_token_consume(string $token, array $config, array
     return $valid;
 }
 
+function heatmap_admin_landmark_evidence(array $landmarks, array $config, $tolerance): array
+{
+    $tolerance = is_numeric($tolerance) && is_finite(floatval($tolerance))
+        ? max(1.0, min(200.0, floatval($tolerance)))
+        : 10.0;
+    if (count($landmarks) > 64) {
+        return array('ok' => false, 'reason' => 'invalid_landmarks', 'residuals' => array());
+    }
+    $calibration = array();
+    $holdouts = array();
+    $residuals = array();
+    foreach ($landmarks as $index => $landmark) {
+        if (!is_array($landmark)) {
+            return array('ok' => false, 'reason' => 'invalid_landmarks', 'residuals' => array());
+        }
+        foreach (array('worldX', 'worldY', 'pixelX', 'pixelY') as $field) {
+            if (!array_key_exists($field, $landmark) || !is_numeric($landmark[$field]) || !is_finite(floatval($landmark[$field]))) {
+                return array('ok' => false, 'reason' => 'invalid_landmarks', 'residuals' => array());
+            }
+        }
+        $projected = heatmap_transform_point(array(
+            'pos_x' => intval($landmark['worldX']),
+            'pos_y' => intval($landmark['worldY']),
+        ), $config);
+        $residual = hypot(floatval($projected['x']) - floatval($landmark['pixelX']), floatval($projected['y']) - floatval($landmark['pixelY']));
+        $entry = array('index' => intval($index), 'residual' => $residual, 'holdout' => !empty($landmark['holdout']));
+        $residuals[] = $entry;
+        if ($entry['holdout']) {
+            $holdouts[] = $entry;
+        } else {
+            $calibration[] = $entry;
+        }
+    }
+    if (count($calibration) < 4 || count($holdouts) < 2) {
+        return array('ok' => false, 'reason' => 'landmarks_required', 'residuals' => $residuals);
+    }
+    $calibrationValues = array_map(function (array $entry): float { return $entry['residual']; }, $calibration);
+    sort($calibrationValues, SORT_NUMERIC);
+    $middle = intdiv(count($calibrationValues), 2);
+    $median = count($calibrationValues) % 2 === 1
+        ? $calibrationValues[$middle]
+        : ($calibrationValues[$middle - 1] + $calibrationValues[$middle]) / 2.0;
+    $outlierThreshold = max($tolerance, $median * 3.0);
+    $calibrationAccepted = count(array_filter($calibration, function (array $entry) use ($tolerance): bool {
+        return $entry['residual'] <= $tolerance;
+    }));
+    $allHoldoutsAccepted = count(array_filter($holdouts, function (array $entry) use ($tolerance): bool {
+        return $entry['residual'] <= $tolerance;
+    })) === count($holdouts);
+    $maximumResidual = 0.0;
+    foreach ($residuals as $entry) {
+        $maximumResidual = max($maximumResidual, $entry['residual']);
+    }
+    return array(
+        'ok' => $calibrationAccepted >= 4 && $allHoldoutsAccepted,
+        'reason' => $calibrationAccepted >= 4 && $allHoldoutsAccepted ? '' : 'candidate_refused',
+        'residuals' => $residuals,
+        'inliers' => array_values(array_map(function (array $entry): int { return $entry['index']; }, array_filter($calibration, function (array $entry) use ($outlierThreshold): bool {
+            return $entry['residual'] <= $outlierThreshold;
+        }))),
+        'holdouts' => array_values(array_map(function (array $entry): int { return $entry['index']; }, $holdouts)),
+        'maximumResidual' => $maximumResidual,
+        'tolerance' => $tolerance,
+    );
+}
+
 function heatmap_floor_id_is_valid($value)
 {
     return is_string($value) && preg_match('/^[A-Za-z][A-Za-z0-9_-]{0,31}$/D', $value) === 1;

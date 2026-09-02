@@ -73,6 +73,30 @@ var HeatmapLandmarkSolver = (function() {
 		return {x: point.x, y: point.y};
 	}
 
+	function integer(value) {
+		return value < 0 ? Math.ceil(value) : Math.floor(value);
+	}
+
+	function project(anchor, config) {
+		var scale = Number(config.scale);
+		var x = Number(anchor.worldX);
+		var y = Number(anchor.worldY);
+		var rotated;
+		if (!finite(scale) || scale <= 0 || !finite(x) || !finite(y)) {
+			return {x: NaN, y: NaN};
+		}
+		if (config.flipX) {
+			x *= -1;
+		}
+		if (config.flipY) {
+			y *= -1;
+		}
+		x = integer((x + Number(config.xoffset || 0)) / scale);
+		y = integer((y + Number(config.yoffset || 0)) / scale);
+		rotated = HeatmapProjection.rotate(x, y, config.rotate || 0);
+		return {x: rotated.x - Number(config.cropX || 0), y: rotated.y - Number(config.cropY || 0)};
+	}
+
 	function hasArea(anchors, flipY, rotate) {
 		var first;
 		var second;
@@ -140,6 +164,8 @@ var HeatmapLandmarkSolver = (function() {
 		options = options || {};
 		var minimumAnchors = Math.max(4, Number(options.minimumAnchors) || 4);
 		var tolerance = Math.max(1, Number(options.outlierPixels) || 10);
+		var cropX = integer(Number(options.cropX) || 0);
+		var cropY = integer(Number(options.cropY) || 0);
 		var anchors = [];
 		var calibration = [];
 		var holdouts = [];
@@ -193,12 +219,26 @@ var HeatmapLandmarkSolver = (function() {
 				if (!model) {
 					continue;
 				}
-				var allResiduals = anchors.map(function(anchor) { return residual(anchor, model, Boolean(flip), rotate); });
+				var scale = 1 / model.a;
+				var unrotatedOffset = HeatmapProjection.unrotate(model.xoffset + cropX, model.yoffset + cropY, rotate);
+				var candidate = {xoffset: Math.round(unrotatedOffset.x * scale), yoffset: Math.round(unrotatedOffset.y * scale), scale: scale, flipX: false, flipY: Boolean(flip), rotate: rotate, cropX: cropX, cropY: cropY};
+				var allResiduals = anchors.map(function(anchor) {
+					var projected = project(anchor, candidate);
+					return Math.sqrt(Math.pow(projected.x - anchor.pixelX, 2) + Math.pow(projected.y - anchor.pixelY, 2));
+				});
+				var calibrationInliers = anchors.filter(function(anchor, index) { return !anchor.holdout && allResiduals[index] <= cutoff; });
 				var inliers = anchors.filter(function(anchor, index) { return allResiduals[index] <= cutoff; });
-				var holdoutResiduals = holdouts.map(function(anchor) { return residual(anchor, model, Boolean(flip), rotate); });
+				var holdoutResiduals = holdouts.map(function(anchor) {
+					return allResiduals[anchor.index];
+				});
 				var holdoutRmse = Math.sqrt(holdoutResiduals.reduce(function(sum, value) { return sum + value * value; }, 0) / holdoutResiduals.length);
-				var maximumResidual = inliers.reduce(function(maximum, anchor) { return Math.max(maximum, residual(anchor, model, Boolean(flip), rotate)); }, 0);
-				var candidate = {ok: holdoutRmse <= tolerance && maximumResidual <= tolerance, xoffset: model.xoffset, yoffset: model.yoffset, scale: 1 / model.a, flipX: false, flipY: Boolean(flip), rotate: rotate, rmse: holdoutRmse, maximumResidual: maximumResidual, inliers: inliers.map(function(anchor) { return anchor.index; }), holdouts: holdouts.map(function(anchor) { return anchor.index; })};
+				var maximumResidual = allResiduals.reduce(function(maximum, value) { return Math.max(maximum, value); }, 0);
+				candidate.ok = calibrationInliers.length >= minimumAnchors && holdoutResiduals.every(function(value) { return value <= tolerance; });
+				candidate.rmse = holdoutRmse;
+				candidate.maximumResidual = maximumResidual;
+				candidate.inliers = inliers.map(function(anchor) { return anchor.index; });
+				candidate.holdouts = holdouts.map(function(anchor) { return anchor.index; });
+				candidate.residuals = allResiduals;
 				if (!best || candidate.rmse < best.rmse || (candidate.rmse === best.rmse && candidate.maximumResidual < best.maximumResidual)) {
 					best = candidate;
 				}
@@ -210,7 +250,7 @@ var HeatmapLandmarkSolver = (function() {
 		return best || {ok: false, reason: 'candidate_refused'};
 	}
 
-	return {solve: solve};
+	return {solve: solve, project: project};
 }());
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -870,7 +910,10 @@ function setupHeatmapAdminWizard(wizard) {
 	var landmarkRows = wizard.querySelector('[data-heatmap-landmark-rows]');
 	var landmarkTolerance = wizard.querySelector('[data-heatmap-landmark-tolerance]');
 	var landmarkStatus = wizard.querySelector('[data-heatmap-landmark-status]');
+	var landmarkApply = wizard.querySelector('[data-heatmap-landmark-apply]');
 	var saveButton = wizard.querySelector('[data-heatmap-admin-save]');
+	var appliedCandidateKey = '';
+	var serverRegistration = null;
 	var suggestedFloors = [];
 	var currentConfig = {
 		xoffset: 0,
@@ -913,25 +956,66 @@ function setupHeatmapAdminWizard(wizard) {
 	}
 
 	function evaluateLandmarks() {
-		return HeatmapLandmarkSolver.solve(readLandmarks(), {minimumAnchors: 4, outlierPixels: landmarkTolerance ? Number(landmarkTolerance.value) : 10});
+		return HeatmapLandmarkSolver.solve(readLandmarks(), {
+			minimumAnchors: 4,
+			outlierPixels: landmarkTolerance ? Number(landmarkTolerance.value) : 10,
+			cropX: intConfig('cropx2') > 0 && intConfig('cropy2') > 0 ? intConfig('cropx1') : 0,
+			cropY: intConfig('cropx2') > 0 && intConfig('cropy2') > 0 ? intConfig('cropy1') : 0
+		});
+	}
+
+	function candidateKey(candidate) {
+		if (!candidate) {
+			return '';
+		}
+		return [candidate.xoffset, candidate.yoffset, Number(candidate.scale).toPrecision(12), candidate.flipX ? 1 : 0, candidate.flipY ? 1 : 0, candidate.rotate, candidate.cropX, candidate.cropY].join('|');
+	}
+
+	function currentCandidateKey() {
+		return candidateKey({
+			xoffset: intConfig('xoffset'), yoffset: intConfig('yoffset'), scale: scaleConfig(),
+			flipX: boolConfig('flipx'), flipY: boolConfig('flipy'), rotate: rotationSteps(),
+			cropX: intConfig('cropx2') > 0 && intConfig('cropy2') > 0 ? intConfig('cropx1') : 0,
+			cropY: intConfig('cropx2') > 0 && intConfig('cropy2') > 0 ? intConfig('cropy1') : 0
+		});
+	}
+
+	function candidateIsApplied() {
+		return landmarkResult && landmarkResult.ok && appliedCandidateKey !== '' && appliedCandidateKey === candidateKey(landmarkResult) && appliedCandidateKey === currentCandidateKey();
+	}
+
+	function renderLandmarkResiduals(registration) {
+		var rows = landmarkRows ? landmarkRows.querySelectorAll('[data-heatmap-landmark-row]') : [];
+		var residuals = registration && Array.isArray(registration.residuals) ? registration.residuals : [];
+		for (var index = 0; index < rows.length; index += 1) {
+			var cell = rows[index].querySelector('[data-heatmap-landmark-residual]');
+			var residual = residuals[index] && Number(residuals[index].residual);
+			if (cell) {
+				cell.textContent = isFinite(residual) ? residual.toFixed(2) + ' px' : '—';
+				cell.setAttribute('data-accepted', isFinite(residual) && residual <= Number((registration || {}).tolerance || 0) ? '1' : '0');
+			}
+		}
 	}
 
 	function syncSaveGate() {
-		var accepted = landmarkResult && landmarkResult.ok === true && /^[a-f0-9]{64}$/i.test(currentPreviewToken);
+		var accepted = candidateIsApplied() && serverRegistration && serverRegistration.ok === true && /^[a-f0-9]{64}$/i.test(currentPreviewToken);
 		if (saveButton) {
 			saveButton.disabled = !accepted;
 		}
 		if (landmarkStatus) {
 			landmarkStatus.textContent = accepted
 				? adminText('registration-accepted', 'Landmark registration accepted.') + ' ' + adminText('registration-coverage', 'Registration is separate from coverage.')
-				: (landmarkResult && landmarkResult.reason === 'candidate_refused'
+				: (!candidateIsApplied() && landmarkResult && landmarkResult.ok
+					? (landmarkApply ? landmarkApply.textContent : 'Apply landmark candidate')
+					: (landmarkResult && landmarkResult.reason === 'candidate_refused'
 					? adminText('candidate-refused', 'The landmark residuals do not fit one uniform projection.')
-					: adminText('landmarks-required', 'Add four landmarks and two holdouts, then preview.'));
+					: adminText('landmarks-required', 'Add four landmarks and two holdouts, then preview.')));
 		}
 	}
 
 	function invalidatePreviewToken() {
 		currentPreviewToken = '';
+		serverRegistration = null;
 		landmarkResult = evaluateLandmarks();
 		syncSaveGate();
 	}
@@ -1026,6 +1110,11 @@ function setupHeatmapAdminWizard(wizard) {
 		removeCell.appendChild(removeButton);
 		row.appendChild(removeCell);
 		floorRows.appendChild(row);
+		var fields = row.querySelectorAll('[data-heatmap-floor-field]');
+		for (var fieldIndex = 0; fieldIndex < fields.length; fieldIndex += 1) {
+			fields[fieldIndex].oninput = schedulePreview;
+			fields[fieldIndex].onchange = schedulePreview;
+		}
 	}
 
 	function readFloors() {
@@ -1584,7 +1673,9 @@ function setupHeatmapAdminWizard(wizard) {
 	}
 
 	function schedulePreview() {
-		invalidatePreviewToken();
+		if (arguments[0] !== false) {
+			invalidatePreviewToken();
+		}
 		var token = ++requestSeq;
 		if (previewTimer) {
 			clearTimeout(previewTimer);
@@ -1658,8 +1749,9 @@ function setupHeatmapAdminWizard(wizard) {
 		}
 		landmarkResult = evaluateLandmarks();
 		controls.landmarks = readLandmarks();
-		if (landmarkResult.ok) {
-			controls.registrationAccepted = 1;
+		controls.landmarkTolerance = landmarkTolerance ? landmarkTolerance.value : 10;
+		if (candidateIsApplied()) {
+			controls.registrationRequested = 1;
 		}
 		return HeatmapAdminPayload.build(action, {
 			game: wizard.getAttribute('data-heatmap-game'),
@@ -1679,7 +1771,9 @@ function setupHeatmapAdminWizard(wizard) {
 		var imageUrl;
 		var points;
 		lastPayload = payload;
-		currentPreviewToken = landmarkResult && landmarkResult.ok && /^[a-f0-9]{64}$/i.test(payload.previewToken || '') ? payload.previewToken : '';
+		serverRegistration = payload.registration || null;
+		renderLandmarkResiduals(serverRegistration);
+		currentPreviewToken = candidateIsApplied() && serverRegistration && serverRegistration.ok && /^[a-f0-9]{64}$/i.test(payload.previewToken || '') ? payload.previewToken : '';
 		syncSaveGate();
 		if (isConfigHash(payload.configHash)) {
 			currentConfigHash = payload.configHash;
@@ -1780,6 +1874,9 @@ function setupHeatmapAdminWizard(wizard) {
 		})
 		.catch(function(error) {
 			setLog(responseMessage(error, heatmapText('heatmapRequestFailed', 'Heatmap request failed')));
+			if (error && error.code === 'preview_required') {
+				invalidatePreviewToken();
+			}
 			if (error && error.code === 'stale_config') {
 				requestStoredConfig();
 			}
@@ -1853,6 +1950,24 @@ function setupHeatmapAdminWizard(wizard) {
 	bindClick('[data-heatmap-admin-load]', requestStoredConfig);
 	bindClick('[data-heatmap-admin-preview]', function() { request('preview'); });
 	bindClick('[data-heatmap-admin-save]', function() { request('save'); });
+	bindClick('[data-heatmap-landmark-apply]', function() {
+		landmarkResult = evaluateLandmarks();
+		if (!landmarkResult.ok) {
+			syncSaveGate();
+			return;
+		}
+		setNumberField('xoffset', landmarkResult.xoffset);
+		setNumberField('yoffset', landmarkResult.yoffset);
+		setNumberField('scale', landmarkResult.scale);
+		var flipX = wizard.querySelector('[data-heatmap-check="flipx"]');
+		var flipY = wizard.querySelector('[data-heatmap-check="flipy"]');
+		if (flipX) { flipX.checked = landmarkResult.flipX; }
+		if (flipY) { flipY.checked = landmarkResult.flipY; }
+		setNumberField('rotate', landmarkResult.rotate);
+		appliedCandidateKey = candidateKey(landmarkResult);
+		syncTransformButtons();
+		schedulePreview();
+	});
 	bindClick('[data-heatmap-admin-upload]', upload);
 	bindClick('[data-heatmap-floor-add]', function() {
 		addFloorRow({
@@ -1898,7 +2013,7 @@ function setupHeatmapAdminWizard(wizard) {
 			if (range) {
 				range.value = range.getAttribute('data-heatmap-scale-slider') ? scaleToSlider(this.value) : this.value;
 			}
-			schedulePreview();
+			schedulePreview(this.getAttribute('data-heatmap-number') !== 'renderer' && this.getAttribute('data-heatmap-number') !== 'normalization');
 		};
 		numberInputs[n].onchange = numberInputs[n].oninput;
 	}
@@ -1922,7 +2037,7 @@ function setupHeatmapAdminWizard(wizard) {
 		};
 	}
 	if (mapSelect) {
-		mapSelect.onchange = requestStoredConfig;
+		mapSelect.onchange = function() { invalidatePreviewToken(); requestStoredConfig(); };
 	}
 	if (floorSelect) {
 		floorSelect.onchange = schedulePreview;

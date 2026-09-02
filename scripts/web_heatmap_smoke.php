@@ -196,8 +196,28 @@ assert_same(false, heatmap_admin_preview_token_is_valid($previewToken, $previewT
 $previewToken = heatmap_admin_issue_preview_token($previewTokenConfig, $previewTokenImage, $previewTokenQuery, 1700000000);
 assert_true(heatmap_admin_preview_token_consume($previewToken, $previewTokenConfig, $previewTokenImage, $previewTokenQuery, 1700000001), 'matching preview token should be consumable once');
 assert_same(false, heatmap_admin_preview_token_is_valid($previewToken, $previewTokenConfig, $previewTokenImage, $previewTokenQuery, 1700000001), 'consumed preview tokens should fail closed');
+$previewLandmarks = array(
+    array('worldX' => 0, 'worldY' => 0, 'pixelX' => 263, 'pixelY' => 844),
+    array('worldX' => 100, 'worldY' => 0, 'pixelX' => 333, 'pixelY' => 844),
+    array('worldX' => 0, 'worldY' => 100, 'pixelX' => 263, 'pixelY' => 774),
+    array('worldX' => 100, 'worldY' => 100, 'pixelX' => 333, 'pixelY' => 774),
+    array('worldX' => 50, 'worldY' => 150, 'pixelX' => 298, 'pixelY' => 739, 'holdout' => 1),
+    array('worldX' => 150, 'worldY' => 50, 'pixelX' => 368, 'pixelY' => 809, 'holdout' => 1),
+);
+assert_true(heatmap_admin_landmark_evidence($previewLandmarks, $previewTokenConfig, 10)['ok'], 'server should accept landmarks only when they match the normalized candidate projection');
+$forgedPreviewConfig = $previewTokenConfig;
+$forgedPreviewConfig['xoffset'] += 100;
+assert_same(false, heatmap_admin_landmark_evidence($previewLandmarks, $forgedPreviewConfig, 10)['ok'], 'server should reject forged evidence for a mismatched candidate projection');
+$asymmetricPreviewLandmarks = $previewLandmarks;
+$asymmetricPreviewLandmarks[5]['pixelX'] += 14;
+$asymmetricPreviewEvidence = heatmap_admin_landmark_evidence($asymmetricPreviewLandmarks, $previewTokenConfig, 10);
+assert_same(false, $asymmetricPreviewEvidence['ok'], 'server should reject a mandatory holdout outside the selected tolerance');
+assert_true($asymmetricPreviewEvidence['maximumResidual'] >= 14.0, 'server residual summary should retain the failing mandatory holdout');
 assert_contains('heatmap_admin_require_config_hash($request, $oldHash);', file_get_contents(ROOT_PATH . '/heatmap_admin.php'), 'save should keep stale config rejection before the preview-token gate');
 assert_contains("throw new HeatmapAdminException('preview_required', 409);", file_get_contents(ROOT_PATH . '/heatmap_admin.php'), 'save should reject missing or mismatched preview tokens before writes');
+assert_contains("array('preview', 'save', 'upload')", file_get_contents(ROOT_PATH . '/heatmap_admin.php'), 'authorizing preview should be protected by the same POST/origin/CSRF route guard');
+assert_contains('$registration = heatmap_admin_landmark_registration($request, $config);', file_get_contents(ROOT_PATH . '/heatmap_admin.php'), 'preview route should independently verify evidence against the candidate config');
+assert_contains("strval(\$request['registrationRequested'] ?? '') === '1' && \$registration['ok']", file_get_contents(ROOT_PATH . '/heatmap_admin.php'), 'route should mint authorization only for independently accepted landmark evidence');
 
 $explorerModeCases = array(
     array('input' => array(), 'mode' => 0),

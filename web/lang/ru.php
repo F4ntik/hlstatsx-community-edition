@@ -312,6 +312,7 @@ RewriteRule sig-(.*)-(.*).png$ sig.php?player_id=$1&background=$2 [L]</textarea>
 		'admin.task.heatmaps.preview_required' => 'Перед сохранением нужен предпросмотр.',
 		'admin.task.heatmaps.asset_mismatch' => 'Изображение карты или обзор изменились; повторите предпросмотр.',
 		'admin.task.heatmaps.registration_coverage' => 'Привязка не заменяет проверку покрытия событий.',
+		'admin.task.heatmaps.apply_candidate' => 'Применить привязку по ориентирам',
         'heatmap.events' => 'событий',
         'heatmap.request_failed' => 'Не удалось загрузить данные теплокарты',
         'heatmap.killers' => 'Убийцы',
