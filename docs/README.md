@@ -74,11 +74,15 @@ Read them only when you need historical rationale.
 
 - `docs/audits/legacy-python-parity-20260423/`
 - `docs/audits/modern-heatmap-explorer/runtime-acceptance.md` — current local
-  release-candidate gates, rollout boundary, and raw-receipt index.
+  release-candidate source/browser/visual gates, rollout boundary, screenshots,
+  exact restore, and raw-receipt index.
 - `docs/audits/modern-heatmap-explorer/performance.md` — index decision,
   MyISAM updater/performance evidence, and historical contour non-claims.
+- `docs/audits/modern-heatmap-explorer/evidence/acceptance-2026-09-02.json` —
+  current sanitized visibility-correction acceptance summary at exact commit
+  `44f3af9`.
 - `docs/audits/modern-heatmap-explorer/evidence/acceptance-2026-09-01.json` —
-  sanitized machine-readable final acceptance summary.
+  historical pre-visibility-correction acceptance summary.
 
 Keep detailed replay transcripts, compare outputs, and retained parity evidence
 there rather than expanding `status.md`.

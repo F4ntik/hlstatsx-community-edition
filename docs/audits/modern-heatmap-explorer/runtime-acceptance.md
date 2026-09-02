@@ -1,32 +1,72 @@
 # Modern Heatmap Explorer runtime acceptance
 
-Status on 2026-09-01: `SOURCE-READY`, `RUNTIME-ACCEPTED`, and
-`RELEASE-READY` as a local release candidate. Nothing was pushed, deployed, or
-published by this acceptance run.
+Status on 2026-09-02: `SOURCE-READY`, locally `RUNTIME-ACCEPTED`, and
+`RELEASE-READY` only as a local release candidate. Nothing was pushed,
+deployed, published, or accepted for production release by this run.
 
-The accepted product runtime is commit
-`cc116620422182d20ebb29df9c3518693a551da7`. Commit `3dc6330` only makes the
-coordinate receipt portable to the Windows PowerShell available on this host;
-it does not change runtime behavior. The sanitized machine-readable summary is
-[`evidence/acceptance-2026-09-01.json`](evidence/acceptance-2026-09-01.json).
+The accepted visibility-corrected implementation is exact commit
+`44f3af97db46107f3ab9b595b3c32b3e5c2c7986`. The previously accepted DB/API,
+coordinate, migration, admin, cache and performance evidence remains applicable
+because this correction changes only WebGL presentation and its tests. The
+sanitized machine-readable summary is
+[`evidence/acceptance-2026-09-02.json`](evidence/acceptance-2026-09-02.json);
+the 2026-09-01 JSON remains a historical pre-correction receipt.
 
 ## Acceptance result
 
 | Gate | Result | Current evidence |
 | --- | --- | --- |
-| Source | pass | 302 product tests, 91 replay tests, 13 route tests, 5 coordinate-runner tests, compileall, PHP smoke/lint, JavaScript check/smoke, and diff check |
+| Source | pass | 302 product tests with explicit local `PYTHONPATH`, 91 replay tests, 18 focused route/coordinate-script tests, compileall, PHP heatmap/i18n smoke, JavaScript syntax/smoke including the sparse normalization regression, and diff check |
 | Persisted coordinates | pass | Disposable `bench_ephemeral` runner asserted five distinct/consumed/cleared coordinate cases and cleaned itself |
 | Migration | pass | Fresh install and HTTP updater 81→82 retained MyISAM, data fingerprint, and exact `mapEventTime(map,eventTime)` index; second update was idempotent |
 | Performance | pass | cold p95 55.5241 ms, warm p95 10.3528 ms, inspect p95 13.6879 ms, 4,009-byte gzip, 301 bins, 65/65 metrics |
-| Public browser | pass | EN/RU map and player surfaces, Color/Mono, custom period, Difference, inspector aggregates, floor states, keyboard, touch/mobile, 200% reflow, reduced motion, JS/WebGL fallbacks, and legacy rollback |
+| Visual legibility | pass | Old shader failed with singleton/peak alpha `0.009259/0.138889` and zero colored pixels above alpha 0.20; corrected Color and Mono each have 35,766 qualifying colored pixels and Difference has 3,740 against required 189 |
+| Public browser | pass | EN/RU map and player surfaces, visibly obvious Color/Mono/Difference data, custom period, inspector aggregates, floor states, keyboard, touch/mobile, 200% reflow, reduced motion, JS/WebGL fallbacks, and legacy rollback |
 | Admin browser | pass | authenticated EN/RU upload/save/readback plus access, CSRF, stale-session, file-type, size, floor, and generate-over-HTTP negative cases |
 | Map identity | pass | A and B SHA-256 URLs differed; stale A returned 409/no-store; current B returned 200/immutable with matching ETag |
 | Restore | exact | mode 0, original config and assets, `counter_hits=293725`, zero temporary users/fixtures/sessions, no mounts, no custom overview |
 
+## Sparse-grid visibility correction
+
+The accepted `cstrike/de_dust2` scene contains 175 source events and 301
+occupied bins in a 128×103 grid; the raw maximum cell value is 12. The old
+fragment path averaged a 3×3 neighborhood and divided by the original global
+maximum. An ordinary isolated bin therefore became `1/108 = 0.009259` alpha,
+the strongest convolved region became only `15/108 = 0.138889`, and the live
+frame maxed at `35/255 = 0.137255`. It produced zero qualifying colored pixels
+above alpha 0.20 and failed the retained RED gate.
+
+The corrected path normalizes after convolution and applies the fixed square-
+root transfer. An ordinary singleton is `sqrt(1/15) = 0.258199`; the peak is
+`1.0`. Live Color and Mono each contain 35,766 qualifying colored pixels with
+max alpha 1.0 and identical raw WebGL hash prefix `f06b0da2`; only the styled
+background differs, and both composite-contrast checks pass. Difference has
+161 bins, 45 warm plus 3,695 cool qualifying pixels (3,740 total versus the
+required 189), alpha floor 0.22, max alpha 1.0, and passing contrast. Independent
+visual judgment found the hotspots obvious without zoom.
+
+The exact-HEAD objective receipt is
+`.superpowers/sdd/2026-09-02-modern-heatmap-visibility/`
+`fixed-runtime-visual-gate-44f3af9.json`; it reports PASS at full commit
+`44f3af97db46107f3ab9b595b3c32b3e5c2c7986`. The retained old-runtime RED
+receipt proves the same gate rejects the legacy rendering.
+
+Canonical before/after evidence:
+
+- [Color before](screenshots/before-normalization-map-overview-en.png) / [Color after](screenshots/map-overview-en.png)
+- [Mono before](screenshots/before-normalization-map-overview-mono-en.png) / [Mono after](screenshots/map-overview-mono-en.png)
+- [Difference before](screenshots/before-normalization-player-difference-ru.png) / [Difference after](screenshots/player-difference-ru.png)
+- [Mobile inspector](screenshots/mobile-inspector-ru.png) / [static JPEG fallback](screenshots/fallback-jpeg-en.png)
+
 ## Browser proof
 
-The final browser rows used Chromium against `http://127.0.0.1:8281` and the
-rebuilt exact product image.
+The broad browser rows used Chromium against `http://127.0.0.1:8281`. Receipt
+`task3-browser-20260902T010842Z.json` is PASS for keyboard Color/Mono
+reversibility without request or URL changes, mobile, 200% zoom/reflow,
+reduced motion, legacy mobile, and WebGL fallback. Its embedded repository HEAD
+is the pre-commit `59b0786` because the capture ran immediately before commit;
+the candidate code content is identical to reviewed `44f3af9`, and the separate
+exact-HEAD objective receipt above removes that provenance ambiguity.
 
 - Color is the default map-only grade. Mono is reversible and changes neither
   scene request nor URL. WebGL-unavailable fallback remains unfiltered.
@@ -95,7 +135,23 @@ the v1/JPEG compatibility contract.
 
 ## Rollout and rollback
 
-`HeatmapExplorerBeta` remains at `0` after acceptance:
+`HeatmapExplorerBeta` remains at `0` after acceptance. The first generic helper
+reported only a `floors_json` comparison mismatch caused by double escaping in
+its temporary expected value; that was a helper assertion defect, not a product
+restore failure. Final independent manual readback then matched exactly:
+
+- mode `0`, counter `293725`;
+- projection `384/1120/1.26`, flips `0/1`, rotate `0`, days `30`, empty floors,
+  and crops `0/0/0/0`;
+- zero temporary users, fixture rows, and sessions; AUTO_INCREMENT users `0`
+  and frags `6937`;
+- asset/JPEG/thumb SHA-256
+  `ef05c0fae9d8e73eaeab92f4c119dc6d3eeb5c946ad5da7946a49dcba2d5ca15`,
+  `258fc395fa5971d3fe0c022e9e1a448e240f88b5313ae340ca42bd6043368039`, and
+  `5fb70fee2b6070042ee0cbe80b7e5d5d3e6bb919f923e6ad5860ad9812b0b9ce`;
+- no mounts.
+
+Mode meanings remain:
 
 - `0`: legacy v1/JPEG only; direct v2 disabled;
 - `1`: legacy by default, explicit `heatmap_explorer=1` opt-in;
@@ -103,8 +159,9 @@ the v1/JPEG compatibility contract.
 
 Promote `0 → 1 internal → 1 public beta → 2 default`. Roll back immediately
 to `0` for elevated errors, SLA breach, biased/truncated scenes, or coverage
-regression. This document establishes local release readiness, not production
-deployment acceptance.
+regression. This document establishes source readiness, acceptance on the
+tested local runtime, and local-candidate release readiness. It is not
+production deployment or production release acceptance.
 
 ## Raw evidence boundary
 
@@ -122,3 +179,12 @@ read-only references are:
 - `2026-08-31-modern-heatmap-explorer/task-12-evidence/task12-admin-matrix-current-20260901T2251Z.json`;
 - final exact restore
   `2026-08-31-modern-heatmap-explorer/task-12-evidence/task12-final-gap-restore-20260901T225611Z.json`.
+- visibility RED baseline
+  `2026-09-02-modern-heatmap-visibility/old-runtime-visual-gate.json`;
+- exact reviewed-HEAD visibility PASS
+  `2026-09-02-modern-heatmap-visibility/fixed-runtime-visual-gate-44f3af9.json`;
+- broad corrected browser matrix
+  `2026-09-01-heatmap-background-grading/task3-browser-20260902T010842Z.json`.
+
+An independent final review of the visibility correction and its evidence
+returned `ship` with zero findings.

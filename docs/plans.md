@@ -80,14 +80,17 @@ Historical autonomy follow-up context:
   web, static JPEG compatibility fallback, player-scoped kill/death widgets,
   and per-map projection calibration from overview seeds plus DB-first manual
   diagnostics.
-- Modern Heatmap Explorer implementation and all 12 planned gates are complete
-  for the local release candidate. Source, disposable coordinates, MyISAM
-  install/update/performance, public EN/RU browser, authenticated admin,
-  accessibility/fallback/rollback, cache identity, and exact restoration are
-  accepted. Use `docs/audits/modern-heatmap-explorer/runtime-acceptance.md` as
-  the current truth. Remaining work is operational promotion through mode 0,
-  migration readback, mode 1 observation and production monitoring; it is not
-  an implementation correction pass.
+- Modern Heatmap Explorer implementation and all 12 planned gates, plus the
+  2026-09-02 sparse-layer visibility correction, are complete for exact commit
+  `44f3af97db46107f3ab9b595b3c32b3e5c2c7986`. Source, disposable coordinates,
+  MyISAM install/update/performance, public EN/RU browser, objective
+  Color/Mono/Difference pixel visibility, authenticated admin, accessibility/
+  fallback/rollback, cache identity, independent review, and exact restoration
+  are accepted on the tested local stack. Use
+  `docs/audits/modern-heatmap-explorer/runtime-acceptance.md` as the current
+  truth. Remaining work is operational promotion through mode 0, migration
+  readback, mode 1 observation and production monitoring; no production
+  deployment, publication, or release acceptance is claimed.
 - Keep GoldSrc import and Steam/Valve provenance outside this release. Local
   source research validated the overview coordinate model, but no Valve asset
   is shipped. The accepted product path uses repository maps with reversible

@@ -146,12 +146,16 @@ release-readiness artifacts when present.
 
 ## Modern Heatmap Explorer rollout notes
 
-Current status on 2026-09-01: local candidate `RELEASE-READY`. Source,
-coordinate persistence, MyISAM install/update/performance, public EN/RU
-browser, authenticated admin, cache identity and exact restoration are
-accepted at product runtime `cc11662`; see
+Current status on 2026-09-02: exact implementation commit
+`44f3af97db46107f3ab9b595b3c32b3e5c2c7986` is `SOURCE-READY`, locally
+`RUNTIME-ACCEPTED`, and `RELEASE-READY` only as a local candidate. Coordinate
+persistence, MyISAM install/update/performance, authenticated admin, cache
+identity and compatibility evidence remain accepted from the unchanged
+DB/API boundary. Fresh source regression, EN/RU browser, objective
+Color/Mono/Difference pixel visibility, exact restoration and independent
+`ship` review close the sparse-layer correction; see
 `docs/audits/modern-heatmap-explorer/runtime-acceptance.md`. This is not a
-production deployment or publication record.
+production deployment, publication, or production release acceptance record.
 
 No Steam/Valve asset is shipped. Local GoldSrc research validated overview
 coordinates, while the release uses repository images with reversible map-only
@@ -232,7 +236,8 @@ rtk python -m hlstats_py.heatmaps --game <validated-game> --map <validated-map> 
   scope ad hoc
 - shipped telemetry claim: the cstrike grammar is verified; other mods may use
   only the coordinates actually present in their logs
-- local acceptance gates are closed; production promotion must still follow
+- local source/runtime/visual/release-candidate gates are closed at `44f3af9`;
+  production promotion must still follow
   mode `0` deploy/readback, mode `1` internal observation, public beta, and the
   rollback thresholds above
 

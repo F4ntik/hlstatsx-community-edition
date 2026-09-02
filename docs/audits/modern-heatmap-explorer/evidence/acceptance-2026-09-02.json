@@ -1,0 +1,136 @@
+{
+  "schema": "modern-heatmap-explorer-acceptance/v2",
+  "recordedAtUtc": "2026-09-02T01:25:41Z",
+  "productRuntimeHead": "44f3af97db46107f3ab9b595b3c32b3e5c2c7986",
+  "verdicts": {
+    "sourceReady": true,
+    "runtimeAcceptedLocal": true,
+    "releaseReadyLocalCandidate": true,
+    "productionOrReleaseAccepted": false,
+    "deployedOrPublished": false
+  },
+  "source": {
+    "pythonProductTests": 302,
+    "pythonPathWasExplicit": true,
+    "replayTests": 91,
+    "focusedRouteAndCoordinateScriptTests": 18,
+    "compileAll": "pass",
+    "javascriptCheckAndSmoke": "pass",
+    "phpHeatmapAndI18nSmoke": "pass",
+    "normalizationRegression": "pass"
+  },
+  "scene": {
+    "game": "cstrike",
+    "map": "de_dust2",
+    "sourceEvents": 175,
+    "occupiedBins": 301,
+    "grid": {"width": 128, "height": 103},
+    "rawMax": 12
+  },
+  "normalization": {
+    "legacy": {
+      "singletonAlpha": 0.009259,
+      "singletonFormula": "1/108",
+      "peakAlpha": 0.138889,
+      "peakFormula": "15/108",
+      "liveMaxAlpha": 0.137255,
+      "liveMaxAlphaFormula": "35/255",
+      "coloredPixelsAboveAlphaPoint20": 0,
+      "visualGate": "fail"
+    },
+    "corrected": {
+      "transfer": "sqrt(convolved/maxConvolved)",
+      "ordinarySingletonIntensity": 0.258199,
+      "ordinarySingletonFormula": "sqrt(1/15)",
+      "peakIntensity": 1.0,
+      "visualGate": "pass"
+    }
+  },
+  "visual": {
+    "color": {
+      "qualifyingColoredPixels": 35766,
+      "maxAlpha": 1.0,
+      "rawWebglHashPrefix": "f06b0da2",
+      "compositeContrast": "pass"
+    },
+    "mono": {
+      "qualifyingColoredPixels": 35766,
+      "maxAlpha": 1.0,
+      "rawWebglHashPrefix": "f06b0da2",
+      "backgroundDiffersFromColor": true,
+      "compositeContrast": "pass"
+    },
+    "difference": {
+      "bins": 161,
+      "warmQualifyingPixels": 45,
+      "coolQualifyingPixels": 3695,
+      "qualifyingColoredPixels": 3740,
+      "minimumRequiredPixels": 189,
+      "alphaFloor": 0.22,
+      "maxAlpha": 1.0,
+      "compositeContrast": "pass"
+    },
+    "judgment": "heatmap hotspots are obvious without zoom",
+    "exactHeadReceipt": ".superpowers/sdd/2026-09-02-modern-heatmap-visibility/fixed-runtime-visual-gate-44f3af9.json",
+    "legacyRedReceipt": ".superpowers/sdd/2026-09-02-modern-heatmap-visibility/old-runtime-visual-gate.json"
+  },
+  "browser": {
+    "verdict": "pass",
+    "receipt": ".superpowers/sdd/2026-09-01-heatmap-background-grading/task3-browser-20260902T010842Z.json",
+    "receiptHead": "59b078603352d40d25c68b372226b5212fd1107b",
+    "candidateContentMatchesReviewedCommit": true,
+    "keyboardColorMonoReversible": true,
+    "styleChangeHasNoRequestOrUrlMutation": true,
+    "mobile": "pass",
+    "zoomAndReducedMotion": "pass",
+    "legacyMobile": "pass",
+    "webglFallback": "pass",
+    "screenshots": {
+      "beforeColor": "docs/audits/modern-heatmap-explorer/screenshots/before-normalization-map-overview-en.png",
+      "beforeMono": "docs/audits/modern-heatmap-explorer/screenshots/before-normalization-map-overview-mono-en.png",
+      "beforeDifference": "docs/audits/modern-heatmap-explorer/screenshots/before-normalization-player-difference-ru.png",
+      "afterColor": "docs/audits/modern-heatmap-explorer/screenshots/map-overview-en.png",
+      "afterMono": "docs/audits/modern-heatmap-explorer/screenshots/map-overview-mono-en.png",
+      "afterDifference": "docs/audits/modern-heatmap-explorer/screenshots/player-difference-ru.png",
+      "mobile": "docs/audits/modern-heatmap-explorer/screenshots/mobile-inspector-ru.png",
+      "fallback": "docs/audits/modern-heatmap-explorer/screenshots/fallback-jpeg-en.png"
+    }
+  },
+  "review": {
+    "verdict": "ship",
+    "findings": 0,
+    "scope": "visibility correction code and visual evidence"
+  },
+  "restore": {
+    "verdict": "exact manual readback after the helper-only floors_json escaping mismatch",
+    "heatmapExplorerBeta": 0,
+    "counterHits": 293725,
+    "config": {
+      "xoffset": 384,
+      "yoffset": 1120,
+      "scale": 1.26,
+      "flipx": 0,
+      "flipy": 1,
+      "rotate": 0,
+      "days": 30,
+      "floorsJson": "",
+      "crop": [0, 0, 0, 0]
+    },
+    "temporaryUsers": 0,
+    "fixtureRows": 0,
+    "sessions": 0,
+    "autoIncrement": {"users": 0, "frags": 6937},
+    "hashes": {
+      "asset": "ef05c0fae9d8e73eaeab92f4c119dc6d3eeb5c946ad5da7946a49dcba2d5ca15",
+      "jpeg": "258fc395fa5971d3fe0c022e9e1a448e240f88b5313ae340ca42bd6043368039",
+      "thumbnail": "5fb70fee2b6070042ee0cbe80b7e5d5d3e6bb919f923e6ad5860ad9812b0b9ce"
+    },
+    "mounts": []
+  },
+  "boundary": {
+    "sourceReady": "exact corrected source and source gates",
+    "runtimeAccepted": "tested local populated browser runtime only",
+    "releaseReady": "local candidate only",
+    "notClaimed": ["production deployment", "publication", "production release acceptance"]
+  }
+}

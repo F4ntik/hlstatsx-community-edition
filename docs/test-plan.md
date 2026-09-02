@@ -290,13 +290,20 @@ Use the already populated DB for visual/projection iteration first.
 
 ### Modern Heatmap Explorer
 
-#### Final runtime acceptance (`cc11662` product runtime)
+#### Final local runtime acceptance (`44f3af9` visibility-corrected runtime)
 
 - Required browser rows: reversible Color/Mono without request or URL change;
   map/player/custom/Difference/inspector/floor flows; keyboard pin/pan/reset/
   unpin; reduced motion; JS-off and WebGL failure fallbacks; static JPEG;
   legacy rollback; true 390px mobile and 720px @2x reflow. Measure only visible,
   enabled Explorer controls for the 44×44 target gate.
+- Required objective visual rows on the accepted sparse `de_dust2` scene:
+  175 source events, 301 occupied bins, grid 128×103, raw max 12; Color and
+  Mono must each exceed the configured colored-pixel and composite-contrast
+  thresholds while retaining identical raw WebGL output; Difference must pass
+  independent warm/cool pixel and contrast thresholds. The gate must fail the
+  old singleton/peak alpha `0.009259/0.138889` implementation, not merely prove
+  that `drawArrays()` ran.
 - Required admin rows: authenticated EN/RU preview/upload/save/readback, two
   stale sessions, non-admin denial, CSRF rejection, invalid floor/token/type/
   dimension/body size and HTTP generation denial.
@@ -314,7 +321,11 @@ Use the already populated DB for visual/projection iteration first.
   `python-web:latest` Docker image with the same commands.
 - JavaScript syntax/smoke: `node --check web/includes/js/heatmap.js`,
   `node --check web/includes/js/heatmap-explorer.js`, and
-  `node scripts/heatmap_js_smoke.js`.
+  `node scripts/heatmap_js_smoke.js`. The smoke pins normalization after the
+  3×3 convolution and the square-root sparse-density transfer.
+- Objective runtime visual gate: `node scripts/heatmap_visual_gate.js` against
+  the accepted populated local browser runtime. Retain the legacy RED receipt,
+  an exact-HEAD PASS receipt, and canonical Color/Mono/Difference screenshots.
 - Route smoke: `python -m pytest
   scripts/replay_baseline/tests/test_web_route_smoke.py -q`. Migration checks
   include the focused source assertions and `php -l` for
@@ -325,15 +336,22 @@ Use the already populated DB for visual/projection iteration first.
   normal source test.
 - Current runtime truth is
   `docs/audits/modern-heatmap-explorer/runtime-acceptance.md`. The 2026-09-01
-  final pass closes source, coordinate, MyISAM, performance, public browser,
-  admin, map-identity and exact-restore gates. The local candidate is release
-  ready; deployment acceptance still requires staged promotion and monitoring.
+  pass remains historical evidence for coordinate, MyISAM, performance, admin,
+  map identity and compatibility. The 2026-09-02 pass additionally closes the
+  sparse-layer source regression, objective Color/Mono/Difference visibility,
+  exact-HEAD visual receipt, browser screenshots, independent `ship` review and
+  exact mode-0 restoration. The candidate is release-ready locally only;
+  deployment and production release acceptance still require staged promotion
+  and monitoring.
 
-**Source gate:** static contract, Python, PHP, JavaScript, route, migration,
-and diff checks pass without Docker DB execution. **Runtime acceptance:** a
-fresh disposable coordinate-runner receipt proves persisted tuples. **Release
-acceptance:** adds the approved live DB/browser/regeneration and release
-evidence; source or runtime results alone do not establish it.
+**Source gate:** static contract, sparse normalization regression, Python, PHP,
+JavaScript, route, migration, and diff checks pass without relying on live
+browser appearance. **Local runtime acceptance:** fresh disposable coordinate
+readback plus populated browser, objective visual, admin, fallback and rollback
+evidence pass on the tested stack. **Local release readiness:** additionally
+requires performance/operations, exact restoration and independent final
+review. None of these labels establishes deployment or production release
+acceptance.
 
 ### Frontend / i18n
 

@@ -2,21 +2,29 @@
 
 ## Snapshot
 
-- Last updated: `2026-09-01`
-- Modern Heatmap Explorer is `SOURCE-READY`, `RUNTIME-ACCEPTED`, and
-  `RELEASE-READY` as a local candidate at product runtime `cc11662` plus the
-  PowerShell-compatible coordinate runner `3dc6330`. The final pass includes
-  302 product tests, 91 replay tests, 13 route tests, PHP/JS gates, a passing
-  disposable five-case coordinate receipt, fresh-install and populated MyISAM
-  updater acceptance, 65/65 performance metrics, authenticated EN/RU admin
-  acceptance, and live browser proof for map/player/mobile/floor/keyboard/
-  fallback/rollback paths. Color/Mono is map-only, reversible, and causes no
-  request or URL change. True mobile is `clientWidth=390`, DPR 3, one column,
-  no content overflow, and 19 enabled targets at least 44×44; the 200% reflow
-  proxy is `720px @ 2x` without page scaling. The final restore returned exact
-  mode `0`, config/assets/counter/users/fixtures/auto-increments/sessions and
-  mounts. See `docs/audits/modern-heatmap-explorer/runtime-acceptance.md` and
-  its sanitized JSON evidence. No push, deployment, or publication occurred.
+- Last updated: `2026-09-02`
+- Modern Heatmap Explorer is `SOURCE-READY`, locally `RUNTIME-ACCEPTED`, and
+  `RELEASE-READY` only as a local candidate at exact implementation commit
+  `44f3af97db46107f3ab9b595b3c32b3e5c2c7986`. The visibility correction closes
+  the previously missed sparse-grid normalization defect: the accepted
+  `de_dust2` scene has 175 source events, 301 occupied bins in a 128×103 grid,
+  and raw maximum 12. The old renderer produced singleton/peak alpha only
+  `0.009259/0.138889` and zero colored pixels above alpha 0.20; the corrected
+  transfer produces ordinary singleton intensity `0.258199`, peak `1.0`, and
+  35,766 qualifying colored pixels in both Color and Mono. Difference has 161
+  bins and 3,740 qualifying warm/cool pixels against a required 189. Heatmap
+  hotspots are obvious without zoom; Color/Mono changes only the background,
+  with the same raw WebGL hash. Source gates passed 302 product tests with an
+  explicit local `PYTHONPATH`, 91 replay tests, 18 focused route/coordinate
+  tests, compileall, Node syntax/smoke, and PHP heatmap/i18n smoke. The broad
+  browser matrix, objective Color/Mono/Difference pixel gates, and independent
+  reviewer all pass (`ship`, zero findings). Final manual readback restored
+  exact mode `0`, original config/assets/counter/users/fixtures/
+  auto-increments/sessions and no mounts. See
+  `docs/audits/modern-heatmap-explorer/runtime-acceptance.md` and
+  `docs/audits/modern-heatmap-explorer/evidence/acceptance-2026-09-02.json`.
+  No push, deployment, publication, or
+  production release acceptance occurred.
 - Counter-Strike/GoldSrc color overview BMP/TXT files were researched locally,
   but no Valve/Steam asset was copied or shipped. The product uses repository
   images with Color/Mono grading. Optional operator-side GoldSrc import remains
@@ -585,7 +593,8 @@ Current parity state:
 
 - Docker API access can still block single-log or narrow replay verification
   even when the local unit slice is already green.
-- Modern Heatmap Explorer is locally release-ready, but production promotion
+- Modern Heatmap Explorer is release-ready only as the accepted local
+  `44f3af9` candidate; production promotion
   still requires the documented mode-0 deployment, migration readback, staged
   mode-1 observation, reverse-proxy inspect rate limit, and rollback monitoring.
 - Some Python test commands still require explicit `PYTHONPATH` setup because
