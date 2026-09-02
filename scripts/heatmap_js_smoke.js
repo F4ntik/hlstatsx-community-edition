@@ -762,6 +762,103 @@ function normalizedAmount(value, maxAbs) {
   return Math.max(0, Math.min(1, Math.abs(value) / Math.max(maxAbs, 0.000001)));
 }
 
+function sqrtNormalizedAmount(value, maxAbs) {
+  return Math.sqrt(normalizedAmount(value, maxAbs));
+}
+
+function differenceHue(value) {
+  return value < 0 ? -1 : (value > 0 ? 1 : 0);
+}
+
+function differencePresentationAlpha(value, maxAbs, confidence) {
+  if (value === 0) {
+    return 0;
+  }
+  return Math.max(sqrtNormalizedAmount(value, maxAbs) * confidence, 0.22);
+}
+
+function kernelDisplayMax(upload, width, height) {
+  let maxAbs = 0;
+  for (let gridY = 0; gridY < height; gridY += 1) {
+    for (let gridX = 0; gridX < width; gridX += 1) {
+      maxAbs = Math.max(maxAbs, Math.abs(kernelAverage(upload, width, height, gridX, gridY)));
+    }
+  }
+  return maxAbs;
+}
+
+function assertSparseDisplayNormalization() {
+  const width = 7;
+  const height = 3;
+  const sparseUpload = new Float32Array(width * height);
+  sparseUpload[1 * width + 1] = 1;
+  sparseUpload[1 * width + 4] = 3;
+  sparseUpload[1 * width + 5] = 12;
+  const rawMaxAbs = 12;
+  const singletonAverage = kernelAverage(sparseUpload, width, height, 1, 1);
+  const peakAverage = kernelAverage(sparseUpload, width, height, 5, 1);
+  const displayMax = kernelDisplayMax(sparseUpload, width, height);
+  const legacySingletonAlpha = normalizedAmount(singletonAverage, rawMaxAbs);
+  const legacyPeakAlpha = normalizedAmount(peakAverage, rawMaxAbs);
+  const legibilityThreshold = 0.2;
+
+  assert.ok(Math.abs(singletonAverage - (1 / 9)) < 1e-7, 'sparse singleton should keep one occupied texel in the clamped 3x3 average');
+  assert.ok(Math.abs(peakAverage - (15 / 9)) < 1e-7, 'sparse peak should include the documented 12+3 neighborhood sum');
+  assert.ok(Math.abs(displayMax - (15 / 9)) < 1e-7, 'display max should be the maximum clamped 3x3 average');
+  assert.ok(Math.abs(legacySingletonAlpha - (1 / 108)) < 1e-12, 'legacy sparse singleton alpha should be 0.009259...');
+  assert.ok(Math.abs(legacyPeakAlpha - (15 / 108)) < 1e-12, 'legacy sparse peak alpha should be 0.138889...');
+  assert.ok(legacySingletonAlpha < legibilityThreshold, 'legacy singleton must fail the legibility predicate');
+  assert.ok(legacyPeakAlpha < legibilityThreshold, 'legacy peak must fail the legibility predicate');
+
+  const sparsePayload = explorerSceneFixture({
+    query: Object.assign({}, explorerSceneFixture().query, {lens: 'overview', event: 'kills'}),
+    grid: {
+      bucketSize: 8,
+      width,
+      height,
+      fields: ['cell', 'x', 'y', 'kills', 'deaths'],
+    },
+    layers: {
+      total: [['c1.1', 1, 1, 1, 2], ['c4.1', 4, 1, 3, 6], ['c5.1', 5, 1, 12, 8]],
+      me: [['c1.1', 1, 1, 0, 0], ['c4.1', 4, 1, 0, 0], ['c5.1', 5, 1, 0, 0]],
+      others: [['c1.1', 1, 1, 1, 2], ['c4.1', 4, 1, 3, 6], ['c5.1', 5, 1, 12, 8]],
+    },
+    comparison: {
+      fields: ['cell', 'x', 'y', 'killDelta', 'deathDelta', 'sample'],
+      bins: [],
+      personalSample: 0,
+      otherSample: 16,
+    },
+    summary: {rowsRead: 3, sourceRows: 3, personalSample: 0, otherSample: 16},
+  });
+  const sparseScene = new HeatmapExplorerScene(sparsePayload);
+  const sparseDense = sparseScene.dense('total', 'kills');
+  assert.strictEqual(sparseDense.maxAbs, rawMaxAbs, 'dense raw max must remain the unblurred maximum');
+  const sparseGl = fakeGl();
+  const sparseDom = makeDom(sparseGl);
+  const sparseRenderer = new HeatmapGlRenderer(sparseDom.root, sparseScene, {window: sparseDom.window});
+  sparseRenderer.mount();
+  assert.ok(sparseGl.calls.draws > 0, 'legacy renderer could call drawArrays even when sparse data was illegible');
+  const displayMaxUniform = sparseGl.calls.uniform1f.find(call => call.name === 'u_displayMax');
+  assert.ok(displayMaxUniform, 'ordinary rendering must pass a separate post-convolution display max');
+  assert.ok(Math.abs(displayMaxUniform.value - displayMax) < 1e-7, 'display max uniform should match the clamped 3x3 model');
+  assert.ok(Math.abs(sqrtNormalizedAmount(singletonAverage, displayMax) - 0.2581988897) < 1e-7, 'sparse singleton should use sqrt(1/15) presentation intensity');
+  assert.strictEqual(sqrtNormalizedAmount(peakAverage, displayMax), 1, 'sparse peak should remain full presentation intensity');
+  const sparseDeathDense = sparseScene.dense('total', 'deaths');
+  const deathDisplayMax = kernelDisplayMax(sparseDeathDense.values, width, height);
+  sparseRenderer.render({layer: 'total', channel: 'deaths'});
+  const deathDisplayMaxUniform = sparseGl.calls.uniform1f
+    .slice().reverse().find(call => call.name === 'u_displayMax');
+  assert.ok(deathDisplayMax > 0 && deathDisplayMax <= sparseDeathDense.maxAbs, 'deaths should retain a bounded post-convolution display range');
+  assert.ok(deathDisplayMaxUniform, 'deaths rendering must pass its own post-convolution display max');
+  assert.ok(Math.abs(deathDisplayMaxUniform.value - deathDisplayMax) < 1e-7, 'deaths display max uniform should match its clamped 3x3 model');
+  const sparseFragment = fragmentShaderSource(sparseGl);
+  assert.match(sparseFragment, /sqrt\(/, 'sparse ordinary rendering must apply sqrt presentation scaling');
+  sparseRenderer.destroy();
+}
+
+assertSparseDisplayNormalization();
+
 function cssAtRuleBlock(source, marker) {
   const start = source.indexOf(marker);
   assert.ok(start >= 0, `missing CSS block: ${marker}`);
@@ -865,12 +962,46 @@ assert.match(
 );
 assert.match(
   differenceFragment,
+  /float rawMaxAbs = max\(u_maxAbs, 0\.000001\);/,
+  'difference normalization should retain the raw signed maximum separately'
+);
+assert.match(
+  differenceFragment,
+  /sqrt\(clamp\(abs\(center\) \/ rawMaxAbs, 0\.0, 1\.0\)\)/,
+  'difference alpha should use sqrt presentation scaling on the signed center sample'
+);
+assert.match(
+  differenceFragment,
+  /float differenceHue = center < 0\.0 \? -1\.0 : \(center > 0\.0 \? 1\.0 : 0\.0\);/,
+  'difference hue should use the full signed palette endpoints while alpha carries magnitude'
+);
+assert.match(
+  differenceFragment,
+  /float alpha = u_palette == 2\n\s+\? \(center == 0\.0 \? 0\.0 : max\(amount \* confidence, 0\.22\)\)\n\s+: amount \* confidence;/,
+  'difference alpha should floor occupied pixels after confidence while preserving confidence multiplication'
+);
+assert.match(
+  differenceFragment,
+  /differenceBlueNeutralAmber\(differenceHue\)/,
+  'difference palette should receive the signed endpoint rather than the near-neutral raw ratio'
+);
+assert.strictEqual(differencePresentationAlpha(0, 1, 1), 0, 'zero difference should remain transparent');
+assert.strictEqual(differencePresentationAlpha(0.01, 1, 1), 0.22, 'tiny high-confidence difference should meet the alpha floor');
+assert.strictEqual(differencePresentationAlpha(-0.01, 1, 0.22), 0.22, 'tiny low-confidence difference should remain visibly muted at the floor');
+assert.strictEqual(differencePresentationAlpha(0.25, 1, 0.22), 0.22, 'low-confidence difference should retain its muted cap');
+assert.strictEqual(differencePresentationAlpha(0.25, 1, 1), 0.5, 'high-confidence difference alpha should retain sqrt magnitude growth');
+assert.ok(differencePresentationAlpha(0.25, 1, 1) > 0.22, 'difference alpha should grow above the floor with magnitude');
+assert.strictEqual(differenceHue(0), 0, 'zero difference should keep the neutral hue but remain transparent');
+assert.strictEqual(differenceHue(0.01), 1, 'positive difference should use the full warm endpoint');
+assert.strictEqual(differenceHue(-0.01), -1, 'negative difference should use the full cool endpoint');
+assert.match(
+  differenceFragment,
   /float confidence = u_palette == 2 \? clamp\(texture\(u_opacity, sampleUv\)\.r, 0\.0, 1\.0\) : 1\.0;/,
   'difference alpha should come from the dedicated opacity texture while non-difference layers remain fully opaque'
 );
 assert.match(
   differenceFragment,
-  /outputColor = vec4\(mix\(color, vec3\(1\.0\), contour\), amount \* confidence\);/,
+  /outputColor = vec4\(mix\(color, vec3\(1\.0\), contour\), alpha\);/,
   'difference alpha should combine normalized amount with confidence'
 );
 const signedDifferencePayload = explorerSceneFixture({

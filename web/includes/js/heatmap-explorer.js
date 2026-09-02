@@ -1343,6 +1343,7 @@
       + 'uniform sampler2D u_opacity;\n'
       + 'uniform vec2 u_gridSize;\n'
       + 'uniform float u_maxAbs;\n'
+      + 'uniform float u_displayMax;\n'
       + 'uniform int u_palette;\n'
       + 'uniform int u_contours;\n'
       + 'in vec2 v_uv;\n'
@@ -1366,15 +1367,23 @@
       + '  }\n'
       + '  float center = texture(u_density, sampleUv).r;\n'
       + '  float value = u_palette == 2 ? center : sum / 9.0;\n'
-      + '  float amount = clamp(abs(value) / max(u_maxAbs, 0.000001), 0.0, 1.0);\n'
+      + '  float rawMaxAbs = max(u_maxAbs, 0.000001);\n'
+      + '  float displayMax = max(u_displayMax, 0.000001);\n'
+      + '  float amount = u_palette == 2\n'
+      + '    ? sqrt(clamp(abs(center) / rawMaxAbs, 0.0, 1.0))\n'
+      + '    : sqrt(clamp(abs(value) / displayMax, 0.0, 1.0));\n'
       + '  float confidence = u_palette == 2 ? clamp(texture(u_opacity, sampleUv).r, 0.0, 1.0) : 1.0;\n'
-      + '  vec3 color = u_palette == 2 ? differenceBlueNeutralAmber(clamp(value / max(u_maxAbs, 0.000001), -1.0, 1.0))\n'
+      + '  float differenceHue = center < 0.0 ? -1.0 : (center > 0.0 ? 1.0 : 0.0);\n'
+      + '  float alpha = u_palette == 2\n'
+      + '    ? (center == 0.0 ? 0.0 : max(amount * confidence, 0.22))\n'
+      + '    : amount * confidence;\n'
+      + '  vec3 color = u_palette == 2 ? differenceBlueNeutralAmber(differenceHue)\n'
       + '    : (u_palette == 1 ? cyanBlue(amount) : amberOrange(amount));\n'
       + '  float contour = 0.0;\n'
       + '  if (u_contours == 1) {\n'
       + '    contour = step(0.245, amount) * 0.10 + step(0.495, amount) * 0.10 + step(0.745, amount) * 0.10;\n'
       + '  }\n'
-      + '  outputColor = vec4(mix(color, vec3(1.0), contour), amount * confidence);\n'
+      + '  outputColor = vec4(mix(color, vec3(1.0), contour), alpha);\n'
       + '}\n';
 
     var vertex = null;
@@ -1437,6 +1446,7 @@
       var uniforms = {
         gridSize: gl.getUniformLocation(program, 'u_gridSize'),
         maxAbs: gl.getUniformLocation(program, 'u_maxAbs'),
+        displayMax: gl.getUniformLocation(program, 'u_displayMax'),
         palette: gl.getUniformLocation(program, 'u_palette'),
         contours: gl.getUniformLocation(program, 'u_contours'),
         density: gl.getUniformLocation(program, 'u_density'),
@@ -1501,6 +1511,29 @@
     return this._opaqueUpload;
   };
 
+  HeatmapGlRenderer.prototype._displayMaxFor = function (layer, dense) {
+    if (layer === 'difference') {
+      return dense.maxAbs;
+    }
+    var width = this.scene.grid.width;
+    var height = this.scene.grid.height;
+    var maxAbs = 0;
+    for (var gridY = 0; gridY < height; gridY += 1) {
+      for (var gridX = 0; gridX < width; gridX += 1) {
+        var sum = 0;
+        for (var offsetY = -1; offsetY <= 1; offsetY += 1) {
+          for (var offsetX = -1; offsetX <= 1; offsetX += 1) {
+            var sampleX = Math.max(0, Math.min(width - 1, gridX + offsetX));
+            var sampleY = Math.max(0, Math.min(height - 1, gridY + offsetY));
+            sum += dense.values[sampleY * width + sampleX];
+          }
+        }
+        maxAbs = Math.max(maxAbs, Math.abs(sum / 9.0));
+      }
+    }
+    return maxAbs;
+  };
+
   HeatmapGlRenderer.prototype._readyAfterFrame = function (dense) {
     if (this._ready || dense.occupied.length === 0) {
       return;
@@ -1534,6 +1567,7 @@
       var dense = this.scene.dense(next.layer, next.channel);
       var upload = dense.values;
       var opacityUpload = this._opacityUploadFor(dense.values.length, next.layer, dense);
+      var displayMax = this._displayMaxFor(next.layer, dense);
       var gl = this._gl;
       gl.useProgram(this._program);
       gl.bindBuffer(gl.ARRAY_BUFFER, this._buffer);
@@ -1563,6 +1597,9 @@
       }
       if (this._uniforms.maxAbs !== null) {
         gl.uniform1f(this._uniforms.maxAbs, dense.maxAbs);
+      }
+      if (this._uniforms.displayMax !== null) {
+        gl.uniform1f(this._uniforms.displayMax, displayMax);
       }
       if (this._uniforms.palette !== null) {
         gl.uniform1i(this._uniforms.palette, next.layer === 'difference' ? 2 : (next.channel === 'deaths' ? 1 : 0));
