@@ -17,6 +17,33 @@ const projection = context.module.exports.HeatmapProjection;
 assert.ok(projection, 'heatmap projection helpers should be exportable for smoke tests');
 const adminPayload = context.module.exports.HeatmapAdminPayload;
 assert.ok(adminPayload, 'heatmap admin payload helper should be exportable for smoke tests');
+const adminGeometry = context.module.exports.HeatmapAdminGeometry;
+assert.ok(adminGeometry, 'heatmap admin geometry helpers should be exportable for responsive calibration drags');
+assert.deepStrictEqual(
+  Array.from(adminGeometry.offsetDelta(10, 20, {width: 640, height: 512}, 1280, 1024, 4, 0)),
+  [80, 160],
+  'responsive drag should convert CSS movement into native canvas offsets'
+);
+assert.deepStrictEqual(
+  Array.from(adminGeometry.offsetDelta(10, 20, {width: 640, height: 512}, 1280, 1024, 4, 1)),
+  [160, -80],
+  'responsive drag should unrotate native canvas offsets before updating calibration'
+);
+assert.deepStrictEqual(
+  Array.from(adminGeometry.canvasDelta(10, 20, {width: 1280, height: 1024}, 1280, 1024)),
+  [10, 20],
+  'native-size display should preserve the client drag delta'
+);
+assert.deepStrictEqual(
+  Array.from(adminGeometry.canvasDelta(10, 20, {width: 640, height: 2048}, 1280, 1024)),
+  [20, 10],
+  'responsive drag should preserve independent horizontal and vertical scale factors'
+);
+assert.deepStrictEqual(
+  Array.from(adminGeometry.canvasDelta(10, 20, {width: 0, height: 0}, 1280, 1024)),
+  [12800, 20480],
+  'zero display rectangle dimensions should stay finite for a safe drag result'
+);
 const original = {x: 17, y: -29};
 
 for (let steps = 0; steps < 4; steps += 1) {

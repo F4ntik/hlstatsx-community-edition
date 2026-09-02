@@ -407,7 +407,13 @@ function heatmap_admin_preview_payload(PDO $pdo, array $request, array $storedCo
     }
 
     try {
-        $scene = heatmap_build_scene($pdo, heatmap_admin_preview_query($request, $config, $game, $map), $config, $image);
+        $scene = heatmap_build_scene(
+            $pdo,
+            heatmap_admin_preview_query($request, $config, $game, $map),
+            $config,
+            $image,
+            array('exact' => true, 'exactLimit' => HEATMAP_EXACT_PREVIEW_LIMIT)
+        );
     } catch (HeatmapAdminException $exception) {
         throw $exception;
     } catch (InvalidArgumentException $exception) {
@@ -420,8 +426,9 @@ function heatmap_admin_preview_payload(PDO $pdo, array $request, array $storedCo
     $scene['map']['image'] = $renderImage;
     $scene['image'] = $renderImage;
     $scene['projection'] = heatmap_projection_config($config);
+    $requestedRenderer = $request['renderer'] ?? 'thermal';
     $scene['renderer'] = array(
-        'mode' => heatmap_clean_renderer_mode($request['renderer'] ?? 'thermal'),
+        'mode' => $requestedRenderer === 'points' ? 'points' : heatmap_clean_renderer_mode($requestedRenderer),
         'normalization' => heatmap_clean_normalization($request['normalization'] ?? 'sqrt'),
         'alpha' => array('min' => 0.05, 'max' => 0.82),
     );

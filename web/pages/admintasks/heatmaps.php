@@ -75,6 +75,7 @@ $adminLanguage = current_lang();
 				<select data-heatmap-number="renderer">
 					<option value="thermal">thermal</option>
 					<option value="semantic">semantic</option>
+					<option value="points">points</option>
 				</select>
 			</label>
 			<label><?php echo eHtml(t('admin.task.heatmaps.normalization')); ?>

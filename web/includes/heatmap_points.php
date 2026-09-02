@@ -21,6 +21,7 @@ const HEATMAP_SCENE_CACHE_SCHEMA = 2;
 const HEATMAP_SCENE_BUCKET_VERSION = 1;
 const HEATMAP_PAYLOAD_CACHE_MAX_AGE = 172800;
 const HEATMAP_PAYLOAD_CACHE_PRUNE_LIMIT = 32;
+const HEATMAP_EXACT_PREVIEW_LIMIT = 20000;
 
 function heatmap_explorer_mode(array $options): int
 {
@@ -1104,6 +1105,11 @@ function heatmap_scene_prepare_state(array &$state): void
     $width = heatmap_scene_dimension($state['image']['width'] ?? null);
     $height = heatmap_scene_dimension($state['image']['height'] ?? null);
     $bucketSize = heatmap_scene_bucket_size($width, $height);
+    $options = is_array($state['options'] ?? null) ? $state['options'] : array();
+    $exactLimit = heatmap_try_canonical_integer($options['exactLimit'] ?? HEATMAP_EXACT_PREVIEW_LIMIT);
+    $exactLimit = $exactLimit === null
+        ? HEATMAP_EXACT_PREVIEW_LIMIT
+        : max(1, min(HEATMAP_EXACT_PREVIEW_LIMIT, $exactLimit));
     $floorCounts = array();
     foreach ($floors as $configuredFloor) {
         $floorCounts[$configuredFloor['id']] = 0;
@@ -1150,6 +1156,13 @@ function heatmap_scene_prepare_state(array &$state): void
         'totalBins' => array(),
         'meBins' => array(),
     );
+    if (($options['exact'] ?? false) === true) {
+        $state['_scene']['exact'] = array(
+            'limit' => $exactLimit,
+            'overflow' => false,
+            'points' => array(),
+        );
+    }
 }
 
 function heatmap_scene_add_bin(array &$bins, string $cellId, int $gridX, int $gridY, string $channel): void
@@ -1164,6 +1177,26 @@ function heatmap_scene_add_bin(array &$bins, string $cellId, int $gridX, int $gr
         );
     }
     $bins[$cellId][$channel]++;
+}
+
+function heatmap_scene_add_exact_point(array &$scene, array $row, array $projected, string $channel, string $participant): void
+{
+    if (!isset($scene['exact'])) {
+        return;
+    }
+    if ($scene['exact']['overflow']) {
+        return;
+    }
+    if (count($scene['exact']['points']) >= $scene['exact']['limit']) {
+        $scene['exact']['points'] = array();
+        $scene['exact']['overflow'] = true;
+        return;
+    }
+    $scene['exact']['points'][] = array(
+        (int) $row[$participant . 'X'], (int) $row[$participant . 'Y'], (int) $row[$participant . 'Z'],
+        (int) $projected['x'], (int) $projected['y'],
+        $channel, $participant, (bool) $projected['in_bounds'],
+    );
 }
 
 function heatmap_scene_accumulate_contribution(array &$scene, array $row, string $channel, string $participant): void
@@ -1218,8 +1251,14 @@ function heatmap_scene_accumulate_contribution(array &$scene, array $row, string
     $point = heatmap_transform_point(array('pos_x' => $x['value'], 'pos_y' => $y['value']), $scene['config']);
     $projectedX = $point['x'];
     $projectedY = $point['y'];
-    if ($projectedX < 0 || $projectedY < 0
-        || $projectedX >= $scene['image']['width'] || $projectedY >= $scene['image']['height']) {
+    $inBounds = $projectedX >= 0 && $projectedY >= 0
+        && $projectedX < $scene['image']['width'] && $projectedY < $scene['image']['height'];
+    heatmap_scene_add_exact_point($scene, array(
+        $participant . 'X' => $x['value'],
+        $participant . 'Y' => $y['value'],
+        $participant . 'Z' => $z['value'],
+    ), array('x' => $projectedX, 'y' => $projectedY, 'in_bounds' => $inBounds), $channel, $participant);
+    if (!$inBounds) {
         $scene['outOfBounds']++;
         return;
     }
@@ -1491,7 +1530,7 @@ function heatmap_finalize_scene(array $state): array
     $map = rawurlencode($scene['query']['map']);
     $excludedSuicides = heatmap_scene_count($state['excludedSuicides'] ?? 0);
 
-    return array(
+    $response = array(
         'schemaVersion' => HEATMAP_V2_SCHEMA,
         'state' => $stateName,
         'query' => $scene['query'],
@@ -1545,12 +1584,21 @@ function heatmap_finalize_scene(array $state): array
             'thumbnail' => './hlstatsimg/games/' . $game . '/heatmaps/' . $map . '-kill-thumb.jpg',
         ),
     );
+    if (isset($scene['exact'])) {
+        $response['exact'] = array(
+            'fields' => array('x', 'y', 'z', 'projectedX', 'projectedY', 'channel', 'participant', 'inBounds'),
+            'points' => $scene['exact']['points'],
+            'overflow' => $scene['exact']['overflow'],
+        );
+    }
+
+    return $response;
 }
 
-function heatmap_build_scene(PDO $pdo, array $query, array $config, array $image): array
+function heatmap_build_scene(PDO $pdo, array $query, array $config, array $image, array $options = array()): array
 {
     $descriptor = heatmap_build_scene_sql($query, $config);
-    $state = array('query' => $query, 'config' => $config, 'image' => $image);
+    $state = array('query' => $query, 'config' => $config, 'image' => $image, 'options' => $options);
     $bufferedAttribute = defined('PDO::MYSQL_ATTR_USE_BUFFERED_QUERY')
         ? constant('PDO::MYSQL_ATTR_USE_BUFFERED_QUERY')
         : null;

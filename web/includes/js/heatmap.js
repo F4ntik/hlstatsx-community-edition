@@ -33,6 +33,30 @@ if (typeof module !== 'undefined' && module.exports) {
 	module.exports.HeatmapProjection = HeatmapProjection;
 }
 
+var HeatmapAdminGeometry = (function() {
+	function canvasDelta(clientDx, clientDy, rect, canvasWidth, canvasHeight) {
+		var width = Math.max(1, Number(rect.width) || 0);
+		var height = Math.max(1, Number(rect.height) || 0);
+		return [clientDx * canvasWidth / width, clientDy * canvasHeight / height];
+	}
+
+	function offsetDelta(clientDx, clientDy, rect, canvasWidth, canvasHeight, projectionScale, rotateSteps) {
+		var nativeDelta = canvasDelta(clientDx, clientDy, rect, canvasWidth, canvasHeight);
+		var moved = HeatmapProjection.unrotate(
+			nativeDelta[0] * projectionScale,
+			nativeDelta[1] * projectionScale,
+			rotateSteps
+		);
+		return [moved.x, moved.y];
+	}
+
+	return {canvasDelta: canvasDelta, offsetDelta: offsetDelta};
+}());
+
+if (typeof module !== 'undefined' && module.exports) {
+	module.exports.HeatmapAdminGeometry = HeatmapAdminGeometry;
+}
+
 var HeatmapAdminPayload = (function() {
 	function build(action, identity, controls, useCurrentControls, configHash) {
 		var payload = {
@@ -297,6 +321,49 @@ HeatmapCanvas.prototype.draw = function() {
 	}
 
 	ctx.drawImage(this._drawLayer(this.points, this.max, 'thermal'), 0, 0);
+};
+
+HeatmapCanvas.prototype.drawPoints = function(points) {
+	var ctx = this.ctx;
+	var i;
+	var point;
+	var x;
+	var y;
+	var inBounds;
+	ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+	for (i = 0; i < points.length; i++) {
+		point = points[i];
+		x = Number(point[3]);
+		y = Number(point[4]);
+		inBounds = point[7] === true;
+		if (!isFinite(x) || !isFinite(y)) {
+			continue;
+		}
+		ctx.strokeStyle = point[5] === 'deaths' ? '#007cff' : '#ff4d00';
+		ctx.fillStyle = ctx.strokeStyle;
+		ctx.lineWidth = 1.5;
+		if (inBounds) {
+			ctx.beginPath();
+			ctx.arc(x, y, 3, 0, Math.PI * 2, true);
+			ctx.fill();
+			ctx.beginPath();
+			ctx.moveTo(x - 5, y);
+			ctx.lineTo(x + 5, y);
+			ctx.moveTo(x, y - 5);
+			ctx.lineTo(x, y + 5);
+			ctx.stroke();
+		} else {
+			x = Math.max(3, Math.min(this.canvas.width - 3, x));
+			y = Math.max(3, Math.min(this.canvas.height - 3, y));
+			ctx.beginPath();
+			ctx.moveTo(x - 4, y - 4);
+			ctx.lineTo(x + 4, y + 4);
+			ctx.moveTo(x + 4, y - 4);
+			ctx.lineTo(x - 4, y + 4);
+			ctx.stroke();
+		}
+	}
+	return this;
 };
 
 function setupInlineHeatmaps() {
@@ -1417,7 +1484,11 @@ function setupHeatmapAdminWizard(wizard) {
 				side = Math.sqrt(canvas.width * canvas.height);
 				radius = points.length <= 5 ? 46 : Math.max(24, Math.min(54, Math.round(side / 38)));
 				lastGuideRadius = radius + Math.round(radius * 0.55);
-				renderer.radius(radius, Math.round(radius * 0.55)).data(points, payload.max || 1, payload.renderer).draw();
+				if (payload.renderer && payload.renderer.mode === 'points') {
+					renderer.drawPoints(payload.exact && Array.isArray(payload.exact.points) ? payload.exact.points : []);
+				} else {
+					renderer.radius(radius, Math.round(radius * 0.55)).data(points, payload.max || 1, payload.renderer).draw();
+				}
 				canvas.style.display = overlayVisible ? 'block' : 'none';
 				updateGuides();
 			};
@@ -1648,13 +1719,17 @@ function setupHeatmapAdminWizard(wizard) {
 	}
 	if (canvas) {
 		canvas.onmousedown = function(event) {
+			var rect = canvas.getBoundingClientRect();
 			dragState = {
 				x: event.clientX,
 				y: event.clientY,
 				xoffset: intConfig('xoffset'),
 				yoffset: intConfig('yoffset'),
 				scale: scaleConfig(),
-				rotate: rotationSteps()
+				rotate: rotationSteps(),
+				rect: {width: rect.width, height: rect.height},
+				canvasWidth: canvas.width,
+				canvasHeight: canvas.height
 			};
 			canvas.className = 'heatmap-overlay is-dragging';
 			if (event.preventDefault) {
@@ -1668,11 +1743,11 @@ function setupHeatmapAdminWizard(wizard) {
 			if (!dragState) {
 				return;
 			}
-			dx = (event.clientX - dragState.x) * dragState.scale;
-			dy = (event.clientY - dragState.y) * dragState.scale;
-			moved = unrotateCoordinate(dx, dy, dragState.rotate);
-			setNumberField('xoffset', dragState.xoffset + moved.x);
-			setNumberField('yoffset', dragState.yoffset + moved.y);
+			dx = event.clientX - dragState.x;
+			dy = event.clientY - dragState.y;
+			moved = HeatmapAdminGeometry.offsetDelta(dx, dy, dragState.rect, dragState.canvasWidth, dragState.canvasHeight, dragState.scale, dragState.rotate);
+			setNumberField('xoffset', dragState.xoffset + moved[0]);
+			setNumberField('yoffset', dragState.yoffset + moved[1]);
 			schedulePreview();
 		};
 		canvas.onmouseup = function() {

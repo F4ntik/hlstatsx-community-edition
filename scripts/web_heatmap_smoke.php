@@ -1416,12 +1416,13 @@ function scene_row(array $overrides = array()): array
     ), $overrides);
 }
 
-function scene_payload(array $rows, array $query = array(), array $config = array(), array $image = array()): array
+function scene_payload(array $rows, array $query = array(), array $config = array(), array $image = array(), array $options = array()): array
 {
     $state = array(
         'query' => scene_query($query),
         'config' => scene_config($config),
         'image' => scene_image($image),
+        'options' => $options,
         'excludedSuicides' => 2,
     );
     foreach ($rows as $row) {
@@ -1430,6 +1431,68 @@ function scene_payload(array $rows, array $query = array(), array $config = arra
 
     return heatmap_finalize_scene($state);
 }
+
+$exactConfig = scene_config(array('xoffset' => 12, 'yoffset' => 64, 'scale' => 2));
+$exactScene = scene_payload(array(
+    scene_row(array('attackerX' => '10', 'attackerY' => '20', 'attackerZ' => '30', 'victimX' => '12', 'victimY' => '4', 'victimZ' => '15')),
+), scene_query(array('event' => 'both')), $exactConfig, scene_image(), array('exact' => true, 'exactLimit' => 20000));
+$exact = $exactScene['exact'];
+assert_same(array('x', 'y', 'z', 'projectedX', 'projectedY', 'channel', 'participant', 'inBounds'), $exact['fields'], 'exact preview should publish its stable tuple fields');
+assert_same(array(10, 20, 30, 11, 42, 'kills', 'attacker', true), $exact['points'][0], 'exact preview should retain the selected attacker kill coordinate after projection');
+assert_same(array(12, 4, 15, 12, 34, 'deaths', 'victim', true), $exact['points'][1], 'exact preview should retain the selected victim death coordinate after projection');
+
+$sceneWithoutExact = scene_payload(array(scene_row()), scene_query(array('event' => 'kills')));
+assert_same(false, array_key_exists('exact', $sceneWithoutExact), 'public scene construction should omit raw exact coordinates unless explicitly requested');
+
+$floorRejectedExact = scene_payload(
+    array(scene_row(array('attackerZ' => '5', 'victimZ' => '15'))),
+    scene_query(array('event' => 'both', 'floor' => 'lower')),
+    scene_config(),
+    scene_image(),
+    array('exact' => true, 'exactLimit' => 20000)
+);
+assert_same(1, count($floorRejectedExact['exact']['points']), 'exact preview should collect only contributions admitted by the selected floor');
+assert_same('attacker', $floorRejectedExact['exact']['points'][0][6], 'floor-filtered exact preview should retain the matching participant');
+
+$oobExact = scene_payload(
+    array(scene_row(array('attackerX' => '130', 'attackerY' => '8', 'attackerZ' => '5'))),
+    scene_query(array('event' => 'kills')),
+    scene_config(),
+    scene_image(),
+    array('exact' => true, 'exactLimit' => 20000)
+);
+assert_same(false, $oobExact['exact']['points'][0][7], 'exact preview should retain an out-of-bounds point with an explicit flag');
+
+$duplicateExact = scene_payload(
+    array(scene_row(), scene_row(array('eventId' => '2'))),
+    scene_query(array('event' => 'kills')),
+    scene_config(),
+    scene_image(),
+    array('exact' => true, 'exactLimit' => 2)
+);
+assert_same(2, count($duplicateExact['exact']['points']), 'exact preview should retain duplicate combat events up to its accepted limit');
+assert_same(false, $duplicateExact['exact']['overflow'], 'exact preview should accept a point count equal to its limit');
+
+$overflowScene = scene_payload(
+    array(scene_row(), scene_row(array('eventId' => '2')), scene_row(array('eventId' => '3'))),
+    scene_query(array('event' => 'kills')),
+    scene_config(),
+    scene_image(),
+    array('exact' => true, 'exactLimit' => 2)
+);
+assert_same(true, $overflowScene['exact']['overflow'], 'exact preview should fail closed after its bounded response limit');
+assert_same(array(), $overflowScene['exact']['points'], 'exact preview overflow should not expose a truncated coordinate subset');
+
+$weakExact = scene_payload(
+    array(scene_row(array('eventId' => '1', 'attackerX' => '8')), scene_row(array('eventId' => '2', 'attackerX' => '130'))),
+    scene_query(array('event' => 'kills')),
+    scene_config(),
+    scene_image(),
+    array('exact' => true, 'exactLimit' => 20000)
+);
+assert_same('weak_projection', $weakExact['state'], 'weak projection fixture should clear its grid layers');
+assert_same(array(), $weakExact['layers']['total'], 'weak projection should still fail closed for public grid layers');
+assert_same(2, count($weakExact['exact']['points']), 'weak projection should retain exact preview rows for calibration');
 
 function scene_layer_row(array $rows, string $cell): array
 {
