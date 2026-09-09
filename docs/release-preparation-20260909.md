@@ -9,12 +9,17 @@ development worktrees and their uncommitted changes are preserved separately.
 - Runtime: mysqlclient ping compatibility, connection ownership during online
   transactions, InnoDB runtime tables, game-scoped player identity, payload-safe
   PROXY parsing, bounded ingress/forward queues and drain-on-stop handling.
+  Overflow messages are coalesced over five-second intervals with exact loss
+  counters, avoiding synchronous logging for every dropped packet.
 - Python 3.10: storage timeout handling now reaches the fail-closed shutdown path.
 - Administration: CSRF before mutation, registry access levels before dispatch,
   POST confirmation for optimization, modern password hashes, strict legacy MD5
   upgrade, rotating password-free sessions and database-backed session revocation.
+  Public routes also recheck password changes, session expiry and current access
+  levels before authorizing IP search.
 - Updater: HTTP is denied; the trusted CLI initializes its request context,
   applies migration 83 and checks the resulting database version before success.
+  A shutdown guard makes legacy bare-exit failures return a nonzero status.
 - Heatmaps: base uploads must match existing floor-image dimensions before
   staging any files. The upgrade archive preserves installed images/calibration;
   only fresh installs receive the native map defaults and matching seeds.
@@ -28,7 +33,7 @@ are visual references, not automatic walkability or floor reconstruction.
 ## Verification already performed during preparation
 
 - Python 3.10: 309 product tests, 61 operational-tool tests, 95 replay-helper
-  tests and 99 proxy tests passed. The two opt-in MariaDB tests passed separately
+  tests and 101 proxy tests passed. The two opt-in MariaDB tests passed separately
   with the current source mounted into an isolated worker container.
 - Proxy Ruff, Black and Mypy passed using the CI dependency versions. Both
   heatmap JavaScript smoke commands and the PHP heatmap/admin checks passed.
@@ -40,7 +45,9 @@ are visual references, not automatic walkability or floor reconstruction.
   transaction rollback were checked in separate synthetic databases.
 - HTTP checks covered legacy login upgrades, special-character passwords,
   session rotation, missing/invalid CSRF, level-80 reset denial, strict magic-hash
-  rejection, heatmap preview/upload and password-change revocation.
+  rejection, heatmap preview/upload and password-change revocation. Direct public
+  IP-search requests were denied after password change, downgrade and expiry;
+  all three stale-session bypasses were reproduced before the fix.
 - An incompatible base-image upload returned `400 floor_image_size` while both
   existing image hashes remained unchanged. Upgrade overlay preserved live
   config and the old map-image pair. Browser checks covered the Russian home
