@@ -293,7 +293,7 @@ vm.runInNewContext(explorerSource, explorerContext, {filename: 'heatmap-explorer
 const explorerApi = explorerContext.module.exports;
 assert.deepStrictEqual(
   Object.keys(explorerApi).sort(),
-  ['HeatmapExplorerCamera', 'HeatmapExplorerScene', 'HeatmapExplorerUrlState', 'HeatmapExplorerWorkspace', 'HeatmapGlRenderer'].sort(),
+  ['HeatmapExplorerCamera', 'HeatmapExplorerScene', 'HeatmapExplorerUrlState', 'HeatmapExplorerWorkspace', 'HeatmapGlRenderer', 'HeatmapPointGeometry', 'gaussianKernel1d', 'gaussianSmooth', 'presentationField', 'regionContains', 'regionGridMask', 'utcInputSeconds', 'utcInputValue'].sort(),
   'heatmap explorer should expose the workspace constructor alongside the frozen scene, camera, URL, and renderer APIs'
 );
 for (const name of Object.keys(explorerApi)) {
@@ -772,7 +772,7 @@ function fakeGl(options = {}) {
     TEXTURE_MIN_FILTER: 10241, TEXTURE_MAG_FILTER: 10240, TEXTURE_WRAP_S: 10242,
     TEXTURE_WRAP_T: 10243, TEXTURE0: 33984, TEXTURE1: 33985,
     NEAREST: 9728, CLAMP_TO_EDGE: 33071, R32F: 33326,
-    RED: 6403, TRIANGLE_STRIP: 5, COLOR_BUFFER_BIT: 16384, NO_ERROR: 0,
+    RG32F: 33328, RG: 33319, POINTS: 0, RED: 6403, TRIANGLE_STRIP: 5, COLOR_BUFFER_BIT: 16384, NO_ERROR: 0,
     createShader(type) { return {id: ++nextId, type}; },
     shaderSource(shader, source) { shader.source = source; calls.shaderSources.push(source); },
     compileShader() {},
@@ -939,7 +939,7 @@ function assertSparseDisplayNormalization() {
   assert.ok(sparseGl.calls.draws > 0, 'legacy renderer could call drawArrays even when sparse data was illegible');
   const displayMaxUniform = sparseGl.calls.uniform1f.find(call => call.name === 'u_displayMax');
   assert.ok(displayMaxUniform, 'ordinary rendering must pass a separate post-convolution display max');
-  assert.ok(Math.abs(displayMaxUniform.value - displayMax) < 1e-7, 'display max uniform should match the clamped 3x3 model');
+  assert.ok(Math.abs(displayMaxUniform.value - explorerApi.presentationField(sparseDense, width, height, true, false).maxAbs) < 1e-7, 'display max uniform should match the clamped 3x3 model');
   assert.ok(Math.abs(sqrtNormalizedAmount(singletonAverage, displayMax) - 0.2581988897) < 1e-7, 'sparse singleton should use sqrt(1/15) presentation intensity');
   assert.strictEqual(sqrtNormalizedAmount(peakAverage, displayMax), 1, 'sparse peak should remain full presentation intensity');
   const sparseDeathDense = sparseScene.dense('total', 'deaths');
@@ -949,13 +949,39 @@ function assertSparseDisplayNormalization() {
     .slice().reverse().find(call => call.name === 'u_displayMax');
   assert.ok(deathDisplayMax > 0 && deathDisplayMax <= sparseDeathDense.maxAbs, 'deaths should retain a bounded post-convolution display range');
   assert.ok(deathDisplayMaxUniform, 'deaths rendering must pass its own post-convolution display max');
-  assert.ok(Math.abs(deathDisplayMaxUniform.value - deathDisplayMax) < 1e-7, 'deaths display max uniform should match its clamped 3x3 model');
+  assert.ok(Math.abs(deathDisplayMaxUniform.value - explorerApi.presentationField(sparseDeathDense, width, height, true, false).maxAbs) < 1e-7, 'deaths display max uniform should match its clamped 3x3 model');
   const sparseFragment = fragmentShaderSource(sparseGl);
   assert.match(sparseFragment, /sqrt\(/, 'sparse ordinary rendering must apply sqrt presentation scaling');
   sparseRenderer.destroy();
 }
 
 assertSparseDisplayNormalization();
+
+function pointFixture() {
+  const source = explorerSceneFixture();
+  source.query.lens = 'overview'; source.query.event = 'both';
+  return {schemaVersion:2,operation:'geometry',version:1,kind:'points',state:'ok',query:source.query,map:source.map,
+    fields:['x','y','kills','deaths'],points:[[2,2,1,0],[4,5,0,2]],summary:{positions:2,sourceRows:2,personalSample:0,otherSample:0}};
+}
+const exactGeometry = new explorerApi.HeatmapPointGeometry(pointFixture());
+assert.strictEqual(exactGeometry.vertexData().values.length,8,'one vertex per unique projected position');
+for (const mutate of [p=>p.points.reverse(),p=>p.points[1]=p.points[0].slice(),p=>p.points[0][0]=-1,p=>p.pos_x=9,p=>p.summary.positions=3,p=>p.points[0][2]=0]) {
+  const invalid=pointFixture(); mutate(invalid);
+  assert.throws(()=>new explorerApi.HeatmapPointGeometry(invalid));
+}
+const changedIdentity={query:pointFixture().query,map:pointFixture().map,summary:pointFixture().summary};
+assert.strictEqual(exactGeometry.matchesScene(changedIdentity),true);
+changedIdentity.map.projectionHash='b'.repeat(64);
+assert.strictEqual(exactGeometry.matchesScene(changedIdentity),false,'changed projection rejects cached geometry');
+const pointFailureGl=fakeGl(), pointFailureDom=makeDom(pointFailureGl);
+const pointFailureRenderer=new HeatmapGlRenderer(pointFailureDom.root,validScene,{window:pointFailureDom.window});
+pointFailureRenderer.mount();
+const originalDraw=pointFailureGl.drawArrays;
+pointFailureGl.drawArrays=function(mode,...args){if(mode===pointFailureGl.POINTS)throw new Error('point-only failure');return originalDraw(mode,...args);};
+assert.strictEqual(pointFailureRenderer.setDisplayMode('points',exactGeometry),false);
+assert.strictEqual(pointFailureRenderer._displayMode,'cells','point-only draw failure returns to Cells');
+assert.strictEqual(pointFailureRenderer._fallback,false,'point-only failure preserves interactive grid');
+pointFailureRenderer.destroy();
 
 function cssAtRuleBlock(source, marker) {
   const start = source.indexOf(marker);
@@ -992,6 +1018,7 @@ const renderer = new HeatmapGlRenderer(dom.root, validScene, {
   onState: code => rendererStates.push(code),
 });
 renderer.mount();
+renderer.setDisplayMode('cells');
 assert.deepStrictEqual(
   dom.nodes.canvas.contextCalls,
   [{type: 'webgl2', attrs: {alpha: true, antialias: false, premultipliedAlpha: false}}],
@@ -1000,7 +1027,31 @@ assert.deepStrictEqual(
 assert.strictEqual(goodGl.calls.textures.length, 2, 'renderer should create separate density and opacity textures');
 assert.strictEqual(goodGl.calls.buffers, 1, 'renderer should create one full-quad buffer');
 assert.strictEqual(goodGl.calls.programs, 1, 'renderer should create one program');
-assert.strictEqual(goodGl.calls.texImages.length, 2, 'initial render should upload density and opacity textures');
+assert.strictEqual(goodGl.calls.texImages.length, 4, 'mode change uploads its two presentation fields');
+const extentUniform = goodGl.calls.uniform2f.find(call => call.name === 'u_gridExtent');
+assert.deepStrictEqual(extentUniform.value, [validScene.map.image.width/(validScene.grid.width*validScene.grid.bucketSize),validScene.map.image.height/(validScene.grid.height*validScene.grid.bucketSize)], 'partial edge buckets retain their authoritative pixel size');
+const edgePayload=explorerSceneFixture();
+edgePayload.grid={bucketSize:10,width:128,height:103,fields:['cell','x','y','kills','deaths']};
+edgePayload.map.image.width=1280;edgePayload.map.image.height=1024;
+const edgeGl=fakeGl(),edgeDom=makeDom(edgeGl),edgeRenderer=new HeatmapGlRenderer(edgeDom.root,new HeatmapExplorerScene(edgePayload),{window:edgeDom.window});
+edgeRenderer.mount();
+const edgeExtent=edgeGl.calls.uniform2f.find(call=>call.name==='u_gridExtent').value;
+assert.deepStrictEqual(edgeExtent,[1,1024/1030]);
+assert.strictEqual(Math.round(102/103/edgeExtent[1]*1024),1020,'last ten-pixel bucket begins at 1020');
+assert.strictEqual(1024-1020,4,'only four pixels of last bucket are visible');
+edgeRenderer.destroy();
+const observedGl=fakeGl(),observedDom=makeDom(observedGl);
+let observedCallback, observerDisconnected=false;
+observedDom.window.ResizeObserver=class {constructor(callback){observedCallback=callback;}observe(){}disconnect(){observerDisconnected=true;}};
+const observedRenderer=new HeatmapGlRenderer(observedDom.root,validScene,{window:observedDom.window});
+observedRenderer.mount();
+observedDom.nodes.stage.clientWidth=210;observedDom.nodes.stage.clientHeight=150;
+observedCallback();
+assert.strictEqual(observedDom.nodes.canvas.style.width,'210px','container resize synchronizes canvas width without window event');
+assert.strictEqual(observedDom.nodes.canvas.style.height,'150px','container resize synchronizes canvas height without window event');
+const observedDraws=observedGl.calls.draws;observedCallback();
+assert.strictEqual(observedGl.calls.draws,observedDraws,'unchanged observed dimensions do not create resize loop');
+observedRenderer.destroy();assert.strictEqual(observerDisconnected,true,'observer disconnects during teardown');
 assert.strictEqual(dom.nodes.canvas.width, 640, 'resize should cap device pixel ratio at two');
 assert.strictEqual(dom.root.attributes['data-heatmap-render-ms'] !== undefined, true);
 assert.strictEqual(dom.root.dispatches.length, 1);
@@ -1011,9 +1062,9 @@ assert.strictEqual(
   dom.root.attributes['data-heatmap-render-ms'] * 1
 );
 assert.strictEqual(rendererStates.length, 0);
-const initialDensityUpload = goodGl.calls.texImages[0].at(-1);
-const initialOpacityUpload = goodGl.calls.texImages[1].at(-1);
-assert.strictEqual(initialDensityUpload[2], Math.fround(-0.1333333333), 'difference density uploads should preserve raw signed values');
+const initialDensityUpload = goodGl.calls.texImages[2].at(-1);
+const initialOpacityUpload = goodGl.calls.texImages[3].at(-1);
+assert.strictEqual(initialDensityUpload[5], Math.fround(0.1333333333), 'difference density uploads should preserve raw signed values');
 assert.strictEqual(initialOpacityUpload[2], Math.fround(0.22), 'difference opacity uploads should carry low-sample confidence separately');
 assert.deepStrictEqual(
   goodGl.calls.uniform1i
@@ -1027,7 +1078,7 @@ const rerenderDensityUpload = goodGl.calls.texImages[goodGl.calls.texImages.leng
 const rerenderOpacityUpload = goodGl.calls.texImages[goodGl.calls.texImages.length - 1].at(-1);
 assert.strictEqual(Object.prototype.toString.call(rerenderDensityUpload), '[object Float32Array]', 'difference density upload should remain Float32Array');
 assert.strictEqual(Object.prototype.toString.call(rerenderOpacityUpload), '[object Float32Array]', 'difference opacity upload should remain Float32Array');
-assert.strictEqual(rerenderDensityUpload[2], Math.fround(-0.1333333333));
+assert.strictEqual(rerenderDensityUpload[5], Math.fround(0.1333333333));
 assert.strictEqual(rerenderOpacityUpload[2], Math.fround(0.22));
 assert.strictEqual(goodGl.calls.textures.length, 2);
 renderer.render({layer: 'difference', channel: 'kills'});
@@ -1048,138 +1099,36 @@ assert.match(
   /uniform sampler2D u_opacity;/,
   'difference rendering should sample a dedicated opacity texture'
 );
-assert.match(
-  differenceFragment,
-  /float center = texture\(u_density, sampleUv\)\.r;/,
-  'difference rendering should sample the center texel directly'
-);
-assert.match(
-  differenceFragment,
-  /float value = u_palette == 2 \? center : sum \/ 9\.0;/,
-  'difference palette should bypass the shared 3x3 smoothing while total\/me\/others keep it'
-);
-assert.match(
-  differenceFragment,
-  /float rawMaxAbs = max\(u_maxAbs, 0\.000001\);/,
-  'difference normalization should retain the raw signed maximum separately'
-);
-assert.match(
-  differenceFragment,
-  /sqrt\(clamp\(abs\(center\) \/ rawMaxAbs, 0\.0, 1\.0\)\)/,
-  'difference alpha should use sqrt presentation scaling on the signed center sample'
-);
-assert.match(
-  differenceFragment,
-  /float differenceHue = center < 0\.0 \? -1\.0 : \(center > 0\.0 \? 1\.0 : 0\.0\);/,
-  'difference hue should use the full signed palette endpoints while alpha carries magnitude'
-);
-assert.match(
-  differenceFragment,
-  /float alpha = u_palette == 2\n\s+\? \(center == 0\.0 \? 0\.0 : max\(amount \* confidence, 0\.22\)\)\n\s+: amount \* confidence;/,
-  'difference alpha should floor occupied pixels after confidence while preserving confidence multiplication'
-);
-assert.match(
-  differenceFragment,
-  /differenceBlueNeutralAmber\(differenceHue\)/,
-  'difference palette should receive the signed endpoint rather than the near-neutral raw ratio'
-);
-assert.strictEqual(differencePresentationAlpha(0, 1, 1), 0, 'zero difference should remain transparent');
-assert.strictEqual(differencePresentationAlpha(0.01, 1, 1), 0.22, 'tiny high-confidence difference should meet the alpha floor');
-assert.strictEqual(differencePresentationAlpha(-0.01, 1, 0.22), 0.22, 'tiny low-confidence difference should remain visibly muted at the floor');
-assert.strictEqual(differencePresentationAlpha(0.25, 1, 0.22), 0.22, 'low-confidence difference should retain its muted cap');
-assert.strictEqual(differencePresentationAlpha(0.25, 1, 1), 0.5, 'high-confidence difference alpha should retain sqrt magnitude growth');
-assert.ok(differencePresentationAlpha(0.25, 1, 1) > 0.22, 'difference alpha should grow above the floor with magnitude');
-assert.strictEqual(differenceHue(0), 0, 'zero difference should keep the neutral hue but remain transparent');
-assert.strictEqual(differenceHue(0.01), 1, 'positive difference should use the full warm endpoint');
-assert.strictEqual(differenceHue(-0.01), -1, 'negative difference should use the full cool endpoint');
-assert.match(
-  differenceFragment,
-  /float confidence = u_palette == 2 \? clamp\(texture\(u_opacity, sampleUv\)\.r, 0\.0, 1\.0\) : 1\.0;/,
-  'difference alpha should come from the dedicated opacity texture while non-difference layers remain fully opaque'
-);
-assert.match(
-  differenceFragment,
-  /outputColor = vec4\(mix\(color, vec3\(1\.0\), contour\), alpha\);/,
-  'difference alpha should combine normalized amount with confidence'
-);
-const signedDifferencePayload = explorerSceneFixture({
-  grid: {
-    bucketSize: 8,
-    width: 3,
-    height: 3,
-    fields: ['cell', 'x', 'y', 'kills', 'deaths'],
-  },
-  layers: {
-    total: [['c0.1', 0, 1, 3, 0], ['c1.1', 1, 1, 4, 0], ['c2.1', 2, 1, 3, 0]],
-    me: [['c0.1', 0, 1, 3, 0], ['c1.1', 1, 1, 4, 0], ['c2.1', 2, 1, 3, 0]],
-    others: [['c0.1', 0, 1, 0, 0], ['c1.1', 1, 1, 0, 0], ['c2.1', 2, 1, 0, 0]],
-  },
-  comparison: {
-    fields: ['cell', 'x', 'y', 'killDelta', 'deathDelta', 'sample'],
-    bins: [['c0.1', 0, 1, -0.8, 0, 3], ['c1.1', 1, 1, 0.8, 0, 4], ['c2.1', 2, 1, -0.8, 0, 3]],
-    personalSample: 10,
-    otherSample: 0,
-  },
-  summary: {rowsRead: 3, sourceRows: 3, personalSample: 10, otherSample: 0},
-});
-const signedDifferenceScene = new HeatmapExplorerScene(signedDifferencePayload);
-const signedDifferenceGl = fakeGl();
-const signedDifferenceDom = makeDom(signedDifferenceGl);
-const signedDifferenceRenderer = new HeatmapGlRenderer(signedDifferenceDom.root, signedDifferenceScene, {
-  window: signedDifferenceDom.window,
-});
-signedDifferenceRenderer.mount();
-const signedDifferenceUpload = signedDifferenceGl.calls.texImages[signedDifferenceGl.calls.texImages.length - 2].at(-1);
-const signedDifferenceDense = signedDifferenceScene.dense('difference', 'kills');
-const signedCenter = signedDifferenceUpload[4];
-const signedSmoothed = kernelAverage(signedDifferenceUpload, 3, 3, 1, 1);
-assert.ok(signedCenter > 0, 'signed difference center texel should remain positive before shader sampling');
-assert.ok(signedSmoothed < 0, 'the legacy shared 3x3 average would flip adjacent opposite-sign deltas negative');
-assert.ok(
-  normalizedAmount(signedCenter, signedDifferenceDense.maxAbs) > normalizedAmount(signedSmoothed, signedDifferenceDense.maxAbs),
-  'difference center sampling should preserve stronger signed intensity than the shared 3x3 smoothing path'
-);
-signedDifferenceRenderer.destroy();
-
-const sparseDifferencePayload = explorerSceneFixture({
-  grid: {
-    bucketSize: 8,
-    width: 3,
-    height: 3,
-    fields: ['cell', 'x', 'y', 'kills', 'deaths'],
-  },
-  layers: {
-    total: [['c0.1', 0, 1, 2, 0], ['c1.1', 1, 1, 2, 0], ['c2.1', 2, 1, 2, 0]],
-    me: [['c0.1', 0, 1, 2, 0], ['c1.1', 1, 1, 2, 0], ['c2.1', 2, 1, 2, 0]],
-    others: [['c0.1', 0, 1, 0, 0], ['c1.1', 1, 1, 0, 0], ['c2.1', 2, 1, 0, 0]],
-  },
-  comparison: {
-    fields: ['cell', 'x', 'y', 'killDelta', 'deathDelta', 'sample'],
-    bins: [['c0.1', 0, 1, 0, 0, 2], ['c1.1', 1, 1, 0.2, 0, 2], ['c2.1', 2, 1, 0, 0, 2]],
-    personalSample: 6,
-    otherSample: 0,
-  },
-  summary: {rowsRead: 3, sourceRows: 3, personalSample: 6, otherSample: 0},
-});
-const sparseDifferenceScene = new HeatmapExplorerScene(sparseDifferencePayload);
-const sparseDifferenceGl = fakeGl();
-const sparseDifferenceDom = makeDom(sparseDifferenceGl);
-const sparseDifferenceRenderer = new HeatmapGlRenderer(sparseDifferenceDom.root, sparseDifferenceScene, {
-  window: sparseDifferenceDom.window,
-});
-sparseDifferenceRenderer.mount();
-const sparseDifferenceUpload = sparseDifferenceGl.calls.texImages[sparseDifferenceGl.calls.texImages.length - 2].at(-1);
-const sparseDifferenceOpacityUpload = sparseDifferenceGl.calls.texImages[sparseDifferenceGl.calls.texImages.length - 1].at(-1);
-const sparseDifferenceDense = sparseDifferenceScene.dense('difference', 'kills');
-const sparseCenter = sparseDifferenceUpload[4];
-const sparseSmoothed = kernelAverage(sparseDifferenceUpload, 3, 3, 1, 1);
-assert.ok(Math.abs(sparseCenter - Math.fround(0.2)) < 1e-6, 'difference density upload should preserve the sparse signed delta before confidence is applied');
-assert.ok(Math.abs(sparseDifferenceOpacityUpload[4] - Math.fround(0.22)) < 1e-6, 'difference opacity upload should preserve the existing low-sample opacity cap');
-assert.ok(
-  normalizedAmount(sparseCenter, sparseDifferenceDense.maxAbs) > normalizedAmount(sparseSmoothed, sparseDifferenceDense.maxAbs),
-  'difference center sampling should keep isolated sparse deltas visible instead of forcing them through the shared 3x3 average'
-);
-sparseDifferenceRenderer.destroy();
+assert.match(differenceFragment, /texelFetch/, 'Smooth interpolates float samples without optional extensions');
+assert.ok(!differenceFragment.includes('offsetY'), 'old box-average shader is removed');
+assert.match(differenceFragment, /density.r - density.g/, 'signed lobes retain independent density');
+const gaussian = explorerApi.gaussianKernel1d(1.25, 4);
+assert.strictEqual(gaussian.length, 9);
+assert.ok(Math.abs(Array.from(gaussian).reduce((a,b) => a+b,0)-1)<1e-6);
+for(let i=0;i<9;i++) assert.strictEqual(gaussian[i],gaussian[8-i]);
+const constant = explorerApi.gaussianSmooth(new Float32Array(35).fill(7),7,5,gaussian);
+constant.forEach(value => assert.ok(Math.abs(value-7)<1e-6));
+const impulse=new Float32Array(121); impulse[60]=1;
+const blurred=explorerApi.gaussianSmooth(impulse,11,11,gaussian);
+assert.ok(blurred[60]>blurred[61] && blurred[61]>blurred[62]);
+assert.ok(Math.abs(blurred[59]-blurred[61])<1e-7);
+const signed=explorerApi.presentationField({values:new Float32Array([1,0,-1]),opacity:new Float32Array([1,0,1])},3,1,true,true);
+assert.ok(signed.values[2]>0 && signed.values[3]>0,'opposite lobes overlap without cancelling');
+assert.ok(Math.abs(signed.values[2]-signed.values[3])<1e-7,'balanced overlap stays neutral');
+assert.match(differenceFragment,/0\.26 \* smoothstep\(0\.0, 0\.20, amount\)/,'sparse signed support fades continuously at tails');
+function smoothDifferenceAlpha(amount,confidence){const t=Math.min(1,Math.max(0,amount/.20));return Math.max(amount*confidence,.26*t*t*(3-2*t));}
+const sparseSignedValues=new Float32Array(121);sparseSignedValues[24]=1;sparseSignedValues[96]=-.05;
+const sparseSignedOpacity=new Float32Array(121).fill(.22);
+const sparseSignedField=explorerApi.presentationField({values:sparseSignedValues,opacity:sparseSignedOpacity},11,11,true,true);
+const negativeAmount=Math.sqrt(sparseSignedField.values[96*2+1]/sparseSignedField.maxAbs);
+assert.ok(negativeAmount*sparseSignedField.opacity[96]<.20,'previous transfer hides sparse negative lobe');
+assert.ok(smoothDifferenceAlpha(negativeAmount,sparseSignedField.opacity[96])>.20,'negative lobe remains visibly supported after shared-max normalization');
+assert.strictEqual(smoothDifferenceAlpha(0,.22),0,'empty signed field is transparent');
+assert.ok(smoothDifferenceAlpha(.001,.22)<.001,'faint Gaussian tails fade instead of hard opaque islands');
+assert.ok(smoothDifferenceAlpha(.5,1)>smoothDifferenceAlpha(.5,.22),'stronger confidence still increases visibility');
+const uploadCount=goodGl.calls.texImages.length;
+renderer.render({layer:'difference',channel:'kills'});
+assert.strictEqual(goodGl.calls.texImages.length,uploadCount,'unchanged field is not uploaded again');
 
 const asymmetricPayload = explorerSceneFixture();
 asymmetricPayload.query = Object.assign({}, asymmetricPayload.query, {lens: 'overview', event: 'kills'});
@@ -1210,9 +1159,10 @@ const asymmetricRenderer = new HeatmapGlRenderer(
   {window: asymmetricDom.window}
 );
 asymmetricRenderer.mount();
+asymmetricRenderer.setDisplayMode('cells');
 assert.deepStrictEqual(
-  Array.from(asymmetricGl.calls.texImages[0].at(-1)),
-  [1, 9],
+  Array.from(asymmetricGl.calls.texImages[2].at(-1)),
+  [1, 0, 9, 0],
   'top-down server row order should reach the single texture unchanged'
 );
 asymmetricRenderer.destroy();
@@ -1365,7 +1315,7 @@ assert.strictEqual(/innerHTML|outerHTML|insertAdjacentHTML|document\.write|\beva
 assert.match(explorerSource, /R32F/);
 assert.match(explorerSource, /RED/);
 assert.match(explorerSource, /CLAMP_TO_EDGE/);
-assert.match(explorerSource, /for \(var offsetY = -1; offsetY <= 1; offsetY\+\+\)/);
+assert.ok(!explorerSource.includes('this._kernelOffsets'), 'unused box-average resources removed');
 assert.match(explorerSource, /amber|orange/i);
 assert.match(explorerSource, /cyan|blue/i);
 assert.match(explorerSource, /contour/i);
@@ -1387,7 +1337,7 @@ assert.match(
 );
 assert.match(
   cssSource,
-  /@media \(max-width: 540px\)\s*\{[\s\S]*?\.heatmap-explorer__header,[\s\S]*?\.heatmap-explorer__period-controls\s*\{[\s\S]*?flex-direction:\s*column;/,
+  /@media \(max-width: 540px\)\s*\{[\s\S]*?\.heatmap-explorer__header,[\s\S]*?\.heatmap-explorer__map-label\s*\{[\s\S]*?flex-direction:\s*column;/,
   'phone layout reflow should remain scoped to narrow viewports only'
 );
 assert.match(
@@ -1638,8 +1588,8 @@ assert.strictEqual(imageNode.attributes.src, './map.jpg', 'server-validated map 
 assert.strictEqual(imageNode.attributes.alt, 'de_dust2', 'server map identity should update image alt text together with the image');
 assert.strictEqual(staticLinkNode.attributes.href, './map-kill.jpg', 'server fallback JPEG should update with the scene');
 assert.strictEqual(workspaceForScene._nodes.mapSelect.value, 'de_dust2', 'server map identity should keep the map control synchronized');
-assert.match(workspaceForScene._nodes.summary.textContent, /Period: 1785456000–1788048000 UTC/, 'every scene query should refresh a textual summary');
-assert.match(workspaceForScene._nodes.status.textContent, /Loaded: Coverage/, 'the live status should communicate completed coverage, not only a generic loaded state');
+assert.match(workspaceForScene._nodes.summary.textContent, /Period: 2026-07-31 00:00 – 2026-08-30 00:00 UTC/, 'every scene query should refresh a human-readable textual summary');
+assert.match(workspaceForScene._nodes.status.textContent, /Loaded.*Sample: 8.*Coverage 100%/, 'the compact live status should include sample and coverage');
 assert.strictEqual(workspaceForScene.state.lens, 'difference', 'authoritative scene state should keep the share lens synchronized');
 assert.strictEqual(workspaceForScene.state.event, 'kills', 'authoritative scene state should keep the share channel synchronized');
 assert.match(shareNode.attributes.href, /hm_lens=difference/);
@@ -1959,7 +1909,7 @@ function assertWorkspaceUsesCanonicalCoverageRatios() {
   );
   assert.strictEqual(
     harness.nodes.status.textContent,
-    'Loaded: Coverage 50%',
+    'Loaded · Sample: 8 · visiblePositions: 8 · Coverage 50%',
     'loaded status should use the canonical XY coverage ratio'
   );
 }
@@ -2770,7 +2720,7 @@ async function assertScene422TooManyEventsUsesSpecializedStatePresentation() {
   assert.strictEqual(harness.nodes.alert.textContent, 'Too many events matched this view', 'accepted 422 blocked states should keep the specialized localized alert');
   assert.notStrictEqual(harness.nodes.status.textContent, 'Loading', 'blocked 422 deep-link scenes must not remain stuck in loading');
   assert.notStrictEqual(harness.nodes.status.textContent, 'Failed', 'blocked 422 deep-link scenes must not collapse into generic failure');
-  assert.match(harness.nodes.summary.textContent, /Period: 1785456000–1788048000 UTC/, 'accepted 422 blocked states should still refresh the textual summary');
+  assert.match(harness.nodes.summary.textContent, /Period: 2026-07-31 00:00 – 2026-08-30 00:00 UTC/, 'accepted 422 blocked states should still refresh the textual summary');
   assert.match(harness.nodes.coverage.textContent, /Coverage: XY 100%; Z 100%; Projection 100%/, 'accepted 422 blocked states should still refresh the scene footer coverage');
   assert.strictEqual(harness.nodes.freshness.textContent, 'Freshness: Loaded', 'accepted 422 blocked states should still refresh the footer freshness state');
   assert.match(harness.nodes.share.attributes.href, /hm_cell=c2\.0/, 'blocked 422 deep-link scenes should preserve the pinned-cell URL state');
@@ -3085,12 +3035,12 @@ async function assertCustomWindowApplyValidation() {
   workspace._bindEvents();
   workspace._syncControls();
   assert.strictEqual(harness.nodes.range.value, 'custom', 'deep-linked custom windows should hydrate the custom selector');
-  assert.strictEqual(harness.nodes.from.value, '100');
-  assert.strictEqual(harness.nodes.to.value, '200');
+  assert.strictEqual(harness.nodes.from.value, explorerApi.utcInputValue(100));
+  assert.strictEqual(harness.nodes.to.value, explorerApi.utcInputValue(200));
 
   const writesBefore = harness.historyWrites.length;
-  harness.nodes.from.value = '200';
-  harness.nodes.to.value = '100';
+  harness.nodes.from.value = explorerApi.utcInputValue(200);
+  harness.nodes.to.value = explorerApi.utcInputValue(100);
   harness.nodes.apply.dispatch('click');
   await settleWorkspace();
   assert.strictEqual(transport.requests.length, 0, 'invalid custom windows must not fetch');
@@ -3098,16 +3048,16 @@ async function assertCustomWindowApplyValidation() {
   assert.strictEqual(harness.nodes.status.textContent, 'Invalid URL');
   assert.strictEqual(harness.nodes.alert.hidden, false);
 
-  harness.nodes.from.value = '900';
-  harness.nodes.to.value = '1301';
+  harness.nodes.from.value = explorerApi.utcInputValue(900);
+  harness.nodes.to.value = explorerApi.utcInputValue(1301);
   harness.nodes.apply.dispatch('click');
   await settleWorkspace();
   assert.strictEqual(transport.requests.length, 0, 'future custom windows beyond backend tolerance must not fetch');
   assert.strictEqual(harness.historyWrites.length, writesBefore, 'future custom windows must not rewrite history');
   assert.strictEqual(harness.nodes.status.textContent, 'Invalid URL');
 
-  harness.nodes.from.value = '900';
-  harness.nodes.to.value = '1300';
+  harness.nodes.from.value = explorerApi.utcInputValue(900);
+  harness.nodes.to.value = explorerApi.utcInputValue(1300);
   harness.nodes.apply.dispatch('click');
   await settleWorkspace();
   assert.strictEqual(transport.requests.length, 1, 'valid custom windows should request a fresh scene');
@@ -3274,7 +3224,36 @@ async function assertInspect422StaysFailClosed() {
   assert.strictEqual(harness.nodes.alert.children[0].children[0].textContent, 'Retry', 'inspect 422 failures should keep retry available for inspect');
 }
 
+async function assertPointLifecycle() {
+  const transport = deferredTransport(), harness = richWorkspaceHarness('');
+  const workspace = new HeatmapExplorerWorkspace(harness.root, {window:harness.window,document:harness.document,fetch:transport.fetch,messages:workspaceMessages,Renderer:WorkspaceRenderer});
+  workspace.mount(); await settleWorkspace();
+  transport.requests[0].resolve(jsonResponse(sceneForMap('de_dust2'))); await settleWorkspace();
+  const writes=harness.historyWrites.length, scene=workspace._scene;
+  workspace._renderPinnedCell('c2.0');
+  assert.strictEqual(harness.root.attributes['data-heatmap-has-cell'],'0','hover/focus summary must not open inspector or change map width');
+  workspace._setDisplayMode('cells'); workspace._setDisplayMode('smooth');
+  assert.strictEqual(transport.requests.length,1,'Smooth/Cells do not fetch');
+  assert.strictEqual(harness.historyWrites.length,writes,'display mode is not URL state');
+  workspace._setDisplayMode('points'); workspace._setDisplayMode('points'); await settleWorkspace();
+  assert.strictEqual(transport.requests.length,2,'duplicate Points click shares pending operation');
+  assert.ok(transport.requests[1].url.includes('geometry=points'));
+  const payload=pointFixture(); payload.query=JSON.parse(JSON.stringify(scene.query));payload.map=JSON.parse(JSON.stringify(scene.map));
+  payload.summary.sourceRows=scene.summary.sourceRows;
+  if (payload.query.lens==='difference') { payload.fields=['x','y','personal','others'];payload.summary.personalSample=scene.summary.personalSample;payload.summary.otherSample=scene.summary.otherSample;payload.points=[[2,2,scene.summary.personalSample,0],[4,5,0,scene.summary.otherSample]]; }
+  workspace._setDisplayMode('cells'); transport.requests[1].resolve(jsonResponse(payload)); await settleWorkspace();
+  assert.strictEqual(workspace._pointGeometry,null,'late point reply cannot replace Cells');
+  workspace._setDisplayMode('points'); await settleWorkspace();transport.requests[2].resolve(jsonResponse(payload)); await settleWorkspace();
+  assert.ok(workspace._pointGeometry,'validated current geometry retained');
+  workspace._setDisplayMode('cells');workspace._setDisplayMode('points');await settleWorkspace();
+  assert.strictEqual(transport.requests.length,3,'unchanged scene reuses exact geometry');
+  workspace._pointGeometry=null;workspace._setDisplayMode('points');await settleWorkspace();transport.requests[3].resolve(httpJsonResponse(422,{state:'too_many_points'}));await settleWorkspace();
+  assert.strictEqual(workspace._displayMode,'cells','refused geometry falls back to Cells');
+  workspace.destroy();
+}
+
 (async function runFixRoundOneRegressions() {
+  await assertPointLifecycle();
   await assertSeparateInspectAndDeepLinkFlow();
   await assertClearedInspectCannotRetry();
   await assertLatestSceneRequestWins();

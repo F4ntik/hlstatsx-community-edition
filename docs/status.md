@@ -2,7 +2,43 @@
 
 ## Snapshot
 
-- Last updated: `2026-09-02`
+- Last updated: `2026-09-08`
+- BSP outlines for the 25 native maps are now bundled web assets and load
+  automatically in the admin editor, with a visible show/hide control and an
+  image-identity check. Fresh installations use the matching existing SQL seeds
+  and base images; manual SVG import remains available for custom images.
+- All 25 installed Counter-Strike maps with matching BSP/BMP/TXT overviews now
+  have native-frame base images, thumbnails and matching seed/local settings.
+  Actual HTTP images/configurations passed for all 25 on port 8382; geometry and
+  extraction instructions are in `docs/heatmap-bsp-registration.md` and
+  `docs/audits/modern-heatmap-explorer/steam-maps-20260908/README.md`.
+  These user-requested local asset replacements supersede the earlier no-copy
+  snapshot below. No publication or automatic floor/wall reconstruction occurred.
+- Floor/wall settings now have a web editor: draw allowed or excluded polygons,
+  undo/cancel corners, remove individual outlines and upload floor JPEGs. Saving
+  floors against an unchanged projection uses a preview token without requiring
+  landmarks again. Calibration changes retain the landmark gate. See
+  `docs/plans/2026-09-08-heatmap-floor-editor.md` and the floor-editor section in
+  `docs/audits/modern-heatmap-explorer/improvements-20260908/README.md`.
+- Heatmap usability/spatial-floor follow-up passed focused PHP/JS checks and
+  real browser review on disposable port 8382. It adds UTC date inputs, numeric
+  reference scales, optional floor polygons/same-frame images, constrained
+  presentation and visual calibration report import. BSP revision persistence
+  is explicitly excluded. The temporary region/account were removed and exact
+  configuration readback matched the backup. See
+  `docs/audits/modern-heatmap-explorer/improvements-20260908/README.md` and
+  `docs/heatmap-regions-and-scale.md`. These remain local uncommitted changes.
+- Heatmap BSP/presentation follow-up passed focused checks and browser review
+  in a separate local runtime on port 8382. Evidence and screenshots are in
+  `docs/audits/modern-heatmap-explorer/improvements-20260907/README.md`.
+  The GoldSrc overview importer used the wrong ZOOM and
+  origin convention; the earlier September 2 de_dust2 candidate is superseded.
+  The new offline BSP tool reads actual v30 geometry, registers the native
+  overview to the served image, emits product settings and checks them with
+  the production transform. See `docs/heatmap-bsp-registration.md` and
+  `docs/plans/2026-09-07-heatmap-bsp-and-presentation.md`. The original runtime
+  and its calibration remain untouched; historical acceptance below applies
+  only to its named commit, not to this follow-up diff.
 - Modern Heatmap Explorer is `SOURCE-READY`, locally `RUNTIME-ACCEPTED`, and
   `RELEASE-READY` only as a local candidate at exact implementation commit
   `44f3af97db46107f3ab9b595b3c32b3e5c2c7986`. The visibility correction closes
@@ -25,7 +61,7 @@
   `docs/audits/modern-heatmap-explorer/evidence/acceptance-2026-09-02.json`.
   No push, deployment, publication, or
   production release acceptance occurred.
-- Counter-Strike/GoldSrc color overview BMP/TXT files were researched locally,
+- Historical release snapshot: Counter-Strike/GoldSrc color overview BMP/TXT files were researched locally,
   but no Valve/Steam asset was copied or shipped. The product uses repository
   images with Color/Mono grading. Optional operator-side GoldSrc import remains
   a separate licensing and feature decision.

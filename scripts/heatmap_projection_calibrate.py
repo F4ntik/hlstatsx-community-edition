@@ -379,7 +379,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     repository.connect()
     try:
         config = selected_config(repository, args.game, args.map_name)
-        config = override_from_overview(config, args)
+        try:
+            config = override_from_overview(config, args)
+        except ValueError as error:
+            print(f"error: {error}", file=sys.stderr)
+            return 2
         config = override_from_args(config, args)
         image_path = settings.assets_root / config.game / f"{config.map_name}.jpg"
         if not image_path.exists():

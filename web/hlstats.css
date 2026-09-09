@@ -569,6 +569,36 @@ nav{
 	font: 14px/1.4 Arial, sans-serif;
 }
 
+.heatmap-explorer__legend {
+	color: var(--hm-muted);
+	font-size: 12px;
+}
+
+.heatmap-explorer[data-heatmap-explorer] a:link,
+.heatmap-explorer[data-heatmap-explorer] a:visited,
+.heatmap-explorer[data-heatmap-explorer] a:hover,
+.heatmap-explorer[data-heatmap-explorer] a:active {
+	color: var(--hm-text);
+}
+
+.heatmap-explorer[data-heatmap-explorer] a[aria-disabled="true"] {
+	color: var(--hm-muted);
+	cursor: default;
+}
+
+.heatmap-explorer[data-heatmap-state="static_fallback"] [data-heatmap-display-controls],
+.heatmap-explorer[data-heatmap-state="context_lost"] [data-heatmap-display-controls] {
+	display: none;
+}
+
+@media (min-width: 901px) {
+	.heatmap-explorer[data-heatmap-has-floors="0"] { grid-template-columns: minmax(0, 1fr) 260px; }
+	.heatmap-explorer[data-heatmap-has-floors="0"] .heatmap-explorer__floors { display: none; }
+	.heatmap-explorer[data-heatmap-has-cell="0"] { grid-template-columns: 180px minmax(0, 1fr); }
+	.heatmap-explorer[data-heatmap-has-cell="0"] .heatmap-explorer__inspector { display: none; }
+	.heatmap-explorer[data-heatmap-has-floors="0"][data-heatmap-has-cell="0"] { grid-template-columns: minmax(0, 1fr); }
+}
+
 .heatmap-explorer *,
 .heatmap-explorer *::before,
 .heatmap-explorer *::after {
@@ -590,6 +620,22 @@ nav{
 .heatmap-explorer__header h2,
 .heatmap-explorer__header p,
 .heatmap-explorer__footer span,
+.heatmap-explorer__footer a { margin: 0; }
+
+.heatmap-explorer [hidden] { display: none !important; }
+.heatmap-explorer[data-heatmap-has-floors="0"] [data-heatmap-sheet-toggle="floors"],
+.heatmap-explorer[data-heatmap-has-cell="0"] [data-heatmap-sheet-toggle="inspector"] { display: none; }
+@media (min-width: 901px) { .heatmap-explorer .heatmap-explorer__sheet-toggle { display: none; } }
+.heatmap-explorer details.heatmap-explorer__footer { display: block; }
+.heatmap-explorer__footer summary { cursor: pointer; color: var(--hm-text); padding: 6px 0; }
+.heatmap-explorer__footer span { display: block; margin: 6px 0; }
+.heatmap-explorer__scale { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 0; color: var(--hm-muted); }
+.heatmap-explorer__scale-bar { width: 100px; height: 10px; background: linear-gradient(to right, transparent, #ff4005, #ffd91f); border-radius: 3px; }
+.heatmap-explorer[data-heatmap-scale-palette="deaths"] .heatmap-explorer__scale-bar { background: linear-gradient(to right, transparent, #1689ed, #19d9ff); }
+.heatmap-explorer[data-heatmap-scale-palette="difference"] .heatmap-explorer__scale-bar { background: linear-gradient(to right, #19d9ff, transparent, #ffd91f); }
+.heatmap-explorer [data-heatmap-scale-lock][aria-pressed="true"] { background: #f5ca58; color: #171a20; }
+.heatmap-explorer input[type="datetime-local"] { width: 215px; color-scheme: dark; max-width: 100%; }
+
 .heatmap-explorer__footer a {
 	margin: 0;
 }
@@ -874,12 +920,31 @@ nav{
 
 	.heatmap-explorer__header,
 	.heatmap-explorer__footer,
-	.heatmap-explorer__controls,
-	.heatmap-explorer__map-label,
-	.heatmap-explorer__group,
-	.heatmap-explorer__period-controls {
+	.heatmap-explorer__map-label {
 		align-items: stretch;
 		flex-direction: column;
+	}
+
+	.heatmap-explorer__group,
+	.heatmap-explorer__controls {
+		flex-direction: row;
+		flex-wrap: wrap;
+		min-width: 0;
+	}
+
+	.heatmap-explorer__period-controls {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr);
+		width: 100%;
+	}
+
+	.heatmap-explorer__period-controls .heatmap-explorer__input {
+		width: 100%;
+		min-width: 0;
+	}
+
+	.heatmap-explorer__period-controls [data-heatmap-apply] {
+		grid-column: 1 / -1;
 	}
 
 	.heatmap-explorer__stage:not([data-heatmap-sized="1"]) {
@@ -995,6 +1060,35 @@ nav{
 
 .heatmap-admin-grid {
 	display: block;
+}
+
+.heatmap-floor-editor-toolbar, .heatmap-floor-contours {
+	display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0;
+}
+.heatmap-floor-editor-toolbar button, .heatmap-floor-contours button, .heatmap-floor-card-actions button {
+	min-height: 34px; padding: 6px 10px; cursor: pointer;
+}
+.heatmap-floor-editor-toolbar [data-heatmap-admin-save] { margin-left: auto; }
+.heatmap-floor-editor-hint { line-height: 1.5; margin: 8px 0; }
+.heatmap-floor-editor .heatmap-canvas-wrap { padding: 8px; min-height: 0; }
+.heatmap-floor-editor .heatmap-admin-floors { margin-top: 16px; text-align: left; }
+.heatmap-floor-editor .heatmap-admin-floors .heatmap-admin-floor-table { min-width: 0; width: 100%; }
+.heatmap-floor-editor .heatmap-admin-floors thead { display: none; }
+.heatmap-floor-editor .heatmap-admin-floors tbody { display: grid; gap: 12px; }
+.heatmap-floor-editor .heatmap-admin-floors tr { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)) 32px; gap: 8px; padding: 12px; border: 1px solid #8886; border-radius: 6px; }
+.heatmap-floor-editor .heatmap-admin-floors td { display: block; min-width: 0; padding: 0; border: 0; }
+.heatmap-floor-editor .heatmap-admin-floors td[data-label]::before { content: attr(data-label); display: block; margin-bottom: 5px; }
+.heatmap-floor-editor .heatmap-admin-floors input:not([type=checkbox]) { box-sizing: border-box; width: 100%; max-width: 100%; min-height: 32px; }
+.heatmap-floor-editor .heatmap-admin-floors .heatmap-floor-card-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.heatmap-floor-editor .heatmap-floor-card-actions input[type=file] { max-width: 300px; }
+.heatmap-admin-advanced { margin-top: 18px; padding: 12px; border: 1px solid #8886; }
+.heatmap-admin-advanced summary { cursor: pointer; font-size: 14px; }
+.heatmap-floor-editor .heatmap-viewer-admin:not(.is-calibrating) .heatmap-admin-guides { display: none; }
+.heatmap-floor-editor .is-drawing-floor .heatmap-overlay { cursor: crosshair; touch-action: none; }
+.heatmap-floor-editor .is-drawing-floor .heatmap-admin-guides { display: none; }
+@media (max-width: 650px) {
+	.heatmap-floor-editor .heatmap-admin-floors tr { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+	.heatmap-floor-editor-toolbar [data-heatmap-admin-save] { margin-left: 0; }
 }
 
 .heatmap-admin-panel {

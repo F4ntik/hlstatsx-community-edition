@@ -800,8 +800,19 @@ def parse_goldsrc_overview(
     code: str,
     game: str,
     map_name: str,
+    native_width: int | None = None,
+    native_height: int | None = None,
+    registered_native_frame: bool = False,
 ) -> ImportedOverview:
-    """Parse a GoldSrc ``overviews/<map>.txt`` file into legacy projection values."""
+    """Convert SDK overview coordinates only for an explicitly registered native frame.
+
+    Arbitrary repository JPGs require native-to-served image registration first.
+    Use heatmap_bsp_registration.py for that workflow; ZOOM is not units/pixel.
+    """
+    if not registered_native_frame or not native_width or not native_height:
+        raise ValueError('GoldSrc TXT alone cannot register the served image. Use scripts/heatmap_bsp_registration.py; native dimensions and registered_native_frame are required.')
+    if native_width <= 0 or native_height <= 0 or native_width * 3 != native_height * 4:
+        raise ValueError('GoldSrc native overview frame must have a 4:3 aspect ratio')
 
     values: dict[str, str] = {}
     for raw_line in content.splitlines():
@@ -822,17 +833,24 @@ def parse_goldsrc_overview(
     if missing:
         raise ValueError(f"GoldSrc overview missing required keys: {', '.join(sorted(missing))}")
 
+    zoom = float(values['ZOOM'])
+    origin_x, origin_y = float(values['ORIGIN_X']), float(values['ORIGIN_Y'])
+    if not all(math.isfinite(value) for value in (zoom, origin_x, origin_y)) or zoom <= 0:
+        raise ValueError('GoldSrc overview requires finite origins and positive zoom')
+    scale = 8192.0 / (zoom * native_width)
+    rotated = values.get('ROTATED', '0').lower() not in {'0', 'false'}
+
     return ImportedOverview(
         projection="goldsrc",
         code=code,
         game=game,
         map_name=map_name,
-        xoffset=round(-float(values["ORIGIN_X"])),
-        yoffset=round(float(values["ORIGIN_Y"])),
-        scale=normalize_scale(values["ZOOM"]),
-        flipx=False,
-        flipy=True,
-        rotate=1 if values.get("ROTATED", "0") not in {"0", "false", "False"} else 0,
+        xoffset=round(native_width / 2 * scale - origin_x) if rotated else round(origin_x + native_height / 2 * scale),
+        yoffset=round(native_height / 2 * scale + origin_y) if rotated else round(-origin_y - native_width / 2 * scale),
+        scale=scale,
+        flipx=not rotated,
+        flipy=rotated,
+        rotate=0 if rotated else 1,
         image=values.get("IMAGE"),
         height=int(float(values["HEIGHT"])) if "HEIGHT" in values else None,
         manual_required=False,
@@ -863,7 +881,8 @@ def parse_source_overview(
         scale=normalize_scale(values["scale"]),
         flipx=False,
         flipy=True,
-        rotate=1 if values.get("rotate", "0") not in {"0", "false", "False"} else 0,
+        # Source rotate controls panel presentation, not the raw overview texture.
+        rotate=0,
         material=values.get("material"),
         manual_required=False,
     )

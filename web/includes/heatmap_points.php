@@ -5,13 +5,15 @@ if (!defined('IN_HLSTATS')) {
     exit;
 }
 
+require_once __DIR__ . '/heatmap_regions.php';
+
 const HEATMAP_V2_SCHEMA = 2;
 const HEATMAP_MAX_WINDOW_SECONDS = 315360000;
 const HEATMAP_MAX_FLOORS = 8;
 const HEATMAP_MEDIUMINT_MIN = -8388608;
 const HEATMAP_MEDIUMINT_MAX = 8388607;
 const HEATMAP_MYSQL_UNSIGNED_INT_MAX = 4294967295;
-const HEATMAP_FLOOR_PARSER_SCHEMA = 1;
+const HEATMAP_FLOOR_PARSER_SCHEMA = 3;
 const HEATMAP_MAX_SOURCE_ROWS = 250000;
 const HEATMAP_INSPECT_MAX_ROWS = 101;
 const HEATMAP_GRID_MAX_AXIS = 128;
@@ -220,7 +222,7 @@ function heatmap_render_explorer_workspace(array $context): string
     $html .= '<header class="heatmap-explorer__header">';
     $html .= '<div><h2 data-heatmap-map-title="1">' . $map . '</h2>';
     $html .= '<p data-heatmap-period="1">' . heatmap_explorer_html(heatmap_explorer_label('loading')) . '</p></div>';
-    $html .= '<label class="heatmap-explorer__map-label">' . heatmap_explorer_html(heatmap_explorer_label('map'));
+    $html .= '<label class="heatmap-explorer__map-label"' . (count($maps) <= 1 ? ' hidden="hidden"' : '') . '>' . heatmap_explorer_html(heatmap_explorer_label('map'));
     $html .= '<select data-heatmap-map-select="1">' . $mapOptions . '</select></label>';
     $html .= '<label class="heatmap-explorer__map-label">' . heatmap_explorer_html(heatmap_explorer_label('period'));
     $html .= '<select data-heatmap-range="1"><option value="7d">' . heatmap_explorer_html(heatmap_explorer_label('range7d')) . '</option>';
@@ -230,16 +232,16 @@ function heatmap_render_explorer_workspace(array $context): string
     $html .= '<option value="custom">' . heatmap_explorer_html(heatmap_explorer_label('rangeCustom')) . '</option></select></label>';
     $html .= '<div class="heatmap-explorer__period-controls">';
     $html .= '<label class="heatmap-explorer__map-label">' . heatmap_explorer_html(heatmap_explorer_label('fromUtc'));
-    $html .= '<input type="text" class="heatmap-explorer__input" inputmode="numeric" pattern="[0-9]*" data-heatmap-from="1" value="" /></label>';
+    $html .= '<input type="datetime-local" step="1" class="heatmap-explorer__input" data-heatmap-from="1" value="" /></label>';
     $html .= '<label class="heatmap-explorer__map-label">' . heatmap_explorer_html(heatmap_explorer_label('toUtc'));
-    $html .= '<input type="text" class="heatmap-explorer__input" inputmode="numeric" pattern="[0-9]*" data-heatmap-to="1" value="" /></label>';
+    $html .= '<input type="datetime-local" step="1" class="heatmap-explorer__input" data-heatmap-to="1" value="" /></label>';
     $html .= '<button type="button" class="heatmap-explorer__control" data-heatmap-apply="1">'
         . heatmap_explorer_html(heatmap_explorer_label('apply')) . '</button></div>';
     $html .= '<button type="button" class="heatmap-explorer__sheet-toggle" data-heatmap-sheet-toggle="floors"'
         . ' aria-controls="' . $floorSheetId . '" aria-expanded="false">' . heatmap_explorer_html(heatmap_explorer_label('floor')) . '</button>';
     $html .= '<button type="button" class="heatmap-explorer__sheet-toggle" data-heatmap-sheet-toggle="inspector"'
         . ' aria-controls="' . $inspectorSheetId . '" aria-expanded="false">' . heatmap_explorer_html(heatmap_explorer_label('inspector')) . '</button>';
-    $html .= '<fieldset class="heatmap-explorer__group"><legend>' . heatmap_explorer_html(heatmap_explorer_label('lens')) . '</legend>';
+    $html .= '<fieldset class="heatmap-explorer__group"' . (!$hasMe && !$hasDifference ? ' hidden="hidden"' : '') . '><legend>' . heatmap_explorer_html(heatmap_explorer_label('lens')) . '</legend>';
     $html .= '<button type="button" class="heatmap-explorer__control is-selected" data-heatmap-lens="overview" aria-pressed="' . $overviewPressed . '">'
         . heatmap_explorer_html(heatmap_explorer_label('overview')) . '</button>' . $meControl . $differenceControl . '</fieldset>';
     $html .= '<fieldset class="heatmap-explorer__group"><legend>' . heatmap_explorer_html(heatmap_explorer_label('channel')) . '</legend>';
@@ -249,6 +251,14 @@ function heatmap_render_explorer_workspace(array $context): string
         . heatmap_explorer_html(heatmap_explorer_label('deaths')) . '</button>';
     $html .= '<button type="button" class="heatmap-explorer__control is-selected" data-heatmap-event="both" aria-pressed="true">'
         . heatmap_explorer_html(heatmap_explorer_label('both')) . '</button></fieldset>';
+    $html .= '<fieldset class="heatmap-explorer__group" data-heatmap-display-controls="1"><legend>'
+        . heatmap_explorer_html(heatmap_explorer_label('display')) . '</legend>';
+    foreach (array('smooth', 'cells', 'points') as $mode) {
+        $html .= '<button type="button" class="heatmap-explorer__control' . ($mode === 'smooth' ? ' is-selected' : '')
+            . '" data-heatmap-display-option="' . $mode . '" aria-pressed="' . ($mode === 'smooth' ? 'true' : 'false') . '">'
+            . heatmap_explorer_html(heatmap_explorer_label($mode)) . '</button>';
+    }
+    $html .= '</fieldset><span class="heatmap-explorer__legend" data-heatmap-legend="1"></span>';
     $html .= '<fieldset class="heatmap-explorer__group" data-heatmap-map-style-controls="1"><legend>'
         . heatmap_explorer_html(heatmap_explorer_label('mapStyle')) . '</legend>';
     $html .= '<button type="button" class="heatmap-explorer__control is-selected" data-heatmap-map-style-option="color" aria-pressed="true">'
@@ -260,6 +270,9 @@ function heatmap_render_explorer_workspace(array $context): string
     $html .= '<div data-heatmap-floor-options="1"><label><input type="radio" name="heatmap-floor-' . $player . '" value="all" data-heatmap-floor="all" checked="checked" />'
         . heatmap_explorer_html(heatmap_explorer_label('allFloors')) . '</label></div></aside>';
     $html .= '<main class="heatmap-explorer__stage-column">';
+    $html .= '<div class="heatmap-explorer__scale"><span class="heatmap-explorer__scale-bar" aria-hidden="true"></span>'
+        . '<span data-heatmap-scale-values="1"></span><button type="button" data-heatmap-scale-lock="1" aria-pressed="false">'
+        . heatmap_explorer_html(heatmap_explorer_label('scaleLock')) . '</button></div>';
     $html .= '<div class="heatmap-explorer__interactive" data-heatmap-interactive="1">';
     $html .= '<div class="heatmap-explorer__stage" data-heatmap-stage="1" tabindex="0" aria-describedby="heatmap-summary-' . $player . '">';
     $html .= '<div data-heatmap-camera="1"><img data-heatmap-image="1" src="' . $image . '" alt="' . $imageAlt . '" />';
@@ -275,14 +288,17 @@ function heatmap_render_explorer_workspace(array $context): string
     $html .= '<p class="heatmap-explorer__status" data-heatmap-status="1" role="status" aria-live="polite">'
         . heatmap_explorer_html(heatmap_explorer_label('loading')) . '</p>';
     $html .= '<p class="heatmap-explorer__alert" data-heatmap-alert="1" role="alert" hidden="hidden"></p>';
-    $html .= '<p id="heatmap-summary-' . $player . '" class="heatmap-explorer__summary" data-heatmap-summary="1">'
+    $html .= '<p id="heatmap-summary-' . $player . '" class="heatmap-explorer__summary" data-heatmap-summary="1" hidden="hidden">'
         . heatmap_explorer_html(heatmap_explorer_label('loading')) . '</p></main>';
     $html .= '<aside id="' . $inspectorSheetId . '" class="heatmap-explorer__inspector" data-heatmap-inspector="1"><h3>'
         . heatmap_explorer_html(heatmap_explorer_label('inspector')) . '</h3><div data-heatmap-inspect-output="1">'
         . heatmap_explorer_html(heatmap_explorer_label('noCell')) . '</div></aside>';
-    $html .= '<footer class="heatmap-explorer__footer"><span data-heatmap-window="1"></span><span data-heatmap-sample="1"></span>';
+    $html .= '<details class="heatmap-explorer__footer"><summary>' . heatmap_explorer_html(heatmap_explorer_label('details')) . '</summary>';
+    $html .= '<p>' . heatmap_explorer_html(heatmap_explorer_label('populationNote')) . '</p>';
+    $html .= '<p>' . heatmap_explorer_html(heatmap_explorer_label('alignmentUnverified')) . '</p>';
+    $html .= '<span data-heatmap-window="1"></span><span data-heatmap-sample="1"></span>';
     $html .= '<span data-heatmap-coverage="1"></span><span data-heatmap-freshness="1"></span>';
-    $html .= '<a data-heatmap-jpeg-link="1" href="' . $jpeg . '">' . heatmap_explorer_html(heatmap_explorer_label('staticJpeg')) . '</a></footer>';
+    $html .= '<a data-heatmap-jpeg-link="1" href="' . $jpeg . '">' . heatmap_explorer_html(heatmap_explorer_label('staticJpeg')) . '</a></details>';
     $html .= '</section>';
 
     return $html;
@@ -320,6 +336,7 @@ function heatmap_cache_identity_value($value)
 function heatmap_scene_cache_key(array $query, array $config, array $image): string
 {
     $identity = array(
+        'geometry' => isset($query['geometry']) ? array('kind' => $query['geometry'], 'version' => 1) : null,
         'cacheSchema' => HEATMAP_SCENE_CACHE_SCHEMA,
         'responseSchema' => HEATMAP_V2_SCHEMA,
         'bucketVersion' => $config['bucketVersion'] ?? HEATMAP_SCENE_BUCKET_VERSION,
@@ -670,7 +687,7 @@ function heatmap_admin_preview_token_consume(string $token, array $config, array
 function heatmap_admin_landmark_evidence(array $landmarks, array $config, $tolerance): array
 {
     $tolerance = is_numeric($tolerance) && is_finite(floatval($tolerance))
-        ? max(1.0, min(200.0, floatval($tolerance)))
+        ? max(1.0, min(10.0, floatval($tolerance)))
         : 10.0;
     if (count($landmarks) > 64) {
         return array('ok' => false, 'reason' => 'invalid_landmarks', 'residuals' => array());
@@ -678,6 +695,10 @@ function heatmap_admin_landmark_evidence(array $landmarks, array $config, $toler
     $calibration = array();
     $holdouts = array();
     $residuals = array();
+    $labels = array();
+    $worldPoints = array();
+    $pixelPoints = array();
+    $anchorPoints = array();
     foreach ($landmarks as $index => $landmark) {
         if (!is_array($landmark)) {
             return array('ok' => false, 'reason' => 'invalid_landmarks', 'residuals' => array());
@@ -687,6 +708,13 @@ function heatmap_admin_landmark_evidence(array $landmarks, array $config, $toler
                 return array('ok' => false, 'reason' => 'invalid_landmarks', 'residuals' => array());
             }
         }
+        $label = is_string($landmark['label'] ?? null) ? trim($landmark['label']) : '';
+        $worldKey = intval($landmark['worldX']) . ':' . intval($landmark['worldY']);
+        $pixelKey = floatval($landmark['pixelX']) . ':' . floatval($landmark['pixelY']);
+        if ($label === '' || strlen($label) > 120 || isset($labels[strtolower($label)]) || isset($worldPoints[$worldKey]) || isset($pixelPoints[$pixelKey])) {
+            return array('ok' => false, 'reason' => 'invalid_landmarks', 'residuals' => array());
+        }
+        $labels[strtolower($label)] = true; $worldPoints[$worldKey] = true; $pixelPoints[$pixelKey] = true;
         $projected = heatmap_transform_point(array(
             'pos_x' => intval($landmark['worldX']),
             'pos_y' => intval($landmark['worldY']),
@@ -698,10 +726,22 @@ function heatmap_admin_landmark_evidence(array $landmarks, array $config, $toler
             $holdouts[] = $entry;
         } else {
             $calibration[] = $entry;
+            if ($residual <= $tolerance) $anchorPoints[] = $landmark;
         }
     }
     if (count($calibration) < 4 || count($holdouts) < 2) {
         return array('ok' => false, 'reason' => 'landmarks_required', 'residuals' => $residuals);
+    }
+    // Independent server-side rank check: repeated or almost collinear anchors cannot certify a map.
+    foreach (array(array('worldX', 'worldY'), array('pixelX', 'pixelY')) as $axes) {
+        $maxArea = 0.0; $span = 0.0;
+        foreach ($anchorPoints as $a) foreach ($anchorPoints as $b) {
+            $dx = floatval($b[$axes[0]]) - floatval($a[$axes[0]]);
+            $dy = floatval($b[$axes[1]]) - floatval($a[$axes[1]]);
+            $span = max($span, $dx * $dx + $dy * $dy);
+            foreach ($anchorPoints as $c) $maxArea = max($maxArea, abs($dx * (floatval($c[$axes[1]]) - floatval($a[$axes[1]])) - $dy * (floatval($c[$axes[0]]) - floatval($a[$axes[0]]))));
+        }
+        if ($span <= 0 || $maxArea / $span < 0.01 || ($axes[0] === 'pixelX' && $span <= 4 * $tolerance * $tolerance)) return array('ok' => false, 'reason' => 'invalid_landmarks', 'residuals' => $residuals);
     }
     $calibrationValues = array_map(function (array $entry): float { return $entry['residual']; }, $calibration);
     sort($calibrationValues, SORT_NUMERIC);
@@ -753,11 +793,15 @@ function heatmap_parse_v2_query(array $input, int $now): array
         'floor',
         'lang',
         'inspect',
+        'geometry',
     ));
     foreach ($input as $key => $value) {
         if (!is_string($key) || !isset($allowed[$key]) || !is_string($value)) {
             throw new InvalidArgumentException('invalid_query');
         }
+    }
+    if (isset($input['geometry']) && ($input['geometry'] !== 'points' || isset($input['inspect']))) {
+        throw new InvalidArgumentException('invalid_query');
     }
 
     if (!isset($input['v']) || $input['v'] !== '2'
@@ -849,6 +893,9 @@ function heatmap_parse_v2_query(array $input, int $now): array
         }
         $query['inspect'] = $inspect;
     }
+    if (isset($input['geometry'])) {
+        $query['geometry'] = 'points';
+    }
 
     return $query;
 }
@@ -889,7 +936,7 @@ function heatmap_parse_floor_config($json): array
         }
         $keys = array_keys($floor);
         sort($keys, SORT_STRING);
-        if ($keys !== $expectedKeys) {
+        if (array_diff($expectedKeys, $keys) || array_diff($keys, array_merge($expectedKeys, array('regions', 'blocked', 'image')))) {
             throw new InvalidArgumentException('invalid_floor_config');
         }
 
@@ -929,18 +976,21 @@ function heatmap_parse_floor_config($json): array
             'z_min' => $zMin,
             'z_max' => $zMax,
         );
+        if (array_key_exists('regions', $floor)) $floors[count($floors) - 1]['regions'] = heatmap_validate_regions($floor['regions']);
+        if (array_key_exists('blocked', $floor)) $floors[count($floors) - 1]['blocked'] = heatmap_validate_regions($floor['blocked']);
+        if (array_key_exists('image', $floor)) {
+            if (!is_bool($floor['image'])) throw new InvalidArgumentException('invalid_floor_config');
+            $floors[count($floors) - 1]['image'] = $floor['image'];
+        }
     }
 
     usort($floors, function ($left, $right) {
         $zCompare = $left['z_min'] <=> $right['z_min'];
         return $zCompare !== 0 ? $zCompare : strcmp($left['id'], $right['id']);
     });
-    $previousMax = null;
-    foreach ($floors as $floor) {
-        if ($previousMax !== null && $floor['z_min'] < $previousMax) {
-            throw new InvalidArgumentException('invalid_floor_config');
-        }
-        $previousMax = $floor['z_max'];
+    foreach ($floors as $i => $floor) foreach (array_slice($floors, $i + 1) as $other) {
+        if ($floor['z_min'] < $other['z_max'] && $other['z_min'] < $floor['z_max']
+            && heatmap_regions_overlap($floor['regions'] ?? array(), $other['regions'] ?? array())) throw new InvalidArgumentException('invalid_floor_config');
     }
 
     return $floors;
@@ -980,7 +1030,7 @@ function heatmap_floor_config_json(array $floors): string
     return $json;
 }
 
-function heatmap_assign_floor($z, array $floors): ?string
+function heatmap_assign_floor($z, array $floors, $x = null, $y = null): ?string
 {
     $z = heatmap_try_canonical_integer($z);
     if ($z === null || $z < HEATMAP_MEDIUMINT_MIN || $z > HEATMAP_MEDIUMINT_MAX) {
@@ -993,7 +1043,8 @@ function heatmap_assign_floor($z, array $floors): ?string
             || !is_int($floor['z_min']) || !is_int($floor['z_max'])) {
             return null;
         }
-        if ($z >= $floor['z_min'] && $z < $floor['z_max']) {
+        if ($z >= $floor['z_min'] && $z < $floor['z_max'] && heatmap_regions_contains($floor['regions'] ?? array(), $x, $y)
+            && (empty($floor['blocked']) || !heatmap_regions_contains($floor['blocked'], $x, $y))) {
             return $floor['id'];
         }
     }
@@ -1280,6 +1331,9 @@ function heatmap_scene_prepare_state(array &$state): void
             'points' => array(),
         );
     }
+    if (($options['geometry'] ?? '') === 'points') {
+        $state['_scene']['geometry'] = array('points' => array(), 'overflow' => false);
+    }
 }
 
 function heatmap_scene_add_bin(array &$bins, string $cellId, int $gridX, int $gridY, string $channel): void
@@ -1351,7 +1405,7 @@ function heatmap_scene_accumulate_contribution(array &$scene, array $row, string
     if ($z['status'] === 'valid') {
         $scene['validZ']++;
         if ($scene['floors']) {
-            $assignedFloor = heatmap_assign_floor($z['value'], $scene['floors']);
+            $assignedFloor = heatmap_assign_floor($z['value'], $scene['floors'], $x['value'], $y['value']);
             if ($assignedFloor === null) {
                 $scene['unassigned']++;
             } else {
@@ -1388,6 +1442,22 @@ function heatmap_scene_accumulate_contribution(array &$scene, array $row, string
     $participantId = heatmap_scene_player_id($row[$participant === 'attacker' ? 'killerId' : 'victimId'] ?? null);
     if ($scene['query']['player'] > 0 && $participantId === $scene['query']['player']) {
         heatmap_scene_add_bin($scene['meBins'], $cellId, $gridX, $gridY, $channel);
+    }
+    if (isset($scene['geometry']) && !$scene['geometry']['overflow']) {
+        $personal = $scene['query']['player'] > 0 && $participantId === $scene['query']['player'];
+        if ($scene['query']['lens'] === 'me' && !$personal) {
+            return;
+        }
+        $key = $projectedY . '.' . $projectedX;
+        if (!isset($scene['geometry']['points'][$key])) {
+            if (count($scene['geometry']['points']) >= 20000) {
+                $scene['geometry'] = array('points' => array(), 'overflow' => true);
+                return;
+            }
+            $scene['geometry']['points'][$key] = array(intval($projectedX), intval($projectedY), 0, 0);
+        }
+        $index = $scene['query']['lens'] === 'difference' ? ($personal ? 2 : 3) : ($channel === 'kills' ? 2 : 3);
+        $scene['geometry']['points'][$key][$index]++;
     }
 }
 
@@ -1509,8 +1579,20 @@ function heatmap_scene_floor_metadata(array $scene, float $zCoverage): array
             'id' => $floor['id'],
             'label' => $scene['query']['lang'] === 'ru' ? $floor['label_ru'] : $floor['label_en'],
             'count' => $count,
-            'available' => $zCoverage >= HEATMAP_MIN_FLOOR_Z_COVERAGE && $count > 0,
+            // A bounded region intentionally excludes the rest of the map; its
+            // availability depends on recorded Z, not whole-map assignment.
+            'available' => (!empty($floor['regions']) || !empty($floor['blocked'])
+                ? ($scene['validXY'] > 0 ? $scene['validZ'] / $scene['validXY'] : 0)
+                : $zCoverage) >= HEATMAP_MIN_FLOOR_Z_COVERAGE && $count > 0,
         );
+        foreach (array('regions', 'blocked') as $kind) if (!empty($floor[$kind])) {
+            $metadata[count($metadata) - 1][$kind] = array_map(function ($polygon) use ($scene) {
+                return array_map(function ($p) use ($scene) {
+                    $point = heatmap_transform_point(array('pos_x' => $p[0], 'pos_y' => $p[1]), $scene['config']);
+                    return array(intval($point['x']), intval($point['y']));
+                }, $polygon);
+            }, $floor[$kind]);
+        }
     }
 
     return $metadata;
@@ -1710,6 +1792,19 @@ function heatmap_finalize_scene(array $state): array
             'fields' => array('x', 'y', 'z', 'projectedX', 'projectedY', 'channel', 'participant', 'inBounds'),
             'points' => $scene['exact']['points'],
             'overflow' => $scene['exact']['overflow'],
+        );
+    }
+    if (isset($scene['geometry'])) {
+        $geometryState = $scene['geometry']['overflow'] ? 'too_many_points' : $stateName;
+        $points = in_array($geometryState, array('ok', 'empty'), true) ? array_values($scene['geometry']['points']) : array();
+        usort($points, function (array $a, array $b): int { return ($a[1] <=> $b[1]) ?: ($a[0] <=> $b[0]); });
+        return array(
+            'schemaVersion' => 2, 'operation' => 'geometry', 'version' => 1, 'kind' => 'points',
+            'state' => $geometryState, 'query' => $response['query'], 'map' => $response['map'],
+            'fields' => $scene['query']['lens'] === 'difference' ? array('x', 'y', 'personal', 'others') : array('x', 'y', 'kills', 'deaths'),
+            'points' => $points,
+            'summary' => array('positions' => count($points), 'sourceRows' => $scene['sourceRows'],
+                'personalSample' => $comparison['personalSample'], 'otherSample' => $comparison['otherSample']),
         );
     }
 
@@ -2051,7 +2146,7 @@ function heatmap_inspect_sql_context(array $query, array $config, array $bounds)
     if ($floor !== 'all') {
         foreach ($floors as $configuredFloor) {
             if ($configuredFloor['id'] === $floor) {
-                $floorBounds = array('zMin' => $configuredFloor['z_min'], 'zMax' => $configuredFloor['z_max']);
+                $floorBounds = array('zMin' => $configuredFloor['z_min'], 'zMax' => $configuredFloor['z_max'], 'regions' => $configuredFloor['regions'] ?? array(), 'blocked' => $configuredFloor['blocked'] ?? array());
                 break;
             }
         }
@@ -2100,6 +2195,12 @@ function heatmap_build_inspect_sql(array $query, array $config, array $bounds): 
                     . '                AND hef.' . $zColumn . ' < :' . $prefix . '_z_max' . "\n";
                 $params[$prefix . '_z_min'] = $context['floorBounds']['zMin'];
                 $params[$prefix . '_z_max'] = $context['floorBounds']['zMax'];
+                if ($context['floorBounds']['regions']) {
+                    $floorPredicate .= '                AND ' . heatmap_regions_sql($context['floorBounds']['regions'], 'hef.' . $xColumn, 'hef.' . $yColumn) . "\n";
+                }
+                if (!empty($context['floorBounds']['blocked'])) {
+                    $floorPredicate .= '                AND NOT ' . heatmap_regions_sql($context['floorBounds']['blocked'], 'hef.' . $xColumn, 'hef.' . $yColumn) . "\n";
+                }
             }
             $branchLines = array(
                 '            SELECT',
@@ -2761,6 +2862,9 @@ function heatmap_admin_config_hash(array $config, array $image = null): string
         'image' => heatmap_admin_file_identity($imagePath),
         'overview' => heatmap_admin_file_identity(heatmap_overview_path($config, $map)),
     );
+    foreach (heatmap_config_floors($config) as $floor) {
+        if (!empty($floor['image'])) $payload['floorImages'][$floor['id']] = heatmap_admin_file_identity(heatmap_source_path($config, $map . '--' . $floor['id']));
+    }
     $encoded = json_encode(
         heatmap_cache_identity_value($payload),
         JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION
@@ -2832,9 +2936,28 @@ function heatmap_transform_point(array $row, array $config)
     return array('x' => $x, 'y' => $y);
 }
 
-function heatmap_image_metadata($game, $map, array $config)
+function heatmap_floor_source_path(array $config, string $map, string $floor): ?string
 {
-    $sourcePath = heatmap_source_path($config, $map);
+    if ($floor === 'all') return null;
+    $floors = heatmap_config_floors($config);
+    heatmap_validate_requested_floor($floor, $floors);
+    foreach ($floors as $item) {
+        if ($item['id'] === $floor && !empty($item['image'])) {
+            $path = heatmap_source_path($config, $map . '--' . $floor);
+            if (!is_file($path)) throw new InvalidArgumentException('invalid_image');
+            $base = heatmap_map_source_snapshot(heatmap_source_path($config, $map));
+            $layer = heatmap_map_source_snapshot($path);
+            if ($base['width'] !== $layer['width'] || $base['height'] !== $layer['height']) throw new InvalidArgumentException('invalid_image');
+            return $path;
+        }
+    }
+    return null;
+}
+
+function heatmap_image_metadata($game, $map, array $config, string $floor = 'all')
+{
+    $floorPath = heatmap_floor_source_path($config, $map, $floor);
+    $sourcePath = $floorPath ?? heatmap_source_path($config, $map);
     if (is_file($sourcePath)) {
         $sourceSnapshot = heatmap_map_source_snapshot($sourcePath);
         $sourceIdentity = $sourceSnapshot['sourceIdentity'];
@@ -2848,6 +2971,7 @@ function heatmap_image_metadata($game, $map, array $config)
             'source' => 'heatmaps/src',
             'sourceIdentity' => $sourceIdentity,
         );
+        if ($floorPath !== null) $base['url'] .= '&floor=' . rawurlencode($floor);
         if (heatmap_has_crop($config)) {
             $base['url'] .= '&crop=1'
                 . '&cropx1=' . intval($config['cropx1'])
@@ -3368,7 +3492,7 @@ function heatmap_parse_overview($content, array $config)
             'scale' => floatval($sourcePairs['scale']),
             'flipx' => 0,
             'flipy' => 1,
-            'rotate' => (isset($sourcePairs['rotate']) && !in_array(strtolower($sourcePairs['rotate']), array('0', 'false'), true)) ? 1 : 0,
+            'rotate' => 0,
         ));
     }
 
@@ -3384,9 +3508,7 @@ function heatmap_parse_overview($content, array $config)
         $gold['rotate'] = !in_array(strtolower(trim($match[1])), array('0', 'false'), true) ? 1 : 0;
     }
     if (isset($gold['xoffset'], $gold['yoffset'], $gold['scale'])) {
-        $gold['flipx'] = 0;
-        $gold['flipy'] = 1;
-        return heatmap_merge_config_override($config, $gold);
+        throw new InvalidArgumentException('GoldSrc TXT requires native image registration; use scripts/heatmap_bsp_registration.py and preview the resulting projection with landmarks.');
     }
 
     throw new InvalidArgumentException('overview file did not contain supported projection fields');

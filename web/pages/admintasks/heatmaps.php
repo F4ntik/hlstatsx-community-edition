@@ -24,6 +24,11 @@ $adminLanguage = current_lang();
 
 <div class="heatmap-admin-wizard" data-heatmap-admin="1" data-heatmap-game="<?php echo eHtml($selectedGame); ?>" data-heatmap-map="<?php echo eHtml($defaultMap); ?>" data-heatmap-csrf="<?php echo eHtml($csrfToken); ?>" data-heatmap-lang="<?php echo eHtml($adminLanguage); ?>" data-heatmap-admin-text-all-floors="<?php echo eHtml(t('admin.task.heatmaps.all_floors')); ?>" data-heatmap-admin-text-remove-floor="<?php echo eHtml(t('admin.task.heatmaps.remove_floor')); ?>" data-heatmap-admin-text-diagnostic-window-invalid="<?php echo eHtml(t('admin.task.heatmaps.diagnostic_window_invalid')); ?>" data-heatmap-admin-text-preview-ready="<?php echo eHtml(t('admin.task.heatmaps.preview_ready')); ?>" data-heatmap-admin-text-saved="<?php echo eHtml(t('admin.task.heatmaps.saved')); ?>" data-heatmap-admin-text-uploaded="<?php echo eHtml(t('admin.task.heatmaps.uploaded')); ?>" data-heatmap-admin-text-load-before-save="<?php echo eHtml(t('admin.task.heatmaps.load_before_save')); ?>" data-heatmap-admin-text-landmarks-required="<?php echo eHtml(t('admin.task.heatmaps.landmarks_required')); ?>" data-heatmap-admin-text-registration-accepted="<?php echo eHtml(t('admin.task.heatmaps.registration_accepted')); ?>" data-heatmap-admin-text-candidate-refused="<?php echo eHtml(t('admin.task.heatmaps.candidate_refused')); ?>" data-heatmap-admin-text-registration-coverage="<?php echo eHtml(t('admin.task.heatmaps.registration_coverage')); ?>">
 	<p><?php echo eHtml(t('admin.task.heatmaps.intro')); ?></p>
+	<details class="heatmap-admin-import"><summary><?php echo eHtml(t('admin.task.heatmaps.import_report')); ?></summary>
+		<p><?php echo eHtml(t('admin.task.heatmaps.import_help')); ?></p>
+		<label>JSON <input type="file" accept=".json,application/json" data-heatmap-registration-report="1" /></label>
+		<label>SVG <input type="file" accept=".svg,image/svg+xml" data-heatmap-registration-geometry="1" /></label>
+	</details>
 	<div class="heatmap-admin-controls">
 		<label>
 			<?php echo eHtml(t('literal.map')); ?>
@@ -38,6 +43,8 @@ $adminLanguage = current_lang();
 			<input type="text" maxlength="64" data-heatmap-admin-new-map="1" />
 		</label>
 		<button type="button" data-heatmap-admin-load="1"><?php echo eHtml(t('admin.task.heatmaps.load')); ?></button>
+		<button type="button" data-heatmap-clear-geometry="1" disabled aria-pressed="false"><?php echo $adminLanguage === 'ru' ? 'Показать геометрию BSP' : 'Show BSP geometry'; ?></button>
+		<span data-heatmap-geometry-status="1" role="status"></span>
 	</div>
 
 	<div class="heatmap-admin-grid">
@@ -104,6 +111,7 @@ $adminLanguage = current_lang();
 			</fieldset>
 			<fieldset class="heatmap-admin-floors">
 				<legend><?php echo eHtml(t('admin.task.heatmaps.floors')); ?></legend>
+				<p><?php echo eHtml(t('admin.task.heatmaps.regions_help')); ?></p>
 				<div class="heatmap-admin-floor-table-wrap">
 					<table class="heatmap-admin-floor-table">
 						<thead><tr><th><?php echo eHtml(t('admin.task.heatmaps.floor_id')); ?></th><th><?php echo eHtml(t('admin.task.heatmaps.floor_label_en')); ?></th><th><?php echo eHtml(t('admin.task.heatmaps.floor_label_ru')); ?></th><th><?php echo eHtml(t('admin.task.heatmaps.floor_z_min')); ?></th><th><?php echo eHtml(t('admin.task.heatmaps.floor_z_max')); ?></th><th></th></tr></thead>
@@ -123,9 +131,9 @@ $adminLanguage = current_lang();
 			</div>
 			<fieldset class="heatmap-admin-landmarks">
 				<legend><?php echo eHtml(t('admin.task.heatmaps.landmarks')); ?></legend>
-				<label><?php echo eHtml(t('admin.task.heatmaps.tolerance')); ?> <input type="number" min="1" max="200" step="1" value="10" data-heatmap-landmark-tolerance="1" /></label>
-				<div class="heatmap-admin-floor-table-wrap"><table class="heatmap-admin-floor-table"><thead><tr><th scope="col"><?php echo eHtml(t('admin.task.heatmaps.world_x')); ?></th><th scope="col"><?php echo eHtml(t('admin.task.heatmaps.world_y')); ?></th><th scope="col"><?php echo eHtml(t('admin.task.heatmaps.pixel_x')); ?></th><th scope="col"><?php echo eHtml(t('admin.task.heatmaps.pixel_y')); ?></th><th scope="col"><?php echo eHtml(t('admin.task.heatmaps.holdout')); ?></th><th scope="col"><?php echo eHtml(t('admin.task.heatmaps.residual')); ?></th></tr></thead><tbody data-heatmap-landmark-rows="1">
-				<?php for ($landmarkIndex = 0; $landmarkIndex < 6; $landmarkIndex++): ?><tr data-heatmap-landmark-row="1"><td><input type="number" aria-label="<?php echo eHtml(t('admin.task.heatmaps.world_x')); ?>" data-heatmap-landmark="worldX" /></td><td><input type="number" aria-label="<?php echo eHtml(t('admin.task.heatmaps.world_y')); ?>" data-heatmap-landmark="worldY" /></td><td><input type="number" aria-label="<?php echo eHtml(t('admin.task.heatmaps.pixel_x')); ?>" data-heatmap-landmark="pixelX" /></td><td><input type="number" aria-label="<?php echo eHtml(t('admin.task.heatmaps.pixel_y')); ?>" data-heatmap-landmark="pixelY" /></td><td><input type="checkbox" aria-label="<?php echo eHtml(t('admin.task.heatmaps.holdout')); ?>" data-heatmap-landmark="holdout"<?php echo $landmarkIndex >= 4 ? ' checked="checked"' : ''; ?> /></td><td data-heatmap-landmark-residual="1">—</td></tr><?php endfor; ?>
+				<label><?php echo eHtml(t('admin.task.heatmaps.tolerance')); ?> <input type="number" min="1" max="10" step="1" value="10" data-heatmap-landmark-tolerance="1" /></label>
+				<div class="heatmap-admin-floor-table-wrap"><table class="heatmap-admin-floor-table"><thead><tr><th scope="col"><?php echo eHtml(t('admin.task.heatmaps.landmark_name')); ?></th><th scope="col"><?php echo eHtml(t('admin.task.heatmaps.world_x')); ?></th><th scope="col"><?php echo eHtml(t('admin.task.heatmaps.world_y')); ?></th><th scope="col"><?php echo eHtml(t('admin.task.heatmaps.pixel_x')); ?></th><th scope="col"><?php echo eHtml(t('admin.task.heatmaps.pixel_y')); ?></th><th scope="col"><?php echo eHtml(t('admin.task.heatmaps.holdout')); ?></th><th scope="col"><?php echo eHtml(t('admin.task.heatmaps.residual')); ?></th></tr></thead><tbody data-heatmap-landmark-rows="1">
+				<?php for ($landmarkIndex = 0; $landmarkIndex < 6; $landmarkIndex++): ?><tr data-heatmap-landmark-row="1"><td><input type="text" maxlength="120" aria-label="<?php echo eHtml(t('admin.task.heatmaps.landmark_name')); ?>" data-heatmap-landmark="label" /></td><td><input type="number" aria-label="<?php echo eHtml(t('admin.task.heatmaps.world_x')); ?>" data-heatmap-landmark="worldX" /></td><td><input type="number" aria-label="<?php echo eHtml(t('admin.task.heatmaps.world_y')); ?>" data-heatmap-landmark="worldY" /></td><td><input type="number" aria-label="<?php echo eHtml(t('admin.task.heatmaps.pixel_x')); ?>" data-heatmap-landmark="pixelX" /></td><td><input type="number" aria-label="<?php echo eHtml(t('admin.task.heatmaps.pixel_y')); ?>" data-heatmap-landmark="pixelY" /></td><td><input type="checkbox" aria-label="<?php echo eHtml(t('admin.task.heatmaps.holdout')); ?>" data-heatmap-landmark="holdout"<?php echo $landmarkIndex >= 4 ? ' checked="checked"' : ''; ?> /></td><td data-heatmap-landmark-residual="1">—</td></tr><?php endfor; ?>
 				</tbody></table></div>
 				<button type="button" data-heatmap-landmark-apply="1"><?php echo eHtml(t('admin.task.heatmaps.apply_candidate')); ?></button>
 				<p data-heatmap-landmark-status="1" aria-live="polite"></p>

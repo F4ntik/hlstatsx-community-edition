@@ -139,7 +139,7 @@ error(t('literal.invalid_game'));
 	<?php printSectionTitle(t('literal.map_details')); ?>
 	<div class="subblock">
 		<div style="float:left;">
-			<strong><?php echo eHtml($map); ?></strong>: <?php echo t('literal.from_total_kills_last_days', array('kills' => number_format(intval($totalkills)), 'days' => $g_options['DeleteDays'])); ?>
+			<strong><?php echo eHtml($map); ?></strong>: <?php echo heatmap_should_render_explorer($g_options, $_GET) ? t('heatmapExplorer.storedKills', array('kills' => number_format(intval($totalkills)))) : t('literal.from_total_kills_last_days', array('kills' => number_format(intval($totalkills)), 'days' => $g_options['DeleteDays'])); ?>
 		</div>
 		<div style="float:right;">
 			<?php echo eHtml(t('literal.back_to')); ?> <a href="<?php echo $g_options['scripturl'] . "?mode=maps&amp;game=$game"; ?>"><?php echo eHtml(t('literal.map_statistics')); ?></a>

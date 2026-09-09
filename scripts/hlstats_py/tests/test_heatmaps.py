@@ -427,32 +427,28 @@ def test_collect_projection_stats_reports_raw_bounds_and_ratio() -> None:
     assert stats.in_bounds_ratio == 0.5
 
 
-def test_parse_goldsrc_overview_converts_to_legacy_config() -> None:
-    overview = parse_goldsrc_overview(
-        """
-        global
-        {
-            ZOOM 1.260000
-            ORIGIN -223 1120 0
-            ROTATED 0
-        }
-        layer
-        {
-            IMAGE "overviews/de_dust2.bmp"
-            HEIGHT 1024
-        }
-        """,
-        code="cstrike",
-        game="cstrike",
-        map_name="de_dust2",
-    )
+def test_parse_goldsrc_overview_requires_explicit_native_frame() -> None:
+    import pytest
+    with pytest.raises(ValueError, match="TXT alone"):
+        parse_goldsrc_overview("ZOOM 1.5\nORIGIN 223 1097 0\nROTATED 0", code="cstrike", game="cstrike", map_name="de_dust2")
 
-    assert overview.projection == "goldsrc"
-    assert overview.manual_required is False
-    assert overview.to_legacy_config().xoffset == 223
-    assert overview.to_legacy_config().yoffset == 1120
-    assert overview.to_legacy_config().scale == 1.26
-    assert overview.to_legacy_config().flipy is True
+
+def test_parse_goldsrc_overview_matches_sdk_axes() -> None:
+    import pytest
+    for rotated in (0, 1):
+        overview = parse_goldsrc_overview(
+            f"ZOOM 1.5\nORIGIN 223 1097 0\nROTATED {rotated}",
+            code="cstrike", game="cstrike", map_name="de_dust2",
+            native_width=1024, native_height=768, registered_native_frame=True,
+        )
+        config = overview.to_legacy_config()
+        assert config.scale == pytest.approx(16 / 3)
+        for x, y in [(223, 1097), (0, 0), (-1700, 2500)]:
+            point = HeatmapPoint(event_time=datetime(2026, 1, 1), pos_x=x, pos_y=y)
+            actual = transform_point(point, config)
+            expected = (512+(x-223)*.1875,384-(y-1097)*.1875) if rotated else (512-(y-1097)*.1875,384-(x-223)*.1875)
+            assert abs(actual[0]-expected[0]) <= 1
+            assert abs(actual[1]-expected[1]) <= 1
 
 
 def test_parse_source_overview_converts_to_legacy_config() -> None:

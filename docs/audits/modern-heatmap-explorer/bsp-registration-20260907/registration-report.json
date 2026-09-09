@@ -1,0 +1,652 @@
+{
+  "status": "diagnostic_only_not_landmark_accepted",
+  "bsp_sha256": "15945389528d113562ede0a2c80647ebfa799079ed1c05a25379bcf84e4e9286",
+  "world_bounds": [
+    [
+      -2816.0,
+      -1664.0,
+      -320.0
+    ],
+    [
+      2048.0,
+      3936.0,
+      640.0
+    ]
+  ],
+  "world_faces": 5130,
+  "world_to_native": [
+    0.0,
+    -0.1875,
+    717.6875,
+    -0.1875,
+    0.0,
+    342.1875
+  ],
+  "native_size": [
+    1024,
+    768
+  ],
+  "entities": [
+    {
+      "classname": "info_player_start",
+      "origin": [
+        448.0,
+        2464.0,
+        -88.0
+      ],
+      "native_pixel": [
+        255.6875,
+        258.1875
+      ]
+    },
+    {
+      "classname": "info_player_start",
+      "origin": [
+        352.0,
+        2464.0,
+        -88.0
+      ],
+      "native_pixel": [
+        255.6875,
+        276.1875
+      ]
+    },
+    {
+      "classname": "info_player_start",
+      "origin": [
+        256.0,
+        2464.0,
+        -88.0
+      ],
+      "native_pixel": [
+        255.6875,
+        294.1875
+      ]
+    },
+    {
+      "classname": "info_player_start",
+      "origin": [
+        448.0,
+        2112.0,
+        -88.0
+      ],
+      "native_pixel": [
+        321.6875,
+        258.1875
+      ]
+    },
+    {
+      "classname": "info_player_start",
+      "origin": [
+        160.0,
+        2464.0,
+        -88.0
+      ],
+      "native_pixel": [
+        255.6875,
+        312.1875
+      ]
+    },
+    {
+      "classname": "info_player_start",
+      "origin": [
+        352.0,
+        2112.0,
+        -88.0
+      ],
+      "native_pixel": [
+        321.6875,
+        276.1875
+      ]
+    },
+    {
+      "classname": "info_player_start",
+      "origin": [
+        256.0,
+        2112.0,
+        -88.0
+      ],
+      "native_pixel": [
+        321.6875,
+        294.1875
+      ]
+    },
+    {
+      "classname": "info_player_start",
+      "origin": [
+        160.0,
+        2112.0,
+        -88.0
+      ],
+      "native_pixel": [
+        321.6875,
+        312.1875
+      ]
+    },
+    {
+      "classname": "info_player_start",
+      "origin": [
+        64.0,
+        2112.0,
+        -88.0
+      ],
+      "native_pixel": [
+        321.6875,
+        330.1875
+      ]
+    },
+    {
+      "classname": "info_player_start",
+      "origin": [
+        -96.0,
+        2240.0,
+        -88.0
+      ],
+      "native_pixel": [
+        297.6875,
+        360.1875
+      ]
+    },
+    {
+      "classname": "info_player_start",
+      "origin": [
+        448.0,
+        2240.0,
+        -88.0
+      ],
+      "native_pixel": [
+        297.6875,
+        258.1875
+      ]
+    },
+    {
+      "classname": "info_player_start",
+      "origin": [
+        352.0,
+        2240.0,
+        -88.0
+      ],
+      "native_pixel": [
+        297.6875,
+        276.1875
+      ]
+    },
+    {
+      "classname": "info_player_start",
+      "origin": [
+        256.0,
+        2240.0,
+        -88.0
+      ],
+      "native_pixel": [
+        297.6875,
+        294.1875
+      ]
+    },
+    {
+      "classname": "info_player_start",
+      "origin": [
+        160.0,
+        2240.0,
+        -88.0
+      ],
+      "native_pixel": [
+        297.6875,
+        312.1875
+      ]
+    },
+    {
+      "classname": "info_player_start",
+      "origin": [
+        544.0,
+        2240.0,
+        -64.0
+      ],
+      "native_pixel": [
+        297.6875,
+        240.1875
+      ]
+    },
+    {
+      "classname": "info_player_start",
+      "origin": [
+        544.0,
+        2128.0,
+        -64.0
+      ],
+      "native_pixel": [
+        318.6875,
+        240.1875
+      ]
+    },
+    {
+      "classname": "info_player_start",
+      "origin": [
+        160.0,
+        2368.0,
+        -88.0
+      ],
+      "native_pixel": [
+        273.6875,
+        312.1875
+      ]
+    },
+    {
+      "classname": "info_player_start",
+      "origin": [
+        256.0,
+        2368.0,
+        -88.0
+      ],
+      "native_pixel": [
+        273.6875,
+        294.1875
+      ]
+    },
+    {
+      "classname": "info_player_start",
+      "origin": [
+        352.0,
+        2368.0,
+        -88.0
+      ],
+      "native_pixel": [
+        273.6875,
+        276.1875
+      ]
+    },
+    {
+      "classname": "info_player_start",
+      "origin": [
+        448.0,
+        2368.0,
+        -88.0
+      ],
+      "native_pixel": [
+        273.6875,
+        258.1875
+      ]
+    },
+    {
+      "classname": "info_player_deathmatch",
+      "origin": [
+        -832.0,
+        -704.0,
+        176.0
+      ],
+      "native_pixel": [
+        849.6875,
+        498.1875
+      ]
+    },
+    {
+      "classname": "info_player_deathmatch",
+      "origin": [
+        -832.0,
+        -800.0,
+        176.0
+      ],
+      "native_pixel": [
+        867.6875,
+        498.1875
+      ]
+    },
+    {
+      "classname": "info_player_deathmatch",
+      "origin": [
+        -832.0,
+        -896.0,
+        192.0
+      ],
+      "native_pixel": [
+        885.6875,
+        498.1875
+      ]
+    },
+    {
+      "classname": "info_player_deathmatch",
+      "origin": [
+        -736.0,
+        -896.0,
+        192.0
+      ],
+      "native_pixel": [
+        885.6875,
+        480.1875
+      ]
+    },
+    {
+      "classname": "info_player_deathmatch",
+      "origin": [
+        -736.0,
+        -800.0,
+        176.0
+      ],
+      "native_pixel": [
+        867.6875,
+        480.1875
+      ]
+    },
+    {
+      "classname": "info_player_deathmatch",
+      "origin": [
+        -736.0,
+        -704.0,
+        176.0
+      ],
+      "native_pixel": [
+        849.6875,
+        480.1875
+      ]
+    },
+    {
+      "classname": "info_player_deathmatch",
+      "origin": [
+        -640.0,
+        -896.0,
+        192.0
+      ],
+      "native_pixel": [
+        885.6875,
+        462.1875
+      ]
+    },
+    {
+      "classname": "info_player_deathmatch",
+      "origin": [
+        -640.0,
+        -800.0,
+        176.0
+      ],
+      "native_pixel": [
+        867.6875,
+        462.1875
+      ]
+    },
+    {
+      "classname": "info_player_deathmatch",
+      "origin": [
+        -640.0,
+        -704.0,
+        176.0
+      ],
+      "native_pixel": [
+        849.6875,
+        462.1875
+      ]
+    },
+    {
+      "classname": "info_player_deathmatch",
+      "origin": [
+        -544.0,
+        -896.0,
+        192.0
+      ],
+      "native_pixel": [
+        885.6875,
+        444.1875
+      ]
+    },
+    {
+      "classname": "info_player_deathmatch",
+      "origin": [
+        -544.0,
+        -800.0,
+        176.0
+      ],
+      "native_pixel": [
+        867.6875,
+        444.1875
+      ]
+    },
+    {
+      "classname": "info_player_deathmatch",
+      "origin": [
+        -544.0,
+        -704.0,
+        176.0
+      ],
+      "native_pixel": [
+        849.6875,
+        444.1875
+      ]
+    },
+    {
+      "classname": "info_player_deathmatch",
+      "origin": [
+        -448.0,
+        -896.0,
+        176.0
+      ],
+      "native_pixel": [
+        885.6875,
+        426.1875
+      ]
+    },
+    {
+      "classname": "info_player_deathmatch",
+      "origin": [
+        -448.0,
+        -800.0,
+        160.0
+      ],
+      "native_pixel": [
+        867.6875,
+        426.1875
+      ]
+    },
+    {
+      "classname": "info_player_deathmatch",
+      "origin": [
+        -448.0,
+        -704.0,
+        160.0
+      ],
+      "native_pixel": [
+        849.6875,
+        426.1875
+      ]
+    },
+    {
+      "classname": "info_player_deathmatch",
+      "origin": [
+        -928.0,
+        -720.0,
+        176.0
+      ],
+      "native_pixel": [
+        852.6875,
+        516.1875
+      ]
+    },
+    {
+      "classname": "info_player_deathmatch",
+      "origin": [
+        -928.0,
+        -816.0,
+        176.0
+      ],
+      "native_pixel": [
+        870.6875,
+        516.1875
+      ]
+    },
+    {
+      "classname": "info_player_deathmatch",
+      "origin": [
+        -1024.0,
+        -800.0,
+        176.0
+      ],
+      "native_pixel": [
+        867.6875,
+        534.1875
+      ]
+    },
+    {
+      "classname": "info_player_deathmatch",
+      "origin": [
+        -1024.0,
+        -704.0,
+        176.0
+      ],
+      "native_pixel": [
+        849.6875,
+        534.1875
+      ]
+    },
+    {
+      "classname": "info_player_deathmatch",
+      "origin": [
+        -1024.0,
+        -896.0,
+        192.0
+      ],
+      "native_pixel": [
+        885.6875,
+        534.1875
+      ]
+    }
+  ],
+  "sources": [
+    "https://github.com/ValveSoftware/halflife/blob/master/utils/common/bspfile.h",
+    "https://github.com/ValveSoftware/halflife/blob/master/cl_dll/hud_spectator.cpp"
+  ],
+  "asset_sha256": {
+    "overview": "51a0e7fe13d2a1a15c9d89174d0f45a4abd68afce56365dd57306c3d09ae884a",
+    "native_image": "9ec191f1c124e928f5aff77fc080dbafcb90146b25463d8d04d8da13d64fbf0a",
+    "served_image": "ef05c0fae9d8e73eaeab92f4c119dc6d3eeb5c946ad5da7946a49dcba2d5ca15"
+  },
+  "native_to_served": [
+    1.0501127243041992,
+    0.0,
+    106.94888305664062,
+    0.0,
+    1.0501127243041992,
+    77.02749633789062
+  ],
+  "world_to_served": [
+    0.0,
+    -0.19689613580703735,
+    860.6016588807106,
+    -0.19689613580703735,
+    0.0,
+    436.3629441857338
+  ],
+  "image_registration": {
+    "matches": 661,
+    "training_inliers": 441,
+    "holdout_split": "connected source-and-target 1px spatial groups, every fifth group",
+    "holdouts": 136,
+    "holdout_inliers": 114,
+    "holdout_inlier_rmse_px": 0.6289360523223877,
+    "holdout_all_median_px": 0.345633864402771,
+    "quadrants": 4,
+    "unconstrained_rotation_degrees": 0.005658425445900256
+  },
+  "served_size": [
+    1280,
+    1024
+  ],
+  "candidate_config": {
+    "xoffset": 2216,
+    "yoffset": -4371,
+    "scale": 5.078819835144061,
+    "flipx": true,
+    "flipy": false,
+    "rotate": 1,
+    "cropx1": 0,
+    "cropx2": 0,
+    "cropy1": 0,
+    "cropy2": 0
+  },
+  "candidate_image": "served_image",
+  "python_roundtrip": {
+    "points": 3229,
+    "max_euclidean_error_px": 1.4162516830193366,
+    "rmse_px": 0.8257588346463679,
+    "samples": [
+      {
+        "world": [
+          448,
+          2464
+        ],
+        "pixel": [
+          375,
+          348
+        ]
+      },
+      {
+        "world": [
+          352,
+          2112
+        ],
+        "pixel": [
+          444,
+          367
+        ]
+      },
+      {
+        "world": [
+          448,
+          2240
+        ],
+        "pixel": [
+          419,
+          348
+        ]
+      },
+      {
+        "world": [
+          544,
+          2128
+        ],
+        "pixel": [
+          441,
+          329
+        ]
+      },
+      {
+        "world": [
+          -832,
+          -704
+        ],
+        "pixel": [
+          999,
+          600
+        ]
+      },
+      {
+        "world": [
+          -736,
+          -704
+        ],
+        "pixel": [
+          999,
+          581
+        ]
+      },
+      {
+        "world": [
+          -544,
+          -800
+        ],
+        "pixel": [
+          1018,
+          543
+        ]
+      },
+      {
+        "world": [
+          -928,
+          -720
+        ],
+        "pixel": [
+          1002,
+          619
+        ]
+      }
+    ]
+  },
+  "acceptance_boundary": "Diagnostic geometry and image registration; real event landmark acceptance remains separate. No database mutation."
+}

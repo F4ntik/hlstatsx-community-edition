@@ -39,6 +39,9 @@ try {
         $crop = false;
     } else {
         $sourcePath = dirname(__DIR__) . '/heatmaps/src/' . $config['game'] . '/' . $map . '.jpg';
+        $floor = $_GET['floor'] ?? 'all';
+        if (!is_string($floor)) throw new InvalidArgumentException('invalid_floor');
+        $sourcePath = heatmap_floor_source_path($config, $map, $floor) ?? $sourcePath;
     }
     if ($sourcePath === '' || !is_file($sourcePath)) {
         http_response_code(404);

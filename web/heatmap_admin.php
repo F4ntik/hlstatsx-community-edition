@@ -46,6 +46,7 @@ function heatmap_admin_message(string $code, string $language): string
 {
     $messages = array(
         'en' => array(
+            'overview_registration_required' => 'GoldSrc TXT needs image registration first. Follow the BSP alignment guide, then preview the derived projection with named landmarks.',
             'access_denied' => 'Administrator access is required.',
             'method_not_allowed' => 'This action requires POST.',
             'same_origin_required' => 'This request must come from this site.',
@@ -55,6 +56,9 @@ function heatmap_admin_message(string $code, string $language): string
 			'preview_required' => 'Preview and validate at least four landmarks plus two holdouts before saving.',
             'actor_required' => 'The authenticated administrator has no valid actor identity.',
             'image_missing' => 'A map image is required for preview.',
+            'floor_image_size' => 'The floor JPEG must have the same dimensions as the main map image.',
+            'floor_save_first' => 'Save this floor before uploading its image.',
+            'invalid_floor_config' => 'Check floor names and height ranges. Outlines need 3–32 distinct corners without crossing; overlapping floor heights require separate regions.',
             'nothing_uploaded' => 'Choose a map image or overview file first.',
             'preview_failed' => 'The preview could not be prepared.',
             'save_failed' => 'The calibration was not saved.',
@@ -63,6 +67,7 @@ function heatmap_admin_message(string $code, string $language): string
             'uploaded' => 'Upload saved.',
         ),
         'ru' => array(
+            'overview_registration_required' => 'Сначала нужно совместить обзор GoldSrc с изображением карты. Используйте руководство по привязке BSP, затем проверьте полученные настройки по именованным ориентирам.',
             'access_denied' => 'Требуются права администратора.',
             'method_not_allowed' => 'Для этого действия нужен POST-запрос.',
             'same_origin_required' => 'Запрос должен быть отправлен с этого сайта.',
@@ -71,7 +76,10 @@ function heatmap_admin_message(string $code, string $language): string
             'stale_config' => 'Настройка изменилась в другом месте. Загрузите её заново перед сохранением.',
 			'preview_required' => 'Перед сохранением выполните предпросмотр и проверьте минимум четыре ориентира и две контрольные точки.',
             'actor_required' => 'У аутентифицированного администратора нет допустимого идентификатора.',
-            'image_missing' => 'Для предпросмотра нужна карта изображения.',
+            'image_missing' => 'Для предпросмотра нужно изображение карты.',
+            'floor_image_size' => 'Размер JPEG этажа должен совпадать с основной картинкой карты.',
+            'floor_save_first' => 'Сначала сохраните этаж, затем загрузите его картинку.',
+            'invalid_floor_config' => 'Проверьте названия и границы высоты этажей. Контуру нужны 3–32 разные точки без самопересечения; этажам с пересекающимися высотами — раздельные области.',
             'nothing_uploaded' => 'Сначала выберите изображение карты или файл обзора.',
             'preview_failed' => 'Не удалось подготовить предпросмотр.',
             'save_failed' => 'Настройка не сохранена.',
@@ -292,6 +300,14 @@ function heatmap_admin_require_preview_token(array $request, array $config, arra
 	}
 }
 
+function heatmap_admin_same_projection(array $stored, array $next): bool
+{
+    $left = heatmap_projection_config($stored);
+    $right = heatmap_projection_config($next);
+    unset($left['floors'], $right['floors']);
+    return $left == $right;
+}
+
 function heatmap_admin_invalidate_alias_payload_caches(string $game, string $map, array $config): void
 {
     $map = heatmap_clean_token($map);
@@ -332,6 +348,9 @@ function heatmap_admin_locked_config(PDO $pdo, string $game, string $map): array
 
 function heatmap_admin_bounded_overview($value): string
 {
+    if (is_string($value) && preg_match('/^\s*ZOOM\s+/mi', $value)) {
+        throw new HeatmapAdminException('overview_registration_required', 400);
+    }
     if (!is_string($value) || strlen($value) > HEATMAP_ADMIN_MAX_OVERVIEW_BYTES || strpos($value, "\0") !== false) {
         throw new HeatmapAdminException('invalid_request', 400);
     }
@@ -409,7 +428,7 @@ function heatmap_admin_preview_payload(PDO $pdo, array $request, array $storedCo
     try {
         $config = heatmap_merge_config_override($storedConfig, $request);
     } catch (InvalidArgumentException $exception) {
-        throw new HeatmapAdminException('invalid_request', 400);
+        throw new HeatmapAdminException($exception->getMessage() === 'invalid_floor_config' ? 'invalid_floor_config' : 'invalid_request', 400);
     }
     if (array_key_exists('overviewText', $request) && strval($request['overviewText']) !== '') {
         try {
@@ -419,6 +438,13 @@ function heatmap_admin_preview_payload(PDO $pdo, array $request, array $storedCo
         }
     }
     $config['map'] = $map;
+    try {
+        foreach (heatmap_config_floors($config) as $configuredFloor) {
+            if (!empty($configuredFloor['image'])) heatmap_floor_source_path($config, $map, $configuredFloor['id']);
+        }
+    } catch (Throwable $exception) {
+        throw new HeatmapAdminException('image_missing', 404);
+    }
     $image = heatmap_image_metadata($game, $map, $config);
     if (!is_array($image)) {
         throw new HeatmapAdminException('image_missing', 404);
@@ -430,7 +456,7 @@ function heatmap_admin_preview_payload(PDO $pdo, array $request, array $storedCo
             $pdo,
 			$query,
             $config,
-            $image,
+            heatmap_image_metadata($game, $map, $config, $query['floor']),
             array('exact' => true, 'exactLimit' => HEATMAP_EXACT_PREVIEW_LIMIT)
         );
     } catch (HeatmapAdminException $exception) {
@@ -463,7 +489,8 @@ function heatmap_admin_preview_payload(PDO $pdo, array $request, array $storedCo
 	$scene['registration'] = $registration;
     $scene['suggestedFloors'] = heatmap_suggest_floor_bands($coverage['zHistogram'] ?? array());
     $scene['configHash'] = heatmap_admin_config_hash($storedConfig, heatmap_image_metadata($game, $map, $storedConfig));
-	if (strval($request['registrationRequested'] ?? '') === '1' && $registration['ok'] && empty($scene['exact']['overflow'])) {
+    $scene['settingsOnly'] = heatmap_admin_same_projection($storedConfig, $config);
+	if (($scene['settingsOnly'] || strval($request['registrationRequested'] ?? '') === '1' && $registration['ok']) && empty($scene['exact']['overflow'])) {
 		$scene['previewToken'] = heatmap_admin_issue_preview_token($config, $image, $query);
 	}
     return $scene;
@@ -502,12 +529,19 @@ function heatmap_admin_save(PDO $pdo, $logger, array $request): void
         try {
             $nextConfig = heatmap_merge_config_override($storedConfig, $request);
         } catch (InvalidArgumentException $exception) {
-            throw new HeatmapAdminException('invalid_request', 400);
+            throw new HeatmapAdminException($exception->getMessage() === 'invalid_floor_config' ? 'invalid_floor_config' : 'invalid_request', 400);
         }
         if (array_key_exists('overviewText', $request) && strval($request['overviewText']) !== '') {
             $nextConfig = heatmap_parse_overview(heatmap_admin_bounded_overview($request['overviewText']), $nextConfig);
         }
         $nextConfig['map'] = $map;
+        foreach (heatmap_config_floors($nextConfig) as $configuredFloor) {
+            if (!empty($configuredFloor['image'])) heatmap_floor_source_path($nextConfig, $map, $configuredFloor['id']);
+        }
+        if (!heatmap_admin_same_projection($storedConfig, $nextConfig)
+            && !heatmap_admin_landmark_registration($request, $nextConfig)['ok']) {
+            throw new HeatmapAdminException('preview_required', 409);
+        }
 		$nextImage = heatmap_image_metadata($game, $map, $nextConfig);
 		if (!is_array($nextImage)) {
 			throw new HeatmapAdminException('image_missing', 404);
@@ -760,9 +794,27 @@ function heatmap_admin_upload(PDO $pdo, $logger, array $request): void
         heatmap_admin_require_config_hash($request, $oldHash);
         if (!empty($_FILES['mapImage']['tmp_name'])) {
             heatmap_admin_validate_map_image($_FILES['mapImage']);
+            $targetName = $map . '.jpg';
+            $floorId = $request['imageFloor'] ?? 'all';
+            if ($floorId !== 'all') {
+                if (!heatmap_floor_id_is_valid($floorId)) throw new HeatmapAdminException('invalid_request', 400);
+                $floors = heatmap_config_floors($config);
+                $found = false;
+                foreach ($floors as &$floor) if ($floor['id'] === $floorId) { $floor['image'] = true; $found = true; }
+                unset($floor);
+                if (!$found) throw new HeatmapAdminException('floor_save_first', 409);
+                $base = heatmap_image_metadata($game, $map, $config);
+                $size = getimagesize($_FILES['mapImage']['tmp_name']);
+                if (!$base || $size[0] !== intval($base['sourceWidth'] ?? $base['width']) || $size[1] !== intval($base['sourceHeight'] ?? $base['height'])) {
+                    throw new HeatmapAdminException('floor_image_size', 400);
+                }
+                $config['floors'] = $floors;
+                $config['floors_json'] = heatmap_floor_config_json($floors);
+                $targetName = $map . '--' . $floorId . '.jpg';
+            }
             $artifacts[] = heatmap_admin_stage_uploaded_file(
                 heatmap_admin_asset_directory('src', $config),
-                $map . '.jpg',
+                $targetName,
                 $_FILES['mapImage'],
                 'mapImage'
             );
@@ -802,6 +854,9 @@ function heatmap_admin_upload(PDO $pdo, $logger, array $request): void
             throw new HeatmapAdminException('nothing_uploaded', 400);
         }
         heatmap_admin_install_artifacts($artifacts);
+        if (($request['imageFloor'] ?? 'all') !== 'all' && !heatmap_save_config($pdo, $config)) {
+            throw new HeatmapAdminException('upload_failed', 500);
+        }
         $newHash = heatmap_admin_config_hash($config, heatmap_image_metadata($game, $map, $config));
         if (!$pdo->commit()) {
             throw new HeatmapAdminException('upload_failed', 500);

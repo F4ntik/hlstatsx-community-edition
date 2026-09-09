@@ -242,7 +242,7 @@ try {
     $query = heatmap_parse_v2_query($_GET, time());
     $isInspect = array_key_exists('inspect', $query);
     $metrics = heatmap_v2_metrics($query, $windowClass, $isInspect ? 'no-store' : 'miss', $v2StartedAt);
-    $metrics['operation'] = $isInspect ? 'inspect' : 'scene';
+    $metrics['operation'] = $isInspect ? 'inspect' : (isset($query['geometry']) ? 'geometry' : 'scene');
 
     $pdo = $container->get('pdo');
     $config = heatmap_fetch_config($pdo, $query['game'], $query['map']);
@@ -257,7 +257,7 @@ try {
         exit;
     }
 
-    $image = heatmap_image_metadata($query['game'], $query['map'], $config);
+    $image = heatmap_image_metadata($query['game'], $query['map'], $config, $query['floor']);
     if (!$image) {
         $metrics['state'] = 'not_found';
         $metrics['fallbackReason'] = 'image_not_found';
@@ -306,14 +306,14 @@ try {
     }
 
     $queryStartedAt = microtime(true);
-    $scene = heatmap_build_scene($pdo, $query, $config, $image);
+    $scene = heatmap_build_scene($pdo, $query, $config, $image, isset($query['geometry']) ? array('geometry' => 'points') : array());
     $metrics['queryMs'] = (microtime(true) - $queryStartedAt) * 1000.0;
     heatmap_v2_scene_metrics($metrics, $scene);
-    $status = ($scene['state'] ?? '') === 'too_many_events' ? 422 : 200;
+    $status = in_array($scene['state'] ?? '', array('too_many_events', 'too_many_points'), true) ? 422 : 200;
     if (heatmap_scene_state_is_cacheable($scene['state'] ?? null)) {
         heatmap_write_payload_cache($cacheKey, $scene);
     } else {
-        $metrics['cache'] = 'bypass';
+        $metrics['cache'] = 'no-store';
     }
     heatmap_v2_emit($scene, $status, $metrics);
 } catch (InvalidArgumentException $exception) {

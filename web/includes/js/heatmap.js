@@ -57,6 +57,34 @@ if (typeof module !== 'undefined' && module.exports) {
 	module.exports.HeatmapAdminGeometry = HeatmapAdminGeometry;
 }
 
+var HeatmapRegistrationReport = {
+	parse: function(text) {
+		if (typeof text !== 'string' || text.length > 2000000) throw new Error('invalid_report');
+		var report = JSON.parse(text), config = report && report.candidate_config;
+		var keys = ['xoffset','yoffset','scale','flipx','flipy','rotate','cropx1','cropy1','cropx2','cropy2'];
+		if (!config || Object.keys(config).length !== keys.length) throw new Error('invalid_report');
+		var result = {};
+		keys.forEach(function(key) {
+			var value = config[key];
+			if (key === 'flipx' || key === 'flipy') {
+				if (value !== true && value !== false && value !== 0 && value !== 1) throw new Error('invalid_report');
+				result[key] = value ? 1 : 0;
+			} else {
+				if (typeof value !== 'number' || !isFinite(value) || Math.abs(value) > 8388607
+					|| (key !== 'scale' && Math.floor(value) !== value)
+					|| (key === 'scale' && (value < 0.1 || value > 64))
+					|| (key === 'rotate' && (value < 0 || value > 3))
+					|| (key.indexOf('crop') === 0 && value < 0)) throw new Error('invalid_report');
+				result[key] = value;
+			}
+		});
+		var size = report.candidate_image === 'served_image' ? report.served_size : report.native_size;
+		if (!Array.isArray(size) || size.length !== 2 || !size.every(function(n) { return typeof n === 'number' && Number.isInteger(n) && n > 0 && n <= 16384; })) throw new Error('invalid_report');
+		return {config: result, size: size};
+	}
+};
+if (typeof module !== 'undefined' && module.exports) module.exports.HeatmapRegistrationReport = HeatmapRegistrationReport;
+
 var HeatmapLandmarkSolver = (function() {
 	function finite(value) {
 		return typeof value === 'number' && isFinite(value);
@@ -915,6 +943,11 @@ function setupHeatmapAdminWizard(wizard) {
 	var appliedCandidateKey = '';
 	var serverRegistration = null;
 	var suggestedFloors = [];
+	var drawingFloor = null, drawingPoints = [], drawingKind = 'regions', pickingLandmark = null, geometryOverlay = null;
+	var geometryKey = '', geometryGeneration = 0, geometryVisible = false, geometryManifest;
+	var geometryToggle = wizard.querySelector('[data-heatmap-clear-geometry]');
+	var geometryStatus = wizard.querySelector('[data-heatmap-geometry-status]');
+	var settingsOnly = false, editorToolbar, editorHint, contourList;
 	var currentConfig = {
 		xoffset: 0,
 		yoffset: 0,
@@ -950,7 +983,7 @@ function setupHeatmapAdminWizard(wizard) {
 			if (!worldX || !worldY || !pixelX || !pixelY || (worldX.value === '' && worldY.value === '' && pixelX.value === '' && pixelY.value === '')) {
 				continue;
 			}
-			landmarks.push({worldX: Number(worldX.value), worldY: Number(worldY.value), pixelX: Number(pixelX.value), pixelY: Number(pixelY.value), holdout: Boolean(holdout && holdout.checked)});
+			landmarks.push({label: (row.querySelector('[data-heatmap-landmark="label"]') || {}).value || '', worldX: worldX.value === '' ? NaN : Number(worldX.value), worldY: worldY.value === '' ? NaN : Number(worldY.value), pixelX: pixelX.value === '' ? NaN : Number(pixelX.value), pixelY: pixelY.value === '' ? NaN : Number(pixelY.value), holdout: Boolean(holdout && holdout.checked)});
 		}
 		return landmarks;
 	}
@@ -998,12 +1031,12 @@ function setupHeatmapAdminWizard(wizard) {
 	}
 
 	function syncSaveGate() {
-		var accepted = candidateIsApplied() && serverRegistration && serverRegistration.ok === true && /^[a-f0-9]{64}$/i.test(currentPreviewToken);
+		var accepted = (settingsOnly || candidateIsApplied() && serverRegistration && serverRegistration.ok === true) && /^[a-f0-9]{64}$/i.test(currentPreviewToken) && !drawingFloor;
 		if (saveButton) {
 			saveButton.disabled = !accepted;
 		}
 		if (landmarkStatus) {
-			landmarkStatus.textContent = accepted
+			landmarkStatus.textContent = settingsOnly ? (adminLanguage === 'ru' ? 'Привязка карты не менялась. Этажи и стены можно сохранить без повторного ввода ориентиров.' : 'Map alignment is unchanged. Floors and walls can be saved without re-entering landmarks.') : accepted
 				? adminText('registration-accepted', 'Landmark registration accepted.') + ' ' + adminText('registration-coverage', 'Registration is separate from coverage.')
 				: (!candidateIsApplied() && landmarkResult && landmarkResult.ok
 					? (landmarkApply ? landmarkApply.textContent : 'Apply landmark candidate')
@@ -1071,6 +1104,9 @@ function setupHeatmapAdminWizard(wizard) {
 		input.type = type || 'text';
 		input.value = value == null ? '' : String(value);
 		input.setAttribute('data-heatmap-floor-field', name);
+		var names = {id: ['Код', 'ID'], label_en: ['Название EN', 'Name EN'], label_ru: ['Название RU', 'Name RU'], z_min: ['Высота от', 'Height from'], z_max: ['Высота до', 'Height to']};
+		cell.setAttribute('data-label', names[name][adminLanguage === 'ru' ? 0 : 1]);
+		input.setAttribute('aria-label', cell.getAttribute('data-label'));
 		if (name === 'id') {
 			input.maxLength = 32;
 		}
@@ -1093,6 +1129,9 @@ function setupHeatmapAdminWizard(wizard) {
 		}
 		floor = floor || {};
 		row = document.createElement('tr');
+		row._regions = floor.regions || [];
+		row._blocked = floor.blocked || [];
+		row._floorImage = floor.image === true;
 		createFloorCell(row, 'id', floor.id || '', 'text');
 		createFloorCell(row, 'label_en', floor.label_en || '', 'text');
 		createFloorCell(row, 'label_ru', floor.label_ru || '', 'text');
@@ -1104,11 +1143,24 @@ function setupHeatmapAdminWizard(wizard) {
 		removeButton.textContent = '×';
 		removeButton.title = adminText('remove-floor', 'Remove floor');
 		removeButton.onclick = function() {
+			if (drawingFloor === row) { drawingFloor = null; drawingPoints = []; }
 			floorRows.removeChild(row);
 			schedulePreview();
 		};
 		removeCell.appendChild(removeButton);
 		row.appendChild(removeCell);
+		var regionCell = document.createElement('td'); regionCell.className = 'heatmap-floor-card-actions';
+		var edit = editorButton(adminLanguage === 'ru' ? 'Редактировать на карте' : 'Edit on map', function() {
+			cancelDrawing(); renderFloorSelect(readFloors()); floorSelect.value = row.querySelector('[data-heatmap-floor-field="id"]').value;
+			schedulePreview(); refreshEditor(); viewer.scrollIntoView({block:'start', behavior:'smooth'});
+		});
+		var imageLabel = document.createElement('label'), floorImage = document.createElement('input');
+		floorImage.type = 'checkbox'; floorImage.checked = row._floorImage;
+		floorImage.onchange = function() { row._floorImage = floorImage.checked; schedulePreview(); };
+		imageLabel.appendChild(floorImage); imageLabel.appendChild(document.createTextNode(adminLanguage === 'ru' ? 'Отдельная картинка' : 'Separate image'));
+		var file = document.createElement('input'); file.type = 'file'; file.accept = 'image/jpeg'; file.setAttribute('aria-label', adminLanguage === 'ru' ? 'Картинка этажа JPEG' : 'Floor image JPEG');
+		file.onchange = function() { if (file.files[0]) uploadFloorImage(row, file); };
+		regionCell.appendChild(edit); regionCell.appendChild(imageLabel); regionCell.appendChild(file); row.appendChild(regionCell);
 		floorRows.appendChild(row);
 		var fields = row.querySelectorAll('[data-heatmap-floor-field]');
 		for (var fieldIndex = 0; fieldIndex < fields.length; fieldIndex += 1) {
@@ -1136,6 +1188,9 @@ function setupHeatmapAdminWizard(wizard) {
 					: fields[fieldIndex].value;
 			}
 			floors.push(floor);
+			if (rows[index]._regions && rows[index]._regions.length) floor.regions = rows[index]._regions;
+			if (rows[index]._blocked && rows[index]._blocked.length) floor.blocked = rows[index]._blocked;
+			if (rows[index]._floorImage) floor.image = true;
 		}
 		return floors;
 	}
@@ -1182,12 +1237,10 @@ function setupHeatmapAdminWizard(wizard) {
 		var row;
 		var item;
 		if (diagnosticCounts) {
-			diagnosticCounts.textContent = 'sourceRows: ' + Number(diagnostics.sourceRows || 0)
-				+ '; candidate: ' + Number(diagnostics.candidate || 0)
-				+ '; validXY: ' + Number(diagnostics.validXY || 0)
-				+ '; validZ: ' + Number(diagnostics.validZ || 0)
-				+ '; assigned: ' + Number(diagnostics.assigned || 0)
-				+ '; inBounds: ' + Number(diagnostics.inBounds || 0);
+			diagnosticCounts.textContent = (adminLanguage === 'ru' ? 'Событий: ' : 'Events: ') + Number(diagnostics.sourceRows || 0)
+				+ (adminLanguage === 'ru' ? '; позиций: ' : '; positions: ') + Number(diagnostics.candidate || 0)
+				+ (adminLanguage === 'ru' ? '; с высотой: ' : '; with height: ') + Number(diagnostics.validZ || 0)
+				+ (adminLanguage === 'ru' ? '; на этажах: ' : '; assigned to floors: ') + Number(diagnostics.assigned || 0);
 		}
 		clearChildren(zHistogram);
 		for (index = 0; zHistogram && Array.isArray(histogram) && index < histogram.length; index++) {
@@ -1258,7 +1311,7 @@ function setupHeatmapAdminWizard(wizard) {
 		var number = wizard.querySelector('[data-heatmap-number="' + name + '"]');
 		var range = wizard.querySelector('[data-heatmap-field="' + name + '"]');
 		if (number) {
-			number.value = name === 'scale' ? clamp(value, 0.1, 64).toFixed(2) : Math.round(value);
+			number.value = name === 'scale' ? String(Number(clamp(value, 0.1, 64).toFixed(8))) : Math.round(value);
 		}
 		if (range) {
 			range.value = range.getAttribute('data-heatmap-scale-slider') ? scaleToSlider(value) : Math.round(value);
@@ -1773,7 +1826,8 @@ function setupHeatmapAdminWizard(wizard) {
 		lastPayload = payload;
 		serverRegistration = payload.registration || null;
 		renderLandmarkResiduals(serverRegistration);
-		currentPreviewToken = candidateIsApplied() && serverRegistration && serverRegistration.ok && /^[a-f0-9]{64}$/i.test(payload.previewToken || '') ? payload.previewToken : '';
+		settingsOnly = payload.settingsOnly === true;
+		currentPreviewToken = (settingsOnly || candidateIsApplied() && serverRegistration && serverRegistration.ok) && /^[a-f0-9]{64}$/i.test(payload.previewToken || '') ? payload.previewToken : '';
 		syncSaveGate();
 		if (isConfigHash(payload.configHash)) {
 			currentConfigHash = payload.configHash;
@@ -1804,6 +1858,9 @@ function setupHeatmapAdminWizard(wizard) {
 				}
 				canvas.style.display = overlayVisible ? 'block' : 'none';
 				updateGuides();
+				drawReviewOverlay();
+				drawSpatialPreview(payload);
+				loadDefaultGeometry(payload);
 			};
 			image.src = imageUrl;
 			if (image.complete) {
@@ -1811,10 +1868,11 @@ function setupHeatmapAdminWizard(wizard) {
 			}
 		}
 		if (status && payload.diagnostics) {
-			status.textContent = payload.diagnostics.inBounds + '/' + payload.diagnostics.queried + ' ' + heatmapText('heatmapInBounds', 'in bounds');
+			status.textContent = payload.diagnostics.inBounds + '/' + payload.diagnostics.candidate + ' ' + heatmapText('heatmapInBounds', 'in bounds');
 			status.className = payload.diagnostics.manualRequired ? 'heatmap-status is-warning' : 'heatmap-status';
 		}
 		renderDiagnostics(payload);
+		refreshEditor();
 		setLog(responseMessage(payload, adminText('preview-ready', 'Preview ready.')));
 	}
 
@@ -1827,7 +1885,7 @@ function setupHeatmapAdminWizard(wizard) {
 		if (!payload) {
 			return Promise.resolve(null);
 		}
-		if (action === 'save' && (!isConfigHash(currentConfigHash) || !landmarkResult || !landmarkResult.ok || !/^[a-f0-9]{64}$/i.test(currentPreviewToken))) {
+		if (action === 'save' && (!isConfigHash(currentConfigHash) || (!settingsOnly && (!landmarkResult || !landmarkResult.ok)) || drawingFloor || !/^[a-f0-9]{64}$/i.test(currentPreviewToken))) {
 			setLog(adminText('load-before-save', 'Load the calibration before saving.'));
 			return Promise.resolve(null);
 		}
@@ -1884,6 +1942,15 @@ function setupHeatmapAdminWizard(wizard) {
 	}
 
 	function requestStoredConfig() {
+		geometryKey = ''; geometryGeneration++; syncGeometryToggle(false);
+		if (geometryStatus) geometryStatus.textContent = adminLanguage === 'ru' ? 'Геометрия не загружена' : 'Geometry not loaded';
+		image.onload = null;
+		image.src = 'hlstatsimg/nomap.png';
+		canvas.width = canvas.width;
+		canvas.style.display = 'none';
+		drawingFloor = null; drawingPoints = []; pickingLandmark = null;
+		if (geometryOverlay && geometryOverlay.parentNode) geometryOverlay.parentNode.removeChild(geometryOverlay);
+		geometryOverlay = null;
 		return request('preview', null, false);
 	}
 
@@ -1947,6 +2014,250 @@ function setupHeatmapAdminWizard(wizard) {
 		}
 	}
 
+	function drawReviewOverlay() {
+		if (!canvas || !canvas.parentNode || !document.createElementNS) return;
+		var ns = 'http://www.w3.org/2000/svg';
+		if (!geometryOverlay) {
+			geometryOverlay = document.createElementNS(ns, 'svg');
+			geometryOverlay.setAttribute('class', 'heatmap-admin-review-overlay');
+			geometryOverlay.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:5';
+			canvas.parentNode.appendChild(geometryOverlay);
+		}
+		geometryOverlay.setAttribute('viewBox', '0 0 ' + canvas.width + ' ' + canvas.height);
+		var previous = geometryOverlay.querySelector('[data-annotations]');
+		if (previous) geometryOverlay.removeChild(previous);
+		var group = document.createElementNS(ns, 'g'); group.setAttribute('data-annotations', '1');
+		var projectConfig = {xoffset:intConfig('xoffset'), yoffset:intConfig('yoffset'), scale:scaleConfig(), flipX:boolConfig('flipx'), flipY:boolConfig('flipy'), rotate:rotationSteps(), cropX:intConfig('cropx1'), cropY:intConfig('cropy1')};
+		var regions = readFloors().filter(function(floor) { return !floorSelect || floorSelect.value === 'all' || floor.id === floorSelect.value; }).reduce(function(all, floor) {
+			return all.concat((floor.regions || []).map(function(p) { return {points:p, wall:false}; }), (floor.blocked || []).map(function(p) { return {points:p, wall:true}; }));
+		}, []);
+		if (drawingPoints.length) regions.push({points:drawingPoints, wall:drawingKind === 'blocked'});
+		regions.forEach(function(item) {
+			var p = item.points;
+			var shape = document.createElementNS(ns, 'polyline');
+			var points = p.map(function(v) { var q = HeatmapLandmarkSolver.project({worldX:v[0],worldY:v[1]}, projectConfig); return q.x + ',' + q.y; });
+			if (p !== drawingPoints && points.length) points.push(points[0]);
+			shape.setAttribute('points', points.join(' ')); shape.setAttribute('fill',item.wall ? '#ff526533' : 'none'); shape.setAttribute('stroke',item.wall ? '#ff5265' : '#ffdc65'); shape.setAttribute('stroke-width','3'); group.appendChild(shape);
+		});
+		readLandmarks().forEach(function(p, index) {
+			if (!isFinite(p.pixelX) || !isFinite(p.pixelY)) return;
+			var circle = document.createElementNS(ns, 'circle'); circle.setAttribute('cx',p.pixelX); circle.setAttribute('cy',p.pixelY);
+			circle.setAttribute('r','6'); circle.setAttribute('fill',p.holdout ? '#ff8956' : '#4adbd2'); group.appendChild(circle);
+			var label = document.createElementNS(ns,'text'); label.setAttribute('x',p.pixelX + 9); label.setAttribute('y',p.pixelY - 8); label.setAttribute('fill','#fff'); label.setAttribute('font-size','16'); label.textContent=String(index+1); group.appendChild(label);
+		});
+		geometryOverlay.appendChild(group);
+	}
+
+	function editorButton(text, action) {
+		var button = document.createElement('button'); button.type = 'button'; button.textContent = text; button.onclick = action; return button;
+	}
+
+	function selectedFloorRow() {
+		return Array.prototype.filter.call(floorRows.children, function(row) { return row.querySelector('[data-heatmap-floor-field="id"]').value === floorSelect.value; })[0];
+	}
+
+	function cancelDrawing() {
+		drawingFloor = null; drawingPoints = []; viewer.classList.remove('is-drawing-floor'); refreshEditor(); drawReviewOverlay(); syncSaveGate();
+	}
+
+	function startDrawing(kind) {
+		var row = selectedFloorRow();
+		if (!row || !lastPayload) { setLog(adminLanguage === 'ru' ? 'Добавьте и выберите этаж.' : 'Add and select a floor.'); return; }
+		if (row['_' + kind].length >= 8) { setLog(adminLanguage === 'ru' ? 'Не более 8 контуров каждого вида на этаж.' : 'Up to 8 outlines of each kind per floor.'); return; }
+		drawingFloor = row; drawingKind = kind; drawingPoints = []; pickingLandmark = null;
+		viewer.classList.add('is-drawing-floor'); invalidatePreviewToken(); refreshEditor();
+	}
+
+	function refreshEditor() {
+		if (!editorHint) return;
+		var row = selectedFloorRow();
+		editorHint.textContent = drawingFloor
+			? (adminLanguage === 'ru' ? 'Отмечайте углы на карте. Точек: ' : 'Click corners on the map. Points: ') + drawingPoints.length + '/32'
+			: (adminLanguage === 'ru' ? 'Жёлтый — допустимая область. Красный — стена: события и заливка внутри исключаются. Выберите этаж для предпросмотра ограничений.' : 'Yellow: allowed region. Red: wall; events and fill inside are excluded. Select a floor to preview its boundaries.');
+		Array.prototype.forEach.call(editorToolbar.querySelectorAll('[data-drawing-action]'), function(button) {
+			var action = button.getAttribute('data-drawing-action'); button.disabled = action === 'start' ? !row || !!drawingFloor : !drawingFloor;
+		});
+		clearChildren(contourList);
+		if (row) ['regions', 'blocked'].forEach(function(kind) {
+			row['_' + kind].forEach(function(p, index) {
+				var name = (kind === 'blocked' ? (adminLanguage === 'ru' ? 'Стена ' : 'Wall ') : (adminLanguage === 'ru' ? 'Область ' : 'Region ')) + (index + 1);
+				var button = editorButton(name + ' ×', function() { row['_' + kind].splice(index, 1); cancelDrawing(); schedulePreview(); });
+				button.title = (adminLanguage === 'ru' ? 'Удалить: ' : 'Remove: ') + name; contourList.appendChild(button);
+			});
+		});
+	}
+
+	function uploadFloorImage(row, input) {
+		var form = new FormData(), map = activeMap(), floorId = row.querySelector('[data-heatmap-floor-field="id"]').value;
+		form.append('action', 'upload'); form.append('game', wizard.getAttribute('data-heatmap-game')); form.append('map', map);
+		form.append('imageFloor', floorId); form.append('mapImage', input.files[0]); form.append('configHash', currentConfigHash); form.append('lang', adminLanguage);
+		invalidatePreviewToken(); input.disabled = true;
+		fetch('heatmap_admin.php', {method:'POST', credentials:'same-origin', headers:{'X-HLX-CSRF':csrfToken}, body:form})
+			.then(function(response) { return response.json().then(function(data) { if (!response.ok) throw data; return data; }); })
+			.then(function(data) {
+				if (map !== activeMap() || !row.isConnected) return;
+				currentConfigHash = data.configHash; row._floorImage = true; row.querySelector('input[type=checkbox]').checked = true;
+				renderFloorSelect(readFloors()); floorSelect.value = floorId; schedulePreview();
+			})
+			.catch(function(error) { setLog(responseMessage(error, heatmapText('heatmapRequestFailed', 'Upload failed'))); })
+			.then(function() { input.disabled = false; input.value = ''; });
+	}
+
+	function drawSpatialPreview(payload) {
+		var floor = (payload.floors || []).filter(function(f) { return f.id === payload.activeFloor; })[0];
+		if (!floor || (!(floor.regions || []).length && !(floor.blocked || []).length)) return;
+		var ctx = canvas.getContext('2d');
+		if (payload.renderer.mode !== 'points' && typeof presentationField === 'function') {
+			// Reuse the public grid and smoothing; keep the calibration canvas in 2D.
+			var grid = payload.grid, n = grid.width * grid.height, values = new Float32Array(n);
+			payload.layers.total.forEach(function(r) { values[r[2] * grid.width + r[1]] = payload.query.event === 'kills' ? r[3] : payload.query.event === 'deaths' ? r[4] : r[3] + r[4]; });
+			var mask = regionGridMask({floors:payload.floors, activeFloor:payload.activeFloor, grid:grid, cellSummary:function() { return null; }});
+			var field = presentationField({values:values}, grid.width, grid.height, true, false, mask);
+			var temp = document.createElement('canvas'); temp.width = grid.width; temp.height = grid.height;
+			var small = temp.getContext('2d'), pixels = small.createImageData(grid.width, grid.height);
+			for (var i = 0; i < n; i++) { var amount = Math.sqrt(field.values[i * 2] / Math.max(field.maxAbs, 0.00001)); pixels.data[i * 4] = 255; pixels.data[i * 4 + 1] = Math.round(190 - 115 * amount); pixels.data[i * 4 + 2] = 40; pixels.data[i * 4 + 3] = Math.round(210 * amount); }
+			small.putImageData(pixels, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.drawImage(temp, 0, 0, grid.width * grid.bucketSize, grid.height * grid.bucketSize);
+		}
+		function path(p) { ctx.moveTo(p[0][0], p[0][1]); for (var j = 1; j < p.length; j++) ctx.lineTo(p[j][0], p[j][1]); ctx.closePath(); }
+		ctx.save(); ctx.fillStyle = '#fff';
+		if ((floor.regions || []).length) {
+			var maskCanvas = document.createElement('canvas'); maskCanvas.width = canvas.width; maskCanvas.height = canvas.height;
+			var target = ctx; ctx = maskCanvas.getContext('2d'); floor.regions.forEach(function(p) { ctx.beginPath(); path(p); ctx.fill(); }); ctx = target;
+			ctx.globalCompositeOperation = 'destination-in'; ctx.drawImage(maskCanvas, 0, 0);
+		}
+		ctx.globalCompositeOperation = 'destination-out'; (floor.blocked || []).forEach(function(p) { ctx.beginPath(); path(p); ctx.fill(); }); ctx.restore();
+	}
+
+	function mountFloorEditor() {
+		var panel = wizard.querySelector('.heatmap-admin-panel'), fieldset = wizard.querySelector('.heatmap-admin-floors');
+		editorToolbar = document.createElement('div'); editorToolbar.className = 'heatmap-floor-editor-toolbar';
+		editorToolbar.appendChild(floorSelect.parentNode);
+		[['Допустимая область', 'Allowed region', function() { startDrawing('regions'); }, 'start'], ['Стена / исключить область', 'Wall / excluded area', function() { startDrawing('blocked'); }, 'start'],
+		 ['Завершить', 'Finish', function() {
+			if (drawingPoints.length < 3) { setLog(adminLanguage === 'ru' ? 'Нужны минимум три точки.' : 'At least three points are required.'); return; }
+			drawingFloor['_' + drawingKind].push(drawingPoints); cancelDrawing(); schedulePreview();
+		 }, 'finish'], ['Убрать точку', 'Undo point', function() { drawingPoints.pop(); drawReviewOverlay(); refreshEditor(); }, 'undo'], ['Отменить', 'Cancel', function() { cancelDrawing(); schedulePreview(); }, 'cancel']].forEach(function(item) {
+			var button = editorButton(item[adminLanguage === 'ru' ? 0 : 1], item[2]); button.setAttribute('data-drawing-action', item[3]); editorToolbar.appendChild(button);
+		});
+		editorToolbar.appendChild(saveButton);
+		editorHint = document.createElement('p'); editorHint.className = 'heatmap-floor-editor-hint'; editorHint.setAttribute('aria-live', 'polite');
+		contourList = document.createElement('div'); contourList.className = 'heatmap-floor-contours';
+		viewer.insertBefore(editorToolbar, viewer.firstChild); viewer.insertBefore(editorHint, editorToolbar.nextSibling);
+		viewer.appendChild(contourList); viewer.appendChild(fieldset); viewer.appendChild(log);
+		var diagnostic = wizard.querySelector('.heatmap-admin-diagnostic'); fieldset.appendChild(diagnostic);
+		var advanced = document.createElement('details'), summary = document.createElement('summary'); advanced.className = 'heatmap-admin-advanced';
+		summary.textContent = adminLanguage === 'ru' ? 'Привязка карты и дополнительные настройки' : 'Map alignment and advanced settings';
+		panel.parentNode.insertBefore(advanced, panel); advanced.appendChild(summary); advanced.appendChild(panel);
+		advanced.ontoggle = function() { viewer.classList.toggle('is-calibrating', advanced.open); };
+		wizard.classList.add('heatmap-floor-editor'); refreshEditor();
+	}
+
+	function chooseMapPoint(event) {
+		if (!drawingFloor && !pickingLandmark) return false;
+		var rect = canvas.getBoundingClientRect();
+		var x = Math.round((event.clientX - rect.left) * canvas.width / rect.width);
+		var y = Math.round((event.clientY - rect.top) * canvas.height / rect.height);
+		if (x < 0 || y < 0 || x >= canvas.width || y >= canvas.height) return true;
+		if (pickingLandmark) {
+			pickingLandmark.querySelector('[data-heatmap-landmark="pixelX"]').value = x;
+			pickingLandmark.querySelector('[data-heatmap-landmark="pixelY"]').value = y;
+			pickingLandmark = null; schedulePreview();
+		} else if (drawingPoints.length < 32) {
+			var raw = HeatmapProjection.unrotate(x + intConfig('cropx1'), y + intConfig('cropy1'), rotationSteps());
+			drawingPoints.push([Math.round((raw.x * scaleConfig() - intConfig('xoffset')) * (boolConfig('flipx') ? -1 : 1)), Math.round((raw.y * scaleConfig() - intConfig('yoffset')) * (boolConfig('flipy') ? -1 : 1))]);
+		}
+		drawReviewOverlay(); refreshEditor(); if (event.preventDefault) event.preventDefault(); return true;
+	}
+
+	var reportFile = wizard.querySelector('[data-heatmap-registration-report]');
+	if (reportFile) reportFile.onchange = function() {
+		var file = reportFile.files && reportFile.files[0];
+		if (!file || file.size > 2000000 || !lastPayload) { setLog(adminLanguage === 'ru' ? 'Сначала загрузите карту. Отчёт — не более 2 МБ.' : 'Load a map first. Report limit: 2 MB.'); return; }
+		var selectedMap = activeMap();
+		file.text().then(function(text) {
+			if (selectedMap !== activeMap()) return;
+			var report = HeatmapRegistrationReport.parse(text);
+			if (report.size[0] !== lastPayload.image.width || report.size[1] !== lastPayload.image.height) throw new Error('image_size');
+			Object.keys(report.config).forEach(function(key) {
+				if (key === 'flipx' || key === 'flipy') wizard.querySelector('[data-heatmap-check="'+key+'"]').checked = !!report.config[key];
+				else setNumberField(key, report.config[key]);
+			});
+			appliedCandidateKey = ''; invalidatePreviewToken(); syncTransformButtons(); schedulePreview();
+			setLog(adminLanguage === 'ru' ? 'Настройки подставлены. Проверьте независимые ориентиры; импорт ничего не сохраняет.' : 'Candidate loaded. Check independent landmarks; importing does not save anything.');
+		}).catch(function() { setLog(adminLanguage === 'ru' ? 'Отчёт не подходит: проверьте формат и размер изображения.' : 'Report rejected: check format and image dimensions.'); });
+	};
+	var geometryFile = wizard.querySelector('[data-heatmap-registration-geometry]');
+	function syncGeometryToggle(available) {
+		if (!geometryToggle) return;
+		geometryToggle.disabled = !available;
+		geometryToggle.setAttribute('aria-pressed', available && geometryVisible ? 'true' : 'false');
+		geometryToggle.textContent = adminLanguage === 'ru'
+			? (available && geometryVisible ? 'Скрыть геометрию BSP' : 'Показать геометрию BSP')
+			: (available && geometryVisible ? 'Hide BSP geometry' : 'Show BSP geometry');
+		var layer = geometryOverlay && geometryOverlay.querySelector('[data-bsp-outlines]');
+		if (layer) layer.style.display = geometryVisible ? '' : 'none';
+	}
+	function loadDefaultGeometry(payload) {
+		var map = activeMap(), game = wizard.getAttribute('data-heatmap-game');
+		var key = map + '|' + payload.image.url;
+		if (geometryKey === key) return;
+		geometryKey = key;
+		var generation = ++geometryGeneration;
+		var old = geometryOverlay && geometryOverlay.querySelector('[data-bsp-outlines]');
+		if (old) old.parentNode.removeChild(old);
+		syncGeometryToggle(false);
+		if (!/^[a-z0-9_-]+$/i.test(game) || !/^[a-z0-9_-]+$/i.test(map)) return;
+		var base = 'hlstatsimg/heatmap-geometry/' + encodeURIComponent(game) + '/';
+		if (geometryStatus) geometryStatus.textContent = adminLanguage === 'ru' ? 'Загрузка геометрии…' : 'Loading geometry…';
+		if (!geometryManifest) geometryManifest = fetch(base + 'manifest.json').then(function(response) {
+			if (!response.ok) throw new Error('missing'); return response.json();
+		});
+		geometryManifest.then(function(manifest) {
+			var entry = manifest[map];
+			if (!entry || new URL(payload.image.url, window.location.href).searchParams.get('v') !== entry.imageHash) throw new Error('missing');
+			return fetch(base + encodeURIComponent(map) + '.svg');
+		}).then(function(response) {
+			if (!response.ok) throw new Error('missing'); return response.text();
+		}).then(function(text) {
+			if (generation !== geometryGeneration || map !== activeMap()) return;
+			installGeometry(text); syncGeometryToggle(true);
+			if (geometryStatus) geometryStatus.textContent = adminLanguage === 'ru' ? 'Шаблон карты готов' : 'Map template ready';
+		}).catch(function() {
+			if (generation !== geometryGeneration) return;
+			if (geometryStatus) geometryStatus.textContent = adminLanguage === 'ru' ? 'Для этого изображения нет шаблона BSP' : 'No BSP template for this image';
+		});
+	}
+	function installGeometry(text) {
+			if (text.length > 4000000) throw new Error('limit');
+			var doc = new DOMParser().parseFromString(text, 'image/svg+xml');
+			if (doc.querySelector('parsererror') || doc.documentElement.localName !== 'svg') throw new Error('svg');
+			var view = (doc.documentElement.getAttribute('viewBox') || '').trim().split(/\s+/).map(Number);
+			if (view.length !== 4 || view[0] !== 0 || view[1] !== 0 || view[2] !== canvas.width || view[3] !== canvas.height) throw new Error('size');
+			var shapes = doc.querySelectorAll('polygon,polyline'); if (shapes.length > 20000) throw new Error('limit');
+			var group = document.createElementNS('http://www.w3.org/2000/svg','g'); group.setAttribute('data-bsp-outlines','1');
+			for (var i=0; i<shapes.length; i++) {
+				var values = (shapes[i].getAttribute('points') || '').trim().split(/[\s,]+/).map(Number);
+				if (values.length < 6 || values.length > 512 || values.length % 2 || !values.every(function(n) { return isFinite(n) && Math.abs(n) < 100000; })) throw new Error('points');
+				var shape = document.createElementNS('http://www.w3.org/2000/svg',shapes[i].localName);
+				shape.setAttribute('points',values.join(' ')); shape.setAttribute('fill','none'); shape.setAttribute('stroke','#45dacf'); shape.setAttribute('stroke-width','1'); group.appendChild(shape);
+			}
+			drawReviewOverlay(); var previous = geometryOverlay.querySelector('[data-bsp-outlines]'); if (previous) geometryOverlay.removeChild(previous); geometryOverlay.insertBefore(group,geometryOverlay.firstChild);
+	}
+	if (geometryFile) geometryFile.onchange = function() {
+		var file = geometryFile.files && geometryFile.files[0], selectedMap = activeMap();
+		if (!file || file.size > 4000000 || !lastPayload) return;
+		file.text().then(function(text) {
+			if (selectedMap !== activeMap()) return;
+			geometryGeneration++; installGeometry(text); geometryVisible = true; syncGeometryToggle(true);
+			if (geometryStatus) geometryStatus.textContent = adminLanguage === 'ru' ? 'Загружены контуры из файла' : 'Geometry loaded from file';
+		}).catch(function() { setLog(adminLanguage === 'ru' ? 'Не удалось открыть контуры: нужен SVG из инструмента для этой картинки.' : 'Use the tool-generated SVG matching this image.'); });
+	};
+	bindClick('[data-heatmap-clear-geometry]',function() { geometryVisible = !geometryVisible; syncGeometryToggle(true); });
+	if (landmarkRows) Array.prototype.forEach.call(landmarkRows.querySelectorAll('[data-heatmap-landmark-row]'), function(row) {
+		var cell=document.createElement('td'), button=document.createElement('button'); button.type='button'; button.textContent=adminLanguage==='ru'?'На карте':'Pick on map';
+		button.onclick=function() { if (drawingFloor) return; pickingLandmark=row; setLog(adminLanguage==='ru'?'Нажмите соответствующее место на карте. X/Y мира берутся из игры, не из этой картинки.':'Click the matching place on the map. World X/Y must come from the game.'); }; cell.appendChild(button); row.appendChild(cell);
+	});
+
 	bindClick('[data-heatmap-admin-load]', requestStoredConfig);
 	bindClick('[data-heatmap-admin-preview]', function() { request('preview'); });
 	bindClick('[data-heatmap-admin-save]', function() { request('save'); });
@@ -1970,13 +2281,15 @@ function setupHeatmapAdminWizard(wizard) {
 	});
 	bindClick('[data-heatmap-admin-upload]', upload);
 	bindClick('[data-heatmap-floor-add]', function() {
+		var used = readFloors(), next = 1; while (used.some(function(f) { return f.id === 'floor' + next; })) next++;
 		addFloorRow({
-			id: 'floor' + String((floorRows ? floorRows.children.length : 0) + 1),
+			id: 'floor' + next,
 			label_en: 'Floor',
 			label_ru: 'Уровень',
-			z_min: 0,
-			z_max: 1
+			z_min: used.length ? Math.max.apply(null, used.map(function(f) { return f.z_max; })) : -4096,
+			z_max: used.length ? Math.min(8388607, Math.max.apply(null, used.map(function(f) { return f.z_max; })) + 128) : 4096
 		});
+		renderFloorSelect(readFloors()); floorSelect.value = 'floor' + next;
 		schedulePreview();
 	});
 	bindClick('[data-heatmap-floor-suggest]', function() {
@@ -2040,7 +2353,7 @@ function setupHeatmapAdminWizard(wizard) {
 		mapSelect.onchange = function() { invalidatePreviewToken(); requestStoredConfig(); };
 	}
 	if (floorSelect) {
-		floorSelect.onchange = schedulePreview;
+		floorSelect.onchange = function() { cancelDrawing(); schedulePreview(); };
 	}
 	if (eventSelect) {
 		eventSelect.onchange = schedulePreview;
@@ -2064,6 +2377,8 @@ function setupHeatmapAdminWizard(wizard) {
 	}
 	if (canvas) {
 		canvas.onmousedown = function(event) {
+			if (chooseMapPoint(event)) return;
+			if (!wizard.querySelector('.heatmap-admin-advanced').open) return;
 			var rect = canvas.getBoundingClientRect();
 			dragState = {
 				x: event.clientX,
@@ -2101,6 +2416,7 @@ function setupHeatmapAdminWizard(wizard) {
 		};
 		canvas.onmouseleave = canvas.onmouseup;
 		canvas.onwheel = function(event) {
+			if (drawingFloor || !wizard.querySelector('.heatmap-admin-advanced').open) return;
 			var rect = canvas.getBoundingClientRect();
 			var oldScale = scaleConfig();
 			var nextScale = clamp(oldScale * (event.deltaY < 0 ? 0.94 : 1.06), 0.1, 64);
@@ -2120,6 +2436,7 @@ function setupHeatmapAdminWizard(wizard) {
 			}
 		};
 	}
+	mountFloorEditor();
 	syncFieldsFromConfig(currentConfig);
 	seedDiagnosticWindow();
 	updateGuides();

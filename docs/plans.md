@@ -2,6 +2,21 @@
 
 ## Summary
 
+Bundled geometry follow-up: 25 BSP templates now load automatically in the admin
+editor with image-identity matching and a show/hide button. Files are included
+under `web/hlstatsimg/heatmap-geometry/cstrike` for ordinary clean installations.
+
+Completed local map refresh: `docs/plans/2026-09-08-steam-map-refresh.md`.
+All 25 installed maps with overviews have current images and BSP-derived settings.
+See `docs/heatmap-bsp-registration.md` for repeatable preparation and web import.
+
+Current web-settings follow-up: `docs/plans/2026-09-08-heatmap-floor-editor.md`.
+Floor and wall configuration is available in the admin UI, including JPEG upload.
+
+Latest heatmap follow-up: `docs/plans/2026-09-08-heatmap-usability-and-regions.md`
+and `docs/heatmap-regions-and-scale.md`. User-requested BSP revision tracking
+exclusion remains in effect; spatial regions do not imply BSP walkability.
+
 This repository is the product integration lane for a standalone HLstatsX
 build that combines:
 
@@ -65,6 +80,12 @@ Historical autonomy follow-up context:
   - no whole-document translation rewriting
 
 ## Current focus
+
+- Complete BSP-backed projection diagnostics and Smooth / Cells / Points
+  presentation in the Explorer worktree. Current follow-up and verification:
+  [`2026-09-07-heatmap-bsp-and-presentation.md`](plans/2026-09-07-heatmap-bsp-and-presentation.md).
+  The September 2 provisional GoldSrc numeric candidate is superseded by the
+  SDK/BSP-derived transform; do not reuse its ZOOM-as-scale assumption.
 
 - Keep the repo release-clean as the integrated Python+i18n product lane.
 - Keep the closed/accepted legacy-vs-Python parity state current without

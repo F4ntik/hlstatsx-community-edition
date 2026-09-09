@@ -204,6 +204,8 @@ $previewLandmarks = array(
     array('worldX' => 50, 'worldY' => 150, 'pixelX' => 298, 'pixelY' => 739, 'holdout' => 1),
     array('worldX' => 150, 'worldY' => 50, 'pixelX' => 368, 'pixelY' => 809, 'holdout' => 1),
 );
+foreach ($previewLandmarks as $i => &$landmark) $landmark['label'] = 'Site ' . $i;
+unset($landmark);
 assert_true(heatmap_admin_landmark_evidence($previewLandmarks, $previewTokenConfig, 10)['ok'], 'server should accept landmarks only when they match the normalized candidate projection');
 $forgedPreviewConfig = $previewTokenConfig;
 $forgedPreviewConfig['xoffset'] += 100;
@@ -212,6 +214,13 @@ $asymmetricPreviewLandmarks = $previewLandmarks;
 $asymmetricPreviewLandmarks[5]['pixelX'] += 14;
 $asymmetricPreviewEvidence = heatmap_admin_landmark_evidence($asymmetricPreviewLandmarks, $previewTokenConfig, 10);
 assert_same(false, $asymmetricPreviewEvidence['ok'], 'server should reject a mandatory holdout outside the selected tolerance');
+assert_same(false, heatmap_admin_landmark_evidence($asymmetricPreviewLandmarks, $previewTokenConfig, 200)['ok'], 'client cannot widen trusted tolerance above ten pixels');
+$duplicateLandmarks = $previewLandmarks; $duplicateLandmarks[3] = $duplicateLandmarks[0];
+assert_same(false, heatmap_admin_landmark_evidence($duplicateLandmarks, $previewTokenConfig, 10)['ok'], 'duplicate landmarks cannot certify projection');
+$collinearLandmarks = $previewLandmarks;
+foreach ($collinearLandmarks as $i => &$landmark) { $landmark['worldX'] = $i * 100; $landmark['worldY'] = 0; $landmark['pixelX'] = 263 + $i * 70; $landmark['pixelY'] = 844; }
+unset($landmark);
+assert_same(false, heatmap_admin_landmark_evidence($collinearLandmarks, $previewTokenConfig, 10)['ok'], 'collinear landmarks cannot certify projection');
 assert_true($asymmetricPreviewEvidence['maximumResidual'] >= 14.0, 'server residual summary should retain the failing mandatory holdout');
 assert_contains('heatmap_admin_require_config_hash($request, $oldHash);', file_get_contents(ROOT_PATH . '/heatmap_admin.php'), 'save should keep stale config rejection before the preview-token gate');
 assert_contains("throw new HeatmapAdminException('preview_required', 409);", file_get_contents(ROOT_PATH . '/heatmap_admin.php'), 'save should reject missing or mismatched preview tokens before writes');
@@ -1129,7 +1138,7 @@ $overviewConfig = heatmap_parse_overview(
 );
 assert_same(1200, $overviewConfig['xoffset'], 'source overview should seed xoffset');
 assert_same(2400, $overviewConfig['yoffset'], 'source overview should seed yoffset');
-assert_same(1, $overviewConfig['rotate'], 'source overview should seed rotate');
+assert_same(0, $overviewConfig['rotate'], 'Source panel rotation must not rotate raw texture coordinates');
 
 $projection = heatmap_projection_config(array('rotate' => 7));
 assert_same(3, $projection['rotate'], 'projection config should normalize rotate to quarter turns');
@@ -1477,6 +1486,31 @@ function scene_payload(array $rows, array $query = array(), array $config = arra
 }
 
 $exactConfig = scene_config(array('xoffset' => 12, 'yoffset' => 64, 'scale' => 2));
+$geometryQuery = heatmap_parse_v2_query(v2_query_input(array('geometry' => 'points')), $queryNow);
+assert_same('points', $geometryQuery['geometry'], 'public geometry operation accepted');
+assert_throws('invalid_query', function () use ($queryNow) { heatmap_parse_v2_query(v2_query_input(array('geometry' => 'points', 'inspect' => 'c0.0')), $queryNow); }, 'geometry and inspect are mutually exclusive');
+$geometryRows = array(scene_row(), scene_row());
+$geometry = scene_payload($geometryRows, array('event' => 'both'), array(), array(), array('geometry' => 'points'));
+assert_same(array('x', 'y', 'kills', 'deaths'), $geometry['fields'], 'public geometry contains projected positions and counts only');
+assert_same(array(array(12, 4, 0, 2), array(8, 8, 2, 0)), $geometry['points'], 'pixel aggregation preserves victim/attacker positions and sorted counts');
+assert_same(false, isset($geometry['query']['geometry']), 'canonical query does not expose operation state');
+assert_same(false, isset($geometry['exact']), 'public geometry never returns admin raw coordinates');
+$meGeometry = scene_payload($geometryRows, array('event' => 'both', 'lens' => 'me', 'player' => 42), array(), array(), array('geometry' => 'points'));
+assert_same(array(array(8, 8, 2, 0)), $meGeometry['points'], 'personal geometry filters participants independently');
+$floorGeometry = scene_payload($geometryRows, array('event' => 'both', 'floor' => 'upper'), array(), array(), array('geometry' => 'points'));
+assert_same(array(array(12, 4, 0, 2)), $floorGeometry['points'], 'geometry uses authoritative participant floor filter');
+$geometryState = array('query' => scene_query(array('event' => 'kills')), 'config' => scene_config(), 'image' => scene_image(array('width' => 30000, 'height' => 100)), 'options' => array('geometry' => 'points'));
+for ($i = 0; $i < 20000; $i++) heatmap_accumulate_scene_row($geometryState, scene_row(array('attackerX' => strval($i))));
+assert_same(20000, count(heatmap_finalize_scene($geometryState)['points']), '20000 unique positions accepted');
+heatmap_accumulate_scene_row($geometryState, scene_row(array('attackerX' => '20000')));
+$refusedGeometry = heatmap_finalize_scene($geometryState);
+assert_same('too_many_points', $refusedGeometry['state'], '20001st unique position refuses geometry');
+assert_same(array(), $refusedGeometry['points'], 'overflow never returns sampled prefix');
+$overflowGeometryState = array('query' => scene_query(), 'config' => scene_config(), 'image' => scene_image(), 'options' => array('geometry' => 'points'));
+heatmap_accumulate_scene_row($overflowGeometryState, scene_row());
+$overflowGeometryState['_scene']['overflow'] = true;
+assert_same(array(), heatmap_finalize_scene($overflowGeometryState)['points'], 'source overflow clears public geometry');
+assert_true(heatmap_scene_cache_key(array_merge(scene_query(), array('geometry' => 'points')), scene_config(), scene_image()) !== heatmap_scene_cache_key(scene_query(), scene_config(), scene_image()), 'geometry and grid caches never collide');
 $exactScene = scene_payload(array(
     scene_row(array('attackerX' => '10', 'attackerY' => '20', 'attackerZ' => '30', 'victimX' => '12', 'victimY' => '4', 'victimZ' => '15')),
 ), scene_query(array('event' => 'both')), $exactConfig, scene_image(), array('exact' => true, 'exactLimit' => 20000));
@@ -2016,7 +2050,7 @@ assert_contains('heatmap_build_inspect_payload', $inspectRouteSource, 'v2 route 
 assert_true(strpos($inspectRouteSource, 'inspect_not_available') === false, 'v2 route should no longer reject valid inspect requests as unavailable');
 assert_contains("header('Cache-Control: no-store')", $inspectRouteSource, 'inspect responses should disable browser and proxy caching');
 assert_contains("header('Pragma: no-cache')", $inspectRouteSource, 'inspect responses should publish the legacy no-cache header');
-assert_contains("\$metrics['operation'] = \$isInspect ? 'inspect' : 'scene';", $inspectRouteSource, 'inspect requests should use the structured inspect log operation');
+assert_contains("\$isInspect ? 'inspect' : (isset(\$query['geometry']) ? 'geometry' : 'scene')", $inspectRouteSource, 'inspect and geometry requests should use separate structured log operations');
 assert_contains("\$metrics['cache'] = 'no-store';", $inspectRouteSource, 'inspect requests should be marked no-store in structured logs');
 $inspectDispatch = strpos($inspectRouteSource, 'if ($isInspect) {');
 $sceneCacheDispatch = strpos($inspectRouteSource, '$cacheKey = heatmap_scene_cache_key(');
