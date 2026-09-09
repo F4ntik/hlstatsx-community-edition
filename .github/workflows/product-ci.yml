@@ -15,6 +15,8 @@ on:
       - 'scripts/proxy_daemon_py/**'
       - 'scripts/replay_baseline/**'
       - 'scripts/web_i18n_smoke.php'
+      - 'scripts/i18n_validate.py'
+      - 'scripts/test_i18n_validate.py'
       - 'web/**'
   pull_request:
     paths:
@@ -30,6 +32,8 @@ on:
       - 'scripts/proxy_daemon_py/**'
       - 'scripts/replay_baseline/**'
       - 'scripts/web_i18n_smoke.php'
+      - 'scripts/i18n_validate.py'
+      - 'scripts/test_i18n_validate.py'
       - 'web/**'
 
 permissions:
@@ -177,6 +181,9 @@ jobs:
 
       - name: Web i18n smoke
         run: php scripts/web_i18n_smoke.php
+
+      - name: Static i18n contract validation
+        run: python scripts/i18n_validate.py --en web/lang/en.php --ru web/lang/ru.php
 
   docs-check:
     name: Docs sanity check
