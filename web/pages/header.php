@@ -275,6 +275,10 @@ For support and installation notes visit http://www.hlxcommunity.com
 		}
 	}
 	
+	if (!defined('GOOGLE_MAPS_API_KEY') || trim(GOOGLE_MAPS_API_KEY) === '') {
+		$g_options['show_google_map'] = 0;
+	}
+
 	// Determine if we should show SourceBans links/Forum links
 	$extratabs = NULL;
 	if ($g_options['sourcebans_address'] && file_exists($iconpath . "/title-sourcebans.png")) {
