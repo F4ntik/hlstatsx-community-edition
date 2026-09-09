@@ -163,10 +163,11 @@ def parse_proxy_envelope(datagram: str) -> ProxyEnvelope:
     if not datagram.startswith(_PROXY_PREFIX):
         raise ValueError("Datagram is not a proxied payload: missing prefix")
 
-    try:
-        prefix, payload = datagram.rsplit(_PROXY_SEPARATOR, 1)
-    except ValueError as exc:  # pragma: no cover - defensive
-        raise ValueError("Malformed proxy datagram: missing separator") from exc
+    separator_index = datagram.find(_PROXY_SEPARATOR, len(_PROXY_PREFIX))
+    if separator_index < 0:
+        raise ValueError("Malformed proxy datagram: missing separator")
+    prefix = datagram[:separator_index]
+    payload = datagram[separator_index + len(_PROXY_SEPARATOR) :]
 
     prefix = prefix[len(_PROXY_PREFIX) :]
     if " " in prefix:

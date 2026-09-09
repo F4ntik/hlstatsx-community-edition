@@ -371,7 +371,11 @@ class SyncDatabaseAdapter:
 
     def _connection_alive(self, connection: SupportsConnection) -> bool:
         try:
-            connection.ping(reconnect=False)
+            # mysqlclient accepts the reconnect flag positionally; using that
+            # form also works with drivers that expose it as positional-only.
+            # Explicit False keeps a liveness check from reconnecting in the
+            # middle of a transaction.
+            connection.ping(False)
         except Exception:
             return False
         return True

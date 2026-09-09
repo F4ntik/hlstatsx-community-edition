@@ -43,6 +43,7 @@ class ProxyDatagramProtocol(DatagramProtocol):
         self._logger = logger
         self._max_packet_size = max_packet_size
         self._transport: DatagramTransport | None = None
+        self._accepting_datagrams = True
 
     def connection_made(self, transport: DatagramTransport) -> None:  # pragma: no cover - trivial
         self._transport = transport
@@ -64,6 +65,8 @@ class ProxyDatagramProtocol(DatagramProtocol):
         self._logger.e403(f"UDP receive error: {exc}")
 
     def datagram_received(self, data: bytes, addr: tuple[str, int]) -> None:
+        if not self._accepting_datagrams:
+            return
         host, port = addr
 
         if not data:
@@ -92,6 +95,11 @@ class ProxyDatagramProtocol(DatagramProtocol):
             )
         )
 
+    def stop_receiving(self) -> None:
+        """Stop accepting new inbound datagrams while retaining outbound send capability."""
+
+        self._accepting_datagrams = False
+
 
 QueueFactory = Callable[[], asyncio.Queue[InboundDatagram]]
 
@@ -113,6 +121,13 @@ class ProxyUdpServer:
     @property
     def queue(self) -> asyncio.Queue[InboundDatagram]:
         return self._queue
+
+    def replace_queue(self, queue: asyncio.Queue[InboundDatagram]) -> None:
+        """Install an ingress queue before binding the UDP transport."""
+
+        if self._transport is not None:
+            raise RuntimeError("Cannot replace UDP queue while server is running")
+        self._queue = queue
 
     @property
     def address(self) -> tuple[str, int] | None:
@@ -151,6 +166,13 @@ class ProxyUdpServer:
         self._listening_address = None
         # Allow the event loop to process the close callback.
         await asyncio.sleep(0)
+
+    async def stop_receiving(self) -> None:
+        """Quiesce ingress without closing the transport used for queued outbound sends."""
+
+        protocol = self._protocol
+        if protocol is not None:
+            protocol.stop_receiving()
 
     def send_bytes(self, payload: bytes, address: tuple[str, int]) -> None:
         """Send ``payload`` to ``address`` using the underlying transport."""

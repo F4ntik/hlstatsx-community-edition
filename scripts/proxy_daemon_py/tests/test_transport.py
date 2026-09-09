@@ -17,6 +17,10 @@ def test_udp_server_drops_invalid_payloads() -> None:
     asyncio.run(_run_drops_invalid_payloads())
 
 
+def test_udp_server_stop_receiving_keeps_outbound_transport_until_close() -> None:
+    asyncio.run(_run_stop_receiving_keeps_outbound_transport_until_close())
+
+
 async def _run_enqueues_valid_datagram() -> None:
     buffer = StringIO()
     logger = ProxyLogger(LoggerConfig(stream=buffer))
@@ -66,6 +70,31 @@ async def _run_drops_invalid_payloads() -> None:
 
     log_contents = buffer.getvalue()
     assert "Dropping datagram with NUL byte" in log_contents
+
+
+async def _run_stop_receiving_keeps_outbound_transport_until_close() -> None:
+    logger = ProxyLogger(LoggerConfig(stream=StringIO()))
+    server = ProxyUdpServer(logger)
+    await server.start("127.0.0.1", 0)
+    address = server.address
+    assert address is not None
+
+    receiver = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    receiver.bind(("127.0.0.1", 0))
+    receiver.settimeout(1)
+    try:
+        await server.stop_receiving()
+        receiver.sendto(b"inbound-after-quiesce", address)
+        await asyncio.sleep(0)
+        assert server.queue.empty()
+
+        server.send_text("drained", receiver.getsockname())
+        data, _ = await asyncio.wait_for(asyncio.to_thread(receiver.recvfrom, 1024), timeout=1)
+    finally:
+        receiver.close()
+        await server.stop()
+
+    assert data == b"drained"
 
 
 def test_udp_server_start_twice_raises() -> None:

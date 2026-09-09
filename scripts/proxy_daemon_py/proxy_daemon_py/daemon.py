@@ -18,6 +18,39 @@ from .heartbeat import DaemonHeartbeatTarget, HeartbeatManager
 from .log import ProxyLogger
 from .transport import InboundDatagram, ProxyUdpServer
 
+_DEFAULT_EVENT_QUEUE_SIZE = 10
+_INGRESS_QUEUE_DRAIN_TIMEOUT_SECONDS = 5.0
+_FORWARD_QUEUE_DRAIN_TIMEOUT_SECONDS = 5.0
+
+
+def _configured_event_queue_size(config: object) -> int:
+    """Return the bounded proxy queue capacity from EventQueueSize."""
+
+    size = getattr(config, "event_queue_size", _DEFAULT_EVENT_QUEUE_SIZE)
+    if not isinstance(size, int) or isinstance(size, bool) or size <= 0:
+        raise ValueError("EventQueueSize must be greater than zero")
+    return size
+
+
+class BoundedProxyIngressQueue(asyncio.Queue[InboundDatagram]):
+    """Bounded proxy UDP ingress that drops newest datagrams without blocking."""
+
+    def __init__(self, logger: ProxyLogger, *, maxsize: int) -> None:
+        super().__init__(maxsize=maxsize)
+        self._logger = logger
+        self.dropped_datagrams = 0
+
+    def put_nowait(self, item: InboundDatagram) -> None:
+        if not self.full():
+            super().put_nowait(item)
+            return
+
+        self.dropped_datagrams += 1
+        self._logger.e403(
+            "Proxy UDP ingress queue full; dropping newest datagram "
+            f"total_dropped={self.dropped_datagrams}"
+        )
+
 
 class ProxyDaemon:
     """Container object coordinating the main daemon subsystems."""
@@ -41,7 +74,16 @@ class ProxyDaemon:
         self._proxy_key: str | None = None
         self._consumer_task: asyncio.Task[None] | None = None
         self._forwarder_task: asyncio.Task[None] | None = None
-        self._game_packet_queue: asyncio.Queue[InboundDatagram] = asyncio.Queue()
+        queue_size = _configured_event_queue_size(config)
+        self._ingress_queue = BoundedProxyIngressQueue(logger, maxsize=queue_size)
+        self._udp_server.replace_queue(self._ingress_queue)
+        self._game_packet_queue: asyncio.Queue[InboundDatagram] = asyncio.Queue(maxsize=queue_size)
+        self._forward_queue_overflow_count = 0
+        self._ingress_queue_shutdown_drop_count = 0
+        self._forward_queue_shutdown_drop_count = 0
+        self._ingress_queue_inflight = 0
+        self._forward_queue_inflight = 0
+        self._accepting_game_packets = True
         self._heartbeat_targets: dict[str, DaemonHeartbeatTarget] = {}
         self._reload_lock: asyncio.Lock | None = None
 
@@ -51,6 +93,7 @@ class ProxyDaemon:
             raise RuntimeError("Daemon already running")
 
         self._loop = asyncio.get_running_loop()
+        self._accepting_game_packets = True
         await self._db.connect()
         self._proxy_key = await self._db.fetch_proxy_key()
         self._reload_lock = asyncio.Lock()
@@ -69,12 +112,22 @@ class ProxyDaemon:
 
     async def stop(self) -> None:
         """Stop the daemon and release its resources."""
+        if self._loop is None:
+            return
+
+        stop_receiving = getattr(self._udp_server, "stop_receiving", None)
+        if callable(stop_receiving):
+            await stop_receiving()
+        if self._consumer_task is not None:
+            await self._drain_ingress_queue()
+        self._accepting_game_packets = False
         if self._consumer_task is not None:
             self._consumer_task.cancel()
             with suppress(asyncio.CancelledError):
                 await self._consumer_task
             self._consumer_task = None
         if self._forwarder_task is not None:
+            await self._drain_forward_queue()
             self._forwarder_task.cancel()
             with suppress(asyncio.CancelledError):
                 await self._forwarder_task
@@ -95,6 +148,30 @@ class ProxyDaemon:
         return self._game_packet_queue
 
     @property
+    def ingress_queue_overflow_count(self) -> int:
+        """Return the number of newest UDP datagrams dropped at ingress."""
+
+        return self._ingress_queue.dropped_datagrams
+
+    @property
+    def ingress_queue_shutdown_drop_count(self) -> int:
+        """Return ingress packets discarded after a bounded shutdown drain expires."""
+
+        return self._ingress_queue_shutdown_drop_count
+
+    @property
+    def forward_queue_overflow_count(self) -> int:
+        """Return the number of newest packets dropped at the forward boundary."""
+
+        return self._forward_queue_overflow_count
+
+    @property
+    def forward_queue_shutdown_drop_count(self) -> int:
+        """Return packets discarded after a bounded shutdown drain expires."""
+
+        return self._forward_queue_shutdown_drop_count
+
+    @property
     def balancer(self) -> ServerBalancer:
         """Expose the server balancer for inspection and tests."""
 
@@ -105,19 +182,95 @@ class ProxyDaemon:
 
         while True:
             datagram = await self._udp_server.queue.get()
-            if not await self._handle_datagram(datagram):
-                self._game_packet_queue.put_nowait(datagram)
+            self._ingress_queue_inflight += 1
+            try:
+                if not await self._handle_datagram(datagram):
+                    self._enqueue_game_packet(datagram)
+            finally:
+                self._ingress_queue_inflight -= 1
+                self._udp_server.queue.task_done()
+
+    def _enqueue_game_packet(self, datagram: InboundDatagram) -> bool:
+        """Queue an accepted game packet without blocking the UDP consumer."""
+
+        if not self._accepting_game_packets:
+            return False
+        if self._game_packet_queue.full():
+            self._forward_queue_overflow_count += 1
+            self._logger.e403(
+                "Proxy forwarding queue full; dropping newest packet "
+                f"total_dropped={self._forward_queue_overflow_count}"
+            )
+            return False
+        self._game_packet_queue.put_nowait(datagram)
+        return True
+
+    async def _drain_forward_queue(self) -> None:
+        """Let accepted forward packets finish before cancelling the worker."""
+
+        try:
+            await asyncio.wait_for(
+                self._game_packet_queue.join(),
+                timeout=_FORWARD_QUEUE_DRAIN_TIMEOUT_SECONDS,
+            )
+        except asyncio.TimeoutError:
+            queued_dropped = 0
+            while True:
+                try:
+                    self._game_packet_queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
+                self._game_packet_queue.task_done()
+                queued_dropped += 1
+            in_flight_dropped = self._forward_queue_inflight
+            dropped = queued_dropped + in_flight_dropped
+            self._forward_queue_shutdown_drop_count += dropped
+            self._logger.e403(
+                "Proxy forwarding shutdown drain timed out; "
+                f"remaining_dropped={queued_dropped} "
+                f"in_flight_dropped={in_flight_dropped} "
+                f"total_shutdown_dropped={self._forward_queue_shutdown_drop_count}"
+            )
+
+    async def _drain_ingress_queue(self) -> None:
+        """Move accepted ingress packets through forwarding before shutdown."""
+
+        try:
+            await asyncio.wait_for(
+                self._udp_server.queue.join(),
+                timeout=_INGRESS_QUEUE_DRAIN_TIMEOUT_SECONDS,
+            )
+        except asyncio.TimeoutError:
+            queued_dropped = 0
+            while True:
+                try:
+                    self._udp_server.queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    break
+                self._udp_server.queue.task_done()
+                queued_dropped += 1
+            in_flight_dropped = self._ingress_queue_inflight
+            dropped = queued_dropped + in_flight_dropped
+            self._ingress_queue_shutdown_drop_count += dropped
+            self._logger.e403(
+                "Proxy UDP ingress shutdown drain timed out; "
+                f"remaining_dropped={queued_dropped} "
+                f"in_flight_dropped={in_flight_dropped} "
+                f"total_shutdown_dropped={self._ingress_queue_shutdown_drop_count}"
+            )
 
     async def _forward_game_packets(self) -> None:
         """Forward queued game datagrams to their assigned downstream daemon."""
 
         while True:
             datagram = await self._game_packet_queue.get()
+            self._forward_queue_inflight += 1
             try:
                 self._forward_game_packet(datagram)
             except Exception as exc:  # pragma: no cover - defensive safety
                 self._logger.e403(f"Error while forwarding packet: {exc}")
             finally:
+                self._forward_queue_inflight -= 1
                 self._game_packet_queue.task_done()
 
     async def _handle_datagram(self, datagram: InboundDatagram) -> bool:

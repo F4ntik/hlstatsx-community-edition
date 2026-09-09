@@ -34,6 +34,15 @@ def test_parse_proxy_envelope_without_server():
     assert envelope.payload == "C;HEARTBEAT;"
 
 
+def test_parse_proxy_envelope_preserves_proxy_marker_inside_payload():
+    payload = 'L 06/15/2023 - 10:15:42: "Alice<2><STEAM_1:1:111><CT>" say "PROXY marker"'
+    envelope = parse_proxy_envelope(f"PROXY Key=test 127.0.0.1:27015PROXY {payload}")
+
+    assert envelope.proxy_key == "test"
+    assert envelope.server_address == "127.0.0.1:27015"
+    assert envelope.payload == payload
+
+
 @pytest.mark.parametrize(
     "payload, expected",
     [

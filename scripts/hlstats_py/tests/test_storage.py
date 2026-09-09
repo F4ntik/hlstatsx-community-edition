@@ -3533,6 +3533,45 @@ def test_lookup_does_not_merge_name_only_players_without_unique_id(
     assert all(query != _UPDATE_PLAYER_NAME_QUERY for query, _params in connection.executed)
 
 
+def test_lookup_keeps_same_unique_id_separate_per_game(event_context: EventContext) -> None:
+    event = parse_log_event('L 01/02/2024 - 03:04:05: "Player<2><STEAM_1:2><CT>" say "first"')
+    descriptor = event.actor
+    assert descriptor is not None
+    other_context = EventContext(
+        server_id=event_context.server_id,
+        game="cstrike",
+        schema=GameSchema(game="cstrike"),
+        localization=event_context.localization,
+        extras=event_context.extras,
+    )
+    responses: dict[QueryKey, list[QueryResponse]] = {
+        (_PLAYER_BY_UNIQUE_QUERY, ("STEAM_1:2", "csgo")): [QueryResponse()],
+        (_PLAYER_BY_UNIQUE_QUERY, ("2", "csgo")): [QueryResponse()],
+        (_PLAYER_BY_UNIQUE_QUERY, ("STEAM_1:2", "cstrike")): [QueryResponse()],
+        (_PLAYER_BY_UNIQUE_QUERY, ("2", "cstrike")): [QueryResponse()],
+        (_LAST_INSERT_ID_QUERY, None): [
+            QueryResponse(fetchone=(101,)),
+            QueryResponse(fetchone=(102,)),
+        ],
+    }
+    connection = FakeConnection(responses)
+    timestamp = datetime(2024, 1, 2, 3, 4, 5)
+    storage = EventStorage(StubAdapter(connection), clock=lambda: timestamp)
+
+    first_id = storage._resolve_player_id(
+        connection, descriptor, event_context, timestamp, timestamp
+    )
+    second_id = storage._resolve_player_id(
+        connection, descriptor, other_context, timestamp, timestamp
+    )
+
+    assert (first_id, second_id) == (101, 102)
+    assert [entry for entry in connection.executed if entry[0] == _INSERT_PLAYER_QUERY] == [
+        (_INSERT_PLAYER_QUERY, ("csgo", "Player")),
+        (_INSERT_PLAYER_QUERY, ("cstrike", "Player")),
+    ]
+
+
 def test_empty_descriptor_without_unique_id_does_not_create_player(
     event_context: EventContext,
 ) -> None:
@@ -3838,6 +3877,39 @@ def test_online_events_commit_independently_without_cross_event_buffering() -> N
     assert connection.commit_calls == 2
     assert connection.autocommit_calls == [False, True, False, True]
     assert storage._event_buffer is None
+
+
+def test_online_event_pins_the_connection_until_it_finishes() -> None:
+    class SwitchingAdapter:
+        def __init__(self, first: FakeConnection, replacement: FakeConnection) -> None:
+            self.first = first
+            self.replacement = replacement
+            self.calls = 0
+
+        def connection(self) -> FakeConnection:
+            self.calls += 1
+            return self.first if self.calls == 1 else self.replacement
+
+    first = FakeConnection()
+    replacement = FakeConnection()
+    adapter = SwitchingAdapter(first, replacement)
+    storage = EventStorage(adapter)
+
+    storage.begin_online_event()
+    assert storage._connection() is first
+    storage._execute(
+        storage._connection(),
+        _INSERT_CHAT_QUERY,
+        (datetime(2024, 1, 2, 3, 4, 5), 7, "de_dust2", 101, 1, "pinned"),
+    )
+    storage.commit_online_event()
+
+    assert adapter.calls == 1
+    assert first.autocommit_calls == [False, True]
+    assert first.commit_calls == 1
+    assert replacement.autocommit_calls == []
+    assert storage._online_event_connection is None
+    assert storage._connection() is replacement
 
 
 def test_online_commit_failure_rolls_back_and_restores_autocommit() -> None:
@@ -5031,6 +5103,52 @@ def test_team_bonus_trace_groups_by_event_signature(
         assert payload["stage_event_counts"]["team_gate_reject"][event_key] == 1
     finally:
         trace_path.unlink(missing_ok=True)
+
+
+def test_team_bonus_trace_does_not_aggregate_without_trace_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("HLSTATS_TEAM_BONUS_TRACE_PATH", raising=False)
+    storage = EventStorage(StubAdapter(FakeConnection()))
+
+    storage._record_team_bonus_stage(
+        "candidate_set",
+        action_id=755,
+        map_name="de_dust2",
+        event_code="SFUI_Notice_CTs_Win",
+        event_time=datetime(2024, 1, 2, 3, 4, 5),
+        player_id=101,
+        team="CT",
+        server_id=7,
+    )
+
+    assert storage._team_bonus_stage_counts == {}
+    assert storage._team_bonus_stage_event_counts == {}
+    assert storage._team_bonus_stage_samples == []
+
+
+def test_team_bonus_trace_samples_remain_bounded_for_matching_env_value(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("HLSTATS_TEAM_BONUS_TRACE_PATH", str(tmp_path / "trace.json"))
+    monkeypatch.setenv("HLSTATS_TEAM_BONUS_TRACE_SAMPLE_PLAYER_ID", "101")
+    storage = EventStorage(StubAdapter(FakeConnection()))
+    started_at = datetime(2024, 1, 2, 3, 4, 5)
+
+    for offset in range(250):
+        storage._record_team_bonus_stage(
+            "candidate_set",
+            action_id=755,
+            map_name="de_dust2",
+            event_code="SFUI_Notice_CTs_Win",
+            event_time=started_at + timedelta(seconds=offset),
+            player_id=101,
+            team="CT",
+            server_id=7,
+        )
+
+    assert len(storage._team_bonus_stage_samples) == 200
 
 
 def test_team_bonus_rescued_hostage_allows_same_second_duplicates(event_context: EventContext) -> None:

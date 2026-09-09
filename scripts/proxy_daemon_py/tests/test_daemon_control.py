@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import asyncio
 import socket
+from contextlib import suppress
+from dataclasses import replace
 from datetime import datetime, timezone
 from io import StringIO
 from pathlib import Path
 from types import MappingProxyType
 
+import pytest
+from proxy_daemon_py import daemon as daemon_module
 from proxy_daemon_py.balancer import Daemon, ServerAssignment, ServerBalancer
 from proxy_daemon_py.config import ProxyConfig
 from proxy_daemon_py.daemon import ProxyDaemon
@@ -19,6 +23,7 @@ class FakeDatabaseAdapter:
     def __init__(self, proxy_key: str, *, daemons: list[ProxyDaemonTarget] | None = None) -> None:
         self._proxy_key = proxy_key
         self.connected = False
+        self.close_calls = 0
         self.daemons = list(daemons or [])
 
     async def connect(self) -> None:
@@ -26,6 +31,7 @@ class FakeDatabaseAdapter:
 
     async def close(self) -> None:
         self.connected = False
+        self.close_calls += 1
 
     async def fetch_proxy_key(self) -> str:
         return self._proxy_key
@@ -37,6 +43,7 @@ class FakeDatabaseAdapter:
 class DummyHeartbeatManager:
     def __init__(self) -> None:
         self.started = False
+        self.stop_calls = 0
         self.targets: set[object] = set()
         self.added: list[object] = []
         self.removed: list[object] = []
@@ -46,6 +53,7 @@ class DummyHeartbeatManager:
 
     async def stop(self) -> None:
         self.started = False
+        self.stop_calls += 1
 
     def add_target(self, target: object) -> None:
         self.targets.add(target)
@@ -66,19 +74,21 @@ class _RecordingUdpServer(ProxyUdpServer):
         self.sent_text.append((payload, address))
 
 
-def _make_idle_daemon() -> tuple[ProxyDaemon, StringIO, ProxyUdpServer]:
+def _make_idle_daemon(*, event_queue_size: int = 10) -> tuple[ProxyDaemon, StringIO, ProxyUdpServer]:
     buffer = StringIO()
     logger = ProxyLogger(LoggerConfig(stream=buffer))
     server = ProxyUdpServer(logger)
     db = FakeDatabaseAdapter('test')
     balancer = ServerBalancer()
     heartbeat = DummyHeartbeatManager()
-    daemon = ProxyDaemon(_make_config(), db, balancer, heartbeat, server, logger)
+    daemon = ProxyDaemon(
+        _make_config(event_queue_size=event_queue_size), db, balancer, heartbeat, server, logger
+    )
     daemon._proxy_key = 'test'
     return daemon, buffer, server
 
 
-def _make_config() -> ProxyConfig:
+def _make_config(*, event_queue_size: int = 10) -> ProxyConfig:
     return ProxyConfig(
         config_path=Path("/tmp/hlstats.conf"),
         db_host="localhost",
@@ -88,7 +98,7 @@ def _make_config() -> ProxyConfig:
         bind_ip="127.0.0.1",
         port=0,
         debug_level=0,
-        event_queue_size=10,
+        event_queue_size=event_queue_size,
         ingress_queue_size=1000,
         cpanel_hack=False,
         raw=MappingProxyType({}),
@@ -113,6 +123,107 @@ def test_proxy_daemon_forwards_non_control_payloads() -> None:
 
 def test_proxy_daemon_reassigns_on_send_failure() -> None:
     asyncio.run(_run_reassigns_on_send_failure())
+
+
+def test_proxy_daemon_rejects_non_positive_forward_queue_capacity() -> None:
+    config = replace(_make_config(), event_queue_size=0)
+    logger = ProxyLogger(LoggerConfig(stream=StringIO()))
+
+    with pytest.raises(ValueError, match="EventQueueSize must be greater than zero"):
+        ProxyDaemon(
+            config,
+            FakeDatabaseAdapter("test"),
+            ServerBalancer(),
+            DummyHeartbeatManager(),
+            ProxyUdpServer(logger),
+            logger,
+        )
+
+
+def test_proxy_daemon_drops_newest_packet_when_forward_queue_is_full() -> None:
+    daemon, buffer, _ = _make_idle_daemon(event_queue_size=1)
+    accepted = InboundDatagram(b"accepted", "accepted", ("127.0.0.1", 27015))
+    overflow = InboundDatagram(b"secret", "PROXY Key=secret chat payload", ("127.0.0.1", 27016))
+
+    assert daemon._enqueue_game_packet(accepted) is True
+    assert daemon._enqueue_game_packet(overflow) is False
+    assert daemon.forward_queue_overflow_count == 1
+    assert daemon.game_packet_queue.get_nowait() == accepted
+
+    log_contents = buffer.getvalue()
+    assert "Proxy forwarding queue full" in log_contents
+    assert "secret" not in log_contents
+    assert "chat payload" not in log_contents
+
+
+def test_proxy_daemon_bounds_udp_ingress_with_count_only_overflow_log() -> None:
+    daemon, buffer, server = _make_idle_daemon(event_queue_size=2)
+    first = InboundDatagram(b"first", "first", ("127.0.0.1", 27015))
+    second = InboundDatagram(b"second", "second", ("127.0.0.1", 27016))
+    overflow = InboundDatagram(b"secret", "PROXY Key=secret chat payload", ("127.0.0.1", 27016))
+
+    server.queue.put_nowait(first)
+    server.queue.put_nowait(second)
+    server.queue.put_nowait(overflow)
+
+    assert server.queue.maxsize == 2
+    assert [server.queue.get_nowait() for _ in range(2)] == [first, second]
+    assert daemon.ingress_queue_overflow_count == 1
+    log_contents = buffer.getvalue()
+    assert "Proxy UDP ingress queue full" in log_contents
+    assert "total_dropped=1" in log_contents
+    assert "secret" not in log_contents
+    assert "chat payload" not in log_contents
+
+
+def test_proxy_daemon_forward_queue_preserves_accepted_arrival_order() -> None:
+    daemon, _, _ = _make_idle_daemon(event_queue_size=3)
+    first = InboundDatagram(b"first", "first", ("127.0.0.1", 27015))
+    second = InboundDatagram(b"second", "second", ("127.0.0.1", 27016))
+    third = InboundDatagram(b"third", "third", ("127.0.0.1", 27015))
+
+    assert [daemon._enqueue_game_packet(item) for item in (first, second, third)] == [True, True, True]
+    assert [daemon.game_packet_queue.get_nowait() for _ in range(3)] == [first, second, third]
+
+
+def test_proxy_daemon_forward_queue_recovers_after_drain() -> None:
+    daemon, _, _ = _make_idle_daemon(event_queue_size=1)
+    first = InboundDatagram(b"first", "first", ("127.0.0.1", 27015))
+    dropped = InboundDatagram(b"dropped", "dropped", ("127.0.0.1", 27016))
+    recovered = InboundDatagram(b"recovered", "recovered", ("127.0.0.1", 27015))
+
+    assert daemon._enqueue_game_packet(first) is True
+    assert daemon._enqueue_game_packet(dropped) is False
+    assert daemon.game_packet_queue.get_nowait() == first
+    daemon.game_packet_queue.task_done()
+
+    assert daemon._enqueue_game_packet(recovered) is True
+    assert daemon.game_packet_queue.get_nowait() == recovered
+    assert daemon.forward_queue_overflow_count == 1
+
+
+def test_proxy_daemon_stop_drains_accepted_forward_packets() -> None:
+    asyncio.run(_run_stop_drains_accepted_forward_packets())
+
+
+def test_proxy_daemon_stop_drains_accepted_ingress_packets() -> None:
+    asyncio.run(_run_stop_drains_accepted_ingress_packets())
+
+
+def test_proxy_daemon_stop_timeout_counts_only_remaining_ingress_packets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    asyncio.run(_run_stop_timeout_counts_only_remaining_ingress_packets(monkeypatch))
+
+
+def test_proxy_daemon_stop_timeout_counts_only_remaining_packets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    asyncio.run(_run_stop_timeout_counts_only_remaining_packets(monkeypatch))
+
+
+def test_proxy_daemon_stop_prevents_post_close_forwarding_and_is_idempotent() -> None:
+    asyncio.run(_run_stop_prevents_post_close_forwarding_and_is_idempotent())
 
 
 def test_parse_proxy_command_invalid_inputs() -> None:
@@ -197,6 +308,148 @@ def test_proxy_daemon_rejects_direct_mutating_loopback_reload() -> None:
 
 def test_proxy_daemon_rejects_unsupported_control_without_forwarding() -> None:
     asyncio.run(_run_rejects_unsupported_control_without_forwarding())
+
+
+async def _start_shutdown_test_daemon() -> tuple[
+    ProxyDaemon,
+    StringIO,
+    FakeDatabaseAdapter,
+    DummyHeartbeatManager,
+]:
+    buffer = StringIO()
+    logger = ProxyLogger(LoggerConfig(stream=buffer))
+    db = FakeDatabaseAdapter("test")
+    heartbeat = DummyHeartbeatManager()
+    daemon = ProxyDaemon(
+        _make_config(),
+        db,
+        ServerBalancer(),
+        heartbeat,
+        ProxyUdpServer(logger),
+        logger,
+    )
+    await daemon.start()
+    return daemon, buffer, db, heartbeat
+
+
+async def _run_stop_drains_accepted_forward_packets() -> None:
+    daemon, _, db, heartbeat = await _start_shutdown_test_daemon()
+    forwarded: list[InboundDatagram] = []
+    daemon._forward_game_packet = forwarded.append  # type: ignore[method-assign]
+    accepted = InboundDatagram(b"accepted", "accepted", ("127.0.0.1", 27015))
+
+    assert daemon._enqueue_game_packet(accepted) is True
+    await daemon.stop()
+
+    assert forwarded == [accepted]
+    assert daemon.game_packet_queue.empty()
+    assert daemon.forward_queue_shutdown_drop_count == 0
+    assert db.close_calls == 1
+    assert heartbeat.stop_calls == 1
+
+
+async def _run_stop_drains_accepted_ingress_packets() -> None:
+    daemon, _, db, heartbeat = await _start_shutdown_test_daemon()
+    forwarded: list[InboundDatagram] = []
+    daemon._forward_game_packet = forwarded.append  # type: ignore[method-assign]
+    accepted = InboundDatagram(b"accepted", "accepted", ("127.0.0.1", 27015))
+
+    daemon._udp_server.queue.put_nowait(accepted)
+    await daemon.stop()
+
+    assert forwarded == [accepted]
+    assert daemon._udp_server.queue.empty()
+    assert daemon.ingress_queue_shutdown_drop_count == 0
+    assert db.close_calls == 1
+    assert heartbeat.stop_calls == 1
+
+
+async def _run_stop_timeout_counts_only_remaining_ingress_packets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    daemon, buffer, db, heartbeat = await _start_shutdown_test_daemon()
+    original_consumer = daemon._consumer_task
+    assert original_consumer is not None
+    original_consumer.cancel()
+    with suppress(asyncio.CancelledError):
+        await original_consumer
+
+    blocker = asyncio.Event()
+
+    async def stalled_consumer() -> None:
+        await blocker.wait()
+
+    daemon._consumer_task = asyncio.create_task(stalled_consumer())
+    monkeypatch.setattr(daemon_module, "_INGRESS_QUEUE_DRAIN_TIMEOUT_SECONDS", 0.01)
+    first = InboundDatagram(b"one", "PROXY Key=secret first payload", ("127.0.0.1", 27015))
+    second = InboundDatagram(b"two", "PROXY Key=secret second payload", ("127.0.0.1", 27016))
+
+    daemon._udp_server.queue.put_nowait(first)
+    daemon._udp_server.queue.put_nowait(second)
+    await daemon.stop()
+
+    assert daemon._udp_server.queue.empty()
+    assert daemon.ingress_queue_shutdown_drop_count == 2
+    assert db.close_calls == 1
+    assert heartbeat.stop_calls == 1
+    log_contents = buffer.getvalue()
+    assert "Proxy UDP ingress shutdown drain timed out" in log_contents
+    assert "remaining_dropped=2" in log_contents
+    assert "total_shutdown_dropped=2" in log_contents
+    assert "secret" not in log_contents
+    assert "first payload" not in log_contents
+    assert "second payload" not in log_contents
+
+
+async def _run_stop_timeout_counts_only_remaining_packets(monkeypatch: pytest.MonkeyPatch) -> None:
+    daemon, buffer, db, heartbeat = await _start_shutdown_test_daemon()
+    original_forwarder = daemon._forwarder_task
+    assert original_forwarder is not None
+    original_forwarder.cancel()
+    with suppress(asyncio.CancelledError):
+        await original_forwarder
+
+    blocker = asyncio.Event()
+
+    async def stalled_forwarder() -> None:
+        await blocker.wait()
+
+    daemon._forwarder_task = asyncio.create_task(stalled_forwarder())
+    monkeypatch.setattr(daemon_module, "_FORWARD_QUEUE_DRAIN_TIMEOUT_SECONDS", 0.01)
+    first = InboundDatagram(b"one", "PROXY Key=secret first payload", ("127.0.0.1", 27015))
+    second = InboundDatagram(b"two", "PROXY Key=secret second payload", ("127.0.0.1", 27016))
+
+    assert daemon._enqueue_game_packet(first) is True
+    assert daemon._enqueue_game_packet(second) is True
+    await daemon.stop()
+
+    assert daemon.game_packet_queue.empty()
+    assert daemon.forward_queue_shutdown_drop_count == 2
+    assert db.close_calls == 1
+    assert heartbeat.stop_calls == 1
+    log_contents = buffer.getvalue()
+    assert "remaining_dropped=2" in log_contents
+    assert "total_shutdown_dropped=2" in log_contents
+    assert "secret" not in log_contents
+    assert "first payload" not in log_contents
+    assert "second payload" not in log_contents
+
+
+async def _run_stop_prevents_post_close_forwarding_and_is_idempotent() -> None:
+    daemon, _, db, heartbeat = await _start_shutdown_test_daemon()
+    forwarded: list[InboundDatagram] = []
+    daemon._forward_game_packet = forwarded.append  # type: ignore[method-assign]
+    after_stop = InboundDatagram(b"after", "after", ("127.0.0.1", 27015))
+
+    await daemon.stop()
+    assert daemon._enqueue_game_packet(after_stop) is False
+    await asyncio.sleep(0)
+    await daemon.stop()
+
+    assert forwarded == []
+    assert daemon.game_packet_queue.empty()
+    assert db.close_calls == 1
+    assert heartbeat.stop_calls == 1
 
 
 async def _run_handles_local_commands() -> None:

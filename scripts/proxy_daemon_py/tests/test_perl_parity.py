@@ -104,6 +104,9 @@ class FakeUdpServer:
         self._running = False
         self._address: tuple[str, int] | None = None
 
+    def replace_queue(self, queue: asyncio.Queue[InboundDatagram]) -> None:
+        self.queue = queue
+
     @property
     def address(self) -> tuple[str, int] | None:
         return self._address if self._running else None

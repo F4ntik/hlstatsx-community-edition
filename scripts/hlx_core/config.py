@@ -25,9 +25,8 @@ _DEFAULTS: Mapping[str, str] = MappingProxyType(
         "Port": "27500",
         "DebugLevel": "0",
         "EventQueueSize": "10",
-        # This is intentionally distinct from the legacy proxy-daemon
-        # EventQueueSize.  It bounds only the Python HLstats worker's UDP
-        # ingress queue.
+        # EventQueueSize bounds both Python proxy-daemon queues: UDP ingress
+        # and forwarding. The Python HLstats worker uses IngressQueueSize.
         "IngressQueueSize": "1000",
         "CpanelHack": "0",
     }

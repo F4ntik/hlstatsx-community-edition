@@ -262,6 +262,35 @@ def test_connection_successful_ping_keeps_existing_connection() -> None:
     assert connection.ping_reconnect_values == [False]
 
 
+def test_connection_positional_only_ping_preserves_transaction_session() -> None:
+    class PositionalOnlyPingConnection(FakeConnection):
+        def ping(self, reconnect: bool = False, /) -> bool:
+            self.pings += 1
+            self.ping_reconnect_values.append(reconnect)
+            return True
+
+    connection = PositionalOnlyPingConnection()
+    replacement = FakeConnection()
+    connections = [connection, replacement]
+    attempts = 0
+
+    def connector(**_: object) -> db.SupportsConnection:
+        nonlocal attempts
+        attempts += 1
+        return connections.pop(0)
+
+    adapter = db.SyncDatabaseAdapter(CONFIG, connector=connector)
+    adapter.connect()
+    connection.autocommit(False)
+
+    for phase in ("epoch lock", "business write", "recovery write", "cursor advance"):
+        assert adapter.connection() is connection, phase
+
+    assert attempts == 1
+    assert connection.pings == 4
+    assert connection.ping_reconnect_values == [False, False, False, False]
+
+
 def test_connection_failed_ping_reconnects() -> None:
     class BrokenPingConnection(FakeConnection):
         def ping(self, reconnect: bool = False) -> bool:

@@ -61,6 +61,7 @@ _POST_ROUND_TEAM_REWARD_GAME_EVENTS = {("cstrike", "Planted_The_Bomb")}
 _ACTIVE_PLAYER_IDLE_TIMEOUT = timedelta(seconds=250)
 _IDLE_PRUNE_INTERVAL = timedelta(seconds=60)
 _MAX_CONNECTION_TIME_GAP_SECONDS = 600
+_TEAM_BONUS_TRACE_MAX_SAMPLES = 200
 _TEAM_ALIASES = {
     "T": "TERRORIST",
     "TS": "TERRORIST",
@@ -647,6 +648,7 @@ class EventStorage:
         self._transaction_batch_size = 0
         self._stdin_batch_active = False
         self._online_event_active = False
+        self._online_event_connection: proxy_db.SupportsConnection | None = None
         self._online_event_touched_players: set[int] = set()
         # Only ids recorded by the active online event may be flushed before
         # its commit.  The broader rollup dictionaries are intentionally kept
@@ -666,6 +668,7 @@ class EventStorage:
         self._team_bonus_stage_player_counts: dict[str, dict[int, int]] = {}
         self._team_bonus_stage_event_counts: dict[str, dict[str, int]] = {}
         self._team_bonus_stage_samples: list[dict[str, Any]] = []
+        self._team_bonus_trace_path = os.environ.get("HLSTATS_TEAM_BONUS_TRACE_PATH")
         self._db_write_trace_path = os.environ.get("HLSTATS_DB_WRITE_TRACE_PATH")
         self._db_write_trace_handle: TextIO | None = None
 
@@ -724,6 +727,8 @@ class EventStorage:
         if buffer is not None and buffer.buffered_rows > 0:
             raise StorageError("online event buffers are not supported")
         self._event_buffer = None
+        connection = self._adapter.connection()
+        self._online_event_connection = connection
         try:
             self._set_autocommit(False)
         except Exception:
@@ -731,6 +736,8 @@ class EventStorage:
                 self._set_autocommit(True)
             except Exception:
                 pass
+            finally:
+                self._online_event_connection = None
             raise
         self._online_event_active = True
 
@@ -2068,7 +2075,9 @@ class EventStorage:
 
     def _cache_key_for_player(self, game: str, descriptor: PlayerDescriptor) -> _PlayerCacheKey:
         if descriptor.unique_id:
-            return _PlayerCacheKey("unique", descriptor.unique_id, None)
+            return _PlayerCacheKey(
+                "unique", f"{game}:{self._canonical_unique_id(descriptor.unique_id)}", None
+            )
         key = f"{descriptor.name.lower()}::{descriptor.user_id}" if descriptor.user_id else descriptor.name.lower()
         return _PlayerCacheKey("name", f"{game}:{key}", descriptor.user_id)
 
@@ -3702,6 +3711,9 @@ class EventStorage:
     # Low level helpers
 
     def _connection(self) -> proxy_db.SupportsConnection:
+        connection = self._online_event_connection
+        if connection is not None:
+            return connection
         return self._adapter.connection()
 
     def _resolve_map(self, context: EventContext) -> str:
@@ -3976,6 +3988,7 @@ class EventStorage:
         self._pending_writes = 0
         self._pending_records = 0
         self._online_event_active = False
+        self._online_event_connection = None
         self._online_event_touched_players.clear()
         self._online_event_deferred_players.clear()
 
@@ -4021,6 +4034,8 @@ class EventStorage:
         observed_team: str = "",
         roster_flags: Optional[Mapping[str, bool]] = None,
     ) -> None:
+        if not self._team_bonus_trace_path:
+            return
         self._team_bonus_stage_counts[stage] = self._team_bonus_stage_counts.get(stage, 0) + 1
         by_action = self._team_bonus_stage_action_counts.setdefault(stage, {})
         by_action[action_id] = by_action.get(action_id, 0) + 1
@@ -4034,12 +4049,12 @@ class EventStorage:
         by_event[event_key] = by_event.get(event_key, 0) + 1
         sample_player = os.environ.get("HLSTATS_TEAM_BONUS_TRACE_SAMPLE_PLAYER_ID")
         sample_event_time = os.environ.get("HLSTATS_TEAM_BONUS_TRACE_SAMPLE_EVENT_TIME")
-        should_sample = len(self._team_bonus_stage_samples) < 200
+        should_sample = len(self._team_bonus_stage_samples) < _TEAM_BONUS_TRACE_MAX_SAMPLES
         if sample_player:
             should_sample = should_sample or str(player_id) == sample_player
         if sample_event_time:
             should_sample = should_sample or event_time.isoformat(sep=" ") == sample_event_time
-        if should_sample:
+        if should_sample and len(self._team_bonus_stage_samples) < _TEAM_BONUS_TRACE_MAX_SAMPLES:
             self._team_bonus_stage_samples.append(
                 {
                     "stage": stage,
@@ -4058,7 +4073,7 @@ class EventStorage:
     def _write_team_bonus_stage_trace(self) -> None:
         if not self._team_bonus_stage_counts:
             return
-        trace_target = os.environ.get("HLSTATS_TEAM_BONUS_TRACE_PATH")
+        trace_target = self._team_bonus_trace_path
         if not trace_target:
             return
         trace_path = Path(trace_target)
