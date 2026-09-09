@@ -20,6 +20,9 @@ development worktrees and their uncommitted changes are preserved separately.
 - Updater: HTTP is denied; the trusted CLI initializes its request context,
   applies migration 83 and checks the resulting database version before success.
   A shutdown guard makes legacy bare-exit failures return a nonzero status.
+  Legacy schemas with a higher version marker also receive an explicit,
+  idempotent password-capacity check and repair. Their schema/application
+  version markers and existing password values are preserved.
 - Heatmaps: base uploads must match existing floor-image dimensions before
   staging any files. The upgrade archive preserves installed images/calibration;
   only fresh installs receive the native map defaults and matching seeds.
