@@ -9,7 +9,9 @@
 - WEB-01 through WEB-05 hardening is integrated:
   classic admin mutations use a session CSRF token and registry access gate;
   passwords use modern hashes with one-time MD5 upgrade and password-free,
-  rotating sessions; the web updater is CLI-only; and heatmap administration
+  rotating sessions; the public dispatcher revalidates the database password,
+  expiry and current access level before routing; the web updater is CLI-only;
+  and heatmap administration
   checks the current database password fingerprint before reads or mutations.
   isolated MariaDB checks verified a fresh schema 83 and a real 82-to-83 CLI
   upgrade. HTTP checks passed for legacy hash upgrade, special-character

@@ -231,6 +231,18 @@ assert_contains('($_SERVER[\'REQUEST_METHOD\'] ?? \'\') !== \'POST\' || !isset($
 assert_contains('DROP TEMPORARY TABLE IF EXISTS hlstats_AdminEventHistory', file_get_contents(ROOT_PATH . '/pages/admintasks/tools_adminevents.php'), 'the GET event-history report must not drop a persistent table');
 assert_contains("PHP_SAPI !== 'cli' || !defined('HLSTATS_TRUSTED_UPDATER')", $hlstatsSource, 'the public dispatcher must reject updater requests');
 assert_contains("PHP_SAPI !== 'cli' || !defined('HLSTATS_TRUSTED_UPDATER')", $updaterSource, 'the updater page must independently require the trusted CLI route');
+$databaseBootstrapPosition = strpos($hlstatsSource, '$db = new $db_classname');
+$publicSessionValidationPosition = strpos($hlstatsSource, 'admin_auth_session_validate_current_user($db);');
+$modeDispatchPosition = strpos($hlstatsSource, '$valid_modes = array(');
+assert_true(
+    $databaseBootstrapPosition !== false
+        && $publicSessionValidationPosition !== false
+        && $modeDispatchPosition !== false
+        && $databaseBootstrapPosition < $publicSessionValidationPosition
+        && $publicSessionValidationPosition < $modeDispatchPosition,
+    'the public dispatcher must validate an authenticated session after database bootstrap and before route dispatch'
+);
+assert_contains('admin_auth_session_validate_current_user($db)', $authSource, 'the admin route must reuse the shared database-backed session validation');
 assert_contains('`password` varchar(255)', $installSource, 'new installs must reserve full modern password storage');
 $updater83Source = file_get_contents(ROOT_PATH . '/updater/83.php');
 assert_contains('MODIFY COLUMN password varchar(255)', $updater83Source, 'the explicit updater must widen old password storage');
@@ -282,6 +294,8 @@ assert_true(session_id() !== $originalSessionId, 'a successful login must rotate
 assert_false(isset($_SESSION['password']), 'the session must not retain a plaintext password');
 assert_false(isset($_SESSION['heatmap_admin_preview']), 'a successful login must discard any prior admin preview capability');
 assert_true(admin_auth_session_is_current('admin', $db->user['password']), 'the fresh session should match the persisted password fingerprint');
+assert_true(is_array(admin_auth_session_validate_current_user($db)), 'the public dispatcher should accept a current database-backed session');
+assert_same(100, $_SESSION['acclevel'], 'database-backed validation should retain the current access level');
 
 $writesBeforeCsrfReject = $db->writeQueries;
 $rejectedStatus = exercise_admin_dispatcher_gate('POST', 'not-a-valid-token', false, function () use ($db): void {
@@ -325,6 +339,23 @@ assert_false(
 assert_contains('heatmap_admin_require_access($pdo);', $heatmapSource, 'all heatmap actions must perform a fresh session check after opening the database');
 assert_contains('admin_auth_session_revoke();', $heatmapSource, 'invalid heatmap sessions must be revoked');
 assert_false(strpos(source_between($heatmapSource, 'function heatmap_admin_actor_id', 'function heatmap_admin_require_actor', 'actor function should be extractable'), '$_SESSION[\'password\']') !== false, 'heatmap actor resolution must not use a plaintext session password');
+
+$changedPasswordHash = admin_password_hash_for_storage('changed password', $g_options);
+assert_true(is_string($changedPasswordHash), 'the changed-password regression needs a valid stored hash');
+$db->user['password'] = $changedPasswordHash;
+assert_false(admin_auth_session_validate_current_user($db), 'a changed database password must revoke public-route access');
+assert_false(isset($_SESSION['loggedin']) || isset($_SESSION['acclevel']), 'a changed database password must clear cached public-route authorization');
+
+assert_true(admin_auth_session_start('admin', $db->user['password'], 100), 'the expiry regression should start a fresh session');
+$_SESSION['authsessionStart'] = time() - 3600;
+assert_false(admin_auth_session_validate_current_user($db), 'an expired session must revoke public-route access');
+assert_false(isset($_SESSION['loggedin']) || isset($_SESSION['acclevel']), 'an expired session must clear cached public-route authorization');
+
+assert_true(admin_auth_session_start('admin', $db->user['password'], 100), 'the downgrade regression should start a fresh session');
+$db->user['acclevel'] = 20;
+assert_true(is_array(admin_auth_session_validate_current_user($db)), 'a current session should refresh its database user record');
+assert_same(20, $_SESSION['acclevel'], 'a database privilege downgrade must replace the cached access level');
+assert_false(isset($_SESSION['loggedin']) && $_SESSION['acclevel'] >= 80, 'a downgraded user must lose public IP-search authorization');
 
 $_SESSION['authsessionStart'] = time() - 3600;
 assert_false(admin_auth_session_is_current('admin', $db->user['password']), 'stale sessions must fail closed');

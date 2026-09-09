@@ -147,6 +147,10 @@ else
 	error(localized_text('error.database_class_missing'));
 }
 
+if (isset($_SESSION['loggedin'])) {
+	admin_auth_session_validate_current_user($db);
+}
+
 $container = require ROOT_PATH . '/bootstrap.php';
 $optionService = $container->get(\Service\OptionService::class);
 

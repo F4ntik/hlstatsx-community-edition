@@ -107,7 +107,6 @@ class Auth
 			$this->session = true;
 
 			if (!$this->checkSession()) {
-				admin_auth_session_revoke();
 				$this->fail(t('admin.session_expired'));
 			}
 			return;
@@ -203,13 +202,14 @@ class Auth
 
 	function checkSession()
 	{
-		$user = $this->fetchUser();
-		if (!is_array($user) || !admin_auth_session_is_current($this->username, $user['password'])) {
+		global $db;
+
+		$user = admin_auth_session_validate_current_user($db);
+		if (!is_array($user)) {
 			return false;
 		}
 
 		$this->userdata = $user;
-		$_SESSION['acclevel'] = (int) $user['acclevel'];
 		$this->ok = true;
 		$this->error = false;
 		return true;

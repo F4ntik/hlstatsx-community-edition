@@ -121,6 +121,44 @@ function admin_auth_session_is_current($username, $storedPassword, $now = null)
     return hash_equals(admin_password_fingerprint($storedPassword), $fingerprint);
 }
 
+function admin_auth_session_validate_current_user($db)
+{
+    if (session_status() !== PHP_SESSION_ACTIVE || empty($_SESSION['loggedin'])) {
+        return false;
+    }
+
+    $username = admin_request_scalar_string($_SESSION['username'] ?? null);
+    if ($username === '') {
+        admin_auth_session_revoke();
+        return false;
+    }
+
+    $escapedUsername = $db->escape($username);
+    $result = $db->query(
+        "SELECT password, acclevel FROM hlstats_Users WHERE username = '$escapedUsername' LIMIT 1",
+        false
+    );
+    if (!$result || $db->num_rows($result) != 1) {
+        if ($result) {
+            $db->free_result($result);
+        }
+        admin_auth_session_revoke();
+        return false;
+    }
+
+    $user = $db->fetch_array($result);
+    $db->free_result($result);
+    if (!is_array($user)
+        || !is_string($user['password'] ?? null)
+        || !admin_auth_session_is_current($username, $user['password'])) {
+        admin_auth_session_revoke();
+        return false;
+    }
+
+    $_SESSION['acclevel'] = (int) ($user['acclevel'] ?? 0);
+    return $user;
+}
+
 function admin_auth_session_revoke()
 {
     unset(
