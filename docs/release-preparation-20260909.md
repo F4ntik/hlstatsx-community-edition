@@ -11,6 +11,8 @@ development worktrees and their uncommitted changes are preserved separately.
   PROXY parsing, bounded ingress/forward queues and drain-on-stop handling.
   Overflow messages are coalesced over five-second intervals with exact loss
   counters, avoiding synchronous logging for every dropped packet.
+  Optional team-bonus diagnostics retain at most 200 distinct keys per stage
+  and dimension, with separate omitted-occurrence counters and bounded samples.
 - Python 3.10: storage timeout handling now reaches the fail-closed shutdown path.
 - Administration: CSRF before mutation, registry access levels before dispatch,
   POST confirmation for optimization, modern password hashes, strict legacy MD5
@@ -35,7 +37,7 @@ are visual references, not automatic walkability or floor reconstruction.
 
 ## Verification already performed during preparation
 
-- Python 3.10: 309 product tests, 61 operational-tool tests, 95 replay-helper
+- Python 3.10: 310 product tests, 61 operational-tool tests, 95 replay-helper
   tests and 101 proxy tests passed. The two opt-in MariaDB tests passed separately
   with the current source mounted into an isolated worker container.
 - Proxy Ruff, Black and Mypy passed using the CI dependency versions. Both
