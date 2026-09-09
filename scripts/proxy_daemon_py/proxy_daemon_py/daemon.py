@@ -8,6 +8,7 @@ APIs that other modules will eventually depend on.
 from __future__ import annotations
 
 import asyncio
+import time
 from collections.abc import Iterable
 from contextlib import suppress
 
@@ -21,6 +22,7 @@ from .transport import InboundDatagram, ProxyUdpServer
 _DEFAULT_EVENT_QUEUE_SIZE = 10
 _INGRESS_QUEUE_DRAIN_TIMEOUT_SECONDS = 5.0
 _FORWARD_QUEUE_DRAIN_TIMEOUT_SECONDS = 5.0
+_OVERFLOW_LOG_INTERVAL_SECONDS = 5.0
 
 
 def _configured_event_queue_size(config: object) -> int:
@@ -39,6 +41,8 @@ class BoundedProxyIngressQueue(asyncio.Queue[InboundDatagram]):
         super().__init__(maxsize=maxsize)
         self._logger = logger
         self.dropped_datagrams = 0
+        self._last_overflow_log_at: float | None = None
+        self._dropped_since_last_overflow_log = 0
 
     def put_nowait(self, item: InboundDatagram) -> None:
         if not self.full():
@@ -46,10 +50,19 @@ class BoundedProxyIngressQueue(asyncio.Queue[InboundDatagram]):
             return
 
         self.dropped_datagrams += 1
-        self._logger.e403(
-            "Proxy UDP ingress queue full; dropping newest datagram "
-            f"total_dropped={self.dropped_datagrams}"
-        )
+        self._dropped_since_last_overflow_log += 1
+        now = time.monotonic()
+        if (
+            self._last_overflow_log_at is None
+            or now - self._last_overflow_log_at >= _OVERFLOW_LOG_INTERVAL_SECONDS
+        ):
+            self._logger.e403(
+                "Proxy UDP ingress queue full; dropping newest datagram "
+                f"dropped_since_last_log={self._dropped_since_last_overflow_log} "
+                f"total_dropped={self.dropped_datagrams}"
+            )
+            self._last_overflow_log_at = now
+            self._dropped_since_last_overflow_log = 0
 
 
 class ProxyDaemon:
@@ -79,6 +92,8 @@ class ProxyDaemon:
         self._udp_server.replace_queue(self._ingress_queue)
         self._game_packet_queue: asyncio.Queue[InboundDatagram] = asyncio.Queue(maxsize=queue_size)
         self._forward_queue_overflow_count = 0
+        self._forward_queue_last_overflow_log_at: float | None = None
+        self._forward_queue_dropped_since_last_overflow_log = 0
         self._ingress_queue_shutdown_drop_count = 0
         self._forward_queue_shutdown_drop_count = 0
         self._ingress_queue_inflight = 0
@@ -197,10 +212,20 @@ class ProxyDaemon:
             return False
         if self._game_packet_queue.full():
             self._forward_queue_overflow_count += 1
-            self._logger.e403(
-                "Proxy forwarding queue full; dropping newest packet "
-                f"total_dropped={self._forward_queue_overflow_count}"
-            )
+            self._forward_queue_dropped_since_last_overflow_log += 1
+            now = time.monotonic()
+            if (
+                self._forward_queue_last_overflow_log_at is None
+                or now - self._forward_queue_last_overflow_log_at >= _OVERFLOW_LOG_INTERVAL_SECONDS
+            ):
+                self._logger.e403(
+                    "Proxy forwarding queue full; dropping newest packet "
+                    "dropped_since_last_log="
+                    f"{self._forward_queue_dropped_since_last_overflow_log} "
+                    f"total_dropped={self._forward_queue_overflow_count}"
+                )
+                self._forward_queue_last_overflow_log_at = now
+                self._forward_queue_dropped_since_last_overflow_log = 0
             return False
         self._game_packet_queue.put_nowait(datagram)
         return True

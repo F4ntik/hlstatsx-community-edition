@@ -179,6 +179,62 @@ def test_proxy_daemon_bounds_udp_ingress_with_count_only_overflow_log() -> None:
     assert "chat payload" not in log_contents
 
 
+def test_proxy_daemon_coalesces_forward_queue_overflow_logs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    daemon, buffer, _ = _make_idle_daemon(event_queue_size=1)
+    clock = [100.0]
+    monkeypatch.setattr(daemon_module.time, "monotonic", lambda: clock[0])
+    accepted = InboundDatagram(b"accepted", "accepted", ("127.0.0.1", 27015))
+    overflow = InboundDatagram(b"overflow", "overflow", ("127.0.0.1", 27016))
+
+    assert daemon._enqueue_game_packet(accepted) is True
+    assert daemon._enqueue_game_packet(overflow) is False
+    for _ in range(4):
+        assert daemon._enqueue_game_packet(overflow) is False
+    clock[0] = 104.999
+    assert daemon._enqueue_game_packet(overflow) is False
+    clock[0] = 105.0
+    assert daemon._enqueue_game_packet(overflow) is False
+
+    assert daemon.forward_queue_overflow_count == 7
+    assert daemon.game_packet_queue.get_nowait() == accepted
+    overflow_logs = [
+        line for line in buffer.getvalue().splitlines() if "Proxy forwarding queue full" in line
+    ]
+    assert len(overflow_logs) == 2
+    assert "dropped_since_last_log=1 total_dropped=1" in overflow_logs[0]
+    assert "dropped_since_last_log=6 total_dropped=7" in overflow_logs[1]
+
+
+def test_proxy_daemon_coalesces_ingress_queue_overflow_logs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    daemon, buffer, server = _make_idle_daemon(event_queue_size=1)
+    clock = [100.0]
+    monkeypatch.setattr(daemon_module.time, "monotonic", lambda: clock[0])
+    accepted = InboundDatagram(b"accepted", "accepted", ("127.0.0.1", 27015))
+    overflow = InboundDatagram(b"overflow", "overflow", ("127.0.0.1", 27016))
+
+    server.queue.put_nowait(accepted)
+    server.queue.put_nowait(overflow)
+    for _ in range(4):
+        server.queue.put_nowait(overflow)
+    clock[0] = 104.999
+    server.queue.put_nowait(overflow)
+    clock[0] = 105.0
+    server.queue.put_nowait(overflow)
+
+    assert daemon.ingress_queue_overflow_count == 7
+    assert server.queue.get_nowait() == accepted
+    overflow_logs = [
+        line for line in buffer.getvalue().splitlines() if "Proxy UDP ingress queue full" in line
+    ]
+    assert len(overflow_logs) == 2
+    assert "dropped_since_last_log=1 total_dropped=1" in overflow_logs[0]
+    assert "dropped_since_last_log=6 total_dropped=7" in overflow_logs[1]
+
+
 def test_proxy_daemon_forward_queue_preserves_accepted_arrival_order() -> None:
     daemon, _, _ = _make_idle_daemon(event_queue_size=3)
     first = InboundDatagram(b"first", "first", ("127.0.0.1", 27015))
