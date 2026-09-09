@@ -34,20 +34,38 @@ conversion can rebuild and lock tables.
    php scripts/run_web_updater.php
    ```
 
-   Migration `83` widens `hlstats_Users.password` to `varchar(255)` before the
-   application writes modern password hashes. The runner exits nonzero unless
-   it can read back database version `83` or newer. It does not run a runtime
-   `ALTER TABLE` during ordinary requests.
+   Migration `83` remains the normal `82`-to-`83` path that widens
+   `hlstats_Users.password` before the application writes modern password
+   hashes. After all numbered migrations, the trusted CLI reads the physical
+   password column. If it finds a `varchar` narrower than `255`, it widens the
+   column once and reads it back before reporting success. Existing
+   `varchar(255)` or wider columns are retained unchanged. The runner fails
+   closed for a missing, incompatible, unreadable, or unrepairable column. It
+   does not run a runtime `ALTER TABLE` during ordinary requests.
+
+   The runner accepts database version `83` or newer. A database that already
+   reports a newer schema and application version, such as `89` / `1.11.4`,
+   keeps those values: the compatibility repair changes only a narrow password
+   column and does not replay migration `83` or rewrite option metadata.
 
 4. Read back the result before restarting workers:
 
    ```sql
-   SELECT value FROM hlstats_Options WHERE keyname = 'dbversion';
-   SHOW COLUMNS FROM hlstats_Users LIKE 'password';
+   SELECT keyname, value
+   FROM hlstats_Options
+   WHERE keyname IN ('dbversion', 'version');
+
+   SELECT DATA_TYPE, CHARACTER_MAXIMUM_LENGTH
+   FROM information_schema.COLUMNS
+   WHERE TABLE_SCHEMA = DATABASE()
+     AND TABLE_NAME = 'hlstats_Users'
+     AND COLUMN_NAME = 'password';
    ```
 
-   The expected database version is `83`, and the password column is
-   `varchar(255)`.
+   The expected database version is `83` after an older upgrade, or the
+   unchanged original value when it was already newer. The password column must
+   be `varchar` with capacity `255` or greater. Preserve the observed
+   application version when the database was already newer.
 
 For the full-stack Docker image, the same runner is available at
 `/var/www/scripts/run_web_updater.php`. The image intentionally retains the

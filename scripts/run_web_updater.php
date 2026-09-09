@@ -59,6 +59,42 @@ register_shutdown_function(static function () use (&$hlstatsTrustedUpdaterComple
     }
 });
 
+function trusted_web_updater_read_password_capacity($pdo): int
+{
+    $statement = $pdo->query("SHOW COLUMNS FROM `hlstats_Users` LIKE 'password'");
+    if ($statement === false) {
+        throw new RuntimeException('could not inspect administrator password storage');
+    }
+
+    $column = $statement->fetch(PDO::FETCH_ASSOC);
+    $type = is_array($column) ? ($column['Type'] ?? null) : null;
+    if (!is_string($type) || preg_match('/\Avarchar\(([1-9][0-9]*)\)\z/iD', $type, $matches) !== 1) {
+        throw new RuntimeException('administrator password storage is incompatible');
+    }
+
+    return (int) $matches[1];
+}
+
+function trusted_web_updater_ensure_password_capacity($pdo): array
+{
+    $initialCapacity = trusted_web_updater_read_password_capacity($pdo);
+    if ($initialCapacity >= 255) {
+        return array('capacity' => $initialCapacity, 'repaired' => false);
+    }
+
+    $altered = $pdo->exec("ALTER TABLE `hlstats_Users` MODIFY COLUMN `password` varchar(255) NOT NULL default ''");
+    if ($altered === false) {
+        throw new RuntimeException('could not widen administrator password storage');
+    }
+
+    $capacity = trusted_web_updater_read_password_capacity($pdo);
+    if ($capacity < 255) {
+        throw new RuntimeException('administrator password storage remains too narrow after repair');
+    }
+
+    return array('capacity' => $capacity, 'repaired' => true, 'initialCapacity' => $initialCapacity);
+}
+
 try {
     require $webRoot . DIRECTORY_SEPARATOR . 'hlstats.php';
 } catch (Throwable $exception) {
@@ -88,5 +124,25 @@ if (!is_scalar($databaseVersion) || preg_match('/^[0-9]+$/', (string) $databaseV
     exit(1);
 }
 
+$passwordStorage = null;
+try {
+    $passwordStorage = trusted_web_updater_ensure_password_capacity($pdo);
+} catch (Throwable $exception) {
+    fwrite(STDERR, "Trusted web updater failed: " . $exception->getMessage() . "\n");
+    exit(1);
+}
+
+if ($passwordStorage['repaired']) {
+    fwrite(
+        STDOUT,
+        "Trusted web updater widened administrator password storage from "
+            . $passwordStorage['initialCapacity'] . " to " . $passwordStorage['capacity'] . ".\n"
+    );
+}
+
 $hlstatsTrustedUpdaterCompleted = true;
-fwrite(STDOUT, "Trusted web updater completed at database version " . $databaseVersion . ".\n");
+fwrite(
+    STDOUT,
+    "Trusted web updater completed at database version " . $databaseVersion
+        . " with administrator password capacity " . $passwordStorage['capacity'] . ".\n"
+);

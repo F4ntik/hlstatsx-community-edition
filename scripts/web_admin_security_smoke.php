@@ -40,14 +40,23 @@ function source_between(string $source, string $start, string $end, string $mess
     return substr($source, $startPosition, $endPosition - $startPosition);
 }
 
-function run_updater_runner_subprocess(string $runnerPath, string $workingDirectory, ?string $databaseVersion): array
+function run_updater_runner_subprocess(string $runnerPath, string $workingDirectory, array $environment = array()): array
 {
-    $environmentKey = 'HLSTATS_UPDATER_SMOKE_DBVERSION';
-    $previousValue = getenv($environmentKey);
-    if ($databaseVersion === null) {
-        putenv($environmentKey);
-    } else {
-        putenv($environmentKey . '=' . $databaseVersion);
+    $environmentKeys = array(
+        'HLSTATS_UPDATER_SMOKE_DBVERSION',
+        'HLSTATS_UPDATER_SMOKE_PASSWORD_COLUMN_TYPE',
+        'HLSTATS_UPDATER_SMOKE_PASSWORD_QUERY_FAIL',
+        'HLSTATS_UPDATER_SMOKE_PASSWORD_ALTER_FAIL',
+    );
+    $previousValues = array();
+    foreach ($environmentKeys as $environmentKey) {
+        $previousValues[$environmentKey] = getenv($environmentKey);
+        if (!array_key_exists($environmentKey, $environment)) {
+            putenv($environmentKey);
+            continue;
+        }
+
+        putenv($environmentKey . '=' . $environment[$environmentKey]);
     }
 
     try {
@@ -77,10 +86,12 @@ function run_updater_runner_subprocess(string $runnerPath, string $workingDirect
             'stderr' => $stderr,
         );
     } finally {
-        if ($previousValue === false) {
-            putenv($environmentKey);
-        } else {
-            putenv($environmentKey . '=' . $previousValue);
+        foreach ($previousValues as $environmentKey => $previousValue) {
+            if ($previousValue === false) {
+                putenv($environmentKey);
+            } else {
+                putenv($environmentKey . '=' . $previousValue);
+            }
         }
     }
 }
@@ -251,6 +262,9 @@ assert_contains("is_file('/var/www/html/hlstats.php')", $updaterRunnerSource, 't
 assert_contains('$_SERVER[\'PHP_SELF\'] = \'/hlstats.php\';', $updaterRunnerSource, 'the updater runner must use the canonical dispatcher path');
 assert_contains('$_SERVER[\'HTTP_HOST\'] = \'localhost\';', $updaterRunnerSource, 'the updater runner must supply a trusted CLI host context');
 assert_contains('database version did not reach 83', $updaterRunnerSource, 'the updater runner must verify migration completion');
+assert_contains("SHOW COLUMNS FROM `hlstats_Users` LIKE 'password'", $updaterRunnerSource, 'the trusted updater must inspect physical password storage');
+assert_contains('trusted_web_updater_ensure_password_capacity($pdo)', $updaterRunnerSource, 'the trusted updater must verify password capacity after numbered migrations');
+assert_contains('administrator password storage is incompatible', $updaterRunnerSource, 'the trusted updater must fail closed for an incompatible password column');
 
 $enCatalog = require ROOT_PATH . '/lang/en.php';
 $ruCatalog = require ROOT_PATH . '/lang/ru.php';
@@ -399,7 +413,7 @@ if (($_GET['mode'] ?? null) !== 'updater' || $_POST !== array() || $_REQUEST !==
     exit(72);
 }
 
-final class UpdaterRunnerSmokeStatement
+final class UpdaterRunnerSmokeVersionStatement
 {
     private string $databaseVersion;
 
@@ -419,15 +433,63 @@ final class UpdaterRunnerSmokeStatement
     }
 }
 
+final class UpdaterRunnerSmokeColumnStatement
+{
+    private array $column;
+
+    public function __construct(array $column)
+    {
+        $this->column = $column;
+    }
+
+    public function fetch($mode)
+    {
+        return $this->column;
+    }
+}
+
 final class UpdaterRunnerSmokePdo
 {
-    public function prepare(string $query): UpdaterRunnerSmokeStatement
+    private string $passwordColumnType;
+
+    public function __construct()
+    {
+        $columnType = getenv('HLSTATS_UPDATER_SMOKE_PASSWORD_COLUMN_TYPE');
+        $this->passwordColumnType = $columnType === false || $columnType === '' ? 'varchar(255)' : $columnType;
+    }
+
+    public function prepare(string $query): UpdaterRunnerSmokeVersionStatement
     {
         if (strpos($query, 'hlstats_Options') === false) {
             throw new RuntimeException('unexpected updater completion query');
         }
         $databaseVersion = getenv('HLSTATS_UPDATER_SMOKE_DBVERSION');
-        return new UpdaterRunnerSmokeStatement($databaseVersion === false || $databaseVersion === '' ? '83' : $databaseVersion);
+        return new UpdaterRunnerSmokeVersionStatement($databaseVersion === false || $databaseVersion === '' ? '83' : $databaseVersion);
+    }
+
+    public function query(string $query)
+    {
+        if (strpos($query, "SHOW COLUMNS FROM `hlstats_Users` LIKE 'password'") === false) {
+            throw new RuntimeException('unexpected password column query');
+        }
+        if (getenv('HLSTATS_UPDATER_SMOKE_PASSWORD_QUERY_FAIL') === '1') {
+            return false;
+        }
+
+        return new UpdaterRunnerSmokeColumnStatement(array('Type' => $this->passwordColumnType));
+    }
+
+    public function exec(string $query)
+    {
+        if (strpos($query, "ALTER TABLE `hlstats_Users` MODIFY COLUMN `password` varchar(255) NOT NULL default ''") === false) {
+            throw new RuntimeException('unexpected password column repair');
+        }
+        if (getenv('HLSTATS_UPDATER_SMOKE_PASSWORD_ALTER_FAIL') === '1') {
+            return false;
+        }
+
+        $this->passwordColumnType = 'varchar(255)';
+        return 0;
     }
 }
 
@@ -446,17 +508,79 @@ $container = new UpdaterRunnerSmokeContainer();
 PHP
     ) !== false, 'updater runner smoke dispatcher should be created');
 
-    $successfulRun = run_updater_runner_subprocess($updaterSmokeRoot . '/scripts/run_web_updater.php', $updaterSmokeRoot, null);
+    $successfulRun = run_updater_runner_subprocess($updaterSmokeRoot . '/scripts/run_web_updater.php', $updaterSmokeRoot);
     assert_same(0, $successfulRun['exitCode'], 'trusted updater runner must reach the canonical dispatcher route');
     assert_same('', $successfulRun['stderr'], 'trusted updater runner must not emit bootstrap warnings');
-    assert_contains('Trusted web updater completed at database version 83.', $successfulRun['stdout'], 'trusted updater runner must report a verified completion');
+    assert_contains('Trusted web updater completed at database version 83 with administrator password capacity 255.', $successfulRun['stdout'], 'trusted updater runner must report a verified completion');
 
-    $staleRun = run_updater_runner_subprocess($updaterSmokeRoot . '/scripts/run_web_updater.php', $updaterSmokeRoot, '82');
+    $staleRun = run_updater_runner_subprocess(
+        $updaterSmokeRoot . '/scripts/run_web_updater.php',
+        $updaterSmokeRoot,
+        array('HLSTATS_UPDATER_SMOKE_DBVERSION' => '82')
+    );
     assert_true($staleRun['exitCode'] !== 0, 'trusted updater runner must fail when the migration remains incomplete');
     assert_contains('database version did not reach 83', $staleRun['stderr'], 'trusted updater runner must explain an incomplete migration');
 
+    $narrowNewerRun = run_updater_runner_subprocess(
+        $updaterSmokeRoot . '/scripts/run_web_updater.php',
+        $updaterSmokeRoot,
+        array(
+            'HLSTATS_UPDATER_SMOKE_DBVERSION' => '89',
+            'HLSTATS_UPDATER_SMOKE_PASSWORD_COLUMN_TYPE' => 'varchar(32)',
+        )
+    );
+    assert_same(0, $narrowNewerRun['exitCode'], 'a newer schema with narrow password storage must be repaired');
+    assert_contains('Trusted web updater widened administrator password storage from 32 to 255.', $narrowNewerRun['stdout'], 'the newer-schema repair must report its physical widening');
+    assert_contains('Trusted web updater completed at database version 89 with administrator password capacity 255.', $narrowNewerRun['stdout'], 'the newer-schema repair must read back the widened capacity without changing the schema version');
+
+    $wideNewerRun = run_updater_runner_subprocess(
+        $updaterSmokeRoot . '/scripts/run_web_updater.php',
+        $updaterSmokeRoot,
+        array(
+            'HLSTATS_UPDATER_SMOKE_DBVERSION' => '89',
+            'HLSTATS_UPDATER_SMOKE_PASSWORD_COLUMN_TYPE' => 'varchar(512)',
+        )
+    );
+    assert_same(0, $wideNewerRun['exitCode'], 'a newer schema with wider password storage must remain supported');
+    assert_contains('Trusted web updater completed at database version 89 with administrator password capacity 512.', $wideNewerRun['stdout'], 'the wider password storage must be read back unchanged');
+    assert_false(strpos($wideNewerRun['stdout'], 'widened administrator password storage') !== false, 'the wider password storage must not be altered');
+
+    $incompatibleColumnRun = run_updater_runner_subprocess(
+        $updaterSmokeRoot . '/scripts/run_web_updater.php',
+        $updaterSmokeRoot,
+        array(
+            'HLSTATS_UPDATER_SMOKE_DBVERSION' => '89',
+            'HLSTATS_UPDATER_SMOKE_PASSWORD_COLUMN_TYPE' => 'text',
+        )
+    );
+    assert_same(1, $incompatibleColumnRun['exitCode'], 'an incompatible password column must fail the trusted updater');
+    assert_contains('administrator password storage is incompatible', $incompatibleColumnRun['stderr'], 'an incompatible password column must fail closed');
+
+    $queryFailureRun = run_updater_runner_subprocess(
+        $updaterSmokeRoot . '/scripts/run_web_updater.php',
+        $updaterSmokeRoot,
+        array(
+            'HLSTATS_UPDATER_SMOKE_DBVERSION' => '89',
+            'HLSTATS_UPDATER_SMOKE_PASSWORD_QUERY_FAIL' => '1',
+        )
+    );
+    assert_same(1, $queryFailureRun['exitCode'], 'a password column query failure must fail the trusted updater');
+    assert_contains('could not inspect administrator password storage', $queryFailureRun['stderr'], 'a password column query failure must fail closed');
+
+    $alterFailureRun = run_updater_runner_subprocess(
+        $updaterSmokeRoot . '/scripts/run_web_updater.php',
+        $updaterSmokeRoot,
+        array(
+            'HLSTATS_UPDATER_SMOKE_DBVERSION' => '89',
+            'HLSTATS_UPDATER_SMOKE_PASSWORD_COLUMN_TYPE' => 'varchar(32)',
+            'HLSTATS_UPDATER_SMOKE_PASSWORD_ALTER_FAIL' => '1',
+        )
+    );
+    assert_same(1, $alterFailureRun['exitCode'], 'a password storage repair failure must fail the trusted updater');
+    assert_contains('could not widen administrator password storage', $alterFailureRun['stderr'], 'a password storage repair failure must fail closed');
+
     assert_true(file_put_contents($updaterSmokeRoot . '/web/hlstats.php', "<?php exit;\n") !== false, 'early-exit dispatcher should be created');
-    $earlyExitRun = run_updater_runner_subprocess($updaterSmokeRoot . '/scripts/run_web_updater.php', $updaterSmokeRoot, null);
+    $earlyExitRun = run_updater_runner_subprocess($updaterSmokeRoot . '/scripts/run_web_updater.php', $updaterSmokeRoot);
     assert_same(1, $earlyExitRun['exitCode'], 'legacy bare exit must not report updater success');
     assert_contains('stopped before verified completion', $earlyExitRun['stderr'], 'early exit must explain missing completion');
 } finally {
