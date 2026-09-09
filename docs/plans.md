@@ -112,10 +112,11 @@ Historical autonomy follow-up context:
   truth. Remaining work is operational promotion through mode 0, migration
   readback, mode 1 observation and production monitoring; no production
   deployment, publication, or release acceptance is claimed.
-- Keep GoldSrc import and Steam/Valve provenance outside this release. Local
-  source research validated the overview coordinate model, but no Valve asset
-  is shipped. The accepted product path uses repository maps with reversible
-  map-only Color/Mono grading and preserves v1/JPEG compatibility.
+- The September 9 candidate uses separate fresh-install and upgrade packages;
+  see `docs/release-install-upgrade.md`. Fresh installs include the September 8
+  native maps and matching seeds. Upgrades preserve installed images and their
+  calibration. Local acquisition tools stay outside the distribution. Historical
+  acceptance at `44f3af9` does not accept this combined candidate.
 - The autonomy/release-readiness follow-up through Phase 9 is complete for the
   current scope. For release-candidate preparation, use
   [`docs/release-readiness.md`](release-readiness.md) and update

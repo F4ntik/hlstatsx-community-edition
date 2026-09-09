@@ -146,7 +146,7 @@ release-readiness artifacts when present.
 
 ## Modern Heatmap Explorer rollout notes
 
-Current status on 2026-09-02: exact implementation commit
+Historical status on 2026-09-02: exact implementation commit
 `44f3af97db46107f3ab9b595b3c32b3e5c2c7986` is `SOURCE-READY`, locally
 `RUNTIME-ACCEPTED`, and `RELEASE-READY` only as a local candidate. Coordinate
 persistence, MyISAM install/update/performance, authenticated admin, cache
@@ -157,10 +157,13 @@ Color/Mono/Difference pixel visibility, exact restoration and independent
 `docs/audits/modern-heatmap-explorer/runtime-acceptance.md`. This is not a
 production deployment, publication, or production release acceptance record.
 
-No Steam/Valve asset is shipped. Local GoldSrc research validated overview
-coordinates, while the release uses repository images with reversible map-only
-Color/Mono grading. Optional GoldSrc import needs separate licensing and
-feature acceptance.
+The September 9 combined candidate supersedes that historical package boundary.
+Fresh installations include the September 8 native maps, geometry and matching
+seeds. Upgrade archives preserve existing images and calibration. Local asset
+acquisition tools and audit exports are excluded. See
+`docs/release-install-upgrade.md` for package contents, recorded provenance and
+the exact-commit manifest. The old acceptance record does not establish
+acceptance of the new combined candidate.
 
 `HeatmapExplorerBeta` meanings:
 
