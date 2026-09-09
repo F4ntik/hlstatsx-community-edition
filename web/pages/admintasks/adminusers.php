@@ -49,7 +49,7 @@ die(localized_direct_access_message());
 		. ';80/' . t('admin.task.adminusers.option.restricted')
 		. ';100/' . t('admin.task.adminusers.option.administrator');
 	$edlist->columns[] = new EditListColumn("username", t('admin.username'), 15, true, "text", "", 16);
-	$edlist->columns[] = new EditListColumn("password", t('admin.password'), 15, true, "password", "", 16);
+	$edlist->columns[] = new EditListColumn("password", t('admin.password'), 15, true, "password", "", 72);
 	$edlist->columns[] = new EditListColumn("acclevel", t('literal.access_level'), 25, true, "select", $accessLevelOptions);
 
 	if ($_POST)

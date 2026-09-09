@@ -56,6 +56,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<img src="<?php echo IMAGE_PATH; ?>/downarrow.gif" width="9" height="6" class="imageformat" alt="" /><b>&nbsp;<?php echo eHtml(t('admin.edit_player_number', array('id' => $id))); ?></b><br /><br />
 
 <form method="post" action="<?php echo $g_options['scripturl'] . "?mode=admin&amp;task=$selTask&amp;id=$id&amp;" . strip_tags(SID); ?>">
+<?php echo admin_csrf_field(); ?>
 <?php
 
   // get available country flag files

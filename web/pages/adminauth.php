@@ -56,6 +56,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 		<div style="float:left;margin-left:40px;">
 		<form method="post" name="auth">
+			<?php echo admin_csrf_field(); ?>
 	
 			<table class="data-table">
 				<tr style="vertical-align:middle;">
@@ -64,7 +65,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 				</tr>
 				<tr style="vertical-align:middle;">
 					<td class="bg1" style="width:45%;border:0;"><?php echo eHtml(t('admin.password')); ?>:</td>
-					<td class="bg1" style="width:55%;border:0;"><input type="password" name="authpassword" size="20" maxlength="16" value="<?php echo $this->password; ?>" class="textbox"></td>
+					<td class="bg1" style="width:55%;border:0;"><input type="password" name="authpassword" size="20" maxlength="72" value="" class="textbox"></td>
 				</tr>
 				<tr>
 					<td class="bg1" style="border:0;">&nbsp;</td>

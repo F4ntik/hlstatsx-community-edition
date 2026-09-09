@@ -40,7 +40,7 @@ For support and installation notes visit http://www.hlxcommunity.com
         die(localized_direct_access_message());
     }
 
-	if ($auth->userdata["acclevel"] < 80) {
+	if ($auth->userdata["acclevel"] < 100) {
         die(localized_access_denied_message());
 	}
 ?>
@@ -103,6 +103,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 ?>
 
 <form method="POST">
+<?php echo admin_csrf_field(); ?>
 <table width="60%" align="center" border=0 cellspacing=0 cellpadding=0 class="border">
 
 <tr>

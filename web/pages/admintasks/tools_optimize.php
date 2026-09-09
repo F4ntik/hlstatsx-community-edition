@@ -43,6 +43,22 @@ die(localized_direct_access_message());
 	if ($auth->userdata["acclevel"] < 100) {
         die(localized_access_denied_message());
 	}
+
+	if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' || !isset($_POST['confirm'])) {
+?>
+
+&nbsp;&nbsp;&nbsp;&nbsp;<img src="<?php echo IMAGE_PATH; ?>/downarrow.gif" width="9" height="6" class="imageformat"><b>&nbsp;<?php echo $task->title; ?></b><p>
+
+<p><?php echo eHtml(t('admin.task.tools_optimize.description')); ?></p>
+<form method="post">
+<?php echo admin_csrf_field(); ?>
+	<input type="hidden" name="confirm" value="1" />
+	<input type="submit" value="<?php echo eHtml(t('admin.task.tools_optimize.title')); ?>" />
+</form>
+
+<?php
+		return;
+	}
 ?>
 
 &nbsp;&nbsp;&nbsp;&nbsp;<img src="<?php echo IMAGE_PATH; ?>/downarrow.gif" width="9" height="6" class="imageformat"><b>&nbsp;<?php echo $task->title; ?></b><p>

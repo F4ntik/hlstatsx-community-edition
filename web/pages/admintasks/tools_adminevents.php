@@ -86,7 +86,7 @@ die(localized_direct_access_message());
 		"sortorder"
 	);
 	
-	$db->query("DROP TABLE IF EXISTS hlstats_AdminEventHistory");
+	$db->query("DROP TEMPORARY TABLE IF EXISTS hlstats_AdminEventHistory");
 
 	$sql_create_temp_table = "
 		CREATE TEMPORARY TABLE hlstats_AdminEventHistory

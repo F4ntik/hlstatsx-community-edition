@@ -257,11 +257,12 @@ For support and installation notes visit http://www.hlxcommunity.com
 	} else {
 		if ((!isset($_SESSION['nojs'])) or ($_SESSION['nojs'] == 1)) {
 			// Send javascript form - if they have javascript enabled it will POST the JS variable, and the code above will update their session variable
+			$adminCsrfField = function_exists('admin_csrf_field') ? admin_csrf_field() : '';
 			echo '
 			<!-- Either this is your first visit in a while, or you don\'t have javascript enabled -->
 			<form name="jsform" id="jsform" action="" method="post" style="display:none">
 			<div>
-			<input name="js" type="text" value="true" />
+			<input name="js" type="text" value="true" />' . $adminCsrfField . '
 			<script type="text/javascript">
 			document.jsform.submit();
 			</script>
@@ -352,7 +353,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 		if ($g_options['display_style_selector'] == 1) {
 ?>
 		<div class="fNormal" style="float:right;margin-left:12px;">
-			<form name="style_selection" id="style_selection" action="" method="post"> <?php echo eHtml(t('ui.style')); ?>:
+			<form name="style_selection" id="style_selection" action="" method="post"> <?php echo function_exists('admin_csrf_field') ? admin_csrf_field() : ''; ?><?php echo eHtml(t('ui.style')); ?>:
 				<select name="stylesheet" onchange="document.style_selection.submit()"> 
 				<?php 
 					$d = dir('styles'); 

@@ -26,11 +26,12 @@ COPY web /var/www/html
 COPY scripts/replay_baseline/comparison/python/web-config.php /var/www/html/config.php
 COPY scripts/hlstats_py /var/www/scripts/hlstats_py
 COPY scripts/hlx_core /var/www/scripts/hlx_core
+COPY scripts/run_web_updater.php /var/www/scripts/run_web_updater.php
 COPY scripts/replay_baseline/comparison/python/hlstats.conf /var/www/scripts/hlstats.conf
+COPY sql/migrations /var/www/sql/migrations
 COPY heatmaps /var/www/heatmaps
 
-RUN rm -rf /var/www/html/updater \
-    && mkdir -p /var/www/html/hlstatsimg/progress \
+RUN mkdir -p /var/www/html/hlstatsimg/progress \
     && rm -rf /var/www/heatmaps/cache \
     && mkdir -p /var/www/heatmaps/cache \
     && chown -R www-data:www-data /var/www/html /var/www/heatmaps

@@ -192,7 +192,7 @@ def test_heatmap_admin_mutation_boundary_is_fail_closed() -> None:
         "HTTP_ORIGIN",
         "HTTP_REFERER",
         "REQUEST_METHOD",
-        "array('save', 'upload')",
+        "array('preview', 'save', 'upload')",
     ):
         assert token in admin
     assert "random_bytes(32)" in helper

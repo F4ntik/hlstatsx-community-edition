@@ -245,6 +245,7 @@ function scanCopyFiles($source,$dest) {
 ?>
 
 <form method="post">
+<?php echo admin_csrf_field(); ?>
 <table width="60%" align="center" border="0" cellspacing="0" cellpadding="0" class="border">
 
 <tr>

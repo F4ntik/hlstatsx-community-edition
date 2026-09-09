@@ -40,7 +40,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 die(localized_direct_access_message());
     }
 
-	if ($auth->userdata['acclevel'] < 80) {
+	if ($auth->userdata['acclevel'] < 100) {
 		die(t('admin.access_denied'));
 	}
 
@@ -929,6 +929,7 @@ function name_history_checked()
 
 </script>
 <form name="resetform" method="post">
+<?php echo admin_csrf_field(); ?>
 <table width="600" align="center" border="0" cellspacing="0" cellpadding="0" class="border">
 
 <tr>

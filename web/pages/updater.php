@@ -3,6 +3,11 @@
 	if (!defined('IN_HLSTATS')) {
 		die(localized_direct_access_message());
 	}
+
+	if (PHP_SAPI !== 'cli' || !defined('HLSTATS_TRUSTED_UPDATER')) {
+		http_response_code(403);
+		die(t('updater.cli_only'));
+	}
 	
 	if (!file_exists("./updater")) {
 		die(t('updater.directory_missing'));

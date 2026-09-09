@@ -2,7 +2,16 @@
 
 ## Snapshot
 
-- Last updated: `2026-09-08`
+- Last updated: `2026-09-09`
+- WEB-01 through WEB-05 source hardening is prepared for release integration:
+  classic admin mutations use a session CSRF token and registry access gate;
+  passwords use modern hashes with one-time MD5 upgrade and password-free,
+  rotating sessions; the web updater is CLI-only; and heatmap administration
+  checks the current database password fingerprint before reads or mutations.
+  `scripts/web_admin_security_smoke.php`, the CLI updater availability check,
+  and focused PHP lint pass in an isolated PHP 8.2 container. This is source
+  evidence only; the disposable-DB HTTP acceptance and final package review
+  remain the release gate.
 - BSP outlines for the 25 native maps are now bundled web assets and load
   automatically in the admin editor, with a visible show/hide control and an
   image-identity check. Fresh installations use the matching existing SQL seeds
@@ -27,7 +36,7 @@
   is explicitly excluded. The temporary region/account were removed and exact
   configuration readback matched the backup. See
   `docs/audits/modern-heatmap-explorer/improvements-20260908/README.md` and
-  `docs/heatmap-regions-and-scale.md`. These remain local uncommitted changes.
+  `docs/heatmap-regions-and-scale.md`. These changes are included in the release candidate snapshot.
 - Heatmap BSP/presentation follow-up passed focused checks and browser review
   in a separate local runtime on port 8382. Evidence and screenshots are in
   `docs/audits/modern-heatmap-explorer/improvements-20260907/README.md`.

@@ -66,169 +66,161 @@ class Auth
 	var $error = false;
 
 	var $username, $password, $savepass;
-	var $sessionStart, $session;
+	var $sessionStart, $session, $loginRequestConsumed = false;
 
 	var $userdata = array();
 
 	function __construct()
 	{
-		//@session_start();
+		$authUsername = admin_request_scalar_string($_POST['authusername'] ?? null);
+		$authPassword = admin_request_scalar_string($_POST['authpassword'] ?? null);
 
-        $authUsername = isset($_POST['authusername']) ? $_POST['authusername'] : '';
-        $authPassword = isset($_POST['authpassword']) ? $_POST['authpassword'] : '';
-        $authSavePass = isset($_POST['authsavepass']) ? $_POST['authsavepass'] : '';
-
-		if (!empty($authUsername) && valid_request($authUsername, false)) {
+		if ($authUsername !== '') {
 			$this->username = valid_request($authUsername, false);
-			$this->password = valid_request($authPassword, false);
-			$this->savepass = valid_request($authSavePass, false);
-			$this->sessionStart = 0;
-
-			# clear POST vars so as not to confuse the receiving page
-			unset($_POST);
-			$_POST = array();
-
-			$this->session = false;
-
-			if ($this->checkPass() == true) {
-				// if we have success, save it in this users SESSION
-				$_SESSION['username'] = $this->username;
-				$_SESSION['password'] = $this->password;
-				$_SESSION['authsessionStart'] = time();
-				$_SESSION['acclevel'] = $this->userdata['acclevel'];
-			}
-		} elseif (isset($_SESSION['loggedin'])) {
-			$this->username = $_SESSION['username'];
-			$this->password = $_SESSION['password'];
+			$this->password = $authPassword;
 			$this->savepass = 0;
-			$this->sessionStart = $_SESSION['authsessionStart'];
-			$this->ok = true;
-			$this->error = false;
-			$this->session = true;
-			
-			if (!$this->checkPass()) {
-				unset($_SESSION['loggedin']);
-			}
-		} else {
-			$this->ok = false;
-			$this->error = false;
-
+			$this->sessionStart = 0;
 			$this->session = false;
 
-			$this->printAuth();
+			if (!admin_csrf_is_valid($_POST['csrf_token'] ?? null)) {
+				$this->fail(t('admin.csrf_invalid'));
+				return;
+			}
+
+			// Do not let a successful login POST reach an administrator task.
+			$_POST = array();
+			$this->loginRequestConsumed = true;
+
+			if (!$this->checkPassword()) {
+				return;
+			}
+
+			if (!admin_auth_session_start($this->username, $this->userdata['password'], $this->userdata['acclevel'])) {
+				$this->fail(t('admin.session_expired'));
+			}
+			return;
 		}
+
+		if (isset($_SESSION['loggedin'])) {
+			$this->username = admin_request_scalar_string($_SESSION['username'] ?? null);
+			$this->sessionStart = (int) ($_SESSION['authsessionStart'] ?? 0);
+			$this->session = true;
+
+			if (!$this->checkSession()) {
+				admin_auth_session_revoke();
+				$this->fail(t('admin.session_expired'));
+			}
+			return;
+		}
+
+		$this->ok = false;
+		$this->error = false;
+		$this->session = false;
+		$this->printAuth();
 	}
 
-	function checkPass()
+	function fetchUser()
 	{
 		global $db;
 
-		$db->query("
+		$username = $db->escape($this->username);
+		$result = $db->query("
             SELECT
                 *
             FROM
                 hlstats_Users
             WHERE
-                username = '$this->username'
+                username = '$username'
             LIMIT 1
-        ");
+        ", false);
 
-		if ($db->num_rows() == 1)
-		{
-			// The username is OK
-
-			$this->userdata = $db->fetch_array();
-			$db->free_result();
-
-			if (md5($this->password) == $this->userdata["password"])
-			{
-				// The username and the password are OK
-
-				$this->ok = true;
-				$this->error = false;
-				$_SESSION['loggedin']=1;
-				if ($this->sessionStart > (time() - 3600))
-				{
-					// Valid session, update session time & display the page
-					$this->doCookies();
-					return true;
-				}
-				elseif ($this->sessionStart)
-				{
-					// A session exists but has expired
-					if ($this->savepass)
-					{
-						// They selected 'Save my password' so we just
-						// generate a new session and show the page.
-						$this->doCookies();
-						return true;
-					}
-					else
-					{
-						$this->ok = false;
-						$this->error = t('admin.session_expired');
-						$this->password = '';
-
-						$this->printAuth();
-						return false;
-					}
-				}
-				elseif (!$this->session)
-				{
-					// No session and no cookies, but the user/pass was
-					// POSTed, so we generate cookies.
-					$this->doCookies();
-					return true;
-				}
-				else
-				{
-					// No session, user/pass from a cookie, so we force auth
-					$this->printAuth();
-					return false;
-				}
-			}
-			else
-			{
-				// The username is OK but the password is wrong
-
-				$this->ok = false;
-				if ($this->session)
-				{
-					// Cookie without 'Save my password' - not an error
-					$this->error = false;
-				}
-				else
-				{
-					$this->error = t('admin.password_incorrect');
-				}
-				$this->password = '';
-				$this->printAuth();
-			}
+		if (!$result || $db->num_rows($result) != 1) {
+			return false;
 		}
-		else
-		{
-			// The username is wrong
-			$this->ok = false;
-			$this->error = t('admin.username_invalid');
-			$this->printAuth();
-		}
+
+		$user = $db->fetch_array($result);
+		$db->free_result($result);
+		return $user;
 	}
 
-	function doCookies()
+	function upgradePassword($storedPassword)
 	{
-		return;
-		setcookie('authusername', $this->username, time() + 31536000, '', '', 0);
+		global $db, $g_options;
 
-		if ($this->savepass)
-		{
-			setcookie('authpassword', $this->password, time() + 31536000, '', '', 0);
+		$newPassword = admin_password_hash_for_storage($this->password, $g_options);
+		if ($newPassword === false) {
+			return false;
 		}
-		else
-		{
-			setcookie('authpassword', $this->password, 0, '', '', 0);
+
+		$username = $db->escape($this->username);
+		$storedPassword = $db->escape($storedPassword);
+		$newPasswordEscaped = $db->escape($newPassword);
+		if (!$db->query("
+			UPDATE hlstats_Users
+			SET password = '$newPasswordEscaped'
+			WHERE username = '$username' AND password = '$storedPassword'
+		", false)) {
+			return false;
 		}
-		setcookie('authsavepass', $this->savepass, time() + 31536000, '', '', 0);
-		setcookie('authsessionStart', time(), 0, '', '', 0);
+
+		$user = $this->fetchUser();
+		if (!is_array($user) || !hash_equals($newPassword, (string) $user['password'])) {
+			return false;
+		}
+
+		$this->userdata = $user;
+		return true;
+	}
+
+	function checkPassword()
+	{
+		global $g_options;
+
+		$user = $this->fetchUser();
+		if (!is_array($user)) {
+			$this->fail(t('admin.username_invalid'));
+			return false;
+		}
+
+		if (!admin_password_verify_value($this->password, $user['password'])) {
+			$this->fail(t('admin.password_incorrect'));
+			return false;
+		}
+
+		if (admin_password_needs_upgrade($user['password']) && admin_password_storage_is_ready($g_options)) {
+			if (!$this->upgradePassword($user['password'])) {
+				$this->fail(t('admin.password_upgrade_failed'));
+				return false;
+			}
+		} else {
+			$this->userdata = $user;
+		}
+
+		$this->ok = true;
+		$this->error = false;
+		return true;
+	}
+
+	function checkSession()
+	{
+		$user = $this->fetchUser();
+		if (!is_array($user) || !admin_auth_session_is_current($this->username, $user['password'])) {
+			return false;
+		}
+
+		$this->userdata = $user;
+		$_SESSION['acclevel'] = (int) $user['acclevel'];
+		$this->ok = true;
+		$this->error = false;
+		return true;
+	}
+
+	function fail($error)
+	{
+		$this->ok = false;
+		$this->error = $error;
+		$this->password = '';
+		$this->printAuth();
 	}
 
 	function printAuth()
@@ -326,7 +318,7 @@ class EditList
 
 	function update()
 	{
-		global $db;
+		global $db, $g_options;
 
 		$okcols = 0;
 		foreach ($this->columns as $col) {
@@ -363,9 +355,14 @@ class EditList
 						$qvals .= ', ';
 					}
 
-					if ($col->type == 'password' && $col->name != 'rcon_password')
+					if ($this->table == 'hlstats_Users' && $col->name == 'password')
 					{
-						$value = md5($value);
+						$value = admin_password_hash_for_storage($value, $g_options);
+						if ($value === false) {
+							$this->errors[] = t('admin.password_storage_upgrade_required');
+							$this->newerror = true;
+							break;
+						}
 					}
 					$qvals .= "'" . $db->escape($value) . "'";
 
@@ -472,9 +469,15 @@ class EditList
 						$query .= ', ';
 					}
 
-					if ($col->type == 'password' && $col->name != 'rcon_password')
+					if ($this->table == 'hlstats_Users' && $col->name == 'password')
 					{
-						$query .= $col->name . "='" . md5($value) . "'";
+						$hashedPassword = admin_password_hash_for_storage($value, $g_options);
+						if ($hashedPassword === false) {
+							$this->errors[] = t('admin.password_storage_upgrade_required');
+							$rowerror = true;
+							break;
+						}
+						$query .= $col->name . "='" . $db->escape($hashedPassword) . "'";
 					}
 					else
 					{
@@ -783,7 +786,8 @@ class EditList
 
 					$input_value = (!empty($value)) ? htmlentities(html_entity_decode($value), ENT_COMPAT, 'UTF-8') : "";
 
-					echo "<input $onClick type=\"text\" name=\"" . $keyval . "_$col->name\" size=$col->width " . "value=\"" . $input_value . "\" class=\"textbox\"" . " maxlength=\"$col->maxlength\"$onclick />";
+					$inputType = $col->type == 'password' ? 'password' : 'text';
+					echo "<input $onClick type=\"$inputType\" name=\"" . $keyval . "_$col->name\" size=$col->width " . "value=\"" . $input_value . "\" class=\"textbox\"" . " maxlength=\"$col->maxlength\"$onclick />";
 // doing htmlentities on something that we just decoded is because we need to encode them when we fill out a form, but we don't want to double encode them (some items like rcon are not encoded at all - but server names are)
 			}
 
@@ -1005,16 +1009,8 @@ if ($auth->ok === false) {
 	return;
 }
 
-pageHeader(array(t('ui.admin')), array(t('ui.admin') => ''));
-
 $selTask = isset($_GET['task']) ? valid_request($_GET['task'], false) : '';
 $selGame = isset($_GET['game']) ? valid_request($_GET['game'], false) : '';
-?>
-
-<table width="100%" align="center" border="0" cellspacing="0" cellpadding="0">
-
-<tr valign="top">
-	<td><?php
 
 // General Settings
 $admintasks['options'] = new AdminTask(t('admin.task.options.title'), 80);
@@ -1060,6 +1056,29 @@ $admintasks['tools_reset_2'] = new AdminTask(t('admin.task.tools_reset_2.title')
 // Game Settings Tools
 $admintasks['tools_settings_copy'] = new AdminTask(t('admin.task.tools_settings_copy.title'), 80, 'tool', t('admin.task.tools_settings_copy.description'), 'settingstool');
 
+if (admin_csrf_rejection_required(
+	$_SERVER['REQUEST_METHOD'] ?? '',
+	$_POST['csrf_token'] ?? null,
+	$auth->loginRequestConsumed
+)) {
+	http_response_code(403);
+	die(eHtml(t('admin.csrf_invalid')));
+}
+
+if ($selTask !== ''
+	&& isset($admintasks[$selTask])
+	&& !admin_task_access_allowed($auth->userdata['acclevel'], $admintasks[$selTask]->acclevel)) {
+	http_response_code(403);
+	die(eHtml(t('admin.access_denied')));
+}
+
+pageHeader(array(t('ui.admin')), array(t('ui.admin') => ''));
+?>
+
+<table width="100%" align="center" border="0" cellspacing="0" cellpadding="0">
+
+<tr valign="top">
+	<td><?php
 
 // Show Tool
 if (!empty($admintasks[$selTask]) && ($admintasks[$selTask]->type == 'tool' || $admintasks[$selTask]->type == 'subtool'))
@@ -1091,6 +1110,7 @@ else
 &nbsp;&nbsp;&nbsp;&nbsp;<img src="<?php echo IMAGE_PATH; ?>/downarrow.gif" width="9" height="6" alt="" /><b>&nbsp;<a href="<?php echo $g_options['scripturl']; ?>?mode=admin" name="<?php echo $code; ?>"><?php echo $task->title; ?></a></b><br /><br />
 
 <form method="post" action="<?php echo $g_options['scripturl']; ?>?mode=admin&amp;task=<?php echo $code; ?>#<?php echo $code; ?>">
+<?php echo admin_csrf_field(); ?>
 
 <table width="100%" border="0" cellspacing="0" cellpadding="0">
 
@@ -1149,6 +1169,7 @@ else
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<img src="<?php echo IMAGE_PATH; ?>/downarrow.gif" width="9" height="6" alt="" /><b>&nbsp;<a href="<?php echo $g_options['scripturl']; ?>?mode=admin&amp;game=<?php echo $gamecode; ?>" name="<?php echo $code; ?>"><?php echo $task->title; ?></a></b><br /><br />
 
 <form method="post" name="<?php echo $code; ?>form" action="<?php echo $g_options['scripturl']; ?>?mode=admin&amp;game=<?php echo $gamecode; ?>&task=<?php echo $code; ?>#<?php echo $code; ?>">
+<?php echo admin_csrf_field(); ?>
 
 <table width="100%" border="0" cellspacing="0" cellpadding="0">
 

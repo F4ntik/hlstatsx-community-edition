@@ -39,14 +39,19 @@ For support and installation notes visit http://www.hlxcommunity.com
 define('IN_HLSTATS', true);
 require('config.php');
 require(INCLUDE_PATH . '/i18n.php');
+require(INCLUDE_PATH . '/admin_security.php');
 
 define('TITLE_IMAGE', IMAGE_PATH . "/downarrow.gif");
 
 session_start();
 init_i18n();
 
+// Older releases stored the raw administrator password in this session. Clear
+// it on the first request after upgrade; current sessions use a fingerprint.
+unset($_SESSION['password'], $_SESSION['authpassword'], $_SESSION['authsavepass']);
+
 if (!empty($_GET['logout']) && $_GET['logout'] == '1') {
-	unset($_SESSION['loggedin']);
+	admin_auth_session_revoke();
 	header('Location: ' . lang_url(current_lang(), array('logout', '_smoke')));
 	die;
 }
@@ -186,7 +191,12 @@ if (!$realgame && $game)
 	$_SESSION['realgame'] = $realgame;
 }
 
-$mode = isset($_GET['mode']) ? $_GET['mode'] : '';
+$mode = isset($_GET['mode']) && is_string($_GET['mode']) ? $_GET['mode'] : '';
+
+if ($mode === 'updater' && (PHP_SAPI !== 'cli' || !defined('HLSTATS_TRUSTED_UPDATER'))) {
+	http_response_code(403);
+	die(eHtml(t('updater.cli_only')));
+}
 
 $valid_modes = array(
 	'players',
@@ -225,18 +235,6 @@ $valid_modes = array(
 	'updater',
 	'profile'
 );
-   
-if (file_exists('./updater') && $mode != 'updater')
-{
-	pageHeader(array(t('ui.updater.notice_title')), array(t('ui.updater.notice_title') => ''));
-	echo "<div class=\"warning\">\n" . 
-	"<span class=\"warning-heading\"><img src=\"".IMAGE_PATH."/warning.gif\" alt=\"".eHtml(t('ui.warning'))."\"> " . eHtml(t('ui.warning')) . ":</span><br />\n" .
-	"<span class=\"warning-text\">" . eHtml(t('ui.updater.detected')) . "<br />" .
-	eHtml(t('ui.updater.perform')) . " <strong><a href=\"{$g_options['scripturl']}?mode=updater\">" . eHtml(t('ui.updater.link')) . "</a></strong>.<br /><br />" .
-	"<strong>" . eHtml(t('ui.updater.cleanup')) . "</strong></span>\n</div>";
-	pageFooter();
-	die();
-}
    
 if ( !in_array($mode, $valid_modes) )
 {

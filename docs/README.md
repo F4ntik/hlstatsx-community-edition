@@ -32,6 +32,7 @@ product lane.
 
 - `docs/python_migration_usage_guide.md`
 - `docs/python_fullstack_docker.md`
+- `docs/web_updater_runbook.md`
 - `docs/proxy_daemon_py_getting_started.md`
 - `docs/proxy_daemon_py_operational_runbook.md`
 - `docs/hlstats_py_stdin_import_tuning.md`

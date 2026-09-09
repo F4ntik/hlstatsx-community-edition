@@ -88,6 +88,10 @@ Historical autonomy follow-up context:
   SDK/BSP-derived transform; do not reuse its ZOOM-as-scale assumption.
 
 - Keep the repo release-clean as the integrated Python+i18n product lane.
+- Keep administrator mutations behind the shared session CSRF and task access
+  boundary. Retain `web/updater/` only for `scripts/run_web_updater.php`; use
+  [`web_updater_runbook.md`](web_updater_runbook.md) for its explicit database
+  prerequisite and maintenance sequence.
 - Keep the closed/accepted legacy-vs-Python parity state current without
   reopening stale `Entries`, `ChangeTeam`, `PlayerNames`, `Players_History`, or
   `TeamBonuses` residuals.

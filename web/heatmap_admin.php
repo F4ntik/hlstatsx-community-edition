@@ -9,6 +9,7 @@ $includeRoot = preg_match('/^([A-Za-z]:)?[\/\\\\]/', INCLUDE_PATH)
     ? INCLUDE_PATH
     : __DIR__ . '/' . ltrim(INCLUDE_PATH, './');
 require $includeRoot . '/functions.php';
+require_once $includeRoot . '/admin_security.php';
 require $includeRoot . '/heatmap_points.php';
 require $includeRoot . '/heatmap_admin_transport.php';
 const HEATMAP_ADMIN_MAX_IMAGE_BYTES = 20971520;
@@ -100,11 +101,41 @@ function heatmap_admin_result(string $code, string $language, array $extra = arr
     ), $extra);
 }
 
-function heatmap_admin_require_access(): void
+function heatmap_admin_session_matches_user($username, array $row): bool
 {
-    if (empty($_SESSION['loggedin']) || intval($_SESSION['acclevel'] ?? 0) < 80) {
+    return is_string($username)
+        && is_string($row['password'] ?? null)
+        && admin_auth_session_is_current($username, $row['password']);
+}
+
+function heatmap_admin_current_user(PDO $pdo): ?array
+{
+    $username = admin_request_scalar_string($_SESSION['username'] ?? null);
+    if ($username === '' || strlen($username) > 16) {
+        return null;
+    }
+
+    $statement = $pdo->prepare(
+        'SELECT password, acclevel, playerId FROM hlstats_Users WHERE username = :username LIMIT 1'
+    );
+    $statement->execute(array('username' => $username));
+    $row = $statement->fetch(PDO::FETCH_ASSOC);
+    if (!is_array($row) || !heatmap_admin_session_matches_user($username, $row)) {
+        return null;
+    }
+
+    return $row;
+}
+
+function heatmap_admin_require_access(PDO $pdo): void
+{
+    $row = heatmap_admin_current_user($pdo);
+    if (!is_array($row) || intval($row['acclevel'] ?? 0) < 80) {
+        admin_auth_session_revoke();
         throw new HeatmapAdminException('access_denied', 403);
     }
+
+    $_SESSION['acclevel'] = intval($row['acclevel']);
 }
 
 function heatmap_admin_request(): array
@@ -203,22 +234,8 @@ function heatmap_admin_config(PDO $pdo, string $game, string $map): ?array
 
 function heatmap_admin_actor_id(PDO $pdo): int
 {
-    $username = $_SESSION['username'] ?? null;
-    $password = $_SESSION['password'] ?? null;
-    if (!is_string($username) || $username === '' || strlen($username) > 16
-        || !is_string($password) || $password === '') {
-        return 0;
-    }
-
-    $statement = $pdo->prepare(
-        'SELECT password, acclevel, playerId FROM hlstats_Users WHERE username = :username LIMIT 1'
-    );
-    $statement->execute(array('username' => $username));
-    $row = $statement->fetch(PDO::FETCH_ASSOC);
-    if (!is_array($row)
-        || intval($row['acclevel'] ?? 0) < 80
-        || !is_string($row['password'] ?? null)
-        || !hash_equals($row['password'], md5($password))) {
+    $row = heatmap_admin_current_user($pdo);
+    if (!is_array($row) || intval($row['acclevel'] ?? 0) < 80) {
         return 0;
     }
 
@@ -905,10 +922,10 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 }
 
 try {
-    heatmap_admin_require_access();
     $container = require __DIR__ . '/bootstrap.php';
     $pdo = $container->get('pdo');
     $logger = $container->get('logger');
+    heatmap_admin_require_access($pdo);
     $request = heatmap_admin_request();
     $action = strtolower(strval($request['action'] ?? 'preview'));
     heatmap_admin_require_mutation_allowed($action);

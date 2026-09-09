@@ -161,6 +161,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 <p><?php echo eHtml(t('admin.task.tools_runtimecontrol.intro')); ?></p>
 
 <form method="POST">
+<?php echo admin_csrf_field(); ?>
 
 	<table class="data-table">
 		<tr class="bg1">
