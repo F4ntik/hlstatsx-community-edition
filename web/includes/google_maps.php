@@ -39,6 +39,9 @@ For support and installation notes visit http://www.hlxcommunity.com
 function printMap($type = 'main')
 {
 	global $db, $game, $g_options, $clandata, $clan;
+	if (!defined('GOOGLE_MAPS_API_KEY') || trim(GOOGLE_MAPS_API_KEY) === '') {
+		return;
+	}
 
 	$jsOptions = JSON_UNESCAPED_SLASHES;
 	if (defined('JSON_UNESCAPED_UNICODE')) {
@@ -51,7 +54,7 @@ function printMap($type = 'main')
 	$killsLabel = json_encode(localized_text('literal.kills', 'Kills'), $jsOptions);
 	
 	if ($type == 'main') {
-		echo ('<script src="http://maps.google.com/maps/api/js?callback=Function.prototype&key=' . GOOGLE_MAPS_API_KEY . '" type="text/javascript"></script>');
+		echo ('<script src="https://maps.google.com/maps/api/js?callback=Function.prototype&amp;key=' . rawurlencode(GOOGLE_MAPS_API_KEY) . '" type="text/javascript"></script>');
 	}
 ?> 
 		<script type="text/javascript">
