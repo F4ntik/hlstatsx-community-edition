@@ -811,6 +811,13 @@ function heatmap_admin_upload(PDO $pdo, $logger, array $request): void
                 $config['floors'] = $floors;
                 $config['floors_json'] = heatmap_floor_config_json($floors);
                 $targetName = $map . '--' . $floorId . '.jpg';
+            } else {
+                $size = getimagesize($_FILES['mapImage']['tmp_name']);
+                try {
+                    heatmap_validate_base_image_dimensions($config, $map, $size[0], $size[1]);
+                } catch (InvalidArgumentException $exception) {
+                    throw new HeatmapAdminException('floor_image_size', 400);
+                }
             }
             $artifacts[] = heatmap_admin_stage_uploaded_file(
                 heatmap_admin_asset_directory('src', $config),

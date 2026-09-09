@@ -55,3 +55,7 @@ Thumbs.db
 # Generated heatmap overlays are disposable; committed web JPEG fallbacks are
 # stored under web/hlstatsimg instead.
 /heatmaps/cache/
+
+# Local code-index caches and release archives are not product source.
+/.repowise/
+/dist/

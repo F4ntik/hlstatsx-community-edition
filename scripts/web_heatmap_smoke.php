@@ -380,6 +380,24 @@ assert_true(preg_match('/^[a-f0-9]{64}$/D', $secondMapIdentity) === 1, 'replacem
 assert_true($firstMapIdentity !== $secondMapIdentity, 'same-second same-size replacement should change map source identity');
 $realMapPath = heatmap_source_path(array('game' => 'cstrike'), 'de_dust2');
 $realMapSnapshot = heatmap_map_source_snapshot($realMapPath);
+$floorUploadGame = 'smoke_' . bin2hex(random_bytes(8));
+$floorUploadPath = heatmap_source_path(array('game' => $floorUploadGame), 'test--ground');
+assert_true(mkdir(dirname($floorUploadPath), 0700, true), 'floor upload fixture directory');
+try {
+    assert_true(copy($realMapPath, $floorUploadPath), 'floor upload fixture');
+    $floorUploadConfig = array('game' => $floorUploadGame, 'floors' => array(array(
+        'id' => 'ground', 'label_en' => 'Ground', 'label_ru' => 'Первый',
+        'z_min' => 0, 'z_max' => 100, 'image' => true,
+    )));
+    heatmap_validate_base_image_dimensions($floorUploadConfig, 'test', $realMapSnapshot['width'], $realMapSnapshot['height']);
+    assert_throws('floor_image_size', function () use ($floorUploadConfig, $realMapSnapshot): void {
+        heatmap_validate_base_image_dimensions($floorUploadConfig, 'test', $realMapSnapshot['width'] + 1, $realMapSnapshot['height']);
+    }, 'base replacement must preserve every floor image dimension');
+    assert_same($realMapSnapshot['sourceIdentity'], hash_file('sha256', $floorUploadPath), 'rejected base replacement preserves the floor');
+    heatmap_validate_base_image_dimensions(array('game' => $floorUploadGame), 'test', 10, 20);
+} finally {
+    smoke_remove_directory(dirname($floorUploadPath));
+}
 $realMapSize = getimagesize($realMapPath);
 assert_same(intval($realMapSize[0]), $realMapSnapshot['width'], 'map snapshot width should come from the hashed bytes');
 assert_same(intval($realMapSize[1]), $realMapSnapshot['height'], 'map snapshot height should come from the hashed bytes');

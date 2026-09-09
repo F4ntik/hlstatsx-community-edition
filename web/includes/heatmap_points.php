@@ -2936,6 +2936,18 @@ function heatmap_transform_point(array $row, array $config)
     return array('x' => $x, 'y' => $y);
 }
 
+function heatmap_validate_base_image_dimensions(array $config, string $map, int $width, int $height): void
+{
+    foreach (heatmap_config_floors($config) as $floor) {
+        if (empty($floor['image'])) continue;
+        $path = heatmap_source_path($config, $map . '--' . $floor['id']);
+        $layer = heatmap_map_source_snapshot($path);
+        if ($layer['width'] !== $width || $layer['height'] !== $height) {
+            throw new InvalidArgumentException('floor_image_size');
+        }
+    }
+}
+
 function heatmap_floor_source_path(array $config, string $map, string $floor): ?string
 {
     if ($floor === 'all') return null;
