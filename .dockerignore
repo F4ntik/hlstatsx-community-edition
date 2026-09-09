@@ -1,6 +1,15 @@
 .git
 .idea
 .vscode
+.repowise
+.codex
+.codex_tmp
+.playwright-cli
+dist
+docs/audits
+scripts/replay_baseline/artifacts
+heatmaps/cache
+web/cache
 
 __pycache__/
 *.py[cod]
