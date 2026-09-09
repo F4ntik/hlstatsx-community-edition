@@ -696,7 +696,7 @@ class HlstatsRuntime:
                 asyncio.shield(future),
                 timeout=self._storage_operation_timeout_seconds,
             )
-        except TimeoutError as exc:
+        except asyncio.TimeoutError as exc:
             operation_fence.cancel()
             self._storage_unavailable = True
             self._requires_hard_termination = True
