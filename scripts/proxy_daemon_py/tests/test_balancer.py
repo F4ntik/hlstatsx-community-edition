@@ -32,10 +32,14 @@ def test_assignment_is_sticky_while_daemon_is_available() -> None:
     balancer.register_daemon(_make_daemon("daemon-a"))
     balancer.register_daemon(_make_daemon("daemon-b"))
 
-    first = balancer.assign_server("192.168.1.10:27015", timestamp=datetime(2024, 1, 1, tzinfo=timezone.utc))
+    first = balancer.assign_server(
+        "192.168.1.10:27015", timestamp=datetime(2024, 1, 1, tzinfo=timezone.utc)
+    )
     assert first is not None
 
-    reassigned = balancer.assign_server("192.168.1.10:27015", timestamp=datetime(2024, 1, 1, 0, 0, 5, tzinfo=timezone.utc))
+    reassigned = balancer.assign_server(
+        "192.168.1.10:27015", timestamp=datetime(2024, 1, 1, 0, 0, 5, tzinfo=timezone.utc)
+    )
     assert reassigned is first
     assert reassigned.assigned_at == datetime(2024, 1, 1, 0, 0, 5, tzinfo=timezone.utc)
 
@@ -45,12 +49,16 @@ def test_reassignment_when_daemon_marked_down() -> None:
     balancer.register_daemon(_make_daemon("daemon-a"))
     balancer.register_daemon(_make_daemon("daemon-b"))
 
-    first = balancer.assign_server("example:27015", timestamp=datetime(2024, 1, 1, tzinfo=timezone.utc))
+    first = balancer.assign_server(
+        "example:27015", timestamp=datetime(2024, 1, 1, tzinfo=timezone.utc)
+    )
     assert first is not None
 
     balancer.manager.mark_down(first.daemon_id)
 
-    reassigned = balancer.assign_server("example:27015", timestamp=datetime(2024, 1, 1, 0, 1, tzinfo=timezone.utc))
+    reassigned = balancer.assign_server(
+        "example:27015", timestamp=datetime(2024, 1, 1, 0, 1, tzinfo=timezone.utc)
+    )
     assert reassigned is not None
     assert reassigned.daemon_id != first.daemon_id
 
@@ -78,55 +86,60 @@ def test_next_available_skips_daemons_with_expired_heartbeat() -> None:
     assert third is not None and third.daemon_id == "daemon-b"
 
 
-
 def test_daemon_mark_heartbeat_resets_failures() -> None:
-    daemon = _make_daemon('daemon-x')
+    daemon = _make_daemon("daemon-x")
     daemon.consecutive_failures = 3
     daemon.mark_heartbeat()
-    assert daemon.state.name == 'UP'
+    assert daemon.state.name == "UP"
     assert daemon.last_heartbeat is not None
     assert daemon.consecutive_failures == 0
 
+
 def test_daemon_mark_failure_without_previous_heartbeat_marks_down() -> None:
-    daemon = _make_daemon('daemon-y')
+    daemon = _make_daemon("daemon-y")
     daemon.mark_failure()
-    assert daemon.state.name == 'DOWN'
+    assert daemon.state.name == "DOWN"
+
 
 def test_daemon_mark_failure_after_timeout_marks_down() -> None:
-    daemon = _make_daemon('daemon-z', timeout=1.0)
+    daemon = _make_daemon("daemon-z", timeout=1.0)
     base = datetime(2024, 1, 1, tzinfo=timezone.utc)
     daemon.mark_heartbeat(timestamp=base)
     daemon.mark_failure(timestamp=base + timedelta(seconds=5))
-    assert daemon.state.name == 'DOWN'
+    assert daemon.state.name == "DOWN"
+
 
 def test_daemon_is_available_respects_state_and_default_timestamp() -> None:
-    daemon = _make_daemon('daemon-check')
+    daemon = _make_daemon("daemon-check")
     assert daemon.is_available()
     daemon.mark_down()
     assert not daemon.is_available()
 
+
 def test_daemon_manager_unregister_resets_round_robin_index() -> None:
     balancer = ServerBalancer()
-    balancer.register_daemon(_make_daemon('a'))
-    balancer.register_daemon(_make_daemon('b'))
+    balancer.register_daemon(_make_daemon("a"))
+    balancer.register_daemon(_make_daemon("b"))
     balancer.manager.next_available()
-    balancer.unregister_daemon('a')
-    assert 'a' not in balancer.manager.daemons
+    balancer.unregister_daemon("a")
+    assert "a" not in balancer.manager.daemons
     assert balancer.manager.next_available() is not None
+
 
 def test_server_assignment_invalid_when_daemon_removed() -> None:
     balancer = ServerBalancer()
-    daemon = _make_daemon('daemon-a')
+    daemon = _make_daemon("daemon-a")
     balancer.register_daemon(daemon)
-    assignment = balancer.assign_server('example:27015')
+    assignment = balancer.assign_server("example:27015")
     assert assignment is not None
     balancer.unregister_daemon(daemon.identifier)
     assert not assignment.is_valid(balancer.manager)
 
+
 def test_server_balancer_prunes_orphaned_assignments() -> None:
     balancer = ServerBalancer()
-    daemon = _make_daemon('daemon-a')
+    daemon = _make_daemon("daemon-a")
     balancer.register_daemon(daemon)
-    balancer.assign_server('example:27015')
+    balancer.assign_server("example:27015")
     balancer.unregister_daemon(daemon.identifier)
-    assert 'example:27015' not in balancer.assignments
+    assert "example:27015" not in balancer.assignments

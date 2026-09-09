@@ -138,7 +138,7 @@ class ServerAssignment:
     daemon_id: str
     assigned_at: datetime
 
-    def is_valid(self, manager: "DaemonManager", *, timestamp: datetime | None = None) -> bool:
+    def is_valid(self, manager: DaemonManager, *, timestamp: datetime | None = None) -> bool:
         """Return whether the assignment still points to an available daemon."""
 
         try:
@@ -162,7 +162,9 @@ class ServerBalancer:
         self.manager.unregister(identifier)
         self._prune_assignments()
 
-    def assign_server(self, server_address: str, *, timestamp: datetime | None = None) -> ServerAssignment | None:
+    def assign_server(
+        self, server_address: str, *, timestamp: datetime | None = None
+    ) -> ServerAssignment | None:
         """Return an assignment for *server_address* or ``None`` if none are available."""
 
         if timestamp is None:
@@ -177,7 +179,9 @@ class ServerBalancer:
         if daemon is None:
             return None
 
-        assignment = ServerAssignment(server_address=server_address, daemon_id=daemon.identifier, assigned_at=timestamp)
+        assignment = ServerAssignment(
+            server_address=server_address, daemon_id=daemon.identifier, assigned_at=timestamp
+        )
         self.assignments[server_address] = assignment
         return assignment
 
@@ -199,4 +203,3 @@ __all__ = [
     "ServerAssignment",
     "ServerBalancer",
 ]
-

@@ -281,14 +281,20 @@ class ProxyDaemon:
 
         if self._is_local_control_host(host) and payload.startswith("C;"):
             if self._requires_authenticated_control(payload):
-                response = self._reject_unauthenticated_mutating_control(payload, host, port)
-                self._udp_server.send_text(response, datagram.address)
+                unauthenticated_response = self._reject_unauthenticated_mutating_control(
+                    payload,
+                    host,
+                    port,
+                )
+                self._udp_server.send_text(unauthenticated_response, datagram.address)
                 return True
             response = await self._handle_control_payload(payload, host, port)
             if response is not None:
                 self._udp_server.send_text(response, datagram.address)
             else:
-                self._udp_server.send_text(self._reject_unsupported_control(payload, host, port), datagram.address)
+                self._udp_server.send_text(
+                    self._reject_unsupported_control(payload, host, port), datagram.address
+                )
             return True
 
         proxy_command = self._parse_proxy_command(payload)
@@ -350,9 +356,9 @@ class ProxyDaemon:
             for identifier in sorted(existing_ids - desired.keys()):
                 self._logger.control(f"Removing proxy daemon {identifier}")
                 self._balancer.unregister_daemon(identifier)
-                target = self._heartbeat_targets.pop(identifier, None)
-                if target is not None:
-                    self._heartbeat.remove_target(target)
+                removed_heartbeat_target = self._heartbeat_targets.pop(identifier, None)
+                if removed_heartbeat_target is not None:
+                    self._heartbeat.remove_target(removed_heartbeat_target)
 
             # Register or update configured daemons.
             for identifier, target in desired.items():
@@ -379,12 +385,10 @@ class ProxyDaemon:
             # Ensure heartbeat targets that no longer have daemons are removed.
             for identifier in list(self._heartbeat_targets.keys()):
                 if identifier not in desired:
-                    target = self._heartbeat_targets.pop(identifier)
-                    self._heartbeat.remove_target(target)
+                    removed_heartbeat_target = self._heartbeat_targets.pop(identifier)
+                    self._heartbeat.remove_target(removed_heartbeat_target)
 
-            self._logger.control(
-                f"Reloaded proxy daemon configuration: {len(desired)} entries"
-            )
+            self._logger.control(f"Reloaded proxy daemon configuration: {len(desired)} entries")
 
     @staticmethod
     def _target_identifier(target: ProxyDaemonTarget) -> str:
@@ -403,7 +407,9 @@ class ProxyDaemon:
 
     def _format_server_list(self) -> str:
         assignments: Iterable[tuple[str, ServerAssignment]] = self._balancer.assignments.items()
-        lines = [f"{server} -> {assignment.daemon_id}" for server, assignment in sorted(assignments)]
+        lines = [
+            f"{server} -> {assignment.daemon_id}" for server, assignment in sorted(assignments)
+        ]
         if lines:
             return "ServerList\n" + "\n".join(lines) + "\n"
         return "ServerList\n"
@@ -425,7 +431,9 @@ class ProxyDaemon:
 
     def _reject_unsupported_control(self, payload: str, host: str, port: int) -> str:
         normalized = self._normalize_control_payload(payload)
-        self._logger.control(f"Rejected unsupported control command from {host}:{port}: {normalized}")
+        self._logger.control(
+            f"Rejected unsupported control command from {host}:{port}: {normalized}"
+        )
         return f"FAILED CONTROL COMMAND: {normalized} is not supported\n"
 
     @staticmethod
@@ -490,9 +498,7 @@ class ProxyDaemon:
                 self._balancer.release_server(server_address)
                 continue
 
-            self._logger.balance(
-                f"Forwarded packet from {server_address} to {daemon.identifier}"
-            )
+            self._logger.balance(f"Forwarded packet from {server_address} to {daemon.identifier}")
             return
 
     def _format_forward_payload(self, server_address: str, payload: str) -> str:
@@ -508,11 +514,6 @@ class ProxyDaemon:
 
     @staticmethod
     def _should_skip_payload(payload: str) -> bool:
-        return (
-            ("rcon from" in payload)
-            and (
-                'command "status"' in payload
-                or 'command "stats"' in payload
-                or 'command ""' in payload
-            )
+        return ("rcon from" in payload) and (
+            'command "status"' in payload or 'command "stats"' in payload or 'command ""' in payload
         )

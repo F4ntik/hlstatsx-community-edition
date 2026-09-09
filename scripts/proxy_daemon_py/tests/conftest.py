@@ -4,8 +4,10 @@ import ast
 import os
 import sys
 import threading
+from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import Dict, Iterable, Set
+from types import FrameType
+from typing import Any, Protocol, TypeAlias, cast
 
 import pytest
 from _pytest.terminal import TerminalReporter
@@ -20,7 +22,25 @@ sys.path.insert(0, SCRIPTS_ROOT_STR)
 
 PACKAGE_DIR_PREFIX = f"{PACKAGE_DIR.resolve()}{os.sep}".casefold()
 TESTS_DIR_PREFIX = f"{(PROJECT_ROOT / 'tests').resolve()}{os.sep}".casefold()
-EXECUTED_LINES: Dict[str, Set[int]] = {}
+TraceFunction: TypeAlias = Callable[[FrameType, str, Any], "TraceFunction | None"]
+CoverageSummary: TypeAlias = tuple[float, dict[str, float], dict[str, list[int]]]
+CoverageFailure: TypeAlias = tuple[float, float]
+
+
+class _CoverageConfig(Protocol):
+    _proxy_daemon_coverage: CoverageSummary
+    _proxy_daemon_coverage_failed: CoverageFailure | None
+
+
+EXECUTED_LINES: dict[str, set[int]] = {}
+
+
+def _coverage_config(config: pytest.Config) -> _CoverageConfig:
+    return cast(_CoverageConfig, config)
+
+
+def _clear_thread_trace() -> None:
+    cast(Callable[[None], None], threading.settrace)(None)
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -35,15 +55,16 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
     sys.settrace(None)
-    threading.settrace(None)
+    _clear_thread_trace()
     coverage, per_file, missing = _compute_coverage()
-    session.config._proxy_daemon_coverage = (coverage, per_file, missing)
+    config = _coverage_config(session.config)
+    config._proxy_daemon_coverage = (coverage, per_file, missing)
     threshold = float(session.config.getoption("coverage_threshold"))
     if exitstatus == 0 and coverage < threshold:
         session.exitstatus = pytest.ExitCode.TESTS_FAILED
-        session.config._proxy_daemon_coverage_failed = (coverage, threshold)
+        config._proxy_daemon_coverage_failed = (coverage, threshold)
     else:
-        session.config._proxy_daemon_coverage_failed = None
+        config._proxy_daemon_coverage_failed = None
 
 
 @pytest.hookimpl(tryfirst=True)
@@ -55,23 +76,21 @@ def pytest_runtest_call(item: pytest.Item) -> None:
 @pytest.hookimpl(trylast=True)
 def pytest_runtest_teardown(item: pytest.Item) -> None:
     sys.settrace(None)
-    threading.settrace(None)
+    _clear_thread_trace()
 
 
-def pytest_terminal_summary(
-    terminalreporter: TerminalReporter, exitstatus: int
-) -> None:
-    summary = getattr(terminalreporter.config, '_proxy_daemon_coverage', None)
+def pytest_terminal_summary(terminalreporter: TerminalReporter, exitstatus: int) -> None:
+    summary = getattr(terminalreporter.config, "_proxy_daemon_coverage", None)
     if summary is None:
         return
     coverage, per_file, missing = summary
-    terminalreporter.write_sep('-', f'proxy_daemon_py coverage: {coverage:.2f}%')
+    terminalreporter.write_sep("-", f"proxy_daemon_py coverage: {coverage:.2f}%")
     for filename, percent in sorted(per_file.items()):
-        terminalreporter.write_line(f'  {filename}: {percent:.2f}%')
+        terminalreporter.write_line(f"  {filename}: {percent:.2f}%")
         gaps = missing.get(filename)
         if gaps:
-            formatted = ', '.join(str(line) for line in gaps)
-            terminalreporter.write_line(f'    missing: {formatted}')
+            formatted = ", ".join(str(line) for line in gaps)
+            terminalreporter.write_line(f"    missing: {formatted}")
     failure = getattr(terminalreporter.config, "_proxy_daemon_coverage_failed", None)
     if failure is not None:
         coverage_value, threshold = failure
@@ -80,7 +99,7 @@ def pytest_terminal_summary(
         )
 
 
-def _trace(frame, event: str, arg):  # type: ignore[no-untyped-def]
+def _trace(frame: FrameType, event: str, arg: Any) -> TraceFunction:
     if event != "line":
         return _trace
     filename = frame.f_code.co_filename
@@ -120,44 +139,44 @@ def _compute_coverage() -> tuple[float, dict[str, float], dict[str, list[int]]]:
 
 
 TARGET_FUNCTIONS: dict[str, set[str]] = {
-    'balancer.py': {
-        'Daemon.mark_heartbeat',
-        'Daemon.mark_failure',
-        'Daemon.is_available',
-        'DaemonManager.next_available',
-        'ServerBalancer.assign_server',
-        'ServerBalancer.release_server',
-        'ServerBalancer._prune_assignments',
+    "balancer.py": {
+        "Daemon.mark_heartbeat",
+        "Daemon.mark_failure",
+        "Daemon.is_available",
+        "DaemonManager.next_available",
+        "ServerBalancer.assign_server",
+        "ServerBalancer.release_server",
+        "ServerBalancer._prune_assignments",
     },
-    'daemon.py': {
-        'ProxyDaemon._format_server_list',
-        'ProxyDaemon._parse_proxy_command',
-        'ProxyDaemon._forward_game_packet',
-        'ProxyDaemon._normalise_payload',
-        'ProxyDaemon._should_skip_payload',
+    "daemon.py": {
+        "ProxyDaemon._format_server_list",
+        "ProxyDaemon._parse_proxy_command",
+        "ProxyDaemon._forward_game_packet",
+        "ProxyDaemon._normalise_payload",
+        "ProxyDaemon._should_skip_payload",
     },
-    'heartbeat.py': {
-        'DaemonHeartbeatTarget.send_heartbeat',
-        'DaemonHeartbeatTarget._send_probe',
-        'DaemonHeartbeatTarget._handle_success',
-        'DaemonHeartbeatTarget._handle_failure',
-        'HeartbeatManager.add_target',
-        'HeartbeatManager.remove_target',
-        'HeartbeatManager.start',
-        'HeartbeatManager.stop',
-        'HeartbeatManager._dispatch_once',
+    "heartbeat.py": {
+        "DaemonHeartbeatTarget.send_heartbeat",
+        "DaemonHeartbeatTarget._send_probe",
+        "DaemonHeartbeatTarget._handle_success",
+        "DaemonHeartbeatTarget._handle_failure",
+        "HeartbeatManager.add_target",
+        "HeartbeatManager.remove_target",
+        "HeartbeatManager.start",
+        "HeartbeatManager.stop",
+        "HeartbeatManager._dispatch_once",
     },
-    'log.py': {
-        'ProxyLogger.log',
-        'ProxyLogger.notice',
-        'ProxyLogger.control',
-        'ProxyLogger.balance',
-        'ProxyLogger.e403',
+    "log.py": {
+        "ProxyLogger.log",
+        "ProxyLogger.notice",
+        "ProxyLogger.control",
+        "ProxyLogger.balance",
+        "ProxyLogger.e403",
     },
-    'transport.py': {
-        'ProxyUdpServer.start',
-        'ProxyUdpServer.stop',
-        'ProxyUdpServer.send_text',
+    "transport.py": {
+        "ProxyUdpServer.start",
+        "ProxyUdpServer.stop",
+        "ProxyUdpServer.send_text",
     },
 }
 
@@ -169,7 +188,7 @@ def _iter_package_files() -> Iterable[Path]:
             yield path.resolve()
 
 
-def _statement_lines(path: Path) -> Set[int]:
+def _statement_lines(path: Path) -> set[int]:
     source = path.read_text()
 
     tree = ast.parse(source)
@@ -179,16 +198,20 @@ def _statement_lines(path: Path) -> Set[int]:
 
     def visit(node: ast.AST, parents: list[str]) -> None:
         if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
-            qualname = '.'.join(parents + [node.name])
+            qualname = ".".join(parents + [node.name])
             if qualname in targets:
-                lineno = getattr(node, 'lineno', None)
-                end_lineno = getattr(node, 'end_lineno', lineno)
+                lineno = getattr(node, "lineno", None)
+                end_lineno = getattr(node, "end_lineno", lineno)
                 if lineno is not None and end_lineno is not None:
                     start_line = lineno
                     if node.body:
                         first = node.body[0]
-                        if isinstance(first, ast.Expr) and isinstance(getattr(first, 'value', None), ast.Constant) and isinstance(first.value.value, str):
-                            start_line = getattr(first, 'end_lineno', first.lineno) + 1
+                        if (
+                            isinstance(first, ast.Expr)
+                            and isinstance(first.value, ast.Constant)
+                            and isinstance(first.value.value, str)
+                        ):
+                            start_line = getattr(first, "end_lineno", first.lineno) + 1
                     for line in range(start_line, end_lineno + 1):
                         statements.add(line)
         elif isinstance(node, ast.ClassDef):
@@ -196,7 +219,7 @@ def _statement_lines(path: Path) -> Set[int]:
             for child in node.body:
                 visit(child, new_parents)
             return
-        for child in getattr(node, 'body', []):
+        for child in getattr(node, "body", []):
             visit(child, parents)
 
     visit(tree, [])

@@ -4,7 +4,6 @@ import asyncio
 from io import StringIO
 
 import pytest
-
 from proxy_daemon_py.balancer import Daemon, DaemonManager, DaemonState
 from proxy_daemon_py.db import ProxyDaemonState
 from proxy_daemon_py.heartbeat import DaemonHeartbeatTarget, HeartbeatManager
@@ -53,7 +52,9 @@ class _HeartbeatResponder(asyncio.DatagramProtocol):
         self.received: list[bytes] = []
         self._event = asyncio.Event()
 
-    def connection_made(self, transport: asyncio.BaseTransport) -> None:  # pragma: no cover - trivial
+    def connection_made(
+        self, transport: asyncio.BaseTransport
+    ) -> None:  # pragma: no cover - trivial
         self.transport = transport  # type: ignore[assignment]
 
     def datagram_received(self, data: bytes, addr: tuple[str, int]) -> None:
@@ -142,11 +143,14 @@ def test_daemon_heartbeat_target_marks_failure_on_bad_response() -> None:
 def test_daemon_heartbeat_target_recovers_from_failure() -> None:
     asyncio.run(_run_daemon_heartbeat_target_recovers_from_failure())
 
+
 def test_daemon_heartbeat_target_skips_unknown_daemon() -> None:
     asyncio.run(_run_daemon_heartbeat_target_skips_unknown())
 
+
 def test_heartbeat_manager_dispatch_without_targets() -> None:
     asyncio.run(_run_heartbeat_manager_dispatch_without_targets())
+
 
 def test_heartbeat_manager_stop_without_start() -> None:
     manager = HeartbeatManager(0.1)
@@ -184,7 +188,7 @@ async def _run_daemon_heartbeat_target_marks_success() -> None:
     assert state.current_state == "up"
     assert state.previous_state == "n/a"
     assert state.latency_ms is not None and state.latency_ms >= 0
-    assert responder.received == [f"PROXY Key=secret {identifier}PROXY C;HEARTBEAT;".encode("utf-8")]
+    assert responder.received == [f"PROXY Key=secret {identifier}PROXY C;HEARTBEAT;".encode()]
     output = buffer.getvalue()
     assert "Heartbeat OK from" in output
     assert "state changed: n/a -> up" in output
@@ -271,9 +275,10 @@ async def _run_daemon_heartbeat_target_skips_unknown() -> None:
     logger = ProxyLogger(LoggerConfig(stream=buffer))
     db = _FakeDatabaseAdapter()
     manager = DaemonManager()
-    target = DaemonHeartbeatTarget('missing', manager, db, logger, timeout=0.1)
+    target = DaemonHeartbeatTarget("missing", manager, db, logger, timeout=0.1)
     await target.send_heartbeat()
-    assert 'Skipping heartbeat for unknown daemon' in buffer.getvalue()
+    assert "Skipping heartbeat for unknown daemon" in buffer.getvalue()
+
 
 async def _run_heartbeat_manager_dispatch_without_targets() -> None:
     manager = HeartbeatManager(0.05)

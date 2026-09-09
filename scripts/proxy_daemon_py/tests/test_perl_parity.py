@@ -10,6 +10,7 @@ from proxy_daemon_py.balancer import ServerBalancer
 from proxy_daemon_py.config import ProxyConfig
 from proxy_daemon_py.daemon import ProxyDaemon
 from proxy_daemon_py.db import ProxyDaemonTarget
+from proxy_daemon_py.heartbeat import HeartbeatManager
 from proxy_daemon_py.log import LoggerConfig, ProxyLogger
 from proxy_daemon_py.transport import InboundDatagram
 
@@ -74,7 +75,7 @@ class FakeDatabaseAdapter:
         return list(self._targets)
 
 
-class DummyHeartbeatManager:
+class DummyHeartbeatManager(HeartbeatManager):
     """Heartbeat scheduler stub that records registered targets."""
 
     def __init__(self) -> None:

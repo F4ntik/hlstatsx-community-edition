@@ -6,6 +6,7 @@ import asyncio
 import logging
 import os
 from dataclasses import dataclass
+from typing import cast
 
 _HEARTBEAT_PAYLOAD = b"C;HEARTBEAT;"
 _HEARTBEAT_RESPONSE = b"Heartbeat OK"
@@ -28,9 +29,12 @@ class MockDaemonProtocol(asyncio.DatagramProtocol):
         self._transport: asyncio.DatagramTransport | None = None
         self._log = logging.getLogger("mock-daemon")
 
-    def connection_made(self, transport: asyncio.DatagramTransport) -> None:  # pragma: no cover - integration
-        self._transport = transport
-        address = transport.get_extra_info("sockname")
+    def connection_made(
+        self, transport: asyncio.BaseTransport
+    ) -> None:  # pragma: no cover - integration
+        datagram_transport = cast(asyncio.DatagramTransport, transport)
+        self._transport = datagram_transport
+        address = datagram_transport.get_extra_info("sockname")
         self._log.info("listening on %s", address)
 
     def datagram_received(self, data: bytes, addr: tuple[str, int]) -> None:

@@ -4,15 +4,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from types import MappingProxyType
 from pathlib import Path
+from types import MappingProxyType
 
 import pytest
-
 from proxy_daemon_py import bootstrap, importer
 from proxy_daemon_py.balancer import DaemonState
-from proxy_daemon_py.db import GameServer, ProxyDaemonTarget, StoredProxyDaemon
 from proxy_daemon_py.config import ProxyConfig
+from proxy_daemon_py.db import GameServer, ProxyDaemonTarget, StoredProxyDaemon
 
 
 @dataclass(slots=True)

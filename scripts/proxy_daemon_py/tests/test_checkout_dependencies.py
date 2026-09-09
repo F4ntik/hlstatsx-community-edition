@@ -7,7 +7,7 @@ from proxy_daemon_py import db
 from proxy_daemon_py.transport import ProxyUdpServer
 
 
-def _source_path(value: object) -> Path:
+def _source_path(value: type[object]) -> Path:
     source = inspect.getsourcefile(value)
     assert source is not None
     return Path(source).resolve()

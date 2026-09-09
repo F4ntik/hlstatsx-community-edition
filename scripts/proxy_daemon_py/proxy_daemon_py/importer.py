@@ -3,16 +3,15 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Sequence
 
 from . import cli
 from .balancer import Daemon, DaemonState, ServerBalancer
 from .bootstrap import database_config_from_proxy_config
-from .config import ConfigError, ProxyConfig
-from .db import GameServer, StoredProxyDaemon, SyncDatabaseAdapter
-from .db import DatabaseError
+from .config import ConfigError
+from .db import DatabaseError, GameServer, StoredProxyDaemon, SyncDatabaseAdapter
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,7 +101,8 @@ def format_summary(summary: ImportSummary) -> str:
         if daemon is None:
             continue
         lines.append(
-            f"  - {identifier} (state={daemon.state.value}, last_heartbeat={_format_timestamp(daemon.last_heartbeat)})"
+            f"  - {identifier} (state={daemon.state.value}, "
+            f"last_heartbeat={_format_timestamp(daemon.last_heartbeat)})"
         )
 
     if summary.missing_daemons:

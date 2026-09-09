@@ -12,7 +12,7 @@ from .config import ProxyConfig
 from .daemon import ProxyDaemon
 from .db import DatabaseAdapter
 from .heartbeat import HeartbeatManager
-from .log import LogLevel, LoggerConfig, ProxyLogger
+from .log import LoggerConfig, LogLevel, ProxyLogger
 from .transport import ProxyUdpServer
 
 # TODO(proxy-daemon-py/env-bootstrap): добавить чтение переменных окружения

@@ -5,9 +5,9 @@ from __future__ import annotations
 import asyncio
 from asyncio import Task
 from datetime import datetime, timezone
-from typing import Protocol
+from typing import Protocol, cast
 
-from .balancer import DaemonManager, DaemonState
+from .balancer import Daemon, DaemonManager, DaemonState
 from .db import DatabaseAdapter, ProxyDaemonState
 from .log import ProxyLogger
 
@@ -15,7 +15,8 @@ from .log import ProxyLogger
 class HeartbeatTarget(Protocol):
     """Protocol describing the objects that can receive heartbeat messages."""
 
-    async def send_heartbeat(self) -> None: ...
+    async def send_heartbeat(self) -> None:
+        ...
 
 
 class _HeartbeatClientProtocol(asyncio.DatagramProtocol):
@@ -30,9 +31,12 @@ class _HeartbeatClientProtocol(asyncio.DatagramProtocol):
         self._future = response_future
         self._transport: asyncio.DatagramTransport | None = None
 
-    def connection_made(self, transport: asyncio.DatagramTransport) -> None:  # pragma: no cover - exercised indirectly
-        self._transport = transport
-        transport.sendto(self._payload)
+    def connection_made(
+        self, transport: asyncio.BaseTransport
+    ) -> None:  # pragma: no cover - exercised indirectly
+        datagram_transport = cast(asyncio.DatagramTransport, transport)
+        self._transport = datagram_transport
+        datagram_transport.sendto(self._payload)
 
     def datagram_received(self, data: bytes, addr: tuple[str, int]) -> None:
         if not self._future.done():
@@ -140,13 +144,11 @@ class DaemonHeartbeatTarget:
     async def _build_payload(self, server_identity: str) -> bytes:
         if self._proxy_key is None:
             self._proxy_key = await self._database.fetch_proxy_key()
-        return (
-            f"PROXY Key={self._proxy_key} {server_identity}PROXY {self._payload}"
-        ).encode("utf-8")
+        return (f"PROXY Key={self._proxy_key} {server_identity}PROXY {self._payload}").encode()
 
     async def _handle_success(
         self,
-        daemon: "Daemon",
+        daemon: Daemon,
         timestamp: datetime,
         latency_seconds: float,
     ) -> None:
@@ -159,12 +161,10 @@ class DaemonHeartbeatTarget:
             self._logger.control(
                 f"Daemon {daemon.identifier} state changed: {previous_state} -> {current_state}"
             )
-        self._logger.control(
-            f"Heartbeat OK from {daemon.identifier} ({latency_ms} ms)"
-        )
+        self._logger.control(f"Heartbeat OK from {daemon.identifier} ({latency_ms} ms)")
         await self._persist_state(daemon, timestamp, current_state, previous_state, latency_ms)
 
-    async def _handle_failure(self, daemon: "Daemon", timestamp: datetime) -> None:
+    async def _handle_failure(self, daemon: Daemon, timestamp: datetime) -> None:
         previous_state = _state_to_db_value(daemon.state)
         self._manager.mark_failure(self._identifier, timestamp=timestamp)
         current_state = _state_to_db_value(daemon.state)
@@ -176,7 +176,7 @@ class DaemonHeartbeatTarget:
 
     async def _persist_state(
         self,
-        daemon: "Daemon",
+        daemon: Daemon,
         timestamp: datetime,
         current_state: str,
         previous_state: str,
@@ -194,9 +194,7 @@ class DaemonHeartbeatTarget:
                 )
             )
         except Exception as exc:  # pragma: no cover - defensive logging
-            self._logger.e403(
-                f"Failed to persist heartbeat state for {daemon.identifier}: {exc}"
-            )
+            self._logger.e403(f"Failed to persist heartbeat state for {daemon.identifier}: {exc}")
 
 
 class HeartbeatManager:

@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 import pytest
-
 from proxy_daemon_py import db
 
 CONFIG = db.DatabaseConfig(

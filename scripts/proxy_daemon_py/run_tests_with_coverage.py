@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import ast
 import sys
-from pathlib import Path
 import trace
+from pathlib import Path
+from typing import cast
 
 import pytest
 
@@ -48,7 +49,7 @@ def _statement_lines(path: Path) -> set[int]:
 
 
 def _compute_coverage(results: trace.CoverageResults) -> tuple[float, dict[str, float]]:
-    counts = results.counts
+    counts = cast(dict[tuple[str, int], int], vars(results)["counts"])
     totals = 0
     covered = 0
     per_file: dict[str, float] = {}

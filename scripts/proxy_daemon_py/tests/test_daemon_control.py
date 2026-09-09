@@ -15,6 +15,7 @@ from proxy_daemon_py.balancer import Daemon, ServerAssignment, ServerBalancer
 from proxy_daemon_py.config import ProxyConfig
 from proxy_daemon_py.daemon import ProxyDaemon
 from proxy_daemon_py.db import ProxyDaemonTarget
+from proxy_daemon_py.heartbeat import HeartbeatManager
 from proxy_daemon_py.log import LoggerConfig, ProxyLogger
 from proxy_daemon_py.transport import InboundDatagram, ProxyUdpServer
 
@@ -40,7 +41,7 @@ class FakeDatabaseAdapter:
         return list(self.daemons)
 
 
-class DummyHeartbeatManager:
+class DummyHeartbeatManager(HeartbeatManager):
     def __init__(self) -> None:
         self.started = False
         self.stop_calls = 0
@@ -74,17 +75,19 @@ class _RecordingUdpServer(ProxyUdpServer):
         self.sent_text.append((payload, address))
 
 
-def _make_idle_daemon(*, event_queue_size: int = 10) -> tuple[ProxyDaemon, StringIO, ProxyUdpServer]:
+def _make_idle_daemon(
+    *, event_queue_size: int = 10
+) -> tuple[ProxyDaemon, StringIO, ProxyUdpServer]:
     buffer = StringIO()
     logger = ProxyLogger(LoggerConfig(stream=buffer))
     server = ProxyUdpServer(logger)
-    db = FakeDatabaseAdapter('test')
+    db = FakeDatabaseAdapter("test")
     balancer = ServerBalancer()
     heartbeat = DummyHeartbeatManager()
     daemon = ProxyDaemon(
         _make_config(event_queue_size=event_queue_size), db, balancer, heartbeat, server, logger
     )
-    daemon._proxy_key = 'test'
+    daemon._proxy_key = "test"
     return daemon, buffer, server
 
 
@@ -182,7 +185,11 @@ def test_proxy_daemon_forward_queue_preserves_accepted_arrival_order() -> None:
     second = InboundDatagram(b"second", "second", ("127.0.0.1", 27016))
     third = InboundDatagram(b"third", "third", ("127.0.0.1", 27015))
 
-    assert [daemon._enqueue_game_packet(item) for item in (first, second, third)] == [True, True, True]
+    assert [daemon._enqueue_game_packet(item) for item in (first, second, third)] == [
+        True,
+        True,
+        True,
+    ]
     assert [daemon.game_packet_queue.get_nowait() for _ in range(3)] == [first, second, third]
 
 
@@ -202,12 +209,16 @@ def test_proxy_daemon_forward_queue_recovers_after_drain() -> None:
     assert daemon.forward_queue_overflow_count == 1
 
 
-def test_proxy_daemon_stop_drains_accepted_forward_packets() -> None:
-    asyncio.run(_run_stop_drains_accepted_forward_packets())
+def test_proxy_daemon_stop_drains_accepted_forward_packets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    asyncio.run(_run_stop_drains_accepted_forward_packets(monkeypatch))
 
 
-def test_proxy_daemon_stop_drains_accepted_ingress_packets() -> None:
-    asyncio.run(_run_stop_drains_accepted_ingress_packets())
+def test_proxy_daemon_stop_drains_accepted_ingress_packets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    asyncio.run(_run_stop_drains_accepted_ingress_packets(monkeypatch))
 
 
 def test_proxy_daemon_stop_timeout_counts_only_remaining_ingress_packets(
@@ -222,71 +233,73 @@ def test_proxy_daemon_stop_timeout_counts_only_remaining_packets(
     asyncio.run(_run_stop_timeout_counts_only_remaining_packets(monkeypatch))
 
 
-def test_proxy_daemon_stop_prevents_post_close_forwarding_and_is_idempotent() -> None:
-    asyncio.run(_run_stop_prevents_post_close_forwarding_and_is_idempotent())
+def test_proxy_daemon_stop_prevents_post_close_forwarding_and_is_idempotent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    asyncio.run(_run_stop_prevents_post_close_forwarding_and_is_idempotent(monkeypatch))
 
 
 def test_parse_proxy_command_invalid_inputs() -> None:
-    assert ProxyDaemon._parse_proxy_command('invalid') is None
-    assert ProxyDaemon._parse_proxy_command('PROXY Foo=bar PROXY C;HEARTBEAT;') is None
-    assert ProxyDaemon._parse_proxy_command('PROXY Key=abc PROXY payload') == ('abc', 'payload')
+    assert ProxyDaemon._parse_proxy_command("invalid") is None
+    assert ProxyDaemon._parse_proxy_command("PROXY Foo=bar PROXY C;HEARTBEAT;") is None
+    assert ProxyDaemon._parse_proxy_command("PROXY Key=abc PROXY payload") == ("abc", "payload")
 
 
 def test_format_server_list_handles_empty_and_populated() -> None:
     daemon, _, _ = _make_idle_daemon()
-    assert daemon._format_server_list() == 'ServerList\n'
-    daemon._balancer.register_daemon(Daemon(identifier='id', host='127.0.0.1', port=6000))
-    daemon._balancer.assignments['srv'] = ServerAssignment(
-        server_address='srv',
-        daemon_id='id',
+    assert daemon._format_server_list() == "ServerList\n"
+    daemon._balancer.register_daemon(Daemon(identifier="id", host="127.0.0.1", port=6000))
+    daemon._balancer.assignments["srv"] = ServerAssignment(
+        server_address="srv",
+        daemon_id="id",
         assigned_at=datetime.now(tz=timezone.utc),
     )
-    assert daemon._format_server_list() == 'ServerList\nsrv -> id\n'
+    assert daemon._format_server_list() == "ServerList\nsrv -> id\n"
 
 
 def test_forward_game_packet_requires_proxy_key() -> None:
     daemon, buffer, _ = _make_idle_daemon()
     daemon._proxy_key = None
-    datagram = InboundDatagram(b'data', 'RL data', ('127.0.0.1', 27015))
+    datagram = InboundDatagram(b"data", "RL data", ("127.0.0.1", 27015))
     daemon._forward_game_packet(datagram)
-    assert 'Proxy key unavailable' in buffer.getvalue()
+    assert "Proxy key unavailable" in buffer.getvalue()
 
 
 def test_forward_game_packet_logs_when_no_daemon_available() -> None:
     daemon, buffer, _ = _make_idle_daemon()
-    datagram = InboundDatagram(b'RL data', 'RL data', ('127.0.0.1', 27015))
+    datagram = InboundDatagram(b"RL data", "RL data", ("127.0.0.1", 27015))
     daemon._forward_game_packet(datagram)
-    assert 'No available daemon' in buffer.getvalue()
+    assert "No available daemon" in buffer.getvalue()
 
 
 def test_forward_game_packet_skips_ignored_payloads() -> None:
     daemon, buffer, _ = _make_idle_daemon()
     text = 'rcon from 1.2.3.4:27015 command "status"'
-    datagram = InboundDatagram(text.encode(), text, ('127.0.0.1', 27015))
+    datagram = InboundDatagram(text.encode(), text, ("127.0.0.1", 27015))
     daemon._forward_game_packet(datagram)
-    assert 'Skipping message' in buffer.getvalue()
+    assert "Skipping message" in buffer.getvalue()
 
 
 def test_forward_game_packet_exhausts_candidates_after_failures() -> None:
     buffer = StringIO()
     logger = ProxyLogger(LoggerConfig(stream=buffer))
-    failing_server = _FailingProxyUdpServer(logger, fail_destination='127.0.0.1:65001')
-    db = FakeDatabaseAdapter('test')
+    failing_server = _FailingProxyUdpServer(logger, fail_destination="127.0.0.1:65001")
+    db = FakeDatabaseAdapter("test")
     balancer = ServerBalancer()
     heartbeat = DummyHeartbeatManager()
     daemon = ProxyDaemon(_make_config(), db, balancer, heartbeat, failing_server, logger)
-    daemon._proxy_key = 'test'
-    balancer.register_daemon(Daemon(identifier='127.0.0.1:65001', host='127.0.0.1', port=65001))
-    balancer.manager.mark_heartbeat('127.0.0.1:65001')
-    datagram = InboundDatagram(b'RL payload', 'RL payload', ('127.0.0.1', 27015))
+    daemon._proxy_key = "test"
+    balancer.register_daemon(Daemon(identifier="127.0.0.1:65001", host="127.0.0.1", port=65001))
+    balancer.manager.mark_heartbeat("127.0.0.1:65001")
+    datagram = InboundDatagram(b"RL payload", "RL payload", ("127.0.0.1", 27015))
     daemon._forward_game_packet(datagram)
-    assert 'Exhausted daemon candidates' in buffer.getvalue()
+    assert "Exhausted daemon candidates" in buffer.getvalue()
 
 
 def test_normalise_payload_trims_to_last_marker() -> None:
     daemon, _, _ = _make_idle_daemon()
-    assert daemon._normalise_payload('noise RL first RL second') == 'RL second'
-    assert daemon._normalise_payload('no marker') == 'no marker'
+    assert daemon._normalise_payload("noise RL first RL second") == "RL second"
+    assert daemon._normalise_payload("no marker") == "no marker"
 
 
 def test_should_skip_payload_matches_commands() -> None:
@@ -295,7 +308,7 @@ def test_should_skip_payload_matches_commands() -> None:
     assert daemon._should_skip_payload('rcon from 1 command "stats"')
     assert daemon._should_skip_payload('rcon from 1 command ""')
     assert not daemon._should_skip_payload('rcon from 1 command "other"')
-    assert not daemon._should_skip_payload('some other text')
+    assert not daemon._should_skip_payload("some other text")
 
 
 def test_proxy_daemon_reload_updates_daemon_pool() -> None:
@@ -332,10 +345,14 @@ async def _start_shutdown_test_daemon() -> tuple[
     return daemon, buffer, db, heartbeat
 
 
-async def _run_stop_drains_accepted_forward_packets() -> None:
+async def _run_stop_drains_accepted_forward_packets(monkeypatch: pytest.MonkeyPatch) -> None:
     daemon, _, db, heartbeat = await _start_shutdown_test_daemon()
     forwarded: list[InboundDatagram] = []
-    daemon._forward_game_packet = forwarded.append  # type: ignore[method-assign]
+
+    def record_forward(datagram: InboundDatagram) -> None:
+        forwarded.append(datagram)
+
+    monkeypatch.setattr(daemon, "_forward_game_packet", record_forward)
     accepted = InboundDatagram(b"accepted", "accepted", ("127.0.0.1", 27015))
 
     assert daemon._enqueue_game_packet(accepted) is True
@@ -348,10 +365,14 @@ async def _run_stop_drains_accepted_forward_packets() -> None:
     assert heartbeat.stop_calls == 1
 
 
-async def _run_stop_drains_accepted_ingress_packets() -> None:
+async def _run_stop_drains_accepted_ingress_packets(monkeypatch: pytest.MonkeyPatch) -> None:
     daemon, _, db, heartbeat = await _start_shutdown_test_daemon()
     forwarded: list[InboundDatagram] = []
-    daemon._forward_game_packet = forwarded.append  # type: ignore[method-assign]
+
+    def record_forward(datagram: InboundDatagram) -> None:
+        forwarded.append(datagram)
+
+    monkeypatch.setattr(daemon, "_forward_game_packet", record_forward)
     accepted = InboundDatagram(b"accepted", "accepted", ("127.0.0.1", 27015))
 
     daemon._udp_server.queue.put_nowait(accepted)
@@ -435,10 +456,16 @@ async def _run_stop_timeout_counts_only_remaining_packets(monkeypatch: pytest.Mo
     assert "second payload" not in log_contents
 
 
-async def _run_stop_prevents_post_close_forwarding_and_is_idempotent() -> None:
+async def _run_stop_prevents_post_close_forwarding_and_is_idempotent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     daemon, _, db, heartbeat = await _start_shutdown_test_daemon()
     forwarded: list[InboundDatagram] = []
-    daemon._forward_game_packet = forwarded.append  # type: ignore[method-assign]
+
+    def record_forward(datagram: InboundDatagram) -> None:
+        forwarded.append(datagram)
+
+    monkeypatch.setattr(daemon, "_forward_game_packet", record_forward)
     after_stop = InboundDatagram(b"after", "after", ("127.0.0.1", 27015))
 
     await daemon.stop()
@@ -527,11 +554,15 @@ async def _run_forwards_non_control_payloads() -> None:
 
     loop = asyncio.get_running_loop()
     protocol = _RecordingProtocol()
-    transport, _ = await loop.create_datagram_endpoint(lambda: protocol, local_addr=("127.0.0.1", 0))
+    transport, _ = await loop.create_datagram_endpoint(
+        lambda: protocol, local_addr=("127.0.0.1", 0)
+    )
 
     daemon_host, daemon_port = transport.get_extra_info("sockname")[:2]
     identifier = f"{daemon_host}:{daemon_port}"
-    daemon.balancer.register_daemon(Daemon(identifier=identifier, host=daemon_host, port=daemon_port))
+    daemon.balancer.register_daemon(
+        Daemon(identifier=identifier, host=daemon_host, port=daemon_port)
+    )
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.settimeout(1)
@@ -567,10 +598,14 @@ async def _run_reassigns_on_send_failure() -> None:
 
     loop = asyncio.get_running_loop()
     protocol = _RecordingProtocol()
-    transport, _ = await loop.create_datagram_endpoint(lambda: protocol, local_addr=("127.0.0.1", 0))
+    transport, _ = await loop.create_datagram_endpoint(
+        lambda: protocol, local_addr=("127.0.0.1", 0)
+    )
     daemon_host, daemon_port = transport.get_extra_info("sockname")[:2]
     second_identifier = f"{daemon_host}:{daemon_port}"
-    balancer.register_daemon(Daemon(identifier=second_identifier, host=daemon_host, port=daemon_port))
+    balancer.register_daemon(
+        Daemon(identifier=second_identifier, host=daemon_host, port=daemon_port)
+    )
 
     address = failing_server.address
     assert address is not None
@@ -657,7 +692,9 @@ async def _run_rejects_direct_mutating_loopback_reload() -> None:
     )
 
     assert handled
-    assert server.sent_text == [("FAILED CONTROL COMMAND: RELOAD requires PROXY Key\n", ("127.0.0.1", 9999))]
+    assert server.sent_text == [
+        ("FAILED CONTROL COMMAND: RELOAD requires PROXY Key\n", ("127.0.0.1", 9999))
+    ]
     assert "127.0.0.1:65001" in balancer.manager.daemons
     assert "127.0.0.1:65002" not in balancer.manager.daemons
     assert "Rejected unauthenticated mutating control command from 127.0.0.1" in buffer.getvalue()
@@ -680,7 +717,9 @@ async def _run_rejects_unsupported_control_without_forwarding() -> None:
     )
 
     assert handled
-    assert recording_server.sent_text == [("FAILED CONTROL COMMAND: KILL is not supported\n", ("127.0.0.1", 9999))]
+    assert recording_server.sent_text == [
+        ("FAILED CONTROL COMMAND: KILL is not supported\n", ("127.0.0.1", 9999))
+    ]
     assert daemon.game_packet_queue.empty()
     assert "Rejected unsupported control command from 127.0.0.1" in buffer.getvalue()
 
@@ -689,7 +728,9 @@ class _RecordingProtocol(asyncio.DatagramProtocol):
     def __init__(self) -> None:
         self.queue: asyncio.Queue[tuple[bytes, tuple[str, int]]] = asyncio.Queue()
 
-    def datagram_received(self, data: bytes, addr: tuple[str, int]) -> None:  # pragma: no cover - exercised via asyncio
+    def datagram_received(
+        self, data: bytes, addr: tuple[str, int]
+    ) -> None:  # pragma: no cover - exercised via asyncio
         self.queue.put_nowait((data, addr))
 
 
@@ -707,7 +748,9 @@ class _FailingProxyUdpServer(ProxyUdpServer):
         super().send_text(message, address)
 
 
-async def _start_daemon(*, udp_server: ProxyUdpServer | None = None) -> tuple[StringIO, ProxyDaemon, ProxyUdpServer]:
+async def _start_daemon(
+    *, udp_server: ProxyUdpServer | None = None
+) -> tuple[StringIO, ProxyDaemon, ProxyUdpServer]:
     buffer = StringIO()
     logger = ProxyLogger(LoggerConfig(stream=buffer))
     server = udp_server or ProxyUdpServer(logger)
