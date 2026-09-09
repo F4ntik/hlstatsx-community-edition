@@ -15,9 +15,7 @@ from typing import TextIO
 
 
 DEFAULT_DATABASE = "hlstatsxce"
-DEFAULT_DB_CONTAINER = "hlstatsx-legacy-db"
 DEFAULT_DAEMON_IMAGE = "startersclan/hlstatsx-community-edition:1.11.4-daemon"
-DEFAULT_DOCKER_NETWORK = "legacy_hlstatsx_legacy_net"
 DEFAULT_SERVER_IDENTITY = "37.230.137.48:27015"
 DEFAULT_DB_HOST = "db:3306"
 DEFAULT_DB_USERNAME = "hlstatsxce"
@@ -47,8 +45,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "--db-container",
-        default=DEFAULT_DB_CONTAINER,
-        help=f"MariaDB container used to verify hlstats_Servers (default: {DEFAULT_DB_CONTAINER})",
+        required=True,
+        help="Explicit MariaDB container used to verify hlstats_Servers.",
     )
     parser.add_argument(
         "--database",
@@ -62,8 +60,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "--docker-network",
-        default=DEFAULT_DOCKER_NETWORK,
-        help=f"Docker network where the comparison DB is reachable as db (default: {DEFAULT_DOCKER_NETWORK})",
+        required=True,
+        help="Explicit Docker network where the replay database is reachable.",
     )
     parser.add_argument(
         "--db-host",

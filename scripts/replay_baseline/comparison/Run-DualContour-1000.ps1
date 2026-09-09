@@ -753,6 +753,8 @@ function Invoke-LegacyReplayImport {
 
     python scripts/replay_baseline/replay_legacy_log.py `
         "$windowDir" `
+        --db-container "hlstatsx-legacy-db" `
+        --docker-network "legacy_hlstatsx_legacy_net" `
         --server-identity "$Identity" `
         --drop-empty-team-enter-events `
         --input-manifest "$manifest" `
