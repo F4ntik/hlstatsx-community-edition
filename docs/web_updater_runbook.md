@@ -35,7 +35,8 @@ conversion can rebuild and lock tables.
    ```
 
    Migration `83` widens `hlstats_Users.password` to `varchar(255)` before the
-   application writes modern password hashes. It does not run a runtime
+   application writes modern password hashes. The runner exits nonzero unless
+   it can read back database version `83` or newer. It does not run a runtime
    `ALTER TABLE` during ordinary requests.
 
 4. Read back the result before restarting workers:

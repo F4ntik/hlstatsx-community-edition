@@ -39,5 +39,44 @@ if ($argc !== 1) {
 define('HLSTATS_TRUSTED_UPDATER', true);
 $_GET = array('mode' => 'updater');
 $_POST = array();
+$_REQUEST = $_GET;
+$_SERVER['HTTP_HOST'] = 'localhost';
+$_SERVER['SERVER_NAME'] = 'localhost';
+$_SERVER['SERVER_PORT'] = '80';
+$_SERVER['REQUEST_METHOD'] = 'GET';
+$_SERVER['REQUEST_URI'] = '/hlstats.php?mode=updater';
+$_SERVER['QUERY_STRING'] = 'mode=updater';
+$_SERVER['SCRIPT_NAME'] = '/hlstats.php';
+$_SERVER['PHP_SELF'] = '/hlstats.php';
 chdir($webRoot);
-require $webRoot . DIRECTORY_SEPARATOR . 'hlstats.php';
+
+try {
+    require $webRoot . DIRECTORY_SEPARATOR . 'hlstats.php';
+} catch (Throwable $exception) {
+    fwrite(STDERR, "Trusted web updater failed: " . $exception->getMessage() . "\n");
+    exit(1);
+}
+
+if (!isset($container) || !is_object($container) || !method_exists($container, 'get')) {
+    fwrite(STDERR, "Trusted web updater failed: application bootstrap did not expose a database connection.\n");
+    exit(1);
+}
+
+try {
+    $pdo = $container->get('pdo');
+    $statement = $pdo->prepare('SELECT `value` FROM hlstats_Options WHERE `keyname` = :keyname');
+    if ($statement === false || $statement->execute(array('keyname' => 'dbversion')) !== true) {
+        throw new RuntimeException('could not read the resulting database version');
+    }
+    $databaseVersion = $statement->fetchColumn();
+} catch (Throwable $exception) {
+    fwrite(STDERR, "Trusted web updater failed: " . $exception->getMessage() . "\n");
+    exit(1);
+}
+
+if (!is_scalar($databaseVersion) || preg_match('/^[0-9]+$/', (string) $databaseVersion) !== 1 || (int) $databaseVersion < 83) {
+    fwrite(STDERR, "Trusted web updater failed: database version did not reach 83.\n");
+    exit(1);
+}
+
+fwrite(STDOUT, "Trusted web updater completed at database version " . $databaseVersion . ".\n");

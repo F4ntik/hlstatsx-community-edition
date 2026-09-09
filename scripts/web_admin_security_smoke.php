@@ -40,6 +40,74 @@ function source_between(string $source, string $start, string $end, string $mess
     return substr($source, $startPosition, $endPosition - $startPosition);
 }
 
+function run_updater_runner_subprocess(string $runnerPath, string $workingDirectory, ?string $databaseVersion): array
+{
+    $environmentKey = 'HLSTATS_UPDATER_SMOKE_DBVERSION';
+    $previousValue = getenv($environmentKey);
+    if ($databaseVersion === null) {
+        putenv($environmentKey);
+    } else {
+        putenv($environmentKey . '=' . $databaseVersion);
+    }
+
+    try {
+        $process = proc_open(
+            escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($runnerPath),
+            array(
+                0 => array('pipe', 'r'),
+                1 => array('pipe', 'w'),
+                2 => array('pipe', 'w'),
+            ),
+            $pipes,
+            $workingDirectory
+        );
+        if (!is_resource($process)) {
+            throw new RuntimeException('could not start trusted updater runner smoke');
+        }
+
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+
+        return array(
+            'exitCode' => proc_close($process),
+            'stdout' => $stdout,
+            'stderr' => $stderr,
+        );
+    } finally {
+        if ($previousValue === false) {
+            putenv($environmentKey);
+        } else {
+            putenv($environmentKey . '=' . $previousValue);
+        }
+    }
+}
+
+function remove_updater_runner_smoke_tree(string $path): void
+{
+    $resolvedPath = realpath($path);
+    $tempPrefix = rtrim(str_replace('\\', '/', sys_get_temp_dir()), '/') . '/hlstats-updater-runner-smoke-';
+    $normalizedPath = $resolvedPath === false ? '' : str_replace('\\', '/', $resolvedPath);
+    if ($normalizedPath === '' || strpos($normalizedPath, $tempPrefix) !== 0) {
+        throw new RuntimeException('refusing to remove an unexpected updater smoke path');
+    }
+
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($resolvedPath, FilesystemIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::CHILD_FIRST
+    );
+    foreach ($iterator as $entry) {
+        if ($entry->isDir()) {
+            rmdir($entry->getPathname());
+        } else {
+            unlink($entry->getPathname());
+        }
+    }
+    rmdir($resolvedPath);
+}
+
 function t($key, $params = array(), $fallback = null)
 {
     return $fallback === null ? $key : $fallback;
@@ -115,6 +183,7 @@ $heatmapSource = file_get_contents(ROOT_PATH . '/heatmap_admin.php');
 $hlstatsSource = file_get_contents(ROOT_PATH . '/hlstats.php');
 $updaterSource = file_get_contents(ROOT_PATH . '/pages/updater.php');
 $installSource = file_get_contents(dirname(ROOT_PATH) . '/sql/install.sql');
+$updaterRunnerSource = file_get_contents(dirname(ROOT_PATH) . '/scripts/run_web_updater.php');
 assert_true(is_string($adminSource) && is_string($heatmapSource) && is_string($hlstatsSource), 'security sources should be readable');
 
 $authSource = source_between($adminSource, 'class Auth', 'class AdminTask', 'Auth class should be extractable for its request lifecycle test');
@@ -163,8 +232,13 @@ assert_contains('DROP TEMPORARY TABLE IF EXISTS hlstats_AdminEventHistory', file
 assert_contains("PHP_SAPI !== 'cli' || !defined('HLSTATS_TRUSTED_UPDATER')", $hlstatsSource, 'the public dispatcher must reject updater requests');
 assert_contains("PHP_SAPI !== 'cli' || !defined('HLSTATS_TRUSTED_UPDATER')", $updaterSource, 'the updater page must independently require the trusted CLI route');
 assert_contains('`password` varchar(255)', $installSource, 'new installs must reserve full modern password storage');
-assert_contains('MODIFY COLUMN password varchar(255)', file_get_contents(ROOT_PATH . '/updater/83.php'), 'the explicit updater must widen old password storage');
-assert_contains("is_file('/var/www/html/hlstats.php')", file_get_contents(dirname(ROOT_PATH) . '/scripts/run_web_updater.php'), 'the updater runner must support the Docker web-root layout');
+$updater83Source = file_get_contents(ROOT_PATH . '/updater/83.php');
+assert_contains('MODIFY COLUMN password varchar(255)', $updater83Source, 'the explicit updater must widen old password storage');
+assert_contains('throw new RuntimeException', $updater83Source, 'the explicit updater must fail with a nonzero CLI status when a database write fails');
+assert_contains("is_file('/var/www/html/hlstats.php')", $updaterRunnerSource, 'the updater runner must support the Docker web-root layout');
+assert_contains('$_SERVER[\'PHP_SELF\'] = \'/hlstats.php\';', $updaterRunnerSource, 'the updater runner must use the canonical dispatcher path');
+assert_contains('$_SERVER[\'HTTP_HOST\'] = \'localhost\';', $updaterRunnerSource, 'the updater runner must supply a trusted CLI host context');
+assert_contains('database version did not reach 83', $updaterRunnerSource, 'the updater runner must verify migration completion');
 
 $enCatalog = require ROOT_PATH . '/lang/en.php';
 $ruCatalog = require ROOT_PATH . '/lang/ru.php';
@@ -261,5 +335,98 @@ assert_false(
 );
 admin_auth_session_revoke();
 assert_false(isset($_SESSION['loggedin']) || isset($_SESSION['auth_password_fingerprint']) || isset($_SESSION['password']) || isset($_SESSION['heatmap_admin_preview']), 'logout/revocation must remove authentication state and preview remnants');
+
+$updaterSmokeRoot = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'hlstats-updater-runner-smoke-' . bin2hex(random_bytes(8));
+try {
+    assert_true(mkdir($updaterSmokeRoot . '/scripts', 0700, true), 'updater runner smoke scripts directory should be created');
+    assert_true(mkdir($updaterSmokeRoot . '/web/pages', 0700, true), 'updater runner smoke pages directory should be created');
+    assert_true(mkdir($updaterSmokeRoot . '/web/updater', 0700, true), 'updater runner smoke updater directory should be created');
+    assert_true(mkdir($updaterSmokeRoot . '/sql/migrations', 0700, true), 'updater runner smoke migrations directory should be created');
+    assert_true(copy(dirname(ROOT_PATH) . '/scripts/run_web_updater.php', $updaterSmokeRoot . '/scripts/run_web_updater.php'), 'updater runner smoke should execute the checked-in runner');
+    assert_true(file_put_contents($updaterSmokeRoot . '/web/pages/updater.php', "<?php\n") !== false, 'updater runner smoke updater page should be created');
+    assert_true(file_put_contents($updaterSmokeRoot . '/web/updater/83.php', "<?php\n") !== false, 'updater runner smoke migration should be created');
+    assert_true(file_put_contents($updaterSmokeRoot . '/sql/migrations/2026_07_22_ftp_checkpoint.sql', "-- smoke\n") !== false, 'updater runner smoke checkpoint should be created');
+    assert_true(file_put_contents($updaterSmokeRoot . '/sql/migrations/2026_07_22_0500.sql', "-- smoke\n") !== false, 'updater runner smoke runtime migration should be created');
+    assert_true(file_put_contents($updaterSmokeRoot . '/web/hlstats.php', <<<'PHP'
+<?php
+$expectedServer = array(
+    'HTTP_HOST' => 'localhost',
+    'REQUEST_METHOD' => 'GET',
+    'REQUEST_URI' => '/hlstats.php?mode=updater',
+    'QUERY_STRING' => 'mode=updater',
+    'SCRIPT_NAME' => '/hlstats.php',
+    'PHP_SELF' => '/hlstats.php',
+);
+foreach ($expectedServer as $key => $value) {
+    if (($_SERVER[$key] ?? null) !== $value) {
+        fwrite(STDERR, "invalid trusted updater request context: $key\n");
+        exit(71);
+    }
+}
+if (($_GET['mode'] ?? null) !== 'updater' || $_POST !== array() || $_REQUEST !== $_GET) {
+    fwrite(STDERR, "invalid trusted updater request payload\n");
+    exit(72);
+}
+
+final class UpdaterRunnerSmokeStatement
+{
+    private string $databaseVersion;
+
+    public function __construct(string $databaseVersion)
+    {
+        $this->databaseVersion = $databaseVersion;
+    }
+
+    public function execute(array $parameters): bool
+    {
+        return ($parameters['keyname'] ?? null) === 'dbversion';
+    }
+
+    public function fetchColumn(): string
+    {
+        return $this->databaseVersion;
+    }
+}
+
+final class UpdaterRunnerSmokePdo
+{
+    public function prepare(string $query): UpdaterRunnerSmokeStatement
+    {
+        if (strpos($query, 'hlstats_Options') === false) {
+            throw new RuntimeException('unexpected updater completion query');
+        }
+        $databaseVersion = getenv('HLSTATS_UPDATER_SMOKE_DBVERSION');
+        return new UpdaterRunnerSmokeStatement($databaseVersion === false || $databaseVersion === '' ? '83' : $databaseVersion);
+    }
+}
+
+final class UpdaterRunnerSmokeContainer
+{
+    public function get(string $service)
+    {
+        if ($service !== 'pdo') {
+            throw new RuntimeException('unexpected updater service');
+        }
+        return new UpdaterRunnerSmokePdo();
+    }
+}
+
+$container = new UpdaterRunnerSmokeContainer();
+PHP
+    ) !== false, 'updater runner smoke dispatcher should be created');
+
+    $successfulRun = run_updater_runner_subprocess($updaterSmokeRoot . '/scripts/run_web_updater.php', $updaterSmokeRoot, null);
+    assert_same(0, $successfulRun['exitCode'], 'trusted updater runner must reach the canonical dispatcher route');
+    assert_same('', $successfulRun['stderr'], 'trusted updater runner must not emit bootstrap warnings');
+    assert_contains('Trusted web updater completed at database version 83.', $successfulRun['stdout'], 'trusted updater runner must report a verified completion');
+
+    $staleRun = run_updater_runner_subprocess($updaterSmokeRoot . '/scripts/run_web_updater.php', $updaterSmokeRoot, '82');
+    assert_true($staleRun['exitCode'] !== 0, 'trusted updater runner must fail when the migration remains incomplete');
+    assert_contains('database version did not reach 83', $staleRun['stderr'], 'trusted updater runner must explain an incomplete migration');
+} finally {
+    if (is_dir($updaterSmokeRoot)) {
+        remove_updater_runner_smoke_tree($updaterSmokeRoot);
+    }
+}
 
 echo "web admin security smoke ok\n";
