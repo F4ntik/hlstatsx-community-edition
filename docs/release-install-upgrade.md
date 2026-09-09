@@ -42,7 +42,7 @@ contains no `heatmaps/`, `web/hlstatsimg/`, or `sql/install*` entries. Existing 
 images, overviews, floor images, generated images and their database calibration
 remain together. Live configuration files are never overwritten: example files
 have a `.example` suffix. Apply the explicit database upgrade procedure described
-in the administration-security upgrade runbook, while the site remains offline.
+in [the trusted updater runbook](web_updater_runbook.md), while the site remains offline.
 Do not import `install.sql` into an existing database.
 
 The new native map images are a fresh-install default, **not an automatic map

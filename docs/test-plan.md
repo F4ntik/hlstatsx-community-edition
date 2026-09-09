@@ -2,6 +2,13 @@
 
 ## Objective
 
+September release evidence and review closures are summarized in
+[release preparation](release-preparation-20260909.md). The administrator smoke
+is `php scripts/web_admin_security_smoke.php`; also verify the actual CLI schema
+upgrade and HTTP session/permission boundaries on an isolated database.
+The PHP heatmap smoke writes and removes a uniquely named fixture under
+`heatmaps/src`, so run it in a writable disposable checkout or staging directory.
+
 Validate that the integrated product repository works as one coherent stack:
 
 - Python is the default runtime and operational path

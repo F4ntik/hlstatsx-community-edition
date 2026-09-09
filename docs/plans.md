@@ -2,6 +2,11 @@
 
 ## Summary
 
+September release integration is described in
+[release preparation](release-preparation-20260909.md). Use the separate
+[install and upgrade packages](release-install-upgrade.md); existing image and
+calibration pairs must remain together during an upgrade.
+
 Bundled geometry follow-up: 25 BSP templates now load automatically in the admin
 editor with image-identity matching and a show/hide button. Files are included
 under `web/hlstatsimg/heatmap-geometry/cstrike` for ordinary clean installations.

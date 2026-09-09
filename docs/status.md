@@ -3,15 +3,19 @@
 ## Snapshot
 
 - Last updated: `2026-09-09`
-- WEB-01 through WEB-05 source hardening is prepared for release integration:
+- September release fixes and the Explorer snapshot are integrated on
+  `release/i18n-20260909`. See [release preparation](release-preparation-20260909.md)
+  for the review closure, verified checks and exact artifact acceptance boundary.
+- WEB-01 through WEB-05 hardening is integrated:
   classic admin mutations use a session CSRF token and registry access gate;
   passwords use modern hashes with one-time MD5 upgrade and password-free,
   rotating sessions; the web updater is CLI-only; and heatmap administration
   checks the current database password fingerprint before reads or mutations.
-  `scripts/web_admin_security_smoke.php`, the CLI updater availability check,
-  and focused PHP lint pass in an isolated PHP 8.2 container. This is source
-  evidence only; the disposable-DB HTTP acceptance and final package review
-  remain the release gate.
+  isolated MariaDB checks verified a fresh schema 83 and a real 82-to-83 CLI
+  upgrade. HTTP checks passed for legacy hash upgrade, special-character
+  passwords, CSRF, restricted reset actions and heatmap session revocation.
+  Package publication requires the exact-commit acceptance receipt; historical
+  acceptance below must not be substituted for that receipt.
 - BSP outlines for the 25 native maps are now bundled web assets and load
   automatically in the admin editor, with a visible show/hide control and an
   image-identity check. Fresh installations use the matching existing SQL seeds

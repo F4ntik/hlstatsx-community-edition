@@ -3,6 +3,11 @@
 This runbook defines the Phase 9 release handoff contract for the integrated
 Python+i18n product lane.
 
+For the September candidate, start with
+[release preparation](release-preparation-20260909.md) and
+[install/upgrade instructions](release-install-upgrade.md). Acceptance belongs
+to the full commit and SHA-256 manifest in the accompanying release receipt.
+
 ## Runtime Metrics
 
 `hlstats_py` emits a stable one-line metrics summary through the normal daemon
