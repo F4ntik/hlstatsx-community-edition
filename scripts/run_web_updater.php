@@ -50,6 +50,15 @@ $_SERVER['SCRIPT_NAME'] = '/hlstats.php';
 $_SERVER['PHP_SELF'] = '/hlstats.php';
 chdir($webRoot);
 
+$hlstatsTrustedUpdaterCompleted = false;
+register_shutdown_function(static function () use (&$hlstatsTrustedUpdaterCompleted): void {
+    // Legacy error handlers can call bare exit; exceptions cannot intercept it.
+    if (!$hlstatsTrustedUpdaterCompleted) {
+        fwrite(STDERR, "Trusted web updater stopped before verified completion.\n");
+        exit(1);
+    }
+});
+
 try {
     require $webRoot . DIRECTORY_SEPARATOR . 'hlstats.php';
 } catch (Throwable $exception) {
@@ -79,4 +88,5 @@ if (!is_scalar($databaseVersion) || preg_match('/^[0-9]+$/', (string) $databaseV
     exit(1);
 }
 
+$hlstatsTrustedUpdaterCompleted = true;
 fwrite(STDOUT, "Trusted web updater completed at database version " . $databaseVersion . ".\n");

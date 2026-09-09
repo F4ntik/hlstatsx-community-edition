@@ -423,6 +423,11 @@ PHP
     $staleRun = run_updater_runner_subprocess($updaterSmokeRoot . '/scripts/run_web_updater.php', $updaterSmokeRoot, '82');
     assert_true($staleRun['exitCode'] !== 0, 'trusted updater runner must fail when the migration remains incomplete');
     assert_contains('database version did not reach 83', $staleRun['stderr'], 'trusted updater runner must explain an incomplete migration');
+
+    assert_true(file_put_contents($updaterSmokeRoot . '/web/hlstats.php', "<?php exit;\n") !== false, 'early-exit dispatcher should be created');
+    $earlyExitRun = run_updater_runner_subprocess($updaterSmokeRoot . '/scripts/run_web_updater.php', $updaterSmokeRoot, null);
+    assert_same(1, $earlyExitRun['exitCode'], 'legacy bare exit must not report updater success');
+    assert_contains('stopped before verified completion', $earlyExitRun['stderr'], 'early exit must explain missing completion');
 } finally {
     if (is_dir($updaterSmokeRoot)) {
         remove_updater_runner_smoke_tree($updaterSmokeRoot);
