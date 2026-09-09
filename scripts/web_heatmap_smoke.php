@@ -812,7 +812,7 @@ assert_contains("hef.pos_victim_x IS NOT NULL AND hef.pos_victim_y IS NOT NULL",
 
 $installSql = file_get_contents(dirname(__DIR__) . '/sql/install.sql');
 assert_true($installSql !== false, 'installer SQL should be readable');
-assert_contains('SET @DBVERSION="82";', $installSql, 'fresh install should set dbversion 82');
+assert_contains('SET @DBVERSION="83";', $installSql, 'fresh install should set dbversion 83');
 assert_true(
     preg_match(
         "/`cropy2` int\\(11\\) NOT NULL default '0',\\s+`floors_json` TEXT NULL,/",

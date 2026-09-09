@@ -305,7 +305,7 @@ def test_heatmap_admin_transport_guard_rejects_oversize_post_before_session_boot
     guard = admin.index("if (heatmap_admin_reject_oversize_post($_SERVER)) {")
     guard_exit = admin.index("exit;", guard)
     session_boot = admin.index("session_start();", guard)
-    access_boundary = admin.index("heatmap_admin_require_access();", guard)
+    access_boundary = admin.index("heatmap_admin_require_access($pdo);", guard)
 
     assert require_transport < guard < guard_exit < session_boot < access_boundary
 
