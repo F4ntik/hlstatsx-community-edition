@@ -62,6 +62,7 @@ _ACTIVE_PLAYER_IDLE_TIMEOUT = timedelta(seconds=250)
 _IDLE_PRUNE_INTERVAL = timedelta(seconds=60)
 _MAX_CONNECTION_TIME_GAP_SECONDS = 600
 _TEAM_BONUS_TRACE_MAX_SAMPLES = 200
+_TEAM_BONUS_TRACE_MAX_DISTINCT_KEYS = 200
 _TEAM_ALIASES = {
     "T": "TERRORIST",
     "TS": "TERRORIST",
@@ -667,6 +668,7 @@ class EventStorage:
         self._team_bonus_stage_map_counts: dict[str, dict[str, int]] = {}
         self._team_bonus_stage_player_counts: dict[str, dict[int, int]] = {}
         self._team_bonus_stage_event_counts: dict[str, dict[str, int]] = {}
+        self._team_bonus_stage_omitted_counts: dict[str, dict[str, int]] = {}
         self._team_bonus_stage_samples: list[dict[str, Any]] = []
         self._team_bonus_trace_path = os.environ.get("HLSTATS_TEAM_BONUS_TRACE_PATH")
         self._db_write_trace_path = os.environ.get("HLSTATS_DB_WRITE_TRACE_PATH")
@@ -4037,16 +4039,40 @@ class EventStorage:
         if not self._team_bonus_trace_path:
             return
         self._team_bonus_stage_counts[stage] = self._team_bonus_stage_counts.get(stage, 0) + 1
+        omitted = self._team_bonus_stage_omitted_counts.setdefault(
+            stage,
+            {"action": 0, "map": 0, "player": 0, "event": 0},
+        )
         by_action = self._team_bonus_stage_action_counts.setdefault(stage, {})
-        by_action[action_id] = by_action.get(action_id, 0) + 1
+        if action_id in by_action:
+            by_action[action_id] += 1
+        elif len(by_action) < _TEAM_BONUS_TRACE_MAX_DISTINCT_KEYS:
+            by_action[action_id] = 1
+        else:
+            omitted["action"] += 1
         map_key = map_name or "<empty>"
         by_map = self._team_bonus_stage_map_counts.setdefault(stage, {})
-        by_map[map_key] = by_map.get(map_key, 0) + 1
+        if map_key in by_map:
+            by_map[map_key] += 1
+        elif len(by_map) < _TEAM_BONUS_TRACE_MAX_DISTINCT_KEYS:
+            by_map[map_key] = 1
+        else:
+            omitted["map"] += 1
         by_player = self._team_bonus_stage_player_counts.setdefault(stage, {})
-        by_player[player_id] = by_player.get(player_id, 0) + 1
+        if player_id in by_player:
+            by_player[player_id] += 1
+        elif len(by_player) < _TEAM_BONUS_TRACE_MAX_DISTINCT_KEYS:
+            by_player[player_id] = 1
+        else:
+            omitted["player"] += 1
         event_key = f"{event_time.isoformat(sep=' ')}|{action_id}|{map_key}|{team}"
         by_event = self._team_bonus_stage_event_counts.setdefault(stage, {})
-        by_event[event_key] = by_event.get(event_key, 0) + 1
+        if event_key in by_event:
+            by_event[event_key] += 1
+        elif len(by_event) < _TEAM_BONUS_TRACE_MAX_DISTINCT_KEYS:
+            by_event[event_key] = 1
+        else:
+            omitted["event"] += 1
         sample_player = os.environ.get("HLSTATS_TEAM_BONUS_TRACE_SAMPLE_PLAYER_ID")
         sample_event_time = os.environ.get("HLSTATS_TEAM_BONUS_TRACE_SAMPLE_EVENT_TIME")
         should_sample = len(self._team_bonus_stage_samples) < _TEAM_BONUS_TRACE_MAX_SAMPLES
@@ -4084,6 +4110,10 @@ class EventStorage:
             "stage_map_counts": self._team_bonus_stage_map_counts,
             "stage_player_counts": self._team_bonus_stage_player_counts,
             "stage_event_counts": self._team_bonus_stage_event_counts,
+            "stage_omitted_counts": self._team_bonus_stage_omitted_counts,
+            "trace_limits": {
+                "max_distinct_keys_per_dimension_per_stage": _TEAM_BONUS_TRACE_MAX_DISTINCT_KEYS,
+            },
             "samples": self._team_bonus_stage_samples,
         }
         trace_path.parent.mkdir(parents=True, exist_ok=True)

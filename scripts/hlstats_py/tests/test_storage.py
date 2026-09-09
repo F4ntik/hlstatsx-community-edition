@@ -29,6 +29,8 @@ from hlstats_py.events import (
 from hlstats_py.protocol import parse_log_event
 from hlstats_py.storage import (
     _ACTIVE_PLAYER_IDLE_TIMEOUT,
+    _TEAM_BONUS_TRACE_MAX_DISTINCT_KEYS,
+    _TEAM_BONUS_TRACE_MAX_SAMPLES,
     _FINALIZE_PLAYER_LAST_EVENT_QUERY,
     _INSERT_ACTION_QUERY,
     _INSERT_CHAT_QUERY,
@@ -5124,6 +5126,7 @@ def test_team_bonus_trace_does_not_aggregate_without_trace_path(
 
     assert storage._team_bonus_stage_counts == {}
     assert storage._team_bonus_stage_event_counts == {}
+    assert storage._team_bonus_stage_omitted_counts == {}
     assert storage._team_bonus_stage_samples == []
 
 
@@ -5149,6 +5152,79 @@ def test_team_bonus_trace_samples_remain_bounded_for_matching_env_value(
         )
 
     assert len(storage._team_bonus_stage_samples) == 200
+
+
+def test_team_bonus_trace_bounds_distinct_dimension_counts(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    trace_path = tmp_path / "trace.json"
+    monkeypatch.setenv("HLSTATS_TEAM_BONUS_TRACE_PATH", str(trace_path))
+    storage = EventStorage(StubAdapter(FakeConnection()))
+    started_at = datetime(2024, 1, 2, 3, 4, 5)
+
+    for offset in range(_TEAM_BONUS_TRACE_MAX_DISTINCT_KEYS + 1):
+        storage._record_team_bonus_stage(
+            "candidate_set",
+            action_id=1000 + offset,
+            map_name=f"map-{offset}",
+            event_code="SFUI_Notice_CTs_Win",
+            event_time=started_at + timedelta(seconds=offset),
+            player_id=1000 + offset,
+            team="CT",
+            server_id=7,
+        )
+
+    storage._record_team_bonus_stage(
+        "candidate_set",
+        action_id=1000,
+        map_name="map-0",
+        event_code="SFUI_Notice_CTs_Win",
+        event_time=started_at,
+        player_id=1000,
+        team="CT",
+        server_id=7,
+    )
+    storage._record_team_bonus_stage(
+        "candidate_set",
+        action_id=1200,
+        map_name="map-200",
+        event_code="SFUI_Notice_CTs_Win",
+        event_time=started_at + timedelta(seconds=200),
+        player_id=1200,
+        team="CT",
+        server_id=7,
+    )
+    storage._write_team_bonus_stage_trace()
+
+    payload = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert payload["stage_counts"] == {"candidate_set": 203}
+    assert payload["trace_limits"] == {
+        "max_distinct_keys_per_dimension_per_stage": _TEAM_BONUS_TRACE_MAX_DISTINCT_KEYS,
+    }
+    assert payload["stage_omitted_counts"] == {
+        "candidate_set": {"action": 2, "map": 2, "player": 2, "event": 2},
+    }
+    for dimension in (
+        "stage_action_counts",
+        "stage_map_counts",
+        "stage_player_counts",
+        "stage_event_counts",
+    ):
+        retained = payload[dimension]["candidate_set"]
+        assert len(retained) == _TEAM_BONUS_TRACE_MAX_DISTINCT_KEYS
+    assert payload["stage_action_counts"]["candidate_set"]["1000"] == 2
+    assert payload["stage_map_counts"]["candidate_set"]["map-0"] == 2
+    assert payload["stage_player_counts"]["candidate_set"]["1000"] == 2
+    assert payload["stage_event_counts"]["candidate_set"][
+        "2024-01-02 03:04:05|1000|map-0|CT"
+    ] == 2
+    assert "1200" not in payload["stage_action_counts"]["candidate_set"]
+    assert "map-200" not in payload["stage_map_counts"]["candidate_set"]
+    assert "1200" not in payload["stage_player_counts"]["candidate_set"]
+    omitted_event_key = "2024-01-02 03:07:25|1200|map-200|CT"
+    assert omitted_event_key not in payload["stage_event_counts"]["candidate_set"]
+    assert len(payload["samples"]) == _TEAM_BONUS_TRACE_MAX_SAMPLES
 
 
 def test_team_bonus_rescued_hostage_allows_same_second_duplicates(event_context: EventContext) -> None:
