@@ -1269,10 +1269,10 @@ RewriteRule sig-(.*)-(.*).png$ sig.php?player_id=$1&background=$2 [L]</textarea>
         'show_graph.average_players_summary' => 'Average Players Last 24h: :day Last 1h: :hour',
         'show_graph.new_players_summary' => 'New Players Last 24h: :day Last 1h: :hour',
         'sig.position' => 'Position ',
-        'sig.of_players_with_skill' => 'of :count players with :skill (',
+        'sig.of_players_with_skill' => 'of :count, skill :skill (',
         'sig.points_delta' => ':points) points',
-        'sig.frags_line' => 'Frags: :kills kills : :deaths deaths (:kpd), :headshots headshots (:hpk%)',
-        'sig.activity_line' => 'Activity: :lastevent (:activity%), Time: :hours hours',
+        'sig.frags_line' => 'Frags: :kills / :deaths, K/D :kpd, HS :headshots (:hpk%)',
+        'sig.activity_line' => 'Activity: :activity%, last: :lastevent, time: :hours',
         'sig.statistics' => 'Statistics: ',
     ),
 );
