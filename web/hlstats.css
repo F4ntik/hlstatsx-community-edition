@@ -820,11 +820,13 @@ nav{
 	z-index: 2;
 }
 
-.heatmap-explorer[data-heatmap-map-style="color"] [data-heatmap-image] {
+.heatmap-explorer[data-heatmap-map-style="color"] [data-heatmap-image],
+.heatmap-explorer[data-heatmap-map-style="inverse"] [data-heatmap-image] {
 	filter: sepia(0.22) saturate(1.14) hue-rotate(346deg) contrast(1.03) brightness(0.94);
 }
 
-.heatmap-explorer[data-heatmap-map-style="color"] [data-heatmap-camera]::after {
+.heatmap-explorer[data-heatmap-map-style="color"] [data-heatmap-camera]::after,
+.heatmap-explorer[data-heatmap-map-style="inverse"] [data-heatmap-camera]::after {
 	opacity: 1;
 }
 
@@ -832,8 +834,12 @@ nav{
 	filter: grayscale(1) contrast(1.05) brightness(0.94);
 }
 
-.heatmap-explorer[data-heatmap-map-style="inverse"] [data-heatmap-image] {
-	filter: invert(1) saturate(0.8) contrast(1.08);
+.heatmap-explorer[data-heatmap-map-style="inverse"] [data-heatmap-camera] {
+	isolation: isolate;
+}
+
+.heatmap-explorer[data-heatmap-map-style="inverse"] [data-heatmap-canvas] {
+	mix-blend-mode: difference;
 }
 
 .heatmap-explorer[data-heatmap-state="static_fallback"] [data-heatmap-map-style-controls],

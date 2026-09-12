@@ -189,6 +189,8 @@ For support and installation notes visit http://www.hlxcommunity.com
 			'visiblePositions' => t('heatmapExplorer.visiblePositions'),
 			'deathsLegend' => t('heatmapExplorer.deathsLegend'),
 			'bothLegend' => t('heatmapExplorer.bothLegend'),
+			'bothPurpleLegend' => t('heatmapExplorer.bothPurpleLegend'),
+			'inversionNote' => t('heatmapExplorer.inversionNote'),
 			'clear' => t('heatmapExplorer.clear'),
 			'soft' => t('heatmapExplorer.soft'),
 			'differenceLegend' => t('heatmapExplorer.differenceLegend'),

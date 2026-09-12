@@ -29,9 +29,9 @@ Object.assign(graph,{grid:{width:21,height:1},image:{width:21,height:1},pixels:U
 const graphScene={map:{image:graph.image},floors:[],activeFloor:'all',summary:{personalSample:1,otherSample:1},surfaces:{allowed:new Uint8Array(21).fill(1),rows:[[10,1,0,1,0],[20,0,1,0,0]]}};
 const compact=graph.field(graphScene,'total','kills','clear'),soft=graph.field(graphScene,'total','kills','soft'),both=graph.field(graphScene,'total','both','clear');
 assert(compact.maxAbs>soft.maxAbs,'compact spread concentrates isolated event');
-assert.strictEqual(compact.values[0],0,'compact radius stops before distant fringe');
+assert(compact.values[0]<soft.values[0],'intermediate compact spread has a weaker distant fringe than Soft');
 assert(soft.values[0]>0,'soft option retains broader spread');
-assert(both.values[20]>0 && both.values[41]>0 && both.values[21]===0,'Both keeps channels separate through topology diffusion');
+assert(both.values[20]>0 && both.values[41]>0 && both.values[1]===0,'Both keeps channels separate through topology diffusion');
 assert.deepStrictEqual(Array.from(graph.field(graphScene,'difference','kills','clear').values),Array.from(graph.field(graphScene,'difference','kills','soft').values),'Difference presentation is unchanged by appearance preference');
 const plane=Object.create(api.HeatmapSurfaceGraph.prototype),planeEdges=[];
 for(let y=0;y<21;y++)for(let x=0;x<21;x++){const n=y*21+x;if(x<20)planeEdges.push(n,n+1);if(y<20)planeEdges.push(n,n+21);}

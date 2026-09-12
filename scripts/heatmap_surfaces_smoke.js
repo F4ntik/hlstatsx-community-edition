@@ -86,7 +86,7 @@ function benchmark(wallProbe) {
       assert(check>=0);
     }
   }
-  const report={benchmark:output,wallProbe,notes:'Integer aggregated count weights, not database row throughput or browser FPS. Clear 8 steps; Soft 24 steps; alpha .18 for both. Both splits total weight across kill/death channels. Cached lookup excludes actual WebGL redraw. Gaussian is unconstrained blur reference.'};
+  const report={benchmark:output,wallProbe,notes:'Integer aggregated count weights, not database row throughput or browser FPS. Clear 12 steps; Soft 24 steps; alpha .18 for both. Both splits total weight across kill/death channels. Cached lookup excludes actual WebGL redraw. Gaussian is unconstrained blur reference.'};
   console.log(JSON.stringify(report,null,2));
   const out=process.argv.indexOf('--output'); if(out>=0) fs.writeFileSync(process.argv[out+1],JSON.stringify(report,null,2)+'\n');
 }

@@ -9,11 +9,11 @@
       "pattern": "distributed",
       "occupied": 1000,
       "totalWeight": 1000,
-      "decodeMs": 16.9,
-      "fieldMs": 17.48,
-      "cacheLookupMs": 0.00034,
-      "gaussianMs": 16.52,
-      "maxAbs": 0.41095101833343506
+      "decodeMs": 14.63,
+      "fieldMs": 24.92,
+      "cacheLookupMs": 0.000441,
+      "gaussianMs": 16.6,
+      "maxAbs": 0.31984665989875793
     },
     {
       "map": "de_dust2",
@@ -24,11 +24,11 @@
       "pattern": "distributed",
       "occupied": 1000,
       "totalWeight": 100000,
-      "decodeMs": 16.9,
-      "fieldMs": 8.32,
-      "cacheLookupMs": 0.000028,
-      "gaussianMs": 9.26,
-      "maxAbs": 41.0951042175293
+      "decodeMs": 14.63,
+      "fieldMs": 11.67,
+      "cacheLookupMs": 0.00003,
+      "gaussianMs": 9.43,
+      "maxAbs": 31.984668731689453
     },
     {
       "map": "de_dust2",
@@ -39,11 +39,11 @@
       "pattern": "distributed",
       "occupied": 1000,
       "totalWeight": 1000000,
-      "decodeMs": 16.9,
-      "fieldMs": 12.2,
+      "decodeMs": 14.63,
+      "fieldMs": 10.69,
       "cacheLookupMs": 0.000021,
-      "gaussianMs": 8.53,
-      "maxAbs": 410.9510192871094
+      "gaussianMs": 7.3,
+      "maxAbs": 319.8466796875
     },
     {
       "map": "de_dust2",
@@ -54,11 +54,11 @@
       "pattern": "dense",
       "occupied": 1000,
       "totalWeight": 1000,
-      "decodeMs": 16.9,
-      "fieldMs": 12.61,
-      "cacheLookupMs": 0.000036,
-      "gaussianMs": 11.95,
-      "maxAbs": 0.41095101833343506
+      "decodeMs": 14.63,
+      "fieldMs": 9.7,
+      "cacheLookupMs": 0.000019,
+      "gaussianMs": 7.21,
+      "maxAbs": 0.31984665989875793
     },
     {
       "map": "de_dust2",
@@ -69,10 +69,10 @@
       "pattern": "dense",
       "occupied": 34380,
       "totalWeight": 100000,
-      "decodeMs": 16.9,
-      "fieldMs": 12.49,
-      "cacheLookupMs": 0.000028,
-      "gaussianMs": 13.42,
+      "decodeMs": 14.63,
+      "fieldMs": 11.82,
+      "cacheLookupMs": 0.000032,
+      "gaussianMs": 7.92,
       "maxAbs": 3
     },
     {
@@ -84,10 +84,10 @@
       "pattern": "dense",
       "occupied": 34380,
       "totalWeight": 1000000,
-      "decodeMs": 16.9,
-      "fieldMs": 11.6,
-      "cacheLookupMs": 0.000058,
-      "gaussianMs": 15.43,
+      "decodeMs": 14.63,
+      "fieldMs": 10.17,
+      "cacheLookupMs": 0.000032,
+      "gaussianMs": 9.15,
       "maxAbs": 30
     },
     {
@@ -99,11 +99,11 @@
       "pattern": "distributed",
       "occupied": 1000,
       "totalWeight": 1000,
-      "decodeMs": 16.9,
-      "fieldMs": 17.57,
-      "cacheLookupMs": 0.000053,
-      "gaussianMs": 13.96,
-      "maxAbs": 0.3758801519870758
+      "decodeMs": 14.63,
+      "fieldMs": 18.35,
+      "cacheLookupMs": 0.000024,
+      "gaussianMs": 9.74,
+      "maxAbs": 0.29166537523269653
     },
     {
       "map": "de_dust2",
@@ -114,11 +114,11 @@
       "pattern": "distributed",
       "occupied": 1000,
       "totalWeight": 100000,
-      "decodeMs": 16.9,
-      "fieldMs": 20.3,
-      "cacheLookupMs": 0.000036,
-      "gaussianMs": 13.77,
-      "maxAbs": 20.54755210876465
+      "decodeMs": 14.63,
+      "fieldMs": 19.73,
+      "cacheLookupMs": 0.000045,
+      "gaussianMs": 8.62,
+      "maxAbs": 15.992334365844727
     },
     {
       "map": "de_dust2",
@@ -129,11 +129,11 @@
       "pattern": "distributed",
       "occupied": 1000,
       "totalWeight": 1000000,
-      "decodeMs": 16.9,
-      "fieldMs": 11.47,
-      "cacheLookupMs": 0.000031,
-      "gaussianMs": 13.9,
-      "maxAbs": 205.4755096435547
+      "decodeMs": 14.63,
+      "fieldMs": 12.37,
+      "cacheLookupMs": 0.000064,
+      "gaussianMs": 7.23,
+      "maxAbs": 159.92333984375
     },
     {
       "map": "de_dust2",
@@ -144,11 +144,11 @@
       "pattern": "dense",
       "occupied": 1000,
       "totalWeight": 1000,
-      "decodeMs": 16.9,
-      "fieldMs": 13.37,
-      "cacheLookupMs": 0.000069,
-      "gaussianMs": 14.14,
-      "maxAbs": 0.3758801519870758
+      "decodeMs": 14.63,
+      "fieldMs": 14.37,
+      "cacheLookupMs": 0.000043,
+      "gaussianMs": 8.26,
+      "maxAbs": 0.29166537523269653
     },
     {
       "map": "de_dust2",
@@ -159,10 +159,10 @@
       "pattern": "dense",
       "occupied": 34380,
       "totalWeight": 100000,
-      "decodeMs": 16.9,
-      "fieldMs": 25.5,
-      "cacheLookupMs": 0.000021,
-      "gaussianMs": 14.14,
+      "decodeMs": 14.63,
+      "fieldMs": 36.87,
+      "cacheLookupMs": 0.000032,
+      "gaussianMs": 16.43,
       "maxAbs": 2
     },
     {
@@ -174,10 +174,10 @@
       "pattern": "dense",
       "occupied": 34380,
       "totalWeight": 1000000,
-      "decodeMs": 16.9,
-      "fieldMs": 11.07,
-      "cacheLookupMs": 0.00002,
-      "gaussianMs": 9.36,
+      "decodeMs": 14.63,
+      "fieldMs": 15.24,
+      "cacheLookupMs": 0.000022,
+      "gaussianMs": 11.11,
       "maxAbs": 15
     },
     {
@@ -189,10 +189,10 @@
       "pattern": "distributed",
       "occupied": 1000,
       "totalWeight": 1000,
-      "decodeMs": 16.9,
-      "fieldMs": 23.56,
-      "cacheLookupMs": 0.000021,
-      "gaussianMs": 11.51,
+      "decodeMs": 14.63,
+      "fieldMs": 23.94,
+      "cacheLookupMs": 0.000034,
+      "gaussianMs": 7.81,
       "maxAbs": 0.23564553260803223
     },
     {
@@ -204,10 +204,10 @@
       "pattern": "distributed",
       "occupied": 1000,
       "totalWeight": 100000,
-      "decodeMs": 16.9,
-      "fieldMs": 33.53,
-      "cacheLookupMs": 0.000021,
-      "gaussianMs": 8.1,
+      "decodeMs": 14.63,
+      "fieldMs": 21.14,
+      "cacheLookupMs": 0.00003,
+      "gaussianMs": 10.96,
       "maxAbs": 23.564556121826172
     },
     {
@@ -219,10 +219,10 @@
       "pattern": "distributed",
       "occupied": 1000,
       "totalWeight": 1000000,
-      "decodeMs": 16.9,
-      "fieldMs": 20.16,
-      "cacheLookupMs": 0.000003,
-      "gaussianMs": 12.52,
+      "decodeMs": 14.63,
+      "fieldMs": 19.53,
+      "cacheLookupMs": 0.00002,
+      "gaussianMs": 7.35,
       "maxAbs": 235.6455535888672
     },
     {
@@ -234,10 +234,10 @@
       "pattern": "dense",
       "occupied": 1000,
       "totalWeight": 1000,
-      "decodeMs": 16.9,
-      "fieldMs": 17.72,
+      "decodeMs": 14.63,
+      "fieldMs": 21.8,
       "cacheLookupMs": 0.000003,
-      "gaussianMs": 7.49,
+      "gaussianMs": 11.18,
       "maxAbs": 0.23564553260803223
     },
     {
@@ -249,10 +249,10 @@
       "pattern": "dense",
       "occupied": 34380,
       "totalWeight": 100000,
-      "decodeMs": 16.9,
-      "fieldMs": 17.13,
+      "decodeMs": 14.63,
+      "fieldMs": 17.05,
       "cacheLookupMs": 0.000003,
-      "gaussianMs": 11.01,
+      "gaussianMs": 8.32,
       "maxAbs": 3
     },
     {
@@ -264,10 +264,10 @@
       "pattern": "dense",
       "occupied": 34380,
       "totalWeight": 1000000,
-      "decodeMs": 16.9,
-      "fieldMs": 19.46,
+      "decodeMs": 14.63,
+      "fieldMs": 21.77,
       "cacheLookupMs": 0.000003,
-      "gaussianMs": 8.48,
+      "gaussianMs": 9.91,
       "maxAbs": 30
     },
     {
@@ -279,10 +279,10 @@
       "pattern": "distributed",
       "occupied": 1000,
       "totalWeight": 1000,
-      "decodeMs": 16.9,
-      "fieldMs": 22.29,
+      "decodeMs": 14.63,
+      "fieldMs": 34.37,
       "cacheLookupMs": 0.000003,
-      "gaussianMs": 8.39,
+      "gaussianMs": 11.33,
       "maxAbs": 0.23564553260803223
     },
     {
@@ -294,10 +294,10 @@
       "pattern": "distributed",
       "occupied": 1000,
       "totalWeight": 100000,
-      "decodeMs": 16.9,
-      "fieldMs": 21.5,
+      "decodeMs": 14.63,
+      "fieldMs": 20.9,
       "cacheLookupMs": 0.000003,
-      "gaussianMs": 7.63,
+      "gaussianMs": 7.28,
       "maxAbs": 11.782278060913086
     },
     {
@@ -309,10 +309,10 @@
       "pattern": "distributed",
       "occupied": 1000,
       "totalWeight": 1000000,
-      "decodeMs": 16.9,
-      "fieldMs": 21.6,
+      "decodeMs": 14.63,
+      "fieldMs": 21.3,
       "cacheLookupMs": 0.000003,
-      "gaussianMs": 7.36,
+      "gaussianMs": 7.14,
       "maxAbs": 117.8227767944336
     },
     {
@@ -324,10 +324,10 @@
       "pattern": "dense",
       "occupied": 1000,
       "totalWeight": 1000,
-      "decodeMs": 16.9,
-      "fieldMs": 22.44,
+      "decodeMs": 14.63,
+      "fieldMs": 21.02,
       "cacheLookupMs": 0.000003,
-      "gaussianMs": 7.36,
+      "gaussianMs": 7.2,
       "maxAbs": 0.23564553260803223
     },
     {
@@ -339,10 +339,10 @@
       "pattern": "dense",
       "occupied": 34380,
       "totalWeight": 100000,
-      "decodeMs": 16.9,
-      "fieldMs": 23.21,
+      "decodeMs": 14.63,
+      "fieldMs": 21.45,
       "cacheLookupMs": 0.000003,
-      "gaussianMs": 7.45,
+      "gaussianMs": 7.16,
       "maxAbs": 2
     },
     {
@@ -354,10 +354,10 @@
       "pattern": "dense",
       "occupied": 34380,
       "totalWeight": 1000000,
-      "decodeMs": 16.9,
-      "fieldMs": 23.37,
+      "decodeMs": 14.63,
+      "fieldMs": 21.57,
       "cacheLookupMs": 0.000003,
-      "gaussianMs": 7.21,
+      "gaussianMs": 7.44,
       "maxAbs": 15
     },
     {
@@ -369,11 +369,11 @@
       "pattern": "distributed",
       "occupied": 1000,
       "totalWeight": 1000,
-      "decodeMs": 47.89,
-      "fieldMs": 19.14,
-      "cacheLookupMs": 0.00002,
-      "gaussianMs": 7.38,
-      "maxAbs": 0.2376747876405716
+      "decodeMs": 49.41,
+      "fieldMs": 34.97,
+      "cacheLookupMs": 0.000033,
+      "gaussianMs": 8.14,
+      "maxAbs": 0.20227858424186707
     },
     {
       "map": "as_oilrig",
@@ -384,11 +384,11 @@
       "pattern": "distributed",
       "occupied": 1000,
       "totalWeight": 100000,
-      "decodeMs": 47.89,
-      "fieldMs": 19.86,
-      "cacheLookupMs": 0.00002,
-      "gaussianMs": 8.41,
-      "maxAbs": 23.76747703552246
+      "decodeMs": 49.41,
+      "fieldMs": 48.85,
+      "cacheLookupMs": 0.000039,
+      "gaussianMs": 11.36,
+      "maxAbs": 20.22785758972168
     },
     {
       "map": "as_oilrig",
@@ -399,11 +399,11 @@
       "pattern": "distributed",
       "occupied": 1000,
       "totalWeight": 1000000,
-      "decodeMs": 47.89,
-      "fieldMs": 19.78,
-      "cacheLookupMs": 0.00003,
-      "gaussianMs": 7.87,
-      "maxAbs": 237.67477416992188
+      "decodeMs": 49.41,
+      "fieldMs": 36.1,
+      "cacheLookupMs": 0.000076,
+      "gaussianMs": 10.83,
+      "maxAbs": 202.27857971191406
     },
     {
       "map": "as_oilrig",
@@ -414,11 +414,11 @@
       "pattern": "dense",
       "occupied": 1000,
       "totalWeight": 1000,
-      "decodeMs": 47.89,
-      "fieldMs": 19.56,
-      "cacheLookupMs": 0.000029,
-      "gaussianMs": 7.12,
-      "maxAbs": 0.2376747876405716
+      "decodeMs": 49.41,
+      "fieldMs": 45.14,
+      "cacheLookupMs": 0.000077,
+      "gaussianMs": 14.76,
+      "maxAbs": 0.20227858424186707
     },
     {
       "map": "as_oilrig",
@@ -429,10 +429,10 @@
       "pattern": "dense",
       "occupied": 100000,
       "totalWeight": 100000,
-      "decodeMs": 47.89,
-      "fieldMs": 20.93,
-      "cacheLookupMs": 0.000037,
-      "gaussianMs": 7.94,
+      "decodeMs": 49.41,
+      "fieldMs": 67.94,
+      "cacheLookupMs": 0.000021,
+      "gaussianMs": 20.09,
       "maxAbs": 1
     },
     {
@@ -444,10 +444,10 @@
       "pattern": "dense",
       "occupied": 113122,
       "totalWeight": 1000000,
-      "decodeMs": 47.89,
-      "fieldMs": 21.2,
-      "cacheLookupMs": 0.000025,
-      "gaussianMs": 8.56,
+      "decodeMs": 49.41,
+      "fieldMs": 50.04,
+      "cacheLookupMs": 0.000053,
+      "gaussianMs": 11.96,
       "maxAbs": 9
     },
     {
@@ -459,11 +459,11 @@
       "pattern": "distributed",
       "occupied": 1000,
       "totalWeight": 1000,
-      "decodeMs": 47.89,
-      "fieldMs": 34.88,
-      "cacheLookupMs": 0.00002,
-      "gaussianMs": 7.74,
-      "maxAbs": 0.2376747876405716
+      "decodeMs": 49.41,
+      "fieldMs": 83.91,
+      "cacheLookupMs": 0.000032,
+      "gaussianMs": 10.55,
+      "maxAbs": 0.20227858424186707
     },
     {
       "map": "as_oilrig",
@@ -474,11 +474,11 @@
       "pattern": "distributed",
       "occupied": 1000,
       "totalWeight": 100000,
-      "decodeMs": 47.89,
-      "fieldMs": 27.21,
-      "cacheLookupMs": 0.000022,
-      "gaussianMs": 7.49,
-      "maxAbs": 11.88373851776123
+      "decodeMs": 49.41,
+      "fieldMs": 64.25,
+      "cacheLookupMs": 0.000003,
+      "gaussianMs": 7.45,
+      "maxAbs": 10.11392879486084
     },
     {
       "map": "as_oilrig",
@@ -489,11 +489,11 @@
       "pattern": "distributed",
       "occupied": 1000,
       "totalWeight": 1000000,
-      "decodeMs": 47.89,
-      "fieldMs": 26.54,
+      "decodeMs": 49.41,
+      "fieldMs": 44.05,
       "cacheLookupMs": 0.000003,
-      "gaussianMs": 8.68,
-      "maxAbs": 118.83738708496094
+      "gaussianMs": 7.26,
+      "maxAbs": 101.13928985595703
     },
     {
       "map": "as_oilrig",
@@ -504,11 +504,11 @@
       "pattern": "dense",
       "occupied": 1000,
       "totalWeight": 1000,
-      "decodeMs": 47.89,
-      "fieldMs": 33.63,
-      "cacheLookupMs": 0.000001,
-      "gaussianMs": 7.26,
-      "maxAbs": 0.2376747876405716
+      "decodeMs": 49.41,
+      "fieldMs": 39.7,
+      "cacheLookupMs": 0.000003,
+      "gaussianMs": 7.13,
+      "maxAbs": 0.20227858424186707
     },
     {
       "map": "as_oilrig",
@@ -519,10 +519,10 @@
       "pattern": "dense",
       "occupied": 100000,
       "totalWeight": 100000,
-      "decodeMs": 47.89,
-      "fieldMs": 29.02,
-      "cacheLookupMs": 0.000001,
-      "gaussianMs": 7.18,
+      "decodeMs": 49.41,
+      "fieldMs": 42.19,
+      "cacheLookupMs": 0.000003,
+      "gaussianMs": 12.33,
       "maxAbs": 1
     },
     {
@@ -534,10 +534,10 @@
       "pattern": "dense",
       "occupied": 113122,
       "totalWeight": 1000000,
-      "decodeMs": 47.89,
-      "fieldMs": 28.61,
-      "cacheLookupMs": 0.000001,
-      "gaussianMs": 7.37,
+      "decodeMs": 49.41,
+      "fieldMs": 49.32,
+      "cacheLookupMs": 0.000003,
+      "gaussianMs": 7.16,
       "maxAbs": 5
     },
     {
@@ -549,10 +549,10 @@
       "pattern": "distributed",
       "occupied": 1000,
       "totalWeight": 1000,
-      "decodeMs": 47.89,
-      "fieldMs": 57.75,
-      "cacheLookupMs": 0.000002,
-      "gaussianMs": 7.28,
+      "decodeMs": 49.41,
+      "fieldMs": 72.93,
+      "cacheLookupMs": 0.000003,
+      "gaussianMs": 7.74,
       "maxAbs": 0.18833036720752716
     },
     {
@@ -564,10 +564,10 @@
       "pattern": "distributed",
       "occupied": 1000,
       "totalWeight": 100000,
-      "decodeMs": 47.89,
-      "fieldMs": 54.07,
-      "cacheLookupMs": 0.000001,
-      "gaussianMs": 7.25,
+      "decodeMs": 49.41,
+      "fieldMs": 75.25,
+      "cacheLookupMs": 0.000003,
+      "gaussianMs": 7.2,
       "maxAbs": 18.833040237426758
     },
     {
@@ -579,10 +579,10 @@
       "pattern": "distributed",
       "occupied": 1000,
       "totalWeight": 1000000,
-      "decodeMs": 47.89,
-      "fieldMs": 54.48,
-      "cacheLookupMs": 0.000001,
-      "gaussianMs": 7.1,
+      "decodeMs": 49.41,
+      "fieldMs": 74.57,
+      "cacheLookupMs": 0.000003,
+      "gaussianMs": 8.37,
       "maxAbs": 188.3303680419922
     },
     {
@@ -594,10 +594,10 @@
       "pattern": "dense",
       "occupied": 1000,
       "totalWeight": 1000,
-      "decodeMs": 47.89,
-      "fieldMs": 63.55,
-      "cacheLookupMs": 0.000001,
-      "gaussianMs": 7.17,
+      "decodeMs": 49.41,
+      "fieldMs": 64.06,
+      "cacheLookupMs": 0.000003,
+      "gaussianMs": 7.64,
       "maxAbs": 0.18833036720752716
     },
     {
@@ -609,10 +609,10 @@
       "pattern": "dense",
       "occupied": 100000,
       "totalWeight": 100000,
-      "decodeMs": 47.89,
-      "fieldMs": 57.24,
-      "cacheLookupMs": 0.000002,
-      "gaussianMs": 7.46,
+      "decodeMs": 49.41,
+      "fieldMs": 71.73,
+      "cacheLookupMs": 0.000003,
+      "gaussianMs": 15.09,
       "maxAbs": 1
     },
     {
@@ -624,10 +624,10 @@
       "pattern": "dense",
       "occupied": 113122,
       "totalWeight": 1000000,
-      "decodeMs": 47.89,
-      "fieldMs": 59.86,
-      "cacheLookupMs": 0.000001,
-      "gaussianMs": 7.29,
+      "decodeMs": 49.41,
+      "fieldMs": 69.34,
+      "cacheLookupMs": 0.000003,
+      "gaussianMs": 12.87,
       "maxAbs": 9
     },
     {
@@ -639,10 +639,10 @@
       "pattern": "distributed",
       "occupied": 1000,
       "totalWeight": 1000,
-      "decodeMs": 47.89,
-      "fieldMs": 80.73,
-      "cacheLookupMs": 0.000002,
-      "gaussianMs": 7.23,
+      "decodeMs": 49.41,
+      "fieldMs": 97.13,
+      "cacheLookupMs": 0.000003,
+      "gaussianMs": 7.39,
       "maxAbs": 0.18833036720752716
     },
     {
@@ -654,10 +654,10 @@
       "pattern": "distributed",
       "occupied": 1000,
       "totalWeight": 100000,
-      "decodeMs": 47.89,
-      "fieldMs": 86.57,
-      "cacheLookupMs": 0.000001,
-      "gaussianMs": 8.21,
+      "decodeMs": 49.41,
+      "fieldMs": 83.13,
+      "cacheLookupMs": 0.000003,
+      "gaussianMs": 9.39,
       "maxAbs": 9.416520118713379
     },
     {
@@ -669,10 +669,10 @@
       "pattern": "distributed",
       "occupied": 1000,
       "totalWeight": 1000000,
-      "decodeMs": 47.89,
-      "fieldMs": 133.53,
-      "cacheLookupMs": 0.000001,
-      "gaussianMs": 7.2,
+      "decodeMs": 49.41,
+      "fieldMs": 76.07,
+      "cacheLookupMs": 0.000003,
+      "gaussianMs": 10.21,
       "maxAbs": 94.1651840209961
     },
     {
@@ -684,10 +684,10 @@
       "pattern": "dense",
       "occupied": 1000,
       "totalWeight": 1000,
-      "decodeMs": 47.89,
-      "fieldMs": 78.71,
-      "cacheLookupMs": 0.000001,
-      "gaussianMs": 7.18,
+      "decodeMs": 49.41,
+      "fieldMs": 78.43,
+      "cacheLookupMs": 0.000003,
+      "gaussianMs": 7.46,
       "maxAbs": 0.18833036720752716
     },
     {
@@ -699,10 +699,10 @@
       "pattern": "dense",
       "occupied": 100000,
       "totalWeight": 100000,
-      "decodeMs": 47.89,
-      "fieldMs": 96.83,
-      "cacheLookupMs": 0.000001,
-      "gaussianMs": 13.78,
+      "decodeMs": 49.41,
+      "fieldMs": 89.87,
+      "cacheLookupMs": 0.000003,
+      "gaussianMs": 12.38,
       "maxAbs": 1
     },
     {
@@ -714,10 +714,10 @@
       "pattern": "dense",
       "occupied": 113122,
       "totalWeight": 1000000,
-      "decodeMs": 47.89,
-      "fieldMs": 81.82,
-      "cacheLookupMs": 0.000001,
-      "gaussianMs": 11.9,
+      "decodeMs": 49.41,
+      "fieldMs": 113.05,
+      "cacheLookupMs": 0.000003,
+      "gaussianMs": 11.58,
       "maxAbs": 5
     }
   ],
@@ -725,5 +725,5 @@
     "postBlurMask": 26.595598220825195,
     "topology": 0
   },
-  "notes": "Integer aggregated count weights, not database row throughput or browser FPS. Clear 8 steps; Soft 24 steps; alpha .18 for both. Both splits total weight across kill/death channels. Cached lookup excludes actual WebGL redraw. Gaussian is unconstrained blur reference."
+  "notes": "Integer aggregated count weights, not database row throughput or browser FPS. Clear 12 steps; Soft 24 steps; alpha .18 for both. Both splits total weight across kill/death channels. Cached lookup excludes actual WebGL redraw. Gaussian is unconstrained blur reference."
 }

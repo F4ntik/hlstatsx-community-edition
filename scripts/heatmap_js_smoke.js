@@ -1021,6 +1021,8 @@ function cssAtRuleBlock(source, marker) {
   surfaceRenderer.mount();
   const uploads = surfaceGl.calls.texImages.length;
   surfaceRenderer.render(); surfaceRenderer.render();
+  surfaceRenderer.setOverlap('light'); surfaceRenderer.setOverlap('purple');
+  assert.deepStrictEqual(surfaceGl.calls.uniform1i.filter(call=>call.name==='u_overlapLight').slice(-2).map(call=>call.value),[1,0],'overlap controls update the color uniform');
   assert.strictEqual(fieldCalls,1,'cached redraw never diffuses again');
   assert.strictEqual(surfaceGl.calls.texImages.length,uploads,'cached redraw never uploads field again');
   assert.strictEqual(surfaceGl.calls.texImages[0][3],2,'surface texture uses its own width');
@@ -2453,9 +2455,13 @@ function assertMapStyleCssStaysScoped() {
   );
   assert.match(
     cssSource,
-    /\.heatmap-explorer\[data-heatmap-map-style="color"\] \[data-heatmap-image\]\s*\{[\s\S]*?filter:\s*sepia\(0\.22\) saturate\(1\.14\) hue-rotate\(346deg\) contrast\(1\.03\) brightness\(0\.94\);[\s\S]*?\}/,
-    'color mode should grade only the dynamic map image'
+    /\.heatmap-explorer\[data-heatmap-map-style="color"\] \[data-heatmap-image\],\s*\.heatmap-explorer\[data-heatmap-map-style="inverse"\] \[data-heatmap-image\]\s*\{[\s\S]*?filter:\s*sepia\(0\.22\) saturate\(1\.14\) hue-rotate\(346deg\) contrast\(1\.03\) brightness\(0\.94\);[\s\S]*?\}/,
+    'color and inverse modes should share the same map image grade outside the spots'
   );
+  assert.match(cssSource, /\.heatmap-explorer\[data-heatmap-map-style="inverse"\] \[data-heatmap-camera\]\s*\{\s*isolation:\s*isolate;/,
+    'inverse spot blending stays inside the map camera');
+  assert.match(cssSource, /\.heatmap-explorer\[data-heatmap-map-style="inverse"\] \[data-heatmap-canvas\]\s*\{\s*mix-blend-mode:\s*difference;/,
+    'inverse blends the spots with the underlying map');
   assert.match(
     cssSource,
     /\.heatmap-explorer\[data-heatmap-map-style="mono"\] \[data-heatmap-image\]\s*\{[\s\S]*?filter:\s*grayscale\(1\) contrast\(1\.05\) brightness\(0\.94\);[\s\S]*?\}/,

@@ -265,6 +265,12 @@ function heatmap_render_explorer_workspace(array $context): string
             . '" data-heatmap-appearance-option="' . $appearance . '" aria-pressed="' . ($appearance === 'clear' ? 'true' : 'false') . '">'
             . heatmap_explorer_html(heatmap_explorer_label($appearance)) . '</button>';
     }
+    $html .= '</fieldset><fieldset class="heatmap-explorer__group"><legend>' . heatmap_explorer_html(heatmap_explorer_label('overlap')) . '</legend>';
+    foreach (array('purple','light') as $overlap) {
+        $html .= '<button type="button" class="heatmap-explorer__control' . ($overlap === 'purple' ? ' is-selected' : '')
+            . '" data-heatmap-overlap-option="' . $overlap . '" aria-pressed="' . ($overlap === 'purple' ? 'true' : 'false') . '">'
+            . heatmap_explorer_html(heatmap_explorer_label($overlap)) . '</button>';
+    }
     $html .= '</fieldset><span class="heatmap-explorer__legend" data-heatmap-legend="1"></span>';
     $html .= '<fieldset class="heatmap-explorer__group" data-heatmap-map-style-controls="1"><legend>'
         . heatmap_explorer_html(heatmap_explorer_label('mapStyle')) . '</legend>';

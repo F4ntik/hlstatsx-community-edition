@@ -1307,7 +1307,7 @@
       values[off+2] = support; values[off+3] = support * (difference && me < 3 ? 0.22 : 1);
     });
     // Compact default; Difference retains its established support/confidence spread.
-    var edges = this.edges, lanes = difference ? 4 : (both ? 2 : 1), steps = difference || appearance === 'soft' ? 24 : 8;
+    var edges = this.edges, lanes = difference ? 4 : (both ? 2 : 1), steps = difference || appearance === 'soft' ? 24 : 12;
     var diffusionAlpha = difference ? 0.24 : 0.18;
     for (var step = 0; step < steps; step++) {
       next.set(values);
@@ -1375,7 +1375,7 @@
     }
     if (smooth) {
       var compact = !difference && appearance === 'clear';
-      var kernel = gaussianKernel1d(compact ? 0.65 : 1.25, compact ? 2 : 4);
+      var kernel = gaussianKernel1d(compact ? 0.85 : 1.25, compact ? 3 : 4);
       positive = gaussianSmooth(positive, width, height, kernel, mask);
       negative = gaussianSmooth(negative, width, height, kernel, mask);
       weighted = gaussianSmooth(weighted, width, height, kernel, mask);
@@ -1467,6 +1467,7 @@
     this._suppressClick = false;
     this._displayMode = 'smooth';
     this._appearance = this.options.appearance === 'soft' ? 'soft' : 'clear';
+    this._overlap = this.options.overlap === 'light' ? 'light' : 'purple';
     this._fields = {};
     this._surfaceGraph = scene.surfaceGraph || null;
     this._uploadedField = null;
@@ -1718,11 +1719,12 @@
       + 'uniform int u_contours;\n'
       + 'uniform int u_smooth;\n'
       + 'uniform int u_constrained;\n'
+      + 'uniform int u_overlapLight;\n'
       + 'in vec2 v_uv;\n'
       + 'out vec4 outputColor;\n'
       + 'vec3 amberOrange(float amount) { return vec3(1.0, 0.45*(1.0-amount), 35.0/255.0); }\n'
       + 'vec3 cyanBlue(float amount) { return mix(vec3(0.02, 0.45, 1.0), vec3(0.15, 1.0, 1.0), amount); }\n'
-      + 'vec3 bothHue(vec2 density, float amount) { float ratio=density.r/max(density.r+density.g,0.000001); return mix(mix(cyanBlue(amount),amberOrange(amount),ratio),vec3(1.0),0.45*4.0*ratio*(1.0-ratio)); }\n'
+      + 'vec3 bothHue(vec2 density, float amount) { float ratio=density.r/max(density.r+density.g,0.000001); vec3 base=mix(cyanBlue(amount),amberOrange(amount),ratio); float balance=2.0*min(ratio,1.0-ratio); return u_overlapLight==1 ? mix(base,vec3(1.0),0.45*4.0*ratio*(1.0-ratio)) : mix(base,vec3(0.65,0.15,1.0),balance*balance); }\n'
       + 'vec3 differenceBlueNeutralAmber(float value) {\n'
       + '  vec3 blue = vec3(0.10, 0.36, 0.95);\n'
       + '  vec3 neutral = vec3(0.94, 0.94, 0.94);\n'
@@ -1750,8 +1752,8 @@
       + '  float alpha = amount * confidence;\n'
       + '  if (u_palette == 0 || u_palette == 3) alpha *= 210.0/255.0;\n'
       + '  if (u_palette != 2) {\n'
-      + '    if (value <= 0.003) discard;\n'
-      + '    alpha = max(alpha, 0.42 * smoothstep(0.003, 0.012, value));\n'
+      + '    float visibleSupport = 0.50 * (1.0-exp(-value/0.018));\n'
+      + '    alpha = max(alpha, visibleSupport) * smoothstep(0.0, 0.004, value);\n'
       + '  }\n'
       + '  if (u_palette == 2 && u_smooth == 1) alpha = max(alpha, 0.26 * smoothstep(0.0, 0.20, amount));\n'
       + '  if (u_palette == 2 && u_smooth == 0 && center != 0.0) alpha = max(alpha, 0.22);\n'
@@ -1830,6 +1832,7 @@
         contours: gl.getUniformLocation(program, 'u_contours'),
         smooth: gl.getUniformLocation(program, 'u_smooth'),
         constrained: gl.getUniformLocation(program, 'u_constrained'),
+        overlapLight: gl.getUniformLocation(program, 'u_overlapLight'),
         density: gl.getUniformLocation(program, 'u_density'),
         opacity: gl.getUniformLocation(program, 'u_opacity')
       };
@@ -1962,6 +1965,7 @@
       this._uploadedField = field;
       gl.uniform1i(this._uniforms.smooth, this._displayMode === 'smooth' ? 1 : 0);
       gl.uniform1i(this._uniforms.constrained, field.constrained ? 1 : 0);
+      gl.uniform1i(this._uniforms.overlapLight, this._overlap === 'light' ? 1 : 0);
       if (typeof gl.activeTexture === 'function' && typeof gl.TEXTURE0 === 'number') {
         gl.activeTexture(gl.TEXTURE0);
       }
@@ -2025,6 +2029,12 @@
     return this.render();
   };
 
+  HeatmapGlRenderer.prototype.setOverlap = function (overlap) {
+    if (overlap !== 'purple' && overlap !== 'light') return false;
+    this._overlap = overlap;
+    return this.render();
+  };
+
   HeatmapGlRenderer.prototype._renderPoints = function (selection) {
     var gl = this._gl;
     if (!this._pointResources) {
@@ -2034,14 +2044,14 @@
           + 'in vec4 a_point; uniform float u_size; out float v_value; out float v_confidence;\n'
           + 'void main(){ gl_Position=vec4(a_point.x*2.0-1.0,1.0-a_point.y*2.0,0.0,1.0); gl_PointSize=u_size; v_value=a_point.z; v_confidence=a_point.w; }');
         fragment = this._createShader(gl, gl.FRAGMENT_SHADER, '#version 300 es\nprecision highp float;\n'
-          + 'in float v_value; in float v_confidence; uniform float u_max; uniform int u_palette; out vec4 color;\n'
+          + 'in float v_value; in float v_confidence; uniform float u_max; uniform int u_palette; uniform int u_overlapLight; out vec4 color;\n'
           + 'void main(){float d=length(gl_PointCoord-0.5)*2.0;float strength=u_palette==3?max(v_value,v_confidence):abs(v_value);if(d>1.0 || strength==0.0) discard;'
           + 'float amount=sqrt(clamp(strength/max(u_max,0.000001),0.0,1.0));'
           + 'vec3 warm=vec3(1.0,0.62,0.08);vec3 cool=vec3(0.1,0.85,1.0);'
           + 'vec3 hue=u_palette==2?(v_value<0.0?cool:warm):(u_palette==1?cool:warm);'
           + 'float confidence=u_palette==3?1.0:v_confidence;'
           + 'if(u_palette==0 || u_palette==3){amount=pow(clamp(strength/max(u_max,0.000001),0.0,1.0),0.45);warm=vec3(1.0,0.45*(1.0-amount),35.0/255.0);hue=warm;}'
-          + 'if(u_palette==3){float ratio=v_value/max(v_value+v_confidence,0.000001);hue=mix(mix(cool,warm,ratio),vec3(1.0),0.45*4.0*ratio*(1.0-ratio));}'
+          + 'if(u_palette==3){float ratio=v_value/max(v_value+v_confidence,0.000001);vec3 base=mix(cool,warm,ratio);float balance=2.0*min(ratio,1.0-ratio);hue=u_overlapLight==1?mix(base,vec3(1.0),0.45*4.0*ratio*(1.0-ratio)):mix(base,vec3(0.65,0.15,1.0),balance*balance);}'
           + 'color=vec4(mix(hue,vec3(1.0),u_palette==2?amount*0.22:0.0),max(u_palette==2?0.35:0.42,amount*confidence)*(1.0-smoothstep(0.75,1.0,d)));}');
         program = gl.createProgram(); if (!program) throw new Error('points_unavailable');
         gl.attachShader(program, vertex); gl.attachShader(program, fragment); gl.linkProgram(program);
@@ -2049,7 +2059,7 @@
         buffer = gl.createBuffer(); if (!buffer) throw new Error('points_unavailable');
         this._pointResources = {program: program, buffer: buffer, geometry: null,
           position: gl.getAttribLocation(program, 'a_point'), size: gl.getUniformLocation(program, 'u_size'),
-          max: gl.getUniformLocation(program, 'u_max'), palette: gl.getUniformLocation(program, 'u_palette')};
+          max: gl.getUniformLocation(program, 'u_max'), palette: gl.getUniformLocation(program, 'u_palette'), overlapLight: gl.getUniformLocation(program, 'u_overlapLight')};
       } catch (error) {
         if (buffer) gl.deleteBuffer(buffer); if (program) gl.deleteProgram(program); throw error;
       } finally {
@@ -2067,6 +2077,7 @@
     gl.uniform1f(resource.size, 5 * this._nodes.canvas.width / cssWidth);
     gl.uniform1f(resource.max, this.options.scaleMaximum ? this.options.scaleMaximum(resource.data.maxAbs, 'points') : resource.data.maxAbs);
     gl.uniform1i(resource.palette, selection.layer === 'difference' ? 2 : (selection.channel === 'both' ? 3 : (selection.channel === 'deaths' ? 1 : 0)));
+    gl.uniform1i(resource.overlapLight, this._overlap === 'light' ? 1 : 0);
     gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
     gl.drawArrays(gl.POINTS, 0, resource.data.values.length / 4);
     if (gl.getError() !== 0) throw new Error('points_unavailable');
@@ -2593,6 +2604,7 @@
     };
     this._mapStyle = 'color';
     this._appearance = 'clear';
+    this._overlap = 'purple';
     this._displayMode = 'smooth';
     this._pointGeometry = null;
     this._geometryGeneration = 0;
@@ -2975,13 +2987,22 @@
       if (displayControls[index].classList) displayControls[index].classList.toggle('is-selected', selectedDisplay);
     }
     var legend = workspaceNode(this.root, '[data-heatmap-legend]');
-    workspaceSetText(legend, this._message(this.state.lens === 'difference' ? 'differenceLegend' : (this.state.event === 'both' ? 'bothLegend' : (this.state.event === 'deaths' ? 'deathsLegend' : 'densityLegend'))));
+    var legendKey = this.state.lens === 'difference' ? 'differenceLegend' : (this.state.event === 'both'
+      ? (this._overlap === 'light' ? 'bothLegend' : 'bothPurpleLegend') : (this.state.event === 'deaths' ? 'deathsLegend' : 'densityLegend'));
+    workspaceSetText(legend, this._message(legendKey) + (this._mapStyle === 'inverse' ? ' ' + this._message('inversionNote') : ''));
     var appearanceControls = workspaceNodes(this.root, '[data-heatmap-appearance-option]');
     for (index = 0; index < appearanceControls.length; index++) {
       var selectedAppearance = appearanceControls[index].getAttribute('data-heatmap-appearance-option') === (this.state.lens === 'difference' ? 'soft' : this._appearance);
       workspaceSetAttribute(appearanceControls[index], 'aria-pressed', selectedAppearance ? 'true' : 'false');
       if (appearanceControls[index].classList) appearanceControls[index].classList.toggle('is-selected',selectedAppearance);
       appearanceControls[index].disabled = this._displayMode !== 'smooth' || this.state.lens === 'difference';
+    }
+    var overlapControls = workspaceNodes(this.root, '[data-heatmap-overlap-option]');
+    for (index = 0; index < overlapControls.length; index++) {
+      var selectedOverlap = overlapControls[index].getAttribute('data-heatmap-overlap-option') === this._overlap;
+      workspaceSetAttribute(overlapControls[index], 'aria-pressed', selectedOverlap ? 'true' : 'false');
+      if (overlapControls[index].classList) overlapControls[index].classList.toggle('is-selected',selectedOverlap);
+      overlapControls[index].disabled = this.state.event !== 'both' || this.state.lens === 'difference';
     }
     for (index = 0; index < lensControls.length; index += 1) {
       var lens = lensControls[index].getAttribute ? lensControls[index].getAttribute('data-heatmap-lens') : '';
@@ -3058,6 +3079,14 @@
     if ((appearance !== 'clear' && appearance !== 'soft') || this.state.lens === 'difference') return false;
     this._appearance = appearance;
     if (this._renderer && this._renderer.setAppearance) this._renderer.setAppearance(appearance);
+    this._syncControls();
+    return true;
+  };
+
+  HeatmapExplorerWorkspace.prototype._setOverlap = function (overlap) {
+    if ((overlap !== 'purple' && overlap !== 'light') || this.state.event !== 'both' || this.state.lens === 'difference') return false;
+    this._overlap = overlap;
+    if (this._renderer && this._renderer.setOverlap) this._renderer.setOverlap(overlap);
     this._syncControls();
     return true;
   };
@@ -3240,6 +3269,7 @@
     this._renderer = new this.Renderer(this.root, scene, {
       window: this.window,
       appearance: this._appearance,
+      overlap: this._overlap,
       cameraKeys: false,
       pointerPan: function () {
         return self._panMode;
@@ -3758,6 +3788,12 @@
     for (index = 0; index < appearanceControls.length; index++) {
       this._listen(appearanceControls[index], 'click', function (event) {
         self._setAppearance(event.currentTarget.getAttribute('data-heatmap-appearance-option'));
+      });
+    }
+    var overlapControls = workspaceNodes(this.root, '[data-heatmap-overlap-option]');
+    for (index = 0; index < overlapControls.length; index++) {
+      this._listen(overlapControls[index], 'click', function (event) {
+        self._setOverlap(event.currentTarget.getAttribute('data-heatmap-overlap-option'));
       });
     }
     this._listen(this._nodes.floors, 'change', function (event) {
