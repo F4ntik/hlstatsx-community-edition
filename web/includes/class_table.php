@@ -240,6 +240,11 @@ class Table
 				$cellbody = '';
 				$colval = $rowdata[$col->name];
                 $colval_lower = (!empty($rowdata[$col->name])) ? strtolower($rowdata[$col->name]) : null;
+				if ($col->type === 'action_description') {
+					$colval = playerinfo_cstrike_action_label($rowdata['code'] ?? '', $colval, $game);
+				} elseif ($col->type === 'team_name') {
+					$colval = playerinfo_cstrike_team_label($colval, $game);
+				}
 
 				if ($col->align != 'left')
 				{

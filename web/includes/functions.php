@@ -370,6 +370,70 @@ function translate_ui_literal($text)
 	return t($key, array(), $text);
 }
 
+function playerinfo_cstrike_action_label($code, $description, $game)
+{
+	if (strtolower((string) $game) !== 'cstrike') {
+		return $description;
+	}
+
+	static $map = array(
+		"Begin_Bomb_Defuse_Without_Kit\0Start Defusing the Bomb Without a Defuse Kit" => 'player_action.defuse_without_kit',
+		"Begin_Bomb_Defuse_With_Kit\0Start Defusing the Bomb With a Defuse Kit" => 'player_action.defuse_with_kit',
+		"Assassinated_The_VIP\0Assassinate the VIP" => 'player_action.assassinate_vip',
+		"Planted_The_Bomb\0Plant the Bomb" => 'player_action.plant_bomb',
+		"Defused_The_Bomb\0Defuse the Bomb" => 'player_action.defuse_bomb',
+		"Touched_A_Hostage\0Touch a Hostage" => 'player_action.touch_hostage',
+		"Rescued_A_Hostage\0Rescue a Hostage" => 'player_action.rescue_hostage',
+		"Killed_A_Hostage\0Kill a Hostage" => 'player_action.kill_hostage',
+		"Became_VIP\0Become the VIP" => 'player_action.become_vip',
+		"Spawned_With_The_Bomb\0Spawn with the Bomb" => 'player_action.spawn_with_bomb',
+		"Got_The_Bomb\0Pick up the Bomb" => 'player_action.pick_up_bomb',
+		"Dropped_The_Bomb\0Drop the Bomb" => 'player_action.drop_bomb',
+		"CTs_Win\0All Terrorists eliminated" => 'player_action.all_terrorists_eliminated',
+		"Terrorists_Win\0All Counter-Terrorists eliminated" => 'player_action.all_counter_terrorists_eliminated',
+		"All_Hostages_Rescued\0Counter-Terrorists rescued all the hostages" => 'player_action.counter_terrorists_rescued_hostages',
+		"Target_Bombed\0Terrorists bombed the target" => 'player_action.terrorists_bombed_target',
+		"VIP_Assassinated\0Terrorists assassinated the VIP" => 'player_action.terrorists_assassinated_vip',
+		"Bomb_Defused\0Counter-Terrorists defused the bomb" => 'player_action.counter_terrorists_defused_bomb',
+		"VIP_Escaped\0VIP escaped" => 'player_action.vip_escaped',
+		"kill_streak_2\0Double Kill (2 kills)" => 'player_action.double_kill',
+		"kill_streak_3\0Triple Kill (3 kills)" => 'player_action.triple_kill',
+		"kill_streak_4\0Domination (4 kills)" => 'player_action.domination',
+		"kill_streak_5\0Rampage (5 kills)" => 'player_action.rampage',
+		"kill_streak_6\0Mega Kill (6 kills)" => 'player_action.mega_kill',
+		"kill_streak_7\0Ownage (7 kills)" => 'player_action.ownage',
+		"kill_streak_8\0Ultra Kill (8 kills)" => 'player_action.ultra_kill',
+		"kill_streak_9\0Killing Spree (9 kills)" => 'player_action.killing_spree',
+		"kill_streak_10\0Monster Kill (10 kills)" => 'player_action.monster_kill',
+		"kill_streak_11\0Unstoppable (11 kills)" => 'player_action.unstoppable',
+		"kill_streak_12\0God Like (12+ kills)" => 'player_action.god_like',
+		"headshot\0Headshot" => 'player_action.headshot',
+		"headshot\0Headshot Kill" => 'player_action.headshot',
+	);
+
+	$key = $map[(string) $code . "\0" . (string) $description] ?? null;
+	return $key === null ? $description : t($key, array(), $description);
+}
+
+function playerinfo_cstrike_team_label($name, $game)
+{
+	if (strtolower((string) $game) !== 'cstrike') {
+		return $name;
+	}
+
+	static $map = array(
+		'Counter-Terrorist' => 'player_team.counter_terrorist',
+		'Counter-Terrorists' => 'player_team.counter_terrorists',
+		'CT' => 'player_team.counter_terrorists',
+		'Terrorist' => 'player_team.terrorist',
+		'Terrorists' => 'player_team.terrorists',
+		'TERRORIST' => 'player_team.terrorists',
+	);
+
+	$key = $map[(string) $name] ?? null;
+	return $key === null ? $name : t($key, array(), $name);
+}
+
 function localized_render_text($text)
 {
 	if (!is_string($text) || $text === '') {

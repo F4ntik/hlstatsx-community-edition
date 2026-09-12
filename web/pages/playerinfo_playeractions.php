@@ -48,7 +48,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			(
 				'description',
 				t('literal.action'),
-				'width=45&link=' . urlencode("mode=actioninfo&amp;action=%k&amp;game=$game")
+				'width=45&type=action_description&link=' . urlencode("mode=actioninfo&amp;action=%k&amp;game=$game")
 			),
 			new TableColumn
 			(
@@ -136,7 +136,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			(
 				'description',
 				t('literal.action'),
-				'width=45&link=' . urlencode("mode=actioninfo&amp;action=%k&amp;game=$game#victims")
+				'width=45&type=action_description&link=' . urlencode("mode=actioninfo&amp;action=%k&amp;game=$game#victims")
 			),
 			new TableColumn
 			(
