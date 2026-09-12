@@ -1,0 +1,7 @@
+# Prepared JSON is immutable for a given SHA query. Keep unversioned URLs fresh.
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE application/json
+</IfModule>
+<IfModule mod_headers.c>
+  Header set Cache-Control "public, max-age=3600, must-revalidate"
+</IfModule>

@@ -1,0 +1,67 @@
+<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BSP: тепло огибает стены — эксперимент de_dust2</title>
+<style>
+:root{color-scheme:dark;font:15px/1.55 system-ui,sans-serif;color:#e2ebef;background:#101820}*{box-sizing:border-box}body{margin:0}main{max-width:1480px;margin:auto;padding:30px}header{max-width:1000px}h1{font-size:32px;line-height:1.2;margin:8px 0 16px}h2{font-size:18px;margin:0 0 5px}p{color:#aec0cb;margin:6px 0 16px}.eyebrow{color:#61e0c1;font-size:12px;letter-spacing:.12em;text-transform:uppercase}.controls{display:flex;align-items:center;gap:15px;flex-wrap:wrap;padding:18px;background:#1b2933;border:1px solid #314451;border-radius:12px;margin:22px 0}button,select{border:1px solid #4b6575;background:#263b49;color:#fff;padding:9px 13px;border-radius:7px;font:inherit;cursor:pointer}button:hover{background:#37566a}input[type=range]{vertical-align:middle;accent-color:#61e0c1;width:130px}label{white-space:nowrap;font-size:14px}.views{display:grid;grid-template-columns:1fr 1fr;gap:20px}.panel{background:#18242e;border:1px solid #30434f;border-radius:12px;overflow:hidden}.caption{padding:16px 18px 10px}.caption p{font-size:13px;margin:0}.mapwrap{position:relative}.map{display:block;width:100%;height:auto;cursor:crosshair}.detail{display:block;width:100%;height:auto;border-top:1px solid #30434f;image-rendering:pixelated}.detail-label{padding:9px 18px;font-size:12px;color:#9cafbc}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin:20px 0}.stat{padding:15px 18px;border:1px solid #314451;border-radius:10px;background:#18242e}.stat b{font-size:22px;display:block;color:#fff}.stat span{font-size:12px;color:#a2b8c7}#notice{min-height:28px;color:#70e2c4;margin:12px 0;font-size:14px}.notes{max-width:1100px;font-size:14px;margin-top:24px}.notes li{margin-bottom:8px;color:#aec0cb}a{color:#6edec6}#levelChoice{display:none;padding:12px;border:1px solid #bd9f4e;background:#443b27;border-radius:8px}.legend{font-size:13px;color:#c7d6df}.white{color:#fff}.cyan{color:#62edff}.pill{padding:3px 7px;background:#304536;border-radius:4px;color:#a5ecc8;font-size:12px}footer{font-size:12px;color:#788f9f;margin-top:35px}@media(max-width:850px){main{padding:18px}.views{grid-template-columns:1fr}.stats{grid-template-columns:1fr}h1{font-size:27px}}
+</style>
+<main>
+<header><div class="eyebrow">Локальная лаборатория / Counter-Strike 1.6</div><h1>Может ли тепло огибать стены?</h1><p>Одна и та же синтетическая точка на настоящей <b>de_dust2</b>. Слева тепло свободно растекается по изображению. Справа — только между соседними поверхностями, если путь разрешён геометрией BSP.</p><span class="pill">Эксперимент · рабочий сайт не изменён</span></header>
+<div class="controls"><button id="example">Пример у стены</button><button id="clear">Убрать точки</button><label>Радиус <input id="radius" type="range" min="3" max="20" value="12" step="1"> <b id="radiusValue">12</b></label><label><input id="mask" type="checkbox"> Показать доступные ячейки</label><label>Поверхности справа <select id="band"><option value="all">Все поверхности (максимум)</option><option value="-1000,-160">Ниже −160</option><option value="-160,-32">От −160 до −32</option><option value="-32,96">От −32 до 96</option><option value="96,1000">Выше 96</option></select></label></div>
+<p id="bandNote" class="legend">Слева показаны все события. Справа — все поверхности; шкала цвета общая.</p>
+<div class="legend"><span class="white">○ Белый круг — событие.</span> <span class="cyan">○ Голубой — точка за стеной.</span> Нажмите на карту, чтобы добавить событие; радиус общий для обеих сторон.</div>
+<div id="notice" role="status" aria-live="polite">Подготовка карты…</div>
+<div id="levelChoice">В этой точке несколько поверхностей. Выберите высоту события: <select id="sourceLevel"></select> <button id="addLevel">Добавить на эту поверхность</button> <button id="cancelLevel">Отмена</button></div>
+<div class="views"><section class="panel"><div class="caption"><h2>Без учёта стен</h2><p>Одинаковое время диффузии на свободной сетке</p></div><canvas class="map" id="ordinary" width="1024" height="768" aria-label="Обычная тепловая карта, нажмите для добавления точки"></canvas><div class="detail-label">Увеличенный фрагмент около последней точки · тот же масштаб цвета</div><canvas class="detail" id="ordinaryDetail" width="640" height="320"></canvas></section><section class="panel"><div class="caption"><h2>С учётом BSP</h2><p>Пол + просвет по высоте + проверка пути через BSP</p></div><canvas class="map" id="bounded" width="1024" height="768" aria-label="Тепловая карта с учётом BSP, нажмите для добавления точки"></canvas><div class="detail-label">Увеличенный фрагмент около последней точки · без размытия через края</div><canvas class="detail" id="boundedDetail" width="640" height="320"></canvas></section></div>
+<div class="stats"><div class="stat"><b id="leak">—</b><span>Значение за стеной: свободно / BSP</span></div><div class="stat"><b id="mass">—</b><span>Сохранённый вес событий: свободно / BSP</span></div><div class="stat"><b id="geometry">—</b><span>Поверхностей / ячеек с наложением по высоте</span></div></div>
+<div class="notes"><h2>Что проверяет этот опыт</h2><p>Каждый шаг переносит часть веса в четыре соседние ячейки. Закрытая грань сохраняет эту часть на месте; в открытом проходе тепло продолжает растекаться. Сверху нет дополнительного размытия, способного снова протянуть цвет через стену.</p><ul><li>Источник — локальный BSP карты, события придуманы для проверки. Это не статистика игроков.</li><li id="resolution"></li><li>Проверяются поверхности пола, свободные 72 единицы над ними и три отрезка на соседнем переходе. Максимальная ступень — 22 единицы. Толщина игрока не моделируется: это ещё не навигационная сетка.</li><li>Многоуровневые поверхности хранятся отдельно. Связи «прямо вверх» нет. В режиме «Все поверхности» показан максимум, а не сумма; фильтр высоты помогает раскрыть перекрытия.</li><li>Движущиеся двери и другие отдельные BSP-объекты не учтены. Крыши и небольшие отдельные участки пока сохранены; их доступность игроку не доказана. Узкие проходы могут потеряться при разбиении на ячейки.</li><li>Левая сторона — свободная диффузия для честного сравнения одинакового времени и веса; это не точная копия сглаживания рабочего Explorer. Цветовая шкала общая для двух сторон и пересчитывается при изменении точек.</li></ul><p>Формат: <a href="https://github.com/ValveSoftware/halflife/blob/master/utils/common/bspfile.h">Valve BSP v30</a>. Устройство обхода геометрии: <a href="https://github.com/rehlds/ReHLDS/blob/master/rehlds/engine/world.cpp">ReHLDS world.cpp</a>. Результаты проверок: <a href="evidence.json">evidence.json</a>.</p></div>
+<footer id="footer"></footer>
+</main>
+<script>
+const D=__EXPERIMENT_DATA__;
+const W=D.width,H=D.height,N=W*H,alpha=.24;
+const $=id=>document.getElementById(id), cells=Array.from({length:N},()=>[]);
+D.pixel.forEach((p,i)=>cells[p].push(i));
+let sources=[D.example.source_node],probe=D.example.probe_node,ordinary=new Float64Array(N),bounded=new Float64Array(D.pixel.length),pending=[],revision=0;
+const bg=new Image();bg.src=D.image;
+const heat=document.createElement('canvas');heat.width=W;heat.height=H;const hctx=heat.getContext('2d');
+const visible=id=>{if($('band').value==='all')return true;const [lo,hi]=$('band').value.split(',').map(Number);return D.z[id]>=lo&&D.z[id]<hi;};
+function compute(){
+ const epoch=++revision;$('notice').textContent='Рассчитываю распространение…';
+ setTimeout(()=>{if(epoch!==revision)return;const t0=performance.now(),r=Number($('radius').value),steps=Math.round(r*r/(4*alpha));
+ ordinary=new Float64Array(N);bounded=new Float64Array(D.pixel.length);sources.forEach(id=>{ordinary[D.pixel[id]]++;bounded[id]++;});
+ let bnext=new Float64Array(bounded.length),onext=new Float64Array(N);
+ for(let t=0;t<steps;t++){
+  bnext.set(bounded);for(const [a,b]of D.edges){const f=alpha*(bounded[a]-bounded[b]);bnext[a]-=f;bnext[b]+=f;}[bounded,bnext]=[bnext,bounded];
+  onext.set(ordinary);for(let y=0;y<H;y++)for(let x=0;x<W;x++){const i=y*W+x;if(x+1<W){const f=alpha*(ordinary[i]-ordinary[i+1]);onext[i]-=f;onext[i+1]+=f;}if(y+1<H){const f=alpha*(ordinary[i]-ordinary[i+W]);onext[i]-=f;onext[i+W]+=f;}}[ordinary,onext]=[onext,ordinary];
+ }
+ draw();const elapsed=Math.round(performance.now()-t0);
+ $('notice').textContent=sources.length?`Событий: ${sources.length}. Шагов: ${steps}. Расчёт: ${elapsed} мс. Нажмите на доступный участок карты, чтобы добавить точку.`:'Точки убраны. Нажмите на доступный участок карты.';
+ $('mass').textContent=`${ordinary.reduce((a,b)=>a+b,0).toFixed(6)} / ${bounded.reduce((a,b)=>a+b,0).toFixed(6)}`;
+ $('leak').textContent=probe===null?'Нет контрольной точки':`${ordinary[D.pixel[probe]].toExponential(2)} / ${bounded[probe].toExponential(2)}`;
+ window.experimentState={sources:[...sources],probe,steps,ordinaryMass:ordinary.reduce((a,b)=>a+b,0),boundedMass:bounded.reduce((a,b)=>a+b,0),ordinaryProbe:probe===null?null:ordinary[D.pixel[probe]],boundedProbe:probe===null?null:bounded[probe]};
+ },20);
+}
+function draw(){
+ $('bandNote').textContent=$('band').value==='all'?'Слева показаны все события. Справа — все поверхности; шкала цвета общая.':'Выбран фильтр отображения справа: скрытые высоты и их маркеры не видны. Слева по-прежнему все события; расчёт не изменён.';
+ let peak=0;for(const v of ordinary)peak=Math.max(peak,v);for(const v of bounded)peak=Math.max(peak,v);peak=peak||1;
+ const projected=new Float64Array(N);D.pixel.forEach((p,i)=>{if(visible(i))projected[p]=Math.max(projected[p],bounded[i]);});
+ for(const [id,values]of [['ordinary',ordinary],['bounded',projected]]){
+  const canvas=$(id),ctx=canvas.getContext('2d');ctx.drawImage(bg,0,0,1024,768);
+  const rgba=hctx.createImageData(W,H);for(let p=0;p<N;p++){const v=Math.pow(Math.max(0,values[p]/peak),.45),k=p*4;rgba.data[k]=255;rgba.data[k+1]=210*(1-v);rgba.data[k+2]=35;rgba.data[k+3]=210*v;if($('mask').checked&&cells[p].some(visible)&&v<.03){rgba.data[k]=45;rgba.data[k+1]=225;rgba.data[k+2]=180;rgba.data[k+3]=48;}}
+  hctx.putImageData(rgba,0,0);ctx.imageSmoothingEnabled=false;ctx.drawImage(heat,0,0,1024,768);
+  const mark=(node,color)=>{const p=D.pixel[node],x=(p%W+.5)*1024/W,y=(Math.floor(p/W)+.5)*768/H;ctx.strokeStyle=color;ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,7,0,2*Math.PI);ctx.stroke();};
+  sources.forEach(node=>{if(id==='ordinary'||visible(node))mark(node,'white');});if(probe!==null&&(id==='ordinary'||visible(probe)))mark(probe,'#62edff');
+  const detail=$(id+'Detail'),dc=detail.getContext('2d'),node=sources.at(-1)??D.example.source_node,p=D.pixel[node],cx=(p%W+.5)*1024/W,cy=(Math.floor(p/W)+.5)*768/H;
+  const cropw=230,croph=115,sx=Math.max(0,Math.min(1024-cropw,cx-cropw/2)),sy=Math.max(0,Math.min(768-croph,cy-croph/2));dc.imageSmoothingEnabled=false;dc.drawImage(canvas,sx,sy,cropw,croph,0,0,detail.width,detail.height);
+ }
+}
+function add(node){sources.push(node);$('levelChoice').style.display='none';compute();}
+for(const id of ['ordinary','bounded'])$(id).addEventListener('click',e=>{const rect=e.currentTarget.getBoundingClientRect(),x=Math.min(W-1,Math.floor((e.clientX-rect.left)/rect.width*W)),y=Math.min(H-1,Math.floor((e.clientY-rect.top)/rect.height*H));pending=cells[y*W+x].filter(visible);if(!pending.length){$('notice').textContent='В этой ячейке нет подходящей поверхности пола с нужным просветом. Точка не добавлена.';return;}if(pending.length===1){add(pending[0]);return;}$('sourceLevel').replaceChildren(...pending.map(node=>{const o=document.createElement('option');o.value=node;o.textContent=`Z = ${D.z[node]} · поверхность ${node}`;return o;}));$('levelChoice').style.display='block';$('notice').textContent='Под этой точкой несколько уровней — выберите поверхность для события.';});
+$('addLevel').onclick=()=>add(Number($('sourceLevel').value));$('cancelLevel').onclick=()=>{$('levelChoice').style.display='none';};
+$('example').onclick=()=>{sources=[D.example.source_node];probe=D.example.probe_node;$('radius').value=12;$('radiusValue').textContent=12;$('band').value='all';$('levelChoice').style.display='none';compute();};
+$('clear').onclick=()=>{sources=[];probe=null;$('levelChoice').style.display='none';compute();};
+$('radius').oninput=()=>{$('radiusValue').textContent=$('radius').value;};$('radius').onchange=compute;$('mask').onchange=draw;$('band').onchange=draw;
+$('geometry').textContent=`${D.pixel.length.toLocaleString('ru')} / ${D.report.graph.overlapping_xy_cells.toLocaleString('ru')}`;
+$('resolution').textContent=`Сетка ${W} × ${H}; одна ячейка ≈ ${D.report.world_units_per_cell.toFixed(1)} игровых единиц. Маска измерена в центрах ячеек, поэтому это приближение геометрии. Интерполяции через границы нет.`;
+$('footer').textContent=`BSP SHA-256: ${D.report.bsp_sha256} · ${D.report.invariant_checks.length} проверок пройдено · автономный файл, без сервера и подключения к базе.`;
+bg.onload=compute;if(bg.complete)compute();
+</script></html>

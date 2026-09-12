@@ -1,0 +1,3 @@
+# Optional operator-side native BSP/BMP/TXT preparation; not daemon dependencies.
+numpy>=1.24,<3
+Pillow>=11.2.1,<12

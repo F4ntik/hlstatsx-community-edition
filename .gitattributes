@@ -1,0 +1,2 @@
+# Surface JSON is verified byte-for-byte by PHP/JS and the bundled manifest.
+/web/hlstatsimg/heatmap-surfaces/**/*.json text eol=lf
