@@ -41,6 +41,10 @@ For support and installation notes visit http://www.hlxcommunity.com
     }
 
 	flush();
+	$action_count_attrs = 'width=25&align=right';
+	if (current_lang() !== 'ru') {
+		$action_count_attrs .= '&append=' . urlencode(t('ui.times_suffix'));
+	}
 	$tblPlayerActions = new Table
 	(
 		array(
@@ -54,7 +58,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			(
 				'obj_count',
 				t('literal.earned'),
-				'width=25&align=right&append=' . urlencode(t('ui.times_suffix'))
+				$action_count_attrs
 			),
 			new TableColumn
 			(
@@ -142,7 +146,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 			(
 				'obj_count',
 				t('literal.earned_against'),
-				'width=25&align=right&append=' . urlencode(t('ui.times_suffix'))
+				$action_count_attrs
 			),
 			new TableColumn
 			(

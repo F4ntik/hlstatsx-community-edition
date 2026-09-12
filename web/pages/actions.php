@@ -64,6 +64,10 @@ For support and installation notes visit http://www.hlxcommunity.com
 		array($gamename, t('literal.action_statistics')),
 		array($gamename => "%s?game=$game", t('literal.action_statistics') => '')
 	);
+	$action_count_attrs = 'width=25&align=right';
+	if (current_lang() !== 'ru') {
+		$action_count_attrs .= '&append=+times';
+	}
 
 	$tblPlayerActions = new Table
 	(
@@ -73,13 +77,13 @@ For support and installation notes visit http://www.hlxcommunity.com
 			(
 				'description',
 				t('literal.action'),
-				'width=45&link=' . urlencode('mode=actioninfo&amp;action=%k&amp;game='.$game)
+				'width=45&type=action_description&link=' . urlencode('mode=actioninfo&amp;action=%k&amp;game='.$game)
 			),
 			new TableColumn
 			(
 				'obj_count',
 				t('literal.earned'),
-				'width=25&align=right&append=+times'
+				$action_count_attrs
 			),
 			new TableColumn
 			(

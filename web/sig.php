@@ -289,7 +289,7 @@ function f_num($number) {
 
 	$signature_cache_request = $_GET;
 	$signature_cache_request['lang'] = current_lang();
-	$signature_cache_request['_signature_renderer'] = 'utf8-ttf-v2';
+	$signature_cache_request['_signature_renderer'] = 'utf8-ttf-v3';
 	ksort($signature_cache_request);
 	$signature_cache_path = IMAGE_PATH . '/progress/sig_' . md5(http_build_query($signature_cache_request)) . '.png';
 
@@ -578,27 +578,27 @@ if ($player_id > 0) {
 		$tail_width = sig_ttf_width($signature_font, $body_size, $points_text);
 		$prefix_max = max(1, $line_right - 15 - $tail_width - ($has_trend ? 12 : 4));
 		$prefix = sig_fit_ttf_text($signature_font, $body_size, $position_prefix, $prefix_max);
-		$prefix_width = sig_draw_ttf_fit($image, $signature_font, $prefix, 15, 26, $font_color, $body_size, 6.2, $prefix_max);
+		$prefix_width = sig_draw_ttf_fit($image, $signature_font, $prefix, 15, 31, $font_color, $body_size, 6.2, $prefix_max);
 		$next_x = 15 + $prefix_width + 3;
 		if ($has_trend) {
-			imagecopy($image, $trend, $next_x, 20, 0, 0, 7, 7);
+			imagecopy($image, $trend, $next_x, 25, 0, 0, 7, 7);
 			$next_x += 10;
 		}
-		sig_draw_ttf_fit($image, $signature_font, $points_text, $next_x, 26, $font_color, $body_size, 6.2, max(1, $line_right - $next_x));
+		sig_draw_ttf_fit($image, $signature_font, $points_text, $next_x, 31, $font_color, $body_size, 6.2, max(1, $line_right - $next_x));
 		if ($has_trend) {
 			imagedestroy($trend);
 		}
 
-		sig_draw_ttf_fit($image, $signature_font, $frags_line, 15, 38, $font_color, $body_size, 6.2, 375);
-		sig_draw_ttf_fit($image, $signature_font, $activity_line, 15, 49, $font_color, $body_size, 6.2, 375);
+		sig_draw_ttf_fit($image, $signature_font, $frags_line, 15, 42, $font_color, $body_size, 6.2, 375);
+		sig_draw_ttf_fit($image, $signature_font, $activity_line, 15, 53, $font_color, $body_size, 6.2, 375);
 
 		$watermark_text = 'HLstatsX PY';
 		$watermark_size = 7;
 		$watermark_width = sig_ttf_width($signature_font, $watermark_size, $watermark_text);
 		$watermark_x = max(300, 390 - $watermark_width);
-		$stats_label_width = sig_draw_ttf_fit($image, $signature_font, $statistics_label, 15, 60, $font_color, $body_size, 6.2, max(1, $watermark_x - 23));
+		$stats_label_width = sig_draw_ttf_fit($image, $signature_font, $statistics_label, 15, 64, $font_color, $body_size, 6.2, max(1, $watermark_x - 23));
 		$stats_url_x = 15 + $stats_label_width + 4;
-		sig_draw_ttf_fit($image, $signature_font, (string) $g_options['siteurl'], $stats_url_x, 60, $link_color, $body_size, 6.2, max(1, $watermark_x - 8 - $stats_url_x));
+		sig_draw_ttf_fit($image, $signature_font, (string) $g_options['siteurl'], $stats_url_x, 64, $link_color, $body_size, 6.2, max(1, $watermark_x - 8 - $stats_url_x));
 		sig_draw_ttf_fit($image, $signature_font, $watermark_text, $watermark_x, 71, $link_color, $watermark_size, $watermark_size, $watermark_width);
 	} else {
 		$bitmap_font = 2;

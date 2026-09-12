@@ -1,0 +1,11 @@
+.player-trend{background:#282828;color:#ccc;padding:8px;text-align:left;font:11px/1.4 Verdana,Arial,sans-serif;max-width:100%;box-sizing:border-box}
+.player-trend__note{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+.player-trend svg{display:block;width:100%;height:200px;overflow:visible}.player-trend [hidden]{display:none}
+.player-trend__grid{stroke:#777;stroke-width:.5;stroke-dasharray:2 3}.player-trend__zero{stroke:#aaa;stroke-width:.6}
+.player-trend__axis{fill:#bbb;font:10px Verdana,Arial,sans-serif}.player-trend__rating{fill:#efee4b;stroke:#efee4b}.player-trend__change{fill:#e9827c;stroke:#d95d57}
+.player-trend__axis{stroke:none}.player-trend__line{fill:none;stroke-width:1.5;stroke-linejoin:round}.player-trend__area{fill:#efee4b;fill-opacity:.16}
+.player-trend__point{stroke-width:1;cursor:pointer}.player-trend__point:focus{stroke:#fff;stroke-width:2;outline:none}.player-trend__cursor{stroke:#ddd;stroke-width:.7;stroke-dasharray:3 3;pointer-events:none}
+.player-trend .player-trend__tooltip{margin:3px 0 5px;min-height:28px;font-size:10px;font-variant-numeric:tabular-nums}
+.player-trend__data{font-size:10px;display:inline-block;margin-right:14px}.player-trend__data[open]{display:block;margin-right:0}.player-trend summary{cursor:pointer;display:list-item;width:max-content}.player-trend summary:focus-visible{outline:1px solid #ddd}
+.player-trend__data table{width:100%;border-collapse:collapse;margin-top:5px;font-size:10px}.player-trend__data td,.player-trend__data th{padding:3px;text-align:right;border-bottom:1px solid #555}.player-trend__data td:first-child,.player-trend__data th:first-child{text-align:left}
+.player-trend a.player-trend__legacy{display:inline-block;margin-top:5px;font-size:10px;color:#bbb}

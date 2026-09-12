@@ -103,6 +103,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	<link rel="stylesheet" type="text/css" href="hlstats.css?v=<?php echo intval(@filemtime(dirname(__DIR__) . '/hlstats.css')); ?>" />
 	<link rel="stylesheet" type="text/css" href="styles/<?php echo $selectedStyle; ?>" />
 	<link rel="stylesheet" type="text/css" href="css/SqueezeBox.css" />
+	<link rel="stylesheet" type="text/css" href="css/player-trend.css?v=<?php echo intval(@filemtime(dirname(__DIR__) . '/css/player-trend.css')); ?>" />
 	<!-- U R A SMACKHEAD -->
 
 	<link rel="SHORTCUT ICON" href="favicon.ico" />
@@ -236,6 +237,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 	<script type="text/javascript" src="<?php echo INCLUDE_PATH; ?>/js/SqueezeBox.js"></script>
 	<script type="text/javascript" src="<?php echo INCLUDE_PATH; ?>/js/heatmap.js?v=<?php echo intval(@filemtime(INCLUDE_PATH . '/js/heatmap.js')); ?>"></script>
 	<script type="text/javascript" src="<?php echo INCLUDE_PATH; ?>/js/heatmap-explorer.js?v=<?php echo intval(@filemtime(INCLUDE_PATH . '/js/heatmap-explorer.js')); ?>"></script>
+	<script type="text/javascript" src="<?php echo INCLUDE_PATH; ?>/js/player-trend.js?v=<?php echo intval(@filemtime(INCLUDE_PATH . '/js/player-trend.js')); ?>"></script>
 <?php
 	if ($g_options['playerinfo_tabs'] == '1') {
 ?>

@@ -32,7 +32,7 @@
                 SELECT
                     UNIX_TIMESTAMP(eventTime)
                 AS
-                    ts, skill, skill_change
+                    ts, eventTime AS date, skill, skill_change
                 FROM
                     hlstats_Players_History
                 WHERE

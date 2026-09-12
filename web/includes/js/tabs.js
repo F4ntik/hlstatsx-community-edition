@@ -36,6 +36,9 @@ var Tabs = new Class({
 		{
 			window.HeatmapExplorerWorkspace.mountAll(wrapper, {'window': window});
 		}
+		if (window.PlayerTrendGraph) {
+			window.PlayerTrendGraph.mountAll(wrapper);
+		}
 		this.currentRequest = false;
 	},
 	refreshTab: function(change) {

@@ -71,6 +71,7 @@ For support and installation notes visit http://www.hlxcommunity.com
 		$db->free_result();
 		$act_name = $actiondata['description'];
 	}
+	$act_name = playerinfo_cstrike_action_label($action, $act_name, $game);
 	
 	$db->query("SELECT name FROM hlstats_Games WHERE code='{$game_escaped}'");
 	if ($db->num_rows() != 1)
