@@ -21,9 +21,34 @@ const wallMask=api.regionGridMask(wallScene);
 assert.deepStrictEqual(Array.from(wallMask),[1,1,0,1,1,1,1],'thin wall intersects bucket even without its center');
 const wallField=api.gaussianSmooth(input,7,1,api.gaussianKernel1d(1.25,4),wallMask);
 assert.strictEqual(wallField[3],0,'thin wall stops cross-wall smoothing');
+const dual = api.presentationField({values:new Float32Array([1,0,5]),secondaryValues:new Float32Array([0,2,5])},3,1,false,false,null,'clear');
+assert.deepStrictEqual(Array.from(dual.values),[1,0,0,2,5,5],'Both retains independent kill/death weights, including overlap');
+assert.strictEqual(dual.maxAbs,5,'Both shares a channel-count scale instead of summing overlap');
+const graph=Object.create(api.HeatmapSurfaceGraph.prototype);
+Object.assign(graph,{grid:{width:21,height:1},image:{width:21,height:1},pixels:Uint32Array.from({length:21},(_,i)=>i),edges:Uint32Array.from({length:40},(_,i)=>Math.floor(i/2)+(i%2))});
+const graphScene={map:{image:graph.image},floors:[],activeFloor:'all',summary:{personalSample:1,otherSample:1},surfaces:{allowed:new Uint8Array(21).fill(1),rows:[[10,1,0,1,0],[20,0,1,0,0]]}};
+const compact=graph.field(graphScene,'total','kills','clear'),soft=graph.field(graphScene,'total','kills','soft'),both=graph.field(graphScene,'total','both','clear');
+assert(compact.maxAbs>soft.maxAbs,'compact spread concentrates isolated event');
+assert.strictEqual(compact.values[0],0,'compact radius stops before distant fringe');
+assert(soft.values[0]>0,'soft option retains broader spread');
+assert(both.values[20]>0 && both.values[41]>0 && both.values[21]===0,'Both keeps channels separate through topology diffusion');
+assert.deepStrictEqual(Array.from(graph.field(graphScene,'difference','kills','clear').values),Array.from(graph.field(graphScene,'difference','kills','soft').values),'Difference presentation is unchanged by appearance preference');
+const plane=Object.create(api.HeatmapSurfaceGraph.prototype),planeEdges=[];
+for(let y=0;y<21;y++)for(let x=0;x<21;x++){const n=y*21+x;if(x<20)planeEdges.push(n,n+1);if(y<20)planeEdges.push(n,n+21);}
+Object.assign(plane,{grid:{width:21,height:21},image:{width:21,height:21},pixels:Uint32Array.from({length:441},(_,i)=>i),edges:Uint32Array.from(planeEdges)});
+const single=plane.field({...graphScene,map:{image:plane.image},surfaces:{allowed:new Uint8Array(441).fill(1),rows:[[220,1,0,0,0]]}},'total','kills','clear');
+for(let offset=0;offset<8;offset++)assert(single.values[(220+offset)*2]>=single.values[(221+offset)*2],'compact isolated spot has no alternating brighter parity rings');
 const scene = {map:{name:'de_dust2',projectionHash:'a',image:{width:1280,height:1024}},activeFloor:'all',query:{player:0,lens:'overview',event:'kills'}};
 const workspace = {lang:'en',root:{querySelector:()=>null,setAttribute:()=>{}},_message:k=>k};
 const maximum = (s,n,mode='smooth') => api.HeatmapExplorerWorkspace.prototype._scaleMaximum.call(workspace,s,n,mode);
+for (const lang of ['ru','en']) {
+    const w=Object.create(api.HeatmapExplorerWorkspace.prototype);
+    Object.assign(w,{lang,_message:k=>k,_nodes:{status:{textContent:''}}});
+    w._setCoverageStatus({state:'ok',query:{lens:'difference'},summary:{sourceRows:175,personalSample:5,otherSample:170},
+      coverage:{xyCoverage:1},surfaces:{state:'low_coverage',diagnostics:{assigned:166,candidate:175}}});
+    assert(!w._nodes.status.textContent.includes('166/175'),'overall assignment must not obscure missing selected population');
+    assert(w._nodes.status.textContent.includes(lang==='ru'?'недостаточно точек с надёжной привязкой':'too few reliably located positions'));
+}
 assert.strictEqual(maximum(scene,12),12);
 workspace._scaleReference=workspace._scaleCurrent;
 assert.strictEqual(maximum({...scene,query:{...scene.query,from:123,to:456}},2),12,'same metric period retains denominator');

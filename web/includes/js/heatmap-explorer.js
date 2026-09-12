@@ -12,6 +12,8 @@
     root.HeatmapExplorerWorkspace = api.HeatmapExplorerWorkspace;
     root.HeatmapGlRenderer = api.HeatmapGlRenderer;
     root.HeatmapPointGeometry = api.HeatmapPointGeometry;
+    root.HeatmapSurfaceGraph = api.HeatmapSurfaceGraph;
+    root.loadSurfaceGraph = api.loadSurfaceGraph;
     root.gaussianKernel1d = api.gaussianKernel1d;
     root.gaussianSmooth = api.gaussianSmooth;
     root.presentationField = api.presentationField;
@@ -37,6 +39,7 @@
   var TOKEN = /^[A-Za-z][A-Za-z0-9_-]{0,31}$/;
   var CELL = /^c(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/;
   var HASH = /^[a-f0-9]{16}$/;
+  var SHA256 = /^[a-f0-9]{64}$/;
   var HEATMAP_Z_MIN = -8388608;
   var HEATMAP_Z_MAX = 8388607;
   var RANGE_SECONDS = {
@@ -505,7 +508,7 @@
     if (!exactKeys(payload, [
       'schemaVersion', 'state', 'query', 'map', 'floors', 'activeFloor', 'grid',
       'layers', 'comparison', 'coverage', 'summary', 'warnings', 'fallback'
-    ]) || payload.schemaVersion !== 2
+    ].concat(own(payload, 'surfaces') ? ['surfaces'] : [])) || payload.schemaVersion !== 2
       || !SCENE_STATES[payload.state]) {
       invalidScene();
     }
@@ -535,6 +538,8 @@
     validateMetricObject(payload.summary, ['rowsRead', 'sourceRows', 'personalSample', 'otherSample']);
     validateWarnings(payload.warnings);
     validateFallback(payload.fallback);
+    this.surfaces = own(payload, 'surfaces') ? validateSurfaces(payload.surfaces, payload) : null;
+    this._denseCache = Object.create(null);
 
     this.state = payload.state;
     this.query = cloneQuery(payload.query);
@@ -584,6 +589,8 @@
     if (!allowedLayer || !allowedChannel) {
       throw new Error('invalid_dense_selection');
     }
+    var cacheKey = layer + ':' + channel;
+    if (this._denseCache[cacheKey]) return this._denseCache[cacheKey];
 
     var size = this.grid.width * this.grid.height;
     var values = new Float32Array(size);
@@ -626,7 +633,7 @@
     occupied.sort(function (left, right) {
       return left.gridY - right.gridY || left.gridX - right.gridX;
     });
-    return {values: values, opacity: opacity, maxAbs: maxAbs, occupied: occupied};
+    return (this._denseCache[cacheKey] = {values: values, opacity: opacity, maxAbs: maxAbs, occupied: occupied});
   };
 
   HeatmapExplorerScene.prototype._cellAt = function (gridX, gridY) {
@@ -1194,17 +1201,181 @@
     return current;
   }
 
-  function presentationField(dense, width, height, smooth, difference, mask) {
+  function surfaceBytes(value, length) {
+    if (typeof value !== 'string' || value.length !== Math.ceil(length / 3) * 4
+      || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) throw new TypeError('invalid_surfaces');
+    var raw = atob(value), bytes = new Uint8Array(length);
+    if (raw.length !== length) throw new TypeError('invalid_surfaces');
+    for (var i = 0; i < length; i++) bytes[i] = raw.charCodeAt(i);
+    return bytes;
+  }
+
+  function validateSurfaces(s, payload) {
+    if (!exactKeys(s, ['version','state','asset','fields','rows','allowedData','diagnostics']) || s.version !== 1
+      || ['ready','missing_asset','invalid_asset','identity_mismatch','low_coverage'].indexOf(s.state) < 0
+      || !exactStringArray(s.fields, ['node','kills','deaths','meKills','meDeaths'])
+      || !compactArray(s.rows) || !exactKeys(s.diagnostics, ['candidate','assigned','missingZ','ambiguous','offSurface','excluded'])
+      || !Object.keys(s.diagnostics).every(function (k) { return nonNegativeInteger(s.diagnostics[k]); })) invalidScene();
+    if (!s.asset) {
+      if (s.state === 'ready' || s.rows.length || s.allowedData !== '') invalidScene();
+      return JSON.parse(JSON.stringify(s));
+    }
+    var a = s.asset;
+    if (!exactKeys(a, ['url','sha256','grid','nodeCount','edgeCount'])
+      || a.url !== 'hlstatsimg/heatmap-surfaces/cstrike/' + payload.map.name + '.json' || payload.map.realgame !== 'cstrike'
+      || !SHA256.test(a.sha256) || !exactKeys(a.grid, ['width','height'])
+      || !positiveInteger(a.grid.width) || a.grid.width > 512 || !positiveInteger(a.grid.height) || a.grid.height > 384
+      || !positiveInteger(a.nodeCount) || a.nodeCount > 196608 || !nonNegativeInteger(a.edgeCount) || a.edgeCount > 393216
+      || s.rows.length > a.nodeCount) invalidScene();
+    var allowed = surfaceBytes(s.allowedData, a.nodeCount), last = -1, sum = 0, totals = [0,0,0,0];
+    for (var i = 0; i < allowed.length; i++) if (allowed[i] > 1) invalidScene();
+    s.rows.forEach(function (r) {
+      if (!compactArray(r) || r.length !== 5 || !r.every(nonNegativeInteger) || r[0] <= last || r[0] >= a.nodeCount
+        || !allowed[r[0]] || r[1] + r[2] === 0 || r[3] > r[1] || r[4] > r[2]) invalidScene();
+      last = r[0]; sum += r[1] + r[2];
+      for (var column=0;column<4;column++) totals[column] += r[column+1];
+    });
+    var d = s.diagnostics;
+    if (d.candidate !== d.assigned + d.missingZ + d.ambiguous + d.offSurface + d.excluded
+      || d.candidate !== payload.coverage.inBounds || d.candidate > 500000
+      || (payload.state !== 'too_many_events' && sum !== d.assigned)
+      || (s.state === 'ready' && d.candidate && d.assigned / d.candidate < 0.7)) invalidScene();
+    if (payload.state !== 'too_many_events') {
+      var limits = [0,0,0,0];
+      payload.layers.total.forEach(function (r) { limits[0]+=r[3];limits[1]+=r[4]; });
+      payload.layers.me.forEach(function (r) { limits[2]+=r[3];limits[3]+=r[4]; });
+      if (totals.some(function (value,index) { return value > limits[index]; })) invalidScene();
+    }
+    var copy = JSON.parse(JSON.stringify(s)); copy.allowed = allowed; return copy;
+  }
+
+  function HeatmapSurfaceGraph(a, descriptor) {
+    if (!exactKeys(a, ['schemaVersion','map','bspSha256','image','projection','grid','nodeCount','edgeCount','pixelData','heightData','edgeData'])
+      || a.schemaVersion !== 1 || !SHA256.test(a.bspSha256) || !TOKEN.test(a.map)
+      || !exactKeys(a.image, ['width','height','sha256']) || !positiveInteger(a.image.width) || !positiveInteger(a.image.height) || !SHA256.test(a.image.sha256)
+      || !exactKeys(a.projection, ['xoffset','yoffset','scale','flipx','flipy','rotate','cropx1','cropx2','cropy1','cropy2'])
+      || !Object.keys(a.projection).every(function (k) { return finiteNumber(a.projection[k]) || ((k === 'flipx' || k === 'flipy') && typeof a.projection[k] === 'boolean'); })
+      || a.nodeCount !== descriptor.nodeCount || a.edgeCount !== descriptor.edgeCount
+      || !exactKeys(a.grid, ['width','height']) || a.grid.width !== descriptor.grid.width || a.grid.height !== descriptor.grid.height
+      || descriptor.url !== 'hlstatsimg/heatmap-surfaces/cstrike/' + a.map + '.json') throw new TypeError('invalid_surfaces');
+    var n = a.nodeCount, e = a.edgeCount, w = a.grid.width, h = a.grid.height;
+    if (!positiveInteger(n) || n > 196608 || !nonNegativeInteger(e) || e > 393216 || !positiveInteger(w) || w > 512 || !positiveInteger(h) || h > 384) throw new TypeError('invalid_surfaces');
+    var pb = surfaceBytes(a.pixelData, n * 4), hb = surfaceBytes(a.heightData, n * 4), eb = surfaceBytes(a.edgeData, e * 8);
+    var pv = new DataView(pb.buffer), hv = new DataView(hb.buffer), ev = new DataView(eb.buffer);
+    this.pixels = new Uint32Array(n); this.heights = new Float32Array(n); this.edges = new Uint32Array(e * 2);
+    var degrees = new Uint8Array(n), neighbors = new Int32Array(n * 4); neighbors.fill(-1);
+    var i, j;
+    for (i = 0; i < n; i++) {
+      var p = pv.getUint32(i * 4, true), z = hv.getFloat32(i * 4, true);
+      if (p >= w * h || !isFinite(z) || Math.abs(z) > 8388608 || (i && (p < this.pixels[i-1] || (p === this.pixels[i-1] && z <= this.heights[i-1])))) throw new TypeError('invalid_surfaces');
+      this.pixels[i] = p; this.heights[i] = z;
+    }
+    for (i = 0; i < e; i++) {
+      var left = ev.getUint32(i * 8, true), right = ev.getUint32(i * 8 + 4, true);
+      if (left >= n || right >= n || left === right || degrees[left] >= 4 || degrees[right] >= 4) throw new TypeError('invalid_surfaces');
+      var lp = this.pixels[left], rp = this.pixels[right];
+      if (Math.abs(lp % w - rp % w) + Math.abs(Math.floor(lp / w) - Math.floor(rp / w)) !== 1) throw new TypeError('invalid_surfaces');
+      for (j = 0; j < degrees[left]; j++) if (neighbors[left * 4 + j] === right) throw new TypeError('invalid_surfaces');
+      neighbors[left * 4 + degrees[left]++] = right; neighbors[right * 4 + degrees[right]++] = left;
+      this.edges[i * 2] = left; this.edges[i * 2 + 1] = right;
+    }
+    this.grid = {width:w,height:h}; this.image = a.image;
+  }
+
+  HeatmapSurfaceGraph.prototype.field = function (scene, layer, channel, appearance) {
+    var s = scene.surfaces, n = this.pixels.length, g = this.grid, difference = layer === 'difference', both = channel === 'both';
+    var allowed = new Uint8Array(s.allowed), values = new Float32Array(n * 4), next = new Float32Array(n * 4), i, c;
+    var regions = sceneRegions(scene), blocked = sceneRegions(scene, 'blocked');
+    var dx = scene.map.image.width / g.width, dy = scene.map.image.height / g.height;
+    for (i = 0; (regions.length || blocked.length) && i < n; i++) {
+      var x = this.pixels[i] % g.width * dx, y = Math.floor(this.pixels[i] / g.width) * dy;
+      if ((regions.length && !regions.some(function (p) { return regionContains(p, x + dx/2, y + dy/2); }))
+        || blocked.some(function (p) { return polygonTouchesCell(p, x, y, x + dx, y + dy); })) allowed[i] = 0;
+    }
+    s.rows.forEach(function (r) {
+      if (!allowed[r[0]]) return;
+      var total = channel === 'kills' ? r[1] : (channel === 'deaths' ? r[2] : r[1]+r[2]);
+      var me = channel === 'kills' ? r[3] : (channel === 'deaths' ? r[4] : r[3]+r[4]);
+      var value = difference ? me / Math.max(1, scene.summary.personalSample) - (total-me) / Math.max(1, scene.summary.otherSample)
+        : (layer === 'me' ? me : (layer === 'others' ? total-me : total));
+      var off = r[0] * 4, support = Math.abs(value);
+      values[off] = Math.max(0,value); values[off+1] = Math.max(0,-value);
+      if (both) {
+        values[off] = layer === 'me' ? r[3] : (layer === 'others' ? r[1]-r[3] : r[1]);
+        values[off+1] = layer === 'me' ? r[4] : (layer === 'others' ? r[2]-r[4] : r[2]);
+      }
+      values[off+2] = support; values[off+3] = support * (difference && me < 3 ? 0.22 : 1);
+    });
+    // Compact default; Difference retains its established support/confidence spread.
+    var edges = this.edges, lanes = difference ? 4 : (both ? 2 : 1), steps = difference || appearance === 'soft' ? 24 : 8;
+    var diffusionAlpha = difference ? 0.24 : 0.18;
+    for (var step = 0; step < steps; step++) {
+      next.set(values);
+      for (i = 0; i < edges.length; i += 2) {
+        var a = edges[i], b = edges[i+1];
+        if (!allowed[a] || !allowed[b]) continue;
+        a *= 4; b *= 4;
+        for (c = 0; c < lanes; c++) { var flow = diffusionAlpha * (values[a+c] - values[b+c]); next[a+c] -= flow; next[b+c] += flow; }
+      }
+      var swap = values; values = next; next = swap;
+    }
+    var output = new Float32Array(g.width*g.height*2), opacity = new Float32Array(g.width*g.height), max = 0;
+    for (i = 0; i < n; i++) {
+      if (!allowed[i]) continue; // Final clip is independent of propagation barriers.
+      var pixel = this.pixels[i], off = i*4, strength = Math.max(values[off],values[off+1]);
+      // Choose one strongest surface, never sum or mix stacked floors.
+      if (strength > Math.max(output[pixel*2],output[pixel*2+1])) {
+        output[pixel*2] = values[off]; output[pixel*2+1] = values[off+1];
+        opacity[pixel] = difference ? (values[off+2] > 0 ? values[off+3]/values[off+2] : 0) : 1;
+      }
+      max = Math.max(max,strength);
+    }
+    return {values:output,opacity:opacity,maxAbs:max,width:g.width,height:g.height,constrained:true};
+  };
+
+  var surfaceDownloads = new Map();
+  function loadSurfaceGraph(fetcher, cryptography, descriptor) {
+    var key = descriptor.url + '?' + descriptor.sha256;
+    if (surfaceDownloads.has(key)) {
+      var cached = surfaceDownloads.get(key); surfaceDownloads.delete(key); surfaceDownloads.set(key,cached); return cached;
+    }
+    if (!cryptography || !cryptography.subtle) return Promise.reject(new Error('surface_hash_unavailable'));
+    var promise = Promise.resolve().then(function () { return fetcher(key, {credentials:'same-origin'}); }).then(function (response) {
+      if (!response || response.ok === false || (response.headers && Number(response.headers.get('content-length')) > 6500000)) throw new Error('surface_unavailable');
+      if (!response.body || !response.body.getReader) return response.text().then(function (text) {
+        if (text.length > 6500000) throw new Error('surface_size'); return text;
+      });
+      var reader = response.body.getReader(), chunks = [], size = 0;
+      function read() { return reader.read().then(function (part) {
+        if (part.done) { var bytes = new Uint8Array(size), offset = 0; chunks.forEach(function (chunk) { bytes.set(chunk, offset); offset += chunk.length; }); return new TextDecoder().decode(bytes); }
+        size += part.value.length;
+        if (size > 6500000) { reader.cancel(); throw new Error('surface_size'); }
+        chunks.push(part.value); return read();
+      }); } return read();
+    }).then(function (text) {
+      return cryptography.subtle.digest('SHA-256', new TextEncoder().encode(text)).then(function (hash) {
+        var hex = Array.from(new Uint8Array(hash)).map(function (v) { return v.toString(16).padStart(2,'0'); }).join('');
+        if (hex !== descriptor.sha256) throw new Error('surface_identity');
+        return new HeatmapSurfaceGraph(JSON.parse(text), descriptor);
+      });
+    }).catch(function (error) { if (surfaceDownloads.get(key) === promise) surfaceDownloads.delete(key); throw error; });
+    // A small shared LRU bounds memory while retaining repeated filter requests.
+    if (surfaceDownloads.size >= 3) surfaceDownloads.delete(surfaceDownloads.keys().next().value);
+    surfaceDownloads.set(key,promise); return promise;
+  }
+
+  function presentationField(dense, width, height, smooth, difference, mask, appearance) {
     var n = dense.values.length, positive = new Float32Array(n), negative = new Float32Array(n);
     var support = new Float32Array(n), weighted = new Float32Array(n), i;
     for (i = 0; i < n; i++) {
       positive[i] = Math.max(0, dense.values[i]);
-      negative[i] = Math.max(0, -dense.values[i]);
+      negative[i] = dense.secondaryValues ? Math.max(0, dense.secondaryValues[i]) : Math.max(0, -dense.values[i]);
       support[i] = Math.abs(dense.values[i]);
       weighted[i] = support[i] * (difference ? dense.opacity[i] : 1);
     }
     if (smooth) {
-      var kernel = gaussianKernel1d(1.25, 4);
+      var compact = !difference && appearance === 'clear';
+      var kernel = gaussianKernel1d(compact ? 0.65 : 1.25, compact ? 2 : 4);
       positive = gaussianSmooth(positive, width, height, kernel, mask);
       negative = gaussianSmooth(negative, width, height, kernel, mask);
       weighted = gaussianSmooth(weighted, width, height, kernel, mask);
@@ -1261,6 +1432,11 @@
       vertices[index * 4 + 2] = value;
       var cellIndex = scene ? Math.floor(point[1] / scene.grid.bucketSize) * scene.grid.width + Math.floor(point[0] / scene.grid.bucketSize) : 0;
       vertices[index * 4 + 3] = cellOpacity ? cellOpacity[cellIndex] : (payload.query.lens === 'difference' && point[2] < 3 ? 0.22 : 1);
+      if (payload.query.event === 'both') {
+        // One vertex per exact XY: coincident kills/deaths mix instead of overwriting.
+        vertices[index * 4 + 2] = point[2]; vertices[index * 4 + 3] = point[3];
+        value = Math.max(point[2],point[3]);
+      }
       max = Math.max(max, Math.abs(value));
     });
     return {values: vertices, maxAbs: max};
@@ -1290,7 +1466,9 @@
     this._pointer = null;
     this._suppressClick = false;
     this._displayMode = 'smooth';
+    this._appearance = this.options.appearance === 'soft' ? 'soft' : 'clear';
     this._fields = {};
+    this._surfaceGraph = scene.surfaceGraph || null;
     this._uploadedField = null;
     this._pointGeometry = null;
     this._pointResources = null;
@@ -1539,10 +1717,12 @@
       + 'uniform int u_palette;\n'
       + 'uniform int u_contours;\n'
       + 'uniform int u_smooth;\n'
+      + 'uniform int u_constrained;\n'
       + 'in vec2 v_uv;\n'
       + 'out vec4 outputColor;\n'
-      + 'vec3 amberOrange(float amount) { return mix(vec3(1.0, 0.25, 0.02), vec3(1.0, 0.85, 0.12), amount); }\n'
+      + 'vec3 amberOrange(float amount) { return vec3(1.0, 0.45*(1.0-amount), 35.0/255.0); }\n'
       + 'vec3 cyanBlue(float amount) { return mix(vec3(0.02, 0.45, 1.0), vec3(0.15, 1.0, 1.0), amount); }\n'
+      + 'vec3 bothHue(vec2 density, float amount) { float ratio=density.r/max(density.r+density.g,0.000001); return mix(mix(cyanBlue(amount),amberOrange(amount),ratio),vec3(1.0),0.45*4.0*ratio*(1.0-ratio)); }\n'
       + 'vec3 differenceBlueNeutralAmber(float value) {\n'
       + '  vec3 blue = vec3(0.10, 0.36, 0.95);\n'
       + '  vec3 neutral = vec3(0.94, 0.94, 0.94);\n'
@@ -1552,7 +1732,7 @@
       + 'vec4 field(sampler2D source, vec2 uv) {\n'
       + '  vec2 p = clamp(uv * u_gridSize - 0.5, vec2(0.0), u_gridSize - 1.0);\n'
       + '  ivec2 a = ivec2(floor(p)); ivec2 b = min(a + 1, ivec2(u_gridSize) - 1);\n'
-      + '  if (u_smooth == 0) return texture(source, uv);\n'
+      + '  if (u_smooth == 0 || u_constrained == 1) return texture(source, uv);\n'
       + '  vec2 f = fract(p);\n'
       + '  return mix(mix(texelFetch(source,a,0),texelFetch(source,ivec2(b.x,a.y),0),f.x),mix(texelFetch(source,ivec2(a.x,b.y),0),texelFetch(source,b,0),f.x),f.y);\n'
       + '}\n'
@@ -1564,13 +1744,19 @@
       + '  float value = max(density.r, density.g);\n'
       + '  float displayMax = max(u_displayMax, 0.000001);\n'
       + '  float amount = sqrt(clamp(value / displayMax, 0.0, 1.0));\n'
+      + '  if (u_palette == 0 || u_palette == 3) amount = pow(clamp(value / displayMax, 0.0, 1.0), 0.45);\n'
       + '  float confidence = u_palette == 2 ? clamp(field(u_opacity, sampleUv).r, 0.0, 1.0) : 1.0;\n'
       + '  float differenceHue = center / max(density.r + density.g, 0.000001);\n'
       + '  float alpha = amount * confidence;\n'
+      + '  if (u_palette == 0 || u_palette == 3) alpha *= 210.0/255.0;\n'
+      + '  if (u_palette != 2) {\n'
+      + '    if (value <= 0.003) discard;\n'
+      + '    alpha = max(alpha, 0.42 * smoothstep(0.003, 0.012, value));\n'
+      + '  }\n'
       + '  if (u_palette == 2 && u_smooth == 1) alpha = max(alpha, 0.26 * smoothstep(0.0, 0.20, amount));\n'
       + '  if (u_palette == 2 && u_smooth == 0 && center != 0.0) alpha = max(alpha, 0.22);\n'
       + '  vec3 color = u_palette == 2 ? differenceBlueNeutralAmber(differenceHue)\n'
-      + '    : (u_palette == 1 ? cyanBlue(amount) : amberOrange(amount));\n'
+      + '    : (u_palette == 3 ? bothHue(density, amount) : (u_palette == 1 ? cyanBlue(amount) : amberOrange(amount)));\n'
       + '  float contour = 0.0;\n'
       + '  if (u_contours == 1) {\n'
       + '    contour = step(0.245, amount) * 0.10 + step(0.495, amount) * 0.10 + step(0.745, amount) * 0.10;\n'
@@ -1643,6 +1829,7 @@
         palette: gl.getUniformLocation(program, 'u_palette'),
         contours: gl.getUniformLocation(program, 'u_contours'),
         smooth: gl.getUniformLocation(program, 'u_smooth'),
+        constrained: gl.getUniformLocation(program, 'u_constrained'),
         density: gl.getUniformLocation(program, 'u_density'),
         opacity: gl.getUniformLocation(program, 'u_opacity')
       };
@@ -1731,20 +1918,24 @@
         }
       }
       var dense = this.scene.dense(next.layer, next.channel);
-      var key = this._displayMode + ':' + next.layer + ':' + next.channel;
+      var key = this._displayMode + ':' + next.layer + ':' + next.channel + ':' + (next.layer === 'difference' ? 'difference' : this._appearance);
       var field = this._fields[key];
       if (!field) {
+        var fieldDense = next.channel === 'both' ? {values:this.scene.dense(next.layer,'kills').values,secondaryValues:this.scene.dense(next.layer,'deaths').values} : dense;
         try {
           if (typeof this._regionMask === 'undefined') this._regionMask = regionGridMask(this.scene);
-          field = presentationField(dense, this.scene.grid.width, this.scene.grid.height, this._displayMode === 'smooth', next.layer === 'difference', this._regionMask);
+          field = this._displayMode === 'smooth' && this._surfaceGraph
+            ? this._surfaceGraph.field(this.scene, next.layer, next.channel, this._appearance)
+            : presentationField(fieldDense, this.scene.grid.width, this.scene.grid.height, this._displayMode === 'smooth', next.layer === 'difference', this._regionMask, this._appearance);
         } catch (error) {
           this._displayMode = 'cells';
-          field = presentationField(dense, this.scene.grid.width, this.scene.grid.height, false, next.layer === 'difference');
+          field = presentationField(fieldDense || dense, this.scene.grid.width, this.scene.grid.height, false, next.layer === 'difference');
           this._setState('cells_fallback');
         }
         this._fields[key] = field;
       }
       var upload = field.values;
+      var fieldWidth = field.width || this.scene.grid.width, fieldHeight = field.height || this.scene.grid.height;
       var opacityUpload = field.opacity;
       var displayMax = this.options.scaleMaximum ? this.options.scaleMaximum(field.maxAbs, this._displayMode) : field.maxAbs;
       var gl = this._gl;
@@ -1757,7 +1948,7 @@
       }
       gl.bindTexture(gl.TEXTURE_2D, this._texture);
       if (this._uploadedField !== field) gl.texImage2D(
-        gl.TEXTURE_2D, 0, gl.RG32F, this.scene.grid.width, this.scene.grid.height,
+        gl.TEXTURE_2D, 0, gl.RG32F, fieldWidth, fieldHeight,
         0, gl.RG, gl.FLOAT, upload
       );
       if (typeof gl.activeTexture === 'function' && typeof gl.TEXTURE1 === 'number') {
@@ -1765,20 +1956,21 @@
       }
       gl.bindTexture(gl.TEXTURE_2D, this._opacityTexture);
       if (this._uploadedField !== field) gl.texImage2D(
-        gl.TEXTURE_2D, 0, gl.R32F, this.scene.grid.width, this.scene.grid.height,
+        gl.TEXTURE_2D, 0, gl.R32F, fieldWidth, fieldHeight,
         0, gl.RED, gl.FLOAT, opacityUpload
       );
       this._uploadedField = field;
       gl.uniform1i(this._uniforms.smooth, this._displayMode === 'smooth' ? 1 : 0);
+      gl.uniform1i(this._uniforms.constrained, field.constrained ? 1 : 0);
       if (typeof gl.activeTexture === 'function' && typeof gl.TEXTURE0 === 'number') {
         gl.activeTexture(gl.TEXTURE0);
       }
       if (this._uniforms.gridSize !== null) {
-        gl.uniform2f(this._uniforms.gridSize, this.scene.grid.width, this.scene.grid.height);
+        gl.uniform2f(this._uniforms.gridSize, fieldWidth, fieldHeight);
       }
       gl.uniform2f(this._uniforms.gridExtent,
-        this.scene.map.image.width / (this.scene.grid.width * this.scene.grid.bucketSize),
-        this.scene.map.image.height / (this.scene.grid.height * this.scene.grid.bucketSize));
+        field.constrained ? 1 : this.scene.map.image.width / (this.scene.grid.width * this.scene.grid.bucketSize),
+        field.constrained ? 1 : this.scene.map.image.height / (this.scene.grid.height * this.scene.grid.bucketSize));
       if (this._uniforms.maxAbs !== null) {
         gl.uniform1f(this._uniforms.maxAbs, dense.maxAbs);
       }
@@ -1786,7 +1978,7 @@
         gl.uniform1f(this._uniforms.displayMax, displayMax);
       }
       if (this._uniforms.palette !== null) {
-        gl.uniform1i(this._uniforms.palette, next.layer === 'difference' ? 2 : (next.channel === 'deaths' ? 1 : 0));
+        gl.uniform1i(this._uniforms.palette, next.layer === 'difference' ? 2 : (next.channel === 'both' ? 3 : (next.channel === 'deaths' ? 1 : 0)));
       }
       if (this._uniforms.contours !== null) {
         gl.uniform1i(this._uniforms.contours, this.options.contours ? 1 : 0);
@@ -1827,6 +2019,12 @@
     return this.render();
   };
 
+  HeatmapGlRenderer.prototype.setAppearance = function (appearance) {
+    if (appearance !== 'clear' && appearance !== 'soft') return false;
+    this._appearance = appearance;
+    return this.render();
+  };
+
   HeatmapGlRenderer.prototype._renderPoints = function (selection) {
     var gl = this._gl;
     if (!this._pointResources) {
@@ -1837,11 +2035,14 @@
           + 'void main(){ gl_Position=vec4(a_point.x*2.0-1.0,1.0-a_point.y*2.0,0.0,1.0); gl_PointSize=u_size; v_value=a_point.z; v_confidence=a_point.w; }');
         fragment = this._createShader(gl, gl.FRAGMENT_SHADER, '#version 300 es\nprecision highp float;\n'
           + 'in float v_value; in float v_confidence; uniform float u_max; uniform int u_palette; out vec4 color;\n'
-          + 'void main(){float d=length(gl_PointCoord-0.5)*2.0;if(d>1.0 || v_value==0.0) discard;'
-          + 'float amount=sqrt(clamp(abs(v_value)/max(u_max,0.000001),0.0,1.0));'
+          + 'void main(){float d=length(gl_PointCoord-0.5)*2.0;float strength=u_palette==3?max(v_value,v_confidence):abs(v_value);if(d>1.0 || strength==0.0) discard;'
+          + 'float amount=sqrt(clamp(strength/max(u_max,0.000001),0.0,1.0));'
           + 'vec3 warm=vec3(1.0,0.62,0.08);vec3 cool=vec3(0.1,0.85,1.0);'
           + 'vec3 hue=u_palette==2?(v_value<0.0?cool:warm):(u_palette==1?cool:warm);'
-          + 'color=vec4(mix(hue,vec3(1.0),amount*0.22),max(0.35,amount*v_confidence)*(1.0-smoothstep(0.75,1.0,d)));}');
+          + 'float confidence=u_palette==3?1.0:v_confidence;'
+          + 'if(u_palette==0 || u_palette==3){amount=pow(clamp(strength/max(u_max,0.000001),0.0,1.0),0.45);warm=vec3(1.0,0.45*(1.0-amount),35.0/255.0);hue=warm;}'
+          + 'if(u_palette==3){float ratio=v_value/max(v_value+v_confidence,0.000001);hue=mix(mix(cool,warm,ratio),vec3(1.0),0.45*4.0*ratio*(1.0-ratio));}'
+          + 'color=vec4(mix(hue,vec3(1.0),u_palette==2?amount*0.22:0.0),max(u_palette==2?0.35:0.42,amount*confidence)*(1.0-smoothstep(0.75,1.0,d)));}');
         program = gl.createProgram(); if (!program) throw new Error('points_unavailable');
         gl.attachShader(program, vertex); gl.attachShader(program, fragment); gl.linkProgram(program);
         if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error('points_unavailable');
@@ -1865,7 +2066,7 @@
     var cssWidth = parseFloat(this._nodes.canvas.style.width) || this._nodes.canvas.width;
     gl.uniform1f(resource.size, 5 * this._nodes.canvas.width / cssWidth);
     gl.uniform1f(resource.max, this.options.scaleMaximum ? this.options.scaleMaximum(resource.data.maxAbs, 'points') : resource.data.maxAbs);
-    gl.uniform1i(resource.palette, selection.layer === 'difference' ? 2 : (selection.channel === 'deaths' ? 1 : 0));
+    gl.uniform1i(resource.palette, selection.layer === 'difference' ? 2 : (selection.channel === 'both' ? 3 : (selection.channel === 'deaths' ? 1 : 0)));
     gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
     gl.drawArrays(gl.POINTS, 0, resource.data.values.length / 4);
     if (gl.getError() !== 0) throw new Error('points_unavailable');
@@ -2391,6 +2592,7 @@
       focusedCell: null
     };
     this._mapStyle = 'color';
+    this._appearance = 'clear';
     this._displayMode = 'smooth';
     this._pointGeometry = null;
     this._geometryGeneration = 0;
@@ -2773,7 +2975,14 @@
       if (displayControls[index].classList) displayControls[index].classList.toggle('is-selected', selectedDisplay);
     }
     var legend = workspaceNode(this.root, '[data-heatmap-legend]');
-    workspaceSetText(legend, this._message(this.state.lens === 'difference' ? 'differenceLegend' : (this.state.event === 'deaths' ? 'deathsLegend' : 'densityLegend')));
+    workspaceSetText(legend, this._message(this.state.lens === 'difference' ? 'differenceLegend' : (this.state.event === 'both' ? 'bothLegend' : (this.state.event === 'deaths' ? 'deathsLegend' : 'densityLegend'))));
+    var appearanceControls = workspaceNodes(this.root, '[data-heatmap-appearance-option]');
+    for (index = 0; index < appearanceControls.length; index++) {
+      var selectedAppearance = appearanceControls[index].getAttribute('data-heatmap-appearance-option') === (this.state.lens === 'difference' ? 'soft' : this._appearance);
+      workspaceSetAttribute(appearanceControls[index], 'aria-pressed', selectedAppearance ? 'true' : 'false');
+      if (appearanceControls[index].classList) appearanceControls[index].classList.toggle('is-selected',selectedAppearance);
+      appearanceControls[index].disabled = this._displayMode !== 'smooth' || this.state.lens === 'difference';
+    }
     for (index = 0; index < lensControls.length; index += 1) {
       var lens = lensControls[index].getAttribute ? lensControls[index].getAttribute('data-heatmap-lens') : '';
       var selectedLens = lens === this.state.lens;
@@ -2836,11 +3045,19 @@
   };
 
   HeatmapExplorerWorkspace.prototype._setMapStyle = function (style) {
-    if (style !== 'color' && style !== 'mono') {
+    if (style !== 'color' && style !== 'mono' && style !== 'inverse') {
       return false;
     }
     this._mapStyle = style;
     workspaceSetAttribute(this.root, 'data-heatmap-map-style', style);
+    this._syncControls();
+    return true;
+  };
+
+  HeatmapExplorerWorkspace.prototype._setAppearance = function (appearance) {
+    if ((appearance !== 'clear' && appearance !== 'soft') || this.state.lens === 'difference') return false;
+    this._appearance = appearance;
+    if (this._renderer && this._renderer.setAppearance) this._renderer.setAppearance(appearance);
     this._syncControls();
     return true;
   };
@@ -2954,6 +3171,14 @@
       this._message('loaded') + ' · ' + this._message('sample') + ': ' + String(scene.summary.sourceRows || 0)
         + ' · ' + this._message('visiblePositions') + ': ' + String(positions)
         + ' · ' + this._message('coverage') + ' ' + this._formatPercent(coverage.xyCoverage)
+        + (scene.surfaces ? (' · ' + (scene.surfaceGraph
+          ? (this._displayMode === 'smooth'
+            ? (this.lang === 'ru' ? 'С учётом стен' : 'Walls respected')
+            : (this.lang === 'ru' ? 'Учёт стен — в режиме «Плавно»' : 'Walls apply in Smooth mode'))
+          : (scene.surfaces.state === 'low_coverage'
+            ? (this.lang === 'ru' ? 'Обычная карта: недостаточно точек с надёжной привязкой' : 'Ordinary map: too few reliably located positions')
+            : (this.lang === 'ru' ? 'Обычная карта: геометрия недоступна' : 'Ordinary map: geometry unavailable')))
+          + (scene.surfaces.state !== 'low_coverage' && scene.surfaces.diagnostics.candidate ? ' (' + scene.surfaces.diagnostics.assigned + '/' + scene.surfaces.diagnostics.candidate + ')' : '')) : '')
     );
   };
 
@@ -3014,6 +3239,7 @@
     });
     this._renderer = new this.Renderer(this.root, scene, {
       window: this.window,
+      appearance: this._appearance,
       cameraKeys: false,
       pointerPan: function () {
         return self._panMode;
@@ -3069,7 +3295,9 @@
   };
 
   HeatmapExplorerWorkspace.prototype._scaleMaximum = function (scene, maximum, mode) {
-    var key = JSON.stringify([scene.map, scene.activeFloor, scene.query.player, scene.query.lens, scene.query.event, mode]);
+    var key = JSON.stringify([scene.map, scene.activeFloor, scene.query.player, scene.query.lens, scene.query.event, mode,
+      mode === 'smooth' && scene.surfaceGraph ? scene.surfaces.asset.sha256 : 'ordinary',
+      mode === 'smooth' && scene.query.lens !== 'difference' ? this._appearance : 'unchanged']);
     if (this._scaleReference && this._scaleReference.key !== key) {
       this._scaleReference = null;
       this._scaleReset = true;
@@ -3079,6 +3307,14 @@
     var factor = scene.query.lens === 'difference' ? 100 : 1;
     var number = function (n) { return Number((n * factor).toPrecision(3)).toLocaleString(this.lang); }.bind(this);
     var unit = this._message(scene.query.lens === 'difference' ? 'scaleDifference' : (mode === 'smooth' ? 'scaleSmooth' : (mode === 'points' ? 'scalePoints' : 'scaleCells')));
+    if (mode === 'smooth' && scene.grid) {
+      var fieldGrid = scene.surfaceGraph ? scene.surfaceGraph.grid : scene.grid;
+      var cellWidth = scene.surfaceGraph ? scene.map.image.width / fieldGrid.width : scene.grid.bucketSize;
+      var cellHeight = scene.surfaceGraph ? scene.map.image.height / fieldGrid.height : scene.grid.bucketSize;
+      unit += ' (' + Number(cellWidth.toFixed(2)).toLocaleString(this.lang) + ' × '
+        + Number(cellHeight.toFixed(2)).toLocaleString(this.lang) + ' px)';
+      if (scene.query.lens !== 'difference') unit += ' · ' + this._message(this._appearance === 'soft' ? 'soft' : 'clear');
+    }
     var node = workspaceNode(this.root, '[data-heatmap-scale-values]');
     var label = (scene.query.lens === 'difference' ? '−' + number(limit) + ' ← 0 → +' : '0 → ') + number(limit) + ' ' + unit;
     label += ' · ' + this._message(this._scaleReference ? 'scaleLocked' : 'scaleAuto');
@@ -3163,12 +3399,17 @@
       if (acceptsScene422 && scene.state !== 'too_many_events') {
         throw new Error('request_failed');
       }
-      if (self._destroyed || generation !== self._sceneGeneration) {
-        return false;
-      }
-      self._loading = false;
-      self._applyScene(scene, reason);
-      return true;
+      var surface = scene.surfaces && scene.surfaces.state === 'ready' && !BLOCKED_SCENE_STATES[scene.state]
+        ? loadSurfaceGraph(self.fetch.bind(self), self.window && self.window.crypto, scene.surfaces.asset).then(function (graph) {
+          if (graph.image.width !== scene.map.image.width || graph.image.height !== scene.map.image.height) throw new Error('surface_image');
+          scene.surfaceGraph = graph;
+        }).catch(function () { scene.surfaceGraph = null; }) : Promise.resolve();
+      return surface.then(function () {
+        if (self._destroyed || generation !== self._sceneGeneration) return false;
+        self._loading = false;
+        self._applyScene(scene, reason);
+        return true;
+      });
     }).catch(function () {
       if (self._destroyed || generation !== self._sceneGeneration) {
         return false;
@@ -3513,6 +3754,12 @@
         self._setDisplayMode(event.currentTarget.getAttribute('data-heatmap-display-option'));
       });
     }
+    var appearanceControls = workspaceNodes(this.root, '[data-heatmap-appearance-option]');
+    for (index = 0; index < appearanceControls.length; index++) {
+      this._listen(appearanceControls[index], 'click', function (event) {
+        self._setAppearance(event.currentTarget.getAttribute('data-heatmap-appearance-option'));
+      });
+    }
     this._listen(this._nodes.floors, 'change', function (event) {
       var target = event && event.target;
       var floor = target && target.getAttribute ? target.getAttribute('data-heatmap-floor') : null;
@@ -3699,6 +3946,8 @@
     , gaussianKernel1d: gaussianKernel1d
     , gaussianSmooth: gaussianSmooth
     , presentationField: presentationField
+    , HeatmapSurfaceGraph: HeatmapSurfaceGraph
+    , loadSurfaceGraph: loadSurfaceGraph
     , utcInputValue: utcInputValue
     , utcInputSeconds: utcInputSeconds
     , regionContains: regionContains

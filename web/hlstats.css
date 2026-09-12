@@ -630,8 +630,9 @@ nav{
 .heatmap-explorer__footer summary { cursor: pointer; color: var(--hm-text); padding: 6px 0; }
 .heatmap-explorer__footer span { display: block; margin: 6px 0; }
 .heatmap-explorer__scale { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 0; color: var(--hm-muted); }
-.heatmap-explorer__scale-bar { width: 100px; height: 10px; background: linear-gradient(to right, transparent, #ff4005, #ffd91f); border-radius: 3px; }
+.heatmap-explorer__scale-bar { width: 100px; height: 10px; background: linear-gradient(to right, rgba(255,115,35,0), rgba(255,57,35,.42), rgba(255,0,35,.824)); border-radius: 3px; }
 .heatmap-explorer[data-heatmap-scale-palette="deaths"] .heatmap-explorer__scale-bar { background: linear-gradient(to right, transparent, #1689ed, #19d9ff); }
+.heatmap-explorer[data-heatmap-scale-palette="both"] .heatmap-explorer__scale-bar { height: 12px; background: linear-gradient(to right, rgba(255,115,35,0), rgba(255,0,35,.824)) top / 100% 50% no-repeat, linear-gradient(to right, rgba(22,137,237,0), #19d9ff) bottom / 100% 50% no-repeat; }
 .heatmap-explorer[data-heatmap-scale-palette="difference"] .heatmap-explorer__scale-bar { background: linear-gradient(to right, #19d9ff, transparent, #ffd91f); }
 .heatmap-explorer [data-heatmap-scale-lock][aria-pressed="true"] { background: #f5ca58; color: #171a20; }
 .heatmap-explorer input[type="datetime-local"] { width: 215px; color-scheme: dark; max-width: 100%; }
@@ -829,6 +830,10 @@ nav{
 
 .heatmap-explorer[data-heatmap-map-style="mono"] [data-heatmap-image] {
 	filter: grayscale(1) contrast(1.05) brightness(0.94);
+}
+
+.heatmap-explorer[data-heatmap-map-style="inverse"] [data-heatmap-image] {
+	filter: invert(1) saturate(0.8) contrast(1.08);
 }
 
 .heatmap-explorer[data-heatmap-state="static_fallback"] [data-heatmap-map-style-controls],

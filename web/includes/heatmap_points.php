@@ -6,6 +6,7 @@ if (!defined('IN_HLSTATS')) {
 }
 
 require_once __DIR__ . '/heatmap_regions.php';
+require_once __DIR__ . '/heatmap_surfaces.php';
 
 const HEATMAP_V2_SCHEMA = 2;
 const HEATMAP_MAX_WINDOW_SECONDS = 315360000;
@@ -19,7 +20,7 @@ const HEATMAP_INSPECT_MAX_ROWS = 101;
 const HEATMAP_GRID_MAX_AXIS = 128;
 const HEATMAP_MIN_FLOOR_Z_COVERAGE = 0.70;
 const HEATMAP_MIN_PROJECTION_COVERAGE = 0.70;
-const HEATMAP_SCENE_CACHE_SCHEMA = 2;
+const HEATMAP_SCENE_CACHE_SCHEMA = 5;
 const HEATMAP_SCENE_BUCKET_VERSION = 1;
 const HEATMAP_PAYLOAD_CACHE_MAX_AGE = 172800;
 const HEATMAP_PAYLOAD_CACHE_PRUNE_LIMIT = 32;
@@ -258,13 +259,21 @@ function heatmap_render_explorer_workspace(array $context): string
             . '" data-heatmap-display-option="' . $mode . '" aria-pressed="' . ($mode === 'smooth' ? 'true' : 'false') . '">'
             . heatmap_explorer_html(heatmap_explorer_label($mode)) . '</button>';
     }
+    $html .= '</fieldset><fieldset class="heatmap-explorer__group"><legend>' . heatmap_explorer_html(heatmap_explorer_label('appearance')) . '</legend>';
+    foreach (array('clear','soft') as $appearance) {
+        $html .= '<button type="button" class="heatmap-explorer__control' . ($appearance === 'clear' ? ' is-selected' : '')
+            . '" data-heatmap-appearance-option="' . $appearance . '" aria-pressed="' . ($appearance === 'clear' ? 'true' : 'false') . '">'
+            . heatmap_explorer_html(heatmap_explorer_label($appearance)) . '</button>';
+    }
     $html .= '</fieldset><span class="heatmap-explorer__legend" data-heatmap-legend="1"></span>';
     $html .= '<fieldset class="heatmap-explorer__group" data-heatmap-map-style-controls="1"><legend>'
         . heatmap_explorer_html(heatmap_explorer_label('mapStyle')) . '</legend>';
     $html .= '<button type="button" class="heatmap-explorer__control is-selected" data-heatmap-map-style-option="color" aria-pressed="true">'
         . heatmap_explorer_html(heatmap_explorer_label('color')) . '</button>';
     $html .= '<button type="button" class="heatmap-explorer__control" data-heatmap-map-style-option="mono" aria-pressed="false">'
-        . heatmap_explorer_html(heatmap_explorer_label('mono')) . '</button></fieldset></header>';
+        . heatmap_explorer_html(heatmap_explorer_label('mono')) . '</button>';
+    $html .= '<button type="button" class="heatmap-explorer__control" data-heatmap-map-style-option="inverse" aria-pressed="false">'
+        . heatmap_explorer_html(heatmap_explorer_label('inverse')) . '</button></fieldset></header>';
     $html .= '<aside id="' . $floorSheetId . '" class="heatmap-explorer__floors" data-heatmap-floor-sheet="1" aria-label="' . heatmap_explorer_html(heatmap_explorer_label('floor')) . '">';
     $html .= '<span class="heatmap-explorer__label">' . heatmap_explorer_html(heatmap_explorer_label('floor')) . '</span>';
     $html .= '<div data-heatmap-floor-options="1"><label><input type="radio" name="heatmap-floor-' . $player . '" value="all" data-heatmap-floor="all" checked="checked" />'
@@ -338,6 +347,7 @@ function heatmap_scene_cache_key(array $query, array $config, array $image): str
     $identity = array(
         'geometry' => isset($query['geometry']) ? array('kind' => $query['geometry'], 'version' => 1) : null,
         'cacheSchema' => HEATMAP_SCENE_CACHE_SCHEMA,
+        'surfaceIdentity' => heatmap_surface_identity($config, strval($query['map'] ?? '')),
         'responseSchema' => HEATMAP_V2_SCHEMA,
         'bucketVersion' => $config['bucketVersion'] ?? HEATMAP_SCENE_BUCKET_VERSION,
         'query' => array(
@@ -1324,6 +1334,7 @@ function heatmap_scene_prepare_state(array &$state): void
         'totalBins' => array(),
         'meBins' => array(),
     );
+    $state['_scene']['surfaces'] = heatmap_surface_load($config, $state['image'], $context['map'], $floor);
     if (($options['exact'] ?? false) === true) {
         $state['_scene']['exact'] = array(
             'limit' => $exactLimit,
@@ -1443,6 +1454,7 @@ function heatmap_scene_accumulate_contribution(array &$scene, array $row, string
     if ($scene['query']['player'] > 0 && $participantId === $scene['query']['player']) {
         heatmap_scene_add_bin($scene['meBins'], $cellId, $gridX, $gridY, $channel);
     }
+    heatmap_surface_accumulate($scene, $z, $projectedX, $projectedY, $channel, $scene['query']['player'] > 0 && $participantId === $scene['query']['player']);
     if (isset($scene['geometry']) && !$scene['geometry']['overflow']) {
         $personal = $scene['query']['player'] > 0 && $participantId === $scene['query']['player'];
         if ($scene['query']['lens'] === 'me' && !$personal) {
@@ -1787,6 +1799,9 @@ function heatmap_finalize_scene(array $state): array
             'thumbnail' => './hlstatsimg/games/' . $game . '/heatmaps/' . $map . '-kill-thumb.jpg',
         ),
     );
+    $surfacePersonalCandidate = 0;
+    foreach ($scene['meBins'] as $bin) $surfacePersonalCandidate += $bin['kills'] + $bin['deaths'];
+    $response['surfaces'] = heatmap_surface_finalize($scene['surfaces'], $scene['overflow'], $scene['query']['lens'], $surfacePersonalCandidate);
     if (isset($scene['exact'])) {
         $response['exact'] = array(
             'fields' => array('x', 'y', 'z', 'projectedX', 'projectedY', 'channel', 'participant', 'inBounds'),

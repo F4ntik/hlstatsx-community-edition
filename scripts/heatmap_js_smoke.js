@@ -293,7 +293,7 @@ vm.runInNewContext(explorerSource, explorerContext, {filename: 'heatmap-explorer
 const explorerApi = explorerContext.module.exports;
 assert.deepStrictEqual(
   Object.keys(explorerApi).sort(),
-  ['HeatmapExplorerCamera', 'HeatmapExplorerScene', 'HeatmapExplorerUrlState', 'HeatmapExplorerWorkspace', 'HeatmapGlRenderer', 'HeatmapPointGeometry', 'gaussianKernel1d', 'gaussianSmooth', 'presentationField', 'regionContains', 'regionGridMask', 'utcInputSeconds', 'utcInputValue'].sort(),
+  ['HeatmapExplorerCamera', 'HeatmapExplorerScene', 'HeatmapExplorerUrlState', 'HeatmapExplorerWorkspace', 'HeatmapGlRenderer', 'HeatmapPointGeometry', 'HeatmapSurfaceGraph', 'loadSurfaceGraph', 'gaussianKernel1d', 'gaussianSmooth', 'presentationField', 'regionContains', 'regionGridMask', 'utcInputSeconds', 'utcInputValue'].sort(),
   'heatmap explorer should expose the workspace constructor alongside the frozen scene, camera, URL, and renderer APIs'
 );
 for (const name of Object.keys(explorerApi)) {
@@ -939,7 +939,7 @@ function assertSparseDisplayNormalization() {
   assert.ok(sparseGl.calls.draws > 0, 'legacy renderer could call drawArrays even when sparse data was illegible');
   const displayMaxUniform = sparseGl.calls.uniform1f.find(call => call.name === 'u_displayMax');
   assert.ok(displayMaxUniform, 'ordinary rendering must pass a separate post-convolution display max');
-  assert.ok(Math.abs(displayMaxUniform.value - explorerApi.presentationField(sparseDense, width, height, true, false).maxAbs) < 1e-7, 'display max uniform should match the clamped 3x3 model');
+  assert.ok(Math.abs(displayMaxUniform.value - explorerApi.presentationField(sparseDense, width, height, true, false, null, 'clear').maxAbs) < 1e-7, 'display max uniform should match the clamped 3x3 model');
   assert.ok(Math.abs(sqrtNormalizedAmount(singletonAverage, displayMax) - 0.2581988897) < 1e-7, 'sparse singleton should use sqrt(1/15) presentation intensity');
   assert.strictEqual(sqrtNormalizedAmount(peakAverage, displayMax), 1, 'sparse peak should remain full presentation intensity');
   const sparseDeathDense = sparseScene.dense('total', 'deaths');
@@ -949,7 +949,7 @@ function assertSparseDisplayNormalization() {
     .slice().reverse().find(call => call.name === 'u_displayMax');
   assert.ok(deathDisplayMax > 0 && deathDisplayMax <= sparseDeathDense.maxAbs, 'deaths should retain a bounded post-convolution display range');
   assert.ok(deathDisplayMaxUniform, 'deaths rendering must pass its own post-convolution display max');
-  assert.ok(Math.abs(deathDisplayMaxUniform.value - explorerApi.presentationField(sparseDeathDense, width, height, true, false).maxAbs) < 1e-7, 'deaths display max uniform should match its clamped 3x3 model');
+  assert.ok(Math.abs(deathDisplayMaxUniform.value - explorerApi.presentationField(sparseDeathDense, width, height, true, false, null, 'clear').maxAbs) < 1e-7, 'deaths display max uniform should match its clamped 3x3 model');
   const sparseFragment = fragmentShaderSource(sparseGl);
   assert.match(sparseFragment, /sqrt\(/, 'sparse ordinary rendering must apply sqrt presentation scaling');
   sparseRenderer.destroy();
@@ -965,6 +965,12 @@ function pointFixture() {
 }
 const exactGeometry = new explorerApi.HeatmapPointGeometry(pointFixture());
 assert.strictEqual(exactGeometry.vertexData().values.length,8,'one vertex per unique projected position');
+assert.deepStrictEqual(Array.from(exactGeometry.vertexData().values).filter((_,index)=>index%4>=2),[1,0,0,2],'Both point attributes retain kills/deaths separately');
+const coincidentPayload=pointFixture();coincidentPayload.points=[[2,2,3,7]];coincidentPayload.summary.positions=1;
+const coincidentData=new explorerApi.HeatmapPointGeometry(coincidentPayload).vertexData();
+assert.strictEqual(coincidentData.values.length,4,'coincident kills/deaths share one dot');
+assert.strictEqual(coincidentData.values[2],3);assert.strictEqual(coincidentData.values[3],7);
+assert.strictEqual(coincidentData.maxAbs,7,'point overlap uses shared channel scale, not combined frequency');
 for (const mutate of [p=>p.points.reverse(),p=>p.points[1]=p.points[0].slice(),p=>p.points[0][0]=-1,p=>p.pos_x=9,p=>p.summary.positions=3,p=>p.points[0][2]=0]) {
   const invalid=pointFixture(); mutate(invalid);
   assert.throws(()=>new explorerApi.HeatmapPointGeometry(invalid));
@@ -1006,6 +1012,25 @@ function cssAtRuleBlock(source, marker) {
   throw new Error(`unterminated CSS block: ${marker}`);
 }
 
+{
+  const surfaceScene = new HeatmapExplorerScene(explorerSceneFixture());
+  let fieldCalls = 0;
+  surfaceScene.surfaceGraph = {field() { fieldCalls++; return {values:new Float32Array(8),opacity:new Float32Array(4),maxAbs:1,width:2,height:2,constrained:true}; }};
+  const surfaceGl = fakeGl(), surfaceDom = makeDom(surfaceGl);
+  const surfaceRenderer = new HeatmapGlRenderer(surfaceDom.root,surfaceScene,{window:surfaceDom.window});
+  surfaceRenderer.mount();
+  const uploads = surfaceGl.calls.texImages.length;
+  surfaceRenderer.render(); surfaceRenderer.render();
+  assert.strictEqual(fieldCalls,1,'cached redraw never diffuses again');
+  assert.strictEqual(surfaceGl.calls.texImages.length,uploads,'cached redraw never uploads field again');
+  assert.strictEqual(surfaceGl.calls.texImages[0][3],2,'surface texture uses its own width');
+  assert.strictEqual(surfaceGl.calls.texImages[0][4],2,'surface texture uses its own height');
+  assert(surfaceGl.calls.uniform2f.some(call=>call.name==='u_gridExtent' && call.value[0]===1 && call.value[1]===1),'surface spans exact image extent');
+  assert(surfaceGl.calls.uniform1i.some(call=>call.name==='u_constrained' && call.value===1),'barrier sampling has an independent uniform');
+  assert(surfaceGl.calls.uniform1i.some(call=>call.name==='u_smooth' && call.value===1),'Difference smooth alpha remains enabled');
+  assert.strictEqual(surfaceScene.dense('total','kills'),surfaceScene.dense('total','kills'),'dense count grid cached');
+  surfaceRenderer.destroy();
+}
 const goodGl = fakeGl();
 const dom = makeDom(goodGl);
 let nowValue = 100;
