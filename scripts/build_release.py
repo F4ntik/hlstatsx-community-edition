@@ -21,20 +21,24 @@ def package_path(name: str, upgrade: bool) -> str | None:
         return None
     if any(part in {"__pycache__", ".venv", "tests", ".pytest_cache", "cache", ".repowise", "node_modules", "target"} for part in parts):
         return None
-    if name.startswith(("scripts/replay_baseline/", "docs/audits/", "docs/plans/", "scripts/GeoLiteCity/")):
+    if name.startswith(("scripts/replay_baseline/", "docs/audits/", "docs/plans/", "docs/superpowers/", "scripts/GeoLiteCity/")):
         return None
     if name.startswith("scripts/") and (path.name.startswith(("tmp_", "test_")) or "smoke" in path.name or path.name == "heatmap_visual_gate.js"):
         return None
-    # Local asset acquisition is not part of the runtime distribution.
-    if name in {"scripts/heatmap_import_goldsrc.py", "scripts/heatmap_bsp_registration.py"}:
-        return None
+    # Optional map preparation scripts ship together with their local helpers.
+    # They are never invoked by the web server or ingestion daemon.
     if path.suffix.lower() in {".log", ".pyc", ".pyo", ".pkl", ".db", ".gz", ".tgz", ".zip"}:
         return None
     if name in CONFIG_EXAMPLES:
         return name + ".example"
     if upgrade:
         # An existing image and its DB calibration are one installation-owned pair.
-        if name.startswith(("heatmaps/", "web/hlstatsimg/", "sql/install")):
+        surface_asset = (
+            name == "web/hlstatsimg/heatmap-surfaces/.htaccess"
+            or (parts[:4] == ("web", "hlstatsimg", "heatmap-surfaces", "cstrike")
+                and len(parts) == 5 and path.suffix == ".json")
+        )
+        if name.startswith(("heatmaps/", "sql/install")) or (name.startswith("web/hlstatsimg/") and not surface_asset):
             return None
     return name
 

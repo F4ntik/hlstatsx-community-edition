@@ -1,0 +1,165 @@
+{
+  "status": "offline_experiment_only",
+  "map": "de_dust2",
+  "bsp_sha256": "15945389528d113562ede0a2c80647ebfa799079ed1c05a25379bcf84e4e9286",
+  "grid": [
+    320,
+    240
+  ],
+  "world_units_per_cell": 17.066666666666666,
+  "headroom": 72,
+  "max_step": 22,
+  "minimum_upward_normal": 0.7,
+  "graph": {
+    "non_upward_or_steep_faces": 3922,
+    "candidate_surface_samples": 85619,
+    "excluded_nonempty_or_low_headroom": 16877,
+    "excluded_no_solid_support": 34362,
+    "blocked_neighbor_edges": 19,
+    "nodes": 34380,
+    "edges": 65121,
+    "cells_with_surface": 33768,
+    "overlapping_xy_cells": 612,
+    "components": 94,
+    "isolated_nodes": 4
+  },
+  "largest_component_sizes": [
+    28244,
+    1919,
+    600,
+    418,
+    279,
+    260,
+    241,
+    214,
+    120,
+    96,
+    81,
+    76,
+    67,
+    66,
+    64,
+    60,
+    56,
+    54,
+    50,
+    48
+  ],
+  "example": {
+    "source_node": 6349,
+    "probe_node": 7187,
+    "source_world": [
+      963.1333333333333,
+      525.2666666666667,
+      0.0
+    ],
+    "probe_world": [
+      758.3333333333334,
+      525.2666666666667,
+      0.0
+    ],
+    "direct_segment_at_chest_blocked": true,
+    "graph_distance_greater_than": 40,
+    "iterations": 150,
+    "alpha": 0.24,
+    "graph_shortest_distance": 56,
+    "ordinary_probe": 0.0008149585133786347,
+    "constrained_probe": 5.535595280556926e-12,
+    "ordinary_total_mass": 1.0,
+    "constrained_total_mass": 1.0,
+    "ordinary_max": 0.002203442949177686,
+    "constrained_max": 0.004773204213729863
+  },
+  "invariant_checks": [
+    {
+      "name": "sealed_room",
+      "passed": true,
+      "total_mass": 1.0000000000000004,
+      "probe": 0.0
+    },
+    {
+      "name": "thin_blocked_edge",
+      "passed": true,
+      "total_mass": 1.0,
+      "probe": 0.0
+    },
+    {
+      "name": "open_doorway",
+      "passed": true,
+      "total_mass": 0.9999999999999998,
+      "probe": 0.24978109658114045
+    },
+    {
+      "name": "no_diagonal_corner_cut",
+      "passed": true,
+      "total_mass": 1.0000000000000004,
+      "probe": 0.0
+    },
+    {
+      "name": "two_coincident_levels_without_vertical_edge",
+      "passed": true,
+      "total_mass": 1.0000000000000004,
+      "probe": 0.0
+    },
+    {
+      "name": "bsp_trace_detects_subsample_thin_solid_leaf",
+      "passed": true
+    }
+  ],
+  "live_bsp_checks": [
+    {
+      "name": "live_dust2_obstacle_between_empty_headroom_endpoints",
+      "passed": true,
+      "world_xy": [
+        320,
+        1744
+      ],
+      "contents_at_z_1_18_36_72": [
+        -1,
+        -1,
+        -2,
+        -1
+      ]
+    },
+    {
+      "name": "live_dust2_two_floors_same_xy_remain_separate",
+      "passed": true,
+      "world_xy": [
+        304,
+        2096
+      ],
+      "floor_heights": [
+        -128,
+        96
+      ],
+      "sampled_node_ids": [
+        11102,
+        11103
+      ],
+      "sampled_node_heights": [
+        -128.0,
+        96.0
+      ],
+      "direct_vertical_edges": 0
+    }
+  ],
+  "background_chromakey_pixels": 469210,
+  "elapsed_seconds": 6.541557899909094,
+  "asset_sha256": {
+    "overview": "51a0e7fe13d2a1a15c9d89174d0f45a4abd68afce56365dd57306c3d09ae884a",
+    "image": "9ec191f1c124e928f5aff77fc080dbafcb90146b25463d8d04d8da13d64fbf0a"
+  },
+  "limitations": [
+    "Synthetic events, not actual player statistics",
+    "Point-clearance hull 0, not player-width navigation",
+    "Dynamic brush entities ignored",
+    "Roofs and small components retained and counted, not classified as player-accessible",
+    "Overlapping surfaces remain separate graph nodes; display maximum per XY, never sum",
+    "Grid center sampling can miss narrow openings and subcell geometry",
+    "Baseline is unrestricted diffusion, not the exact production Gaussian renderer"
+  ],
+  "sources": [
+    "https://github.com/ValveSoftware/halflife/blob/master/utils/common/bspfile.h",
+    "https://github.com/rehlds/ReHLDS/blob/master/rehlds/engine/world.cpp"
+  ]
+}
